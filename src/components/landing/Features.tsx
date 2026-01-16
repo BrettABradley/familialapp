@@ -39,7 +39,7 @@ const Features = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="max-w-3xl mx-auto text-center mb-16 md:mb-20">
-          <span className="text-primary font-medium text-sm uppercase tracking-wider">Features</span>
+          <span className="text-foreground font-medium text-sm uppercase tracking-wider">Features</span>
           <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mt-4 mb-6">
             Social Media, Reimagined for Families
           </h2>
@@ -53,11 +53,11 @@ const Features = () => {
           {features.map((feature, index) => (
             <div 
               key={feature.title}
-              className="group p-8 rounded-2xl bg-card border border-border/50 hover:border-primary/30 hover:shadow-lg transition-all duration-300"
+              className="group p-8 rounded-2xl bg-card border border-border hover:border-foreground/30 hover:shadow-lg transition-all duration-300"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
-              <div className="w-14 h-14 rounded-xl bg-accent flex items-center justify-center mb-6 group-hover:bg-primary/10 transition-colors">
-                <feature.icon className="w-7 h-7 text-primary" />
+              <div className="w-14 h-14 rounded-xl bg-secondary flex items-center justify-center mb-6 group-hover:bg-foreground/10 transition-colors">
+                <feature.icon className="w-7 h-7 text-foreground" />
               </div>
               <h3 className="font-serif text-xl font-semibold text-foreground mb-3">
                 {feature.title}

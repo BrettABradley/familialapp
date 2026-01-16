@@ -1,24 +1,22 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Shield, Heart, Users } from "lucide-react";
-import heroBg from "@/assets/hero-bg.jpg";
+import { Link } from "react-router-dom";
+import logo from "@/assets/logo.png";
 
 const Hero = () => {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
-      {/* Background Image with Overlay */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(${heroBg})` }}
-      >
-        <div className="absolute inset-0 hero-gradient opacity-90" />
-      </div>
-
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20 hero-gradient">
       {/* Content */}
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
         <div className="max-w-4xl mx-auto text-center">
+          {/* Logo Icon */}
+          <div className="flex justify-center mb-8 animate-fade-up">
+            <img src={logo} alt="Familial" className="h-24 md:h-32 w-auto" />
+          </div>
+
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/80 backdrop-blur-sm mb-8 animate-fade-up">
-            <Shield className="w-4 h-4 text-primary" />
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary backdrop-blur-sm mb-8 animate-fade-up border border-border">
+            <Shield className="w-4 h-4 text-foreground" />
             <span className="text-sm font-medium text-foreground">
               Private by Design • No Ads • No Algorithms
             </span>
@@ -28,7 +26,7 @@ const Hero = () => {
           <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground leading-tight mb-6 animate-fade-up" style={{ animationDelay: "0.1s" }}>
             Where Family
             <br />
-            <span className="text-primary">Actually Connects</span>
+            <span className="text-foreground">Actually Connects</span>
           </h1>
 
           {/* Subheading */}
@@ -38,27 +36,31 @@ const Hero = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 animate-fade-up" style={{ animationDelay: "0.3s" }}>
-            <Button variant="hero" size="xl">
-              Start Your Family Circle
-              <ArrowRight className="w-5 h-5" />
-            </Button>
-            <Button variant="hero-outline" size="xl">
-              See How It Works
-            </Button>
+            <Link to="/auth">
+              <Button variant="hero" size="xl">
+                Start Your Family Circle
+                <ArrowRight className="w-5 h-5" />
+              </Button>
+            </Link>
+            <a href="#how-it-works">
+              <Button variant="hero-outline" size="xl">
+                See How It Works
+              </Button>
+            </a>
           </div>
 
           {/* Trust Indicators */}
           <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 text-muted-foreground animate-fade-up" style={{ animationDelay: "0.4s" }}>
             <div className="flex items-center gap-2">
-              <Heart className="w-5 h-5 text-primary" />
+              <Heart className="w-5 h-5 text-foreground" />
               <span className="text-sm font-medium">100% Ad-Free</span>
             </div>
             <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-primary" />
+              <Shield className="w-5 h-5 text-foreground" />
               <span className="text-sm font-medium">End-to-End Privacy</span>
             </div>
             <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-primary" />
+              <Users className="w-5 h-5 text-foreground" />
               <span className="text-sm font-medium">Family-First Design</span>
             </div>
           </div>

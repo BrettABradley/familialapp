@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 import { ArrowRight, UserPlus, Users, Share2 } from "lucide-react";
 
 const steps = [
@@ -24,11 +25,11 @@ const steps = [
 
 const HowItWorks = () => {
   return (
-    <section id="how-it-works" className="py-20 md:py-32 bg-muted/30">
+    <section id="how-it-works" className="py-20 md:py-32 bg-secondary/50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="max-w-3xl mx-auto text-center mb-16 md:mb-20">
-          <span className="text-primary font-medium text-sm uppercase tracking-wider">How It Works</span>
+          <span className="text-foreground font-medium text-sm uppercase tracking-wider">How It Works</span>
           <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mt-4 mb-6">
             Getting Started Takes Minutes
           </h2>
@@ -47,15 +48,15 @@ const HowItWorks = () => {
                   <div className="hidden md:block absolute top-14 left-1/2 w-full h-0.5 bg-border" />
                 )}
                 
-                <div className="relative bg-background rounded-2xl p-8 border border-border/50 hover:shadow-lg transition-shadow">
+                <div className="relative bg-background rounded-2xl p-8 border border-border hover:shadow-lg transition-shadow">
                   {/* Step Number */}
                   <div className="absolute -top-4 left-8">
-                    <span className="font-serif text-4xl font-bold text-primary/20">{step.number}</span>
+                    <span className="font-serif text-4xl font-bold text-foreground/20">{step.number}</span>
                   </div>
                   
                   {/* Icon */}
-                  <div className="w-14 h-14 rounded-xl bg-accent flex items-center justify-center mb-6 mt-4">
-                    <step.icon className="w-7 h-7 text-primary" />
+                  <div className="w-14 h-14 rounded-xl bg-secondary flex items-center justify-center mb-6 mt-4">
+                    <step.icon className="w-7 h-7 text-foreground" />
                   </div>
                   
                   <h3 className="font-serif text-xl font-semibold text-foreground mb-3">
@@ -72,10 +73,12 @@ const HowItWorks = () => {
 
         {/* CTA */}
         <div className="text-center mt-16">
-          <Button variant="hero" size="lg">
-            Create Your First Circle
-            <ArrowRight className="w-5 h-5" />
-          </Button>
+          <Link to="/auth">
+            <Button variant="hero" size="lg">
+              Create Your First Circle
+              <ArrowRight className="w-5 h-5" />
+            </Button>
+          </Link>
         </div>
       </div>
     </section>
