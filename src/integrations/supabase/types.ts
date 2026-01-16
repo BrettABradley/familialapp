@@ -149,6 +149,132 @@ export type Database = {
           },
         ]
       }
+      events: {
+        Row: {
+          circle_id: string
+          created_at: string
+          created_by: string
+          description: string | null
+          event_date: string
+          event_time: string | null
+          id: string
+          location: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          circle_id: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          event_date: string
+          event_time?: string | null
+          id?: string
+          location?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          circle_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          event_date?: string
+          event_time?: string | null
+          id?: string
+          location?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fridge_pins: {
+        Row: {
+          circle_id: string
+          content: string | null
+          created_at: string
+          id: string
+          image_url: string | null
+          pin_type: string
+          pinned_by: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          circle_id: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          pin_type?: string
+          pinned_by: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          circle_id?: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          pin_type?: string
+          pinned_by?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fridge_pins_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      photo_permissions: {
+        Row: {
+          can_download: boolean
+          created_at: string
+          granted_by: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          can_download?: boolean
+          created_at?: string
+          granted_by: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          can_download?: boolean
+          created_at?: string
+          granted_by?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "photo_permissions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           author_id: string
@@ -300,15 +426,58 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          circle_id: string
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          circle_id: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          circle_id?: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_circle_role: {
+        Args: {
+          _circle_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_circle_admin: {
+        Args: { _circle_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -435,6 +604,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "member"],
+    },
   },
 } as const
