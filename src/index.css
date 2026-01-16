@@ -4,128 +4,128 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Familial Design System - Warm, Nostalgic, Clean */
+/* Familial Design System - Modern Black & White */
 
 @layer base {
   :root {
-    /* Warm cream background */
-    --background: 40 33% 98%;
-    --foreground: 25 25% 20%;
+    /* Clean white background */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 8%;
 
-    /* Card with subtle warmth */
-    --card: 40 40% 99%;
-    --card-foreground: 25 25% 20%;
+    /* Card with subtle gray */
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
 
-    --popover: 40 40% 99%;
-    --popover-foreground: 25 25% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
 
-    /* Warm terracotta primary */
-    --primary: 25 45% 45%;
-    --primary-foreground: 40 33% 98%;
+    /* Black primary */
+    --primary: 0 0% 8%;
+    --primary-foreground: 0 0% 100%;
 
-    /* Soft sage secondary */
-    --secondary: 140 15% 90%;
-    --secondary-foreground: 25 25% 20%;
+    /* Light gray secondary */
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 8%;
 
-    /* Muted warm gray */
-    --muted: 35 20% 94%;
-    --muted-foreground: 25 15% 50%;
+    /* Muted gray */
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
 
-    /* Warm amber accent */
-    --accent: 35 70% 92%;
-    --accent-foreground: 25 45% 35%;
+    /* Accent gray */
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 8%;
 
-    /* Soft coral destructive */
-    --destructive: 0 65% 55%;
-    --destructive-foreground: 40 33% 98%;
+    /* Destructive red */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 35 25% 88%;
-    --input: 35 25% 88%;
-    --ring: 25 45% 45%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 8%;
 
     --radius: 0.75rem;
 
     /* Sidebar */
-    --sidebar-background: 40 30% 97%;
-    --sidebar-foreground: 25 25% 20%;
-    --sidebar-primary: 25 45% 45%;
-    --sidebar-primary-foreground: 40 33% 98%;
-    --sidebar-accent: 35 70% 92%;
-    --sidebar-accent-foreground: 25 45% 35%;
-    --sidebar-border: 35 25% 88%;
-    --sidebar-ring: 25 45% 45%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 8%;
+    --sidebar-primary: 0 0% 8%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 96%;
+    --sidebar-accent-foreground: 0 0% 8%;
+    --sidebar-border: 0 0% 90%;
+    --sidebar-ring: 0 0% 8%;
 
-    /* Chart colors - warm palette */
-    --chart-1: 25 45% 45%;
-    --chart-2: 140 25% 55%;
-    --chart-3: 35 55% 60%;
-    --chart-4: 200 25% 55%;
-    --chart-5: 350 35% 55%;
+    /* Chart colors - monochrome palette */
+    --chart-1: 0 0% 8%;
+    --chart-2: 0 0% 25%;
+    --chart-3: 0 0% 45%;
+    --chart-4: 0 0% 65%;
+    --chart-5: 0 0% 85%;
 
     /* Typography */
     --font-serif: 'Playfair Display', Georgia, serif;
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 
-    /* Shadows with warmth */
-    --shadow-sm: 0 1px 2px 0 hsl(25 25% 20% / 0.05);
-    --shadow: 0 1px 3px 0 hsl(25 25% 20% / 0.1), 0 1px 2px -1px hsl(25 25% 20% / 0.1);
-    --shadow-md: 0 4px 6px -1px hsl(25 25% 20% / 0.1), 0 2px 4px -2px hsl(25 25% 20% / 0.1);
-    --shadow-lg: 0 10px 15px -3px hsl(25 25% 20% / 0.1), 0 4px 6px -4px hsl(25 25% 20% / 0.1);
-    --shadow-xl: 0 20px 25px -5px hsl(25 25% 20% / 0.1), 0 8px 10px -6px hsl(25 25% 20% / 0.1);
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
+    --shadow: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.1), 0 8px 10px -6px hsl(0 0% 0% / 0.1);
 
     /* Hero-specific tokens */
-    --hero-gradient: linear-gradient(135deg, hsl(35 70% 92%) 0%, hsl(40 33% 98%) 50%, hsl(35 60% 95%) 100%);
-    --hero-text: 25 25% 20%;
-    --hero-text-muted: 25 15% 40%;
+    --hero-gradient: linear-gradient(135deg, hsl(0 0% 98%) 0%, hsl(0 0% 100%) 50%, hsl(0 0% 96%) 100%);
+    --hero-text: 0 0% 8%;
+    --hero-text-muted: 0 0% 45%;
   }
 
   .dark {
-    --background: 25 20% 10%;
-    --foreground: 40 25% 95%;
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
 
-    --card: 25 20% 14%;
-    --card-foreground: 40 25% 95%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 25 20% 14%;
-    --popover-foreground: 40 25% 95%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 35 50% 60%;
-    --primary-foreground: 25 20% 10%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 4%;
 
-    --secondary: 25 15% 20%;
-    --secondary-foreground: 40 25% 95%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 25 15% 18%;
-    --muted-foreground: 35 15% 60%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
 
-    --accent: 35 30% 25%;
-    --accent-foreground: 40 25% 95%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 55% 45%;
-    --destructive-foreground: 40 25% 95%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 25 15% 20%;
-    --input: 25 15% 22%;
-    --ring: 35 50% 60%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 0 0% 85%;
 
-    --sidebar-background: 25 20% 12%;
-    --sidebar-foreground: 40 25% 95%;
-    --sidebar-primary: 35 50% 60%;
-    --sidebar-primary-foreground: 25 20% 10%;
-    --sidebar-accent: 35 30% 25%;
-    --sidebar-accent-foreground: 40 25% 95%;
-    --sidebar-border: 25 15% 20%;
-    --sidebar-ring: 35 50% 60%;
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 0 0% 4%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 0 0% 85%;
 
-    --chart-1: 35 50% 60%;
-    --chart-2: 140 30% 50%;
-    --chart-3: 45 55% 55%;
-    --chart-4: 200 30% 50%;
-    --chart-5: 350 40% 50%;
+    --chart-1: 0 0% 98%;
+    --chart-2: 0 0% 80%;
+    --chart-3: 0 0% 60%;
+    --chart-4: 0 0% 40%;
+    --chart-5: 0 0% 20%;
 
-    --hero-gradient: linear-gradient(135deg, hsl(25 20% 12%) 0%, hsl(25 25% 15%) 50%, hsl(30 20% 12%) 100%);
-    --hero-text: 40 25% 95%;
-    --hero-text-muted: 35 15% 65%;
+    --hero-gradient: linear-gradient(135deg, hsl(0 0% 6%) 0%, hsl(0 0% 8%) 50%, hsl(0 0% 6%) 100%);
+    --hero-text: 0 0% 98%;
+    --hero-text-muted: 0 0% 65%;
   }
 }
 
