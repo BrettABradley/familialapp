@@ -14,7 +14,292 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      circle_invites: {
+        Row: {
+          circle_id: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          status: string
+          token: string
+        }
+        Insert: {
+          circle_id: string
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          status?: string
+          token?: string
+        }
+        Update: {
+          circle_id?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "circle_invites_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      circle_memberships: {
+        Row: {
+          circle_id: string
+          id: string
+          joined_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          circle_id: string
+          id?: string
+          joined_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          circle_id?: string
+          id?: string
+          joined_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "circle_memberships_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      circles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      comments: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          post_id: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          post_id: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          author_id: string
+          circle_id: string
+          content: string | null
+          created_at: string
+          id: string
+          media_urls: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          circle_id: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          media_urls?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          circle_id?: string
+          content?: string | null
+          created_at?: string
+          id?: string
+          media_urls?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          location: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          location?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          location?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      reactions: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          reaction_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          reaction_type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          reaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reactions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_offers: {
+        Row: {
+          company_email: string
+          company_name: string
+          company_phone: string | null
+          created_at: string
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          link_url: string | null
+          offer_description: string | null
+          offer_title: string
+          price_per_impression: number | null
+          target_locations: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          company_email: string
+          company_name: string
+          company_phone?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          link_url?: string | null
+          offer_description?: string | null
+          offer_title: string
+          price_per_impression?: number | null
+          target_locations?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          company_email?: string
+          company_name?: string
+          company_phone?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          link_url?: string | null
+          offer_description?: string | null
+          offer_title?: string
+          price_per_impression?: number | null
+          target_locations?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

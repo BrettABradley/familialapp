@@ -27,7 +27,7 @@ const Testimonials = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="max-w-3xl mx-auto text-center mb-16 md:mb-20">
-          <span className="text-primary font-medium text-sm uppercase tracking-wider">Testimonials</span>
+          <span className="text-foreground font-medium text-sm uppercase tracking-wider">Testimonials</span>
           <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mt-4 mb-6">
             Loved by Families Everywhere
           </h2>
@@ -41,12 +41,12 @@ const Testimonials = () => {
           {testimonials.map((testimonial) => (
             <div 
               key={testimonial.name}
-              className="bg-card rounded-2xl p-8 border border-border/50 hover:shadow-lg transition-shadow"
+              className="bg-card rounded-2xl p-8 border border-border hover:shadow-lg transition-shadow"
             >
               {/* Stars */}
               <div className="flex gap-1 mb-6">
                 {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 fill-primary text-primary" />
+                  <Star key={i} className="w-5 h-5 fill-foreground text-foreground" />
                 ))}
               </div>
               
@@ -57,8 +57,8 @@ const Testimonials = () => {
               
               {/* Author */}
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center">
-                  <span className="font-serif font-semibold text-primary">
+                <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
+                  <span className="font-serif font-semibold text-foreground">
                     {testimonial.avatar}
                   </span>
                 </div>

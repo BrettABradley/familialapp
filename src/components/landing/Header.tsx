@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Phone } from "lucide-react";
+import { Link } from "react-router-dom";
+import logo from "@/assets/logo.png";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -10,14 +12,9 @@ const Header = () => {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
-          <a href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-serif text-lg font-bold">F</span>
-            </div>
-            <span className="font-serif text-xl md:text-2xl font-semibold text-foreground">
-              Familial
-            </span>
-          </a>
+          <Link to="/" className="flex items-center gap-3">
+            <img src={logo} alt="Familial" className="h-10 md:h-12 w-auto" />
+          </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-8">
@@ -30,12 +27,23 @@ const Header = () => {
             <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
               Pricing
             </a>
+            <Link to="/store" className="text-muted-foreground hover:text-foreground transition-colors">
+              Store
+            </Link>
           </nav>
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
-            <Button variant="ghost">Sign In</Button>
-            <Button>Get Started</Button>
+            <a href="tel:520-759-5200" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+              <Phone className="w-4 h-4" />
+              <span className="text-sm">520-759-5200</span>
+            </a>
+            <Link to="/auth">
+              <Button variant="ghost">Sign In</Button>
+            </Link>
+            <Link to="/auth">
+              <Button>Get Started</Button>
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -73,9 +81,28 @@ const Header = () => {
               >
                 Pricing
               </a>
+              <Link 
+                to="/store" 
+                className="text-muted-foreground hover:text-foreground transition-colors py-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Store
+              </Link>
+              <a 
+                href="tel:520-759-5200" 
+                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors py-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <Phone className="w-4 h-4" />
+                <span>Call Support: 520-759-5200</span>
+              </a>
               <div className="flex flex-col gap-2 pt-4 border-t border-border/50">
-                <Button variant="outline" className="w-full">Sign In</Button>
-                <Button className="w-full">Get Started</Button>
+                <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
+                  <Button variant="outline" className="w-full">Sign In</Button>
+                </Link>
+                <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
+                  <Button className="w-full">Get Started</Button>
+                </Link>
               </div>
             </nav>
           </div>

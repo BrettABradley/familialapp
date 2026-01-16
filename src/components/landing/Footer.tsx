@@ -1,4 +1,6 @@
-import { Heart } from "lucide-react";
+import { Heart, Phone } from "lucide-react";
+import { Link } from "react-router-dom";
+import logo from "@/assets/logo.png";
 
 const Footer = () => {
   return (
@@ -7,15 +9,19 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-8">
           {/* Brand */}
           <div className="md:col-span-1">
-            <a href="/" className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-serif text-lg font-bold">F</span>
-              </div>
-              <span className="font-serif text-xl font-semibold text-foreground">Familial</span>
-            </a>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <Link to="/" className="flex items-center gap-2 mb-4">
+              <img src={logo} alt="Familial" className="h-10 w-auto" />
+            </Link>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               The private social network for families who value connection over content.
             </p>
+            <a 
+              href="tel:520-759-5200" 
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Phone className="w-4 h-4" />
+              <span className="text-sm">520-759-5200</span>
+            </a>
           </div>
 
           {/* Product Links */}
@@ -31,6 +37,11 @@ const Footer = () => {
                 <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   Pricing
                 </a>
+              </li>
+              <li>
+                <Link to="/store" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Familial Store
+                </Link>
               </li>
               <li>
                 <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -91,7 +102,7 @@ const Footer = () => {
             © 2026 Familial, LLC. All rights reserved.
           </p>
           <p className="text-sm text-muted-foreground flex items-center gap-1">
-            Made with <Heart className="w-4 h-4 text-primary fill-primary" /> for families everywhere
+            Made with <Heart className="w-4 h-4 text-foreground fill-foreground" /> for families everywhere
           </p>
         </div>
       </div>
