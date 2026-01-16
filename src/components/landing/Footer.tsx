@@ -1,6 +1,6 @@
 import { Heart, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
-import logo from "@/assets/logo.png";
+import icon from "@/assets/icon.png";
 
 const Footer = () => {
   return (
@@ -10,7 +10,8 @@ const Footer = () => {
           {/* Brand */}
           <div className="md:col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <img src={logo} alt="Familial" className="h-10 w-auto" />
+              <img src={icon} alt="Familial" className="h-8 w-auto" />
+              <span className="font-serif text-lg font-bold text-foreground">Familial</span>
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               The private social network for families who value connection over content.

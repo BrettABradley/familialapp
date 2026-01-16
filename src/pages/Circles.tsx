@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Users, LogOut, ArrowLeft, Trash2, UserPlus, Crown } from "lucide-react";
-import logo from "@/assets/logo.png";
+import icon from "@/assets/icon.png";
 
 interface Circle {
   id: string;
@@ -218,7 +218,8 @@ const Circles = () => {
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <img src={logo} alt="Familial" className="h-8 w-auto" />
+            <img src={icon} alt="Familial" className="h-8 w-auto" />
+            <span className="font-serif text-lg font-bold text-foreground">Familial</span>
           </Link>
           <div className="flex items-center gap-4">
             <Link to="/feed">
