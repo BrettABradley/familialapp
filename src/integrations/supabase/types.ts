@@ -669,6 +669,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_plans: {
+        Row: {
+          created_at: string
+          max_circles: number
+          plan: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          max_circles?: number
+          plan?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          max_circles?: number
+          plan?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           circle_id: string
@@ -706,6 +730,9 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_create_circle: { Args: { _user_id: string }; Returns: boolean }
+      get_circle_count: { Args: never; Returns: number }
+      get_circle_limit: { Args: never; Returns: number }
       has_circle_role: {
         Args: {
           _circle_id: string
