@@ -12,14 +12,18 @@ import Store from "./pages/Store";
 import Profile from "./pages/Profile";
 import Events from "./pages/Events";
 import Fridge from "./pages/Fridge";
+import Notifications from "./pages/Notifications";
+import FamilyTree from "./pages/FamilyTree";
+import Albums from "./pages/Albums";
+import Messages from "./pages/Messages";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <TooltipProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -32,13 +36,17 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/events" element={<Events />} />
             <Route path="/fridge" element={<Fridge />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/family-tree" element={<FamilyTree />} />
+            <Route path="/albums" element={<Albums />} />
+            <Route path="/messages" element={<Messages />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 
+export default App;
 export default App;

@@ -10,6 +10,7 @@ const tiers = [
     period: "/forever",
     description: "Perfect for small families getting started",
     features: [
+      "1 circle only",
       "Up to 8 family members",
       "Unlimited posts & photos",
       "Basic circle management",
@@ -25,9 +26,10 @@ const tiers = [
     period: "/month",
     description: "For growing families who want more",
     features: [
+      "Up to 2 circles",
       "Up to 20 family members",
-      "Multiple circles",
       "Event planning & calendars",
+      "Photo albums",
       "Priority support",
       "Advanced privacy controls",
     ],
@@ -40,9 +42,10 @@ const tiers = [
     period: "/month",
     description: "For large families and reunions",
     features: [
+      "Up to 3 circles",
       "Up to 50 family members",
-      "Unlimited circles",
       "Family tree features",
+      "Private messaging",
       "Video sharing",
       "Admin tools & analytics",
     ],

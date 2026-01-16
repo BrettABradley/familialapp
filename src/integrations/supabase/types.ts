@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      album_photos: {
+        Row: {
+          album_id: string
+          caption: string | null
+          created_at: string
+          id: string
+          photo_url: string
+          uploaded_by: string
+        }
+        Insert: {
+          album_id: string
+          caption?: string | null
+          created_at?: string
+          id?: string
+          photo_url: string
+          uploaded_by: string
+        }
+        Update: {
+          album_id?: string
+          caption?: string | null
+          created_at?: string
+          id?: string
+          photo_url?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "album_photos_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "photo_albums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       circle_invites: {
         Row: {
           circle_id: string
@@ -196,6 +231,89 @@ export type Database = {
           },
         ]
       }
+      family_tree_members: {
+        Row: {
+          bio: string | null
+          birth_date: string | null
+          circle_id: string
+          created_at: string
+          created_by: string
+          death_date: string | null
+          gender: string | null
+          id: string
+          linked_user_id: string | null
+          name: string
+          parent1_id: string | null
+          parent2_id: string | null
+          photo_url: string | null
+          spouse_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          bio?: string | null
+          birth_date?: string | null
+          circle_id: string
+          created_at?: string
+          created_by: string
+          death_date?: string | null
+          gender?: string | null
+          id?: string
+          linked_user_id?: string | null
+          name: string
+          parent1_id?: string | null
+          parent2_id?: string | null
+          photo_url?: string | null
+          spouse_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bio?: string | null
+          birth_date?: string | null
+          circle_id?: string
+          created_at?: string
+          created_by?: string
+          death_date?: string | null
+          gender?: string | null
+          id?: string
+          linked_user_id?: string | null
+          name?: string
+          parent1_id?: string | null
+          parent2_id?: string | null
+          photo_url?: string | null
+          spouse_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_tree_members_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_tree_members_parent1_id_fkey"
+            columns: ["parent1_id"]
+            isOneToOne: false
+            referencedRelation: "family_tree_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_tree_members_parent2_id_fkey"
+            columns: ["parent2_id"]
+            isOneToOne: false
+            referencedRelation: "family_tree_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_tree_members_spouse_id_fkey"
+            columns: ["spouse_id"]
+            isOneToOne: false
+            referencedRelation: "family_tree_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fridge_pins: {
         Row: {
           circle_id: string
@@ -233,6 +351,104 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fridge_pins_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          link: string | null
+          message: string | null
+          related_circle_id: string | null
+          related_post_id: string | null
+          related_user_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          link?: string | null
+          message?: string | null
+          related_circle_id?: string | null
+          related_post_id?: string | null
+          related_user_id?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          link?: string | null
+          message?: string | null
+          related_circle_id?: string | null
+          related_post_id?: string | null
+          related_user_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_related_circle_id_fkey"
+            columns: ["related_circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_related_post_id_fkey"
+            columns: ["related_post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      photo_albums: {
+        Row: {
+          circle_id: string
+          cover_photo_url: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          circle_id: string
+          cover_photo_url?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          circle_id?: string
+          cover_photo_url?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "photo_albums_circle_id_fkey"
             columns: ["circle_id"]
             isOneToOne: false
             referencedRelation: "circles"
@@ -312,6 +528,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      private_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_read: boolean
+          recipient_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          recipient_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          recipient_id?: string
+          sender_id?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
