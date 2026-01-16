@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,6 +47,9 @@ const Circles = () => {
   const [newCircleDescription, setNewCircleDescription] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+
+  const [circleLimit, setCircleLimit] = useState<number | null>(null);
+  const [ownedCircleCount, setOwnedCircleCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
