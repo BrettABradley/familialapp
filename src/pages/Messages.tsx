@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { CircleHeader } from "@/components/layout/CircleHeader";
 import { ArrowLeft, Send, MessageSquare, Search, Users } from "lucide-react";
 import icon from "@/assets/icon.png";
 
@@ -32,8 +33,14 @@ interface Conversation {
   unreadCount: number;
 }
 
+interface Circle {
+  id: string;
+  name: string;
+  owner_id: string;
+}
+
 const Messages = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -47,7 +54,8 @@ const Messages = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [hasCircles, setHasCircles] = useState(false);
+  const [circles, setCircles] = useState<Circle[]>([]);
+  const [selectedCircle, setSelectedCircle] = useState<string>("");
 
   useEffect(() => {
     if (!loading && !user) {
@@ -57,7 +65,7 @@ const Messages = () => {
 
   useEffect(() => {
     if (user) {
-      checkCircles();
+      fetchCircles();
       fetchConversations();
     }
   }, [user]);
@@ -73,22 +81,37 @@ const Messages = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const checkCircles = async () => {
+  const fetchCircles = async () => {
     if (!user) return;
     
     const { data: ownedCircles } = await supabase
       .from("circles")
-      .select("id")
-      .eq("owner_id", user.id)
-      .limit(1);
+      .select("id, name, owner_id")
+      .eq("owner_id", user.id);
 
     const { data: memberCircles } = await supabase
       .from("circle_memberships")
-      .select("circle_id")
-      .eq("user_id", user.id)
-      .limit(1);
+      .select("circle_id, circles(id, name, owner_id)")
+      .eq("user_id", user.id);
 
-    setHasCircles((ownedCircles && ownedCircles.length > 0) || (memberCircles && memberCircles.length > 0));
+    const allCircles: Circle[] = [];
+    
+    if (ownedCircles) {
+      allCircles.push(...ownedCircles);
+    }
+    
+    if (memberCircles) {
+      memberCircles.forEach((m) => {
+        if (m.circles && !allCircles.find(c => c.id === (m.circles as Circle).id)) {
+          allCircles.push(m.circles as Circle);
+        }
+      });
+    }
+    
+    setCircles(allCircles);
+    if (allCircles.length > 0 && !selectedCircle) {
+      setSelectedCircle(allCircles[0].id);
+    }
   };
 
   const fetchConversations = async () => {
@@ -298,6 +321,11 @@ const Messages = () => {
     setIsSending(false);
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   if (loading || isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -306,7 +334,7 @@ const Messages = () => {
     );
   }
 
-  if (!hasCircles) {
+  if (circles.length === 0) {
     return (
       <div className="min-h-screen bg-background">
         <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -347,35 +375,21 @@ const Messages = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={icon} alt="Familial" className="h-8 w-auto" />
-            <span className="font-serif text-lg font-bold text-foreground">Familial</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            {selectedUser ? (
-              <Button variant="ghost" size="sm" onClick={() => setSelectedUser(null)}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            ) : (
-              <Link to="/feed">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Feed
-                </Button>
-              </Link>
-            )}
-          </div>
-        </div>
-      </header>
+      <CircleHeader
+        circles={circles}
+        selectedCircle={selectedCircle}
+        onCircleChange={setSelectedCircle}
+        onSignOut={handleSignOut}
+      />
 
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         {selectedUser ? (
           // Chat View
           <div className="flex flex-col h-[calc(100vh-200px)]">
             <div className="flex items-center gap-3 pb-4 border-b border-border mb-4">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedUser(null)}>
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
               <Avatar>
                 <AvatarImage src={selectedUser.avatar_url || undefined} />
                 <AvatarFallback>
@@ -499,10 +513,10 @@ const Messages = () => {
                 <CardContent className="py-12 text-center">
                   <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                   <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
-                    No messages yet
+                    No conversations yet
                   </h3>
                   <p className="text-muted-foreground">
-                    Search for a circle member to start a conversation.
+                    Search for circle members to start a conversation.
                   </p>
                 </CardContent>
               </Card>
@@ -511,35 +525,32 @@ const Messages = () => {
                 {conversations.map((conv) => (
                   <Card
                     key={conv.user.id}
-                    className="cursor-pointer hover:border-foreground transition-colors"
+                    className="cursor-pointer hover:bg-secondary/50 transition-colors"
                     onClick={() => setSelectedUser(conv.user)}
                   >
                     <CardContent className="py-4">
                       <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <Avatar>
-                            <AvatarImage src={conv.user.avatar_url || undefined} />
-                            <AvatarFallback>
-                              {conv.user.display_name?.charAt(0).toUpperCase() || "U"}
-                            </AvatarFallback>
-                          </Avatar>
-                          {conv.unreadCount > 0 && (
-                            <span className="absolute -top-1 -right-1 bg-foreground text-background text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                              {conv.unreadCount}
-                            </span>
-                          )}
-                        </div>
+                        <Avatar>
+                          <AvatarImage src={conv.user.avatar_url || undefined} />
+                          <AvatarFallback>
+                            {conv.user.display_name?.charAt(0).toUpperCase() || "U"}
+                          </AvatarFallback>
+                        </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-foreground">
-                            {conv.user.display_name || "Unknown"}
-                          </p>
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-medium text-foreground truncate">
+                              {conv.user.display_name || "Unknown"}
+                            </h3>
+                            {conv.unreadCount > 0 && (
+                              <span className="bg-primary text-primary-foreground text-xs rounded-full px-2 py-0.5">
+                                {conv.unreadCount}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-muted-foreground truncate">
                             {conv.lastMessage.content}
                           </p>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(conv.lastMessage.created_at).toLocaleDateString()}
-                        </span>
                       </div>
                     </CardContent>
                   </Card>

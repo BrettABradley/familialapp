@@ -11,9 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { CircleHeader } from "@/components/layout/CircleHeader";
 import { FridgeBoard, type FridgeBoardPin } from "@/components/fridge/FridgeBoard";
-import { ArrowLeft, LogOut, Plus, Pin, Image, FileText, Calendar } from "lucide-react";
-import icon from "@/assets/icon.png";
+import { Plus, Pin, Image, FileText, Calendar } from "lucide-react";
 
 
 interface Circle {
@@ -69,7 +69,7 @@ const Fridge = () => {
     if (circles.length > 0) {
       fetchPins();
     }
-  }, [circles]);
+  }, [circles, selectedCircle]);
 
   const fetchCircles = async () => {
     if (!user) return;
@@ -102,15 +102,16 @@ const Fridge = () => {
 
     setCircles(allCircles);
     setAdminCircles(adminList);
-    if (adminList.length > 0 && !selectedCircle) {
-      setSelectedCircle(adminList[0].id);
+    if (allCircles.length > 0 && !selectedCircle) {
+      setSelectedCircle(allCircles[0].id);
     }
   };
 
   const fetchPins = async () => {
     if (circles.length === 0) return;
 
-    const circleIds = circles.map((c) => c.id);
+    // Filter by selected circle if one is selected
+    const circleIds = selectedCircle ? [selectedCircle] : circles.map((c) => c.id);
 
     const { data, error } = await db
       .from("fridge_pins")
@@ -245,27 +246,12 @@ const Fridge = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={icon} alt="Familial" className="h-8 w-auto" />
-            <span className="font-serif text-lg font-bold text-foreground">Familial</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link to="/feed">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Feed
-              </Button>
-            </Link>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </header>
+      <CircleHeader
+        circles={circles}
+        selectedCircle={selectedCircle}
+        onCircleChange={setSelectedCircle}
+        onSignOut={handleSignOut}
+      />
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="flex items-center justify-between mb-8">

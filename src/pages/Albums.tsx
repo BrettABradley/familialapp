@@ -7,9 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { CircleHeader } from "@/components/layout/CircleHeader";
 import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users } from "lucide-react";
 import icon from "@/assets/icon.png";
 
@@ -39,7 +39,7 @@ interface AlbumPhoto {
 }
 
 const Albums = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
@@ -274,6 +274,11 @@ const Albums = () => {
     }
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   if (loading || isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -324,29 +329,12 @@ const Albums = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={icon} alt="Familial" className="h-8 w-auto" />
-            <span className="font-serif text-lg font-bold text-foreground">Familial</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            {selectedAlbum ? (
-              <Button variant="ghost" size="sm" onClick={() => setSelectedAlbum(null)}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Albums
-              </Button>
-            ) : (
-              <Link to="/feed">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Feed
-                </Button>
-              </Link>
-            )}
-          </div>
-        </div>
-      </header>
+      <CircleHeader
+        circles={circles}
+        selectedCircle={selectedCircle}
+        onCircleChange={setSelectedCircle}
+        onSignOut={handleSignOut}
+      />
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         {selectedAlbum ? (
@@ -354,6 +342,10 @@ const Albums = () => {
           <>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
               <div>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedAlbum(null)} className="mb-2">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Albums
+                </Button>
                 <h1 className="font-serif text-3xl font-bold text-foreground">{selectedAlbum.name}</h1>
                 {selectedAlbum.description && (
                   <p className="text-muted-foreground mt-1">{selectedAlbum.description}</p>
@@ -427,65 +419,51 @@ const Albums = () => {
                   Organize and share family memories
                 </p>
               </div>
-              <div className="flex items-center gap-4">
-                <Select value={selectedCircle} onValueChange={setSelectedCircle}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Select circle" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {circles.map((circle) => (
-                      <SelectItem key={circle.id} value={circle.id}>
-                        {circle.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <Plus className="w-4 h-4 mr-2" />
+              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Album
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle className="font-serif">Create Photo Album</DialogTitle>
+                    <DialogDescription>
+                      Create a new album to organize your photos.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="albumName">Album Name *</Label>
+                      <Input
+                        id="albumName"
+                        placeholder="e.g., Summer Vacation 2024"
+                        value={newAlbum.name}
+                        onChange={(e) => setNewAlbum({ ...newAlbum, name: e.target.value })}
+                        maxLength={100}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="albumDesc">Description</Label>
+                      <Textarea
+                        id="albumDesc"
+                        placeholder="What's this album about?"
+                        value={newAlbum.description}
+                        onChange={(e) => setNewAlbum({ ...newAlbum, description: e.target.value })}
+                        maxLength={500}
+                      />
+                    </div>
+                    <Button 
+                      className="w-full" 
+                      onClick={handleCreateAlbum}
+                      disabled={!newAlbum.name.trim()}
+                    >
                       Create Album
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle className="font-serif">Create Photo Album</DialogTitle>
-                      <DialogDescription>
-                        Create a new album to organize your photos.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 mt-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="albumName">Album Name *</Label>
-                        <Input
-                          id="albumName"
-                          placeholder="e.g., Summer Vacation 2024"
-                          value={newAlbum.name}
-                          onChange={(e) => setNewAlbum({ ...newAlbum, name: e.target.value })}
-                          maxLength={100}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="albumDesc">Description</Label>
-                        <Textarea
-                          id="albumDesc"
-                          placeholder="What's this album about?"
-                          value={newAlbum.description}
-                          onChange={(e) => setNewAlbum({ ...newAlbum, description: e.target.value })}
-                          maxLength={500}
-                        />
-                      </div>
-                      <Button 
-                        className="w-full" 
-                        onClick={handleCreateAlbum}
-                        disabled={!newAlbum.name.trim()}
-                      >
-                        Create Album
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
 
             {albums.length === 0 ? (
@@ -505,27 +483,28 @@ const Albums = () => {
                 {albums.map((album) => (
                   <Card 
                     key={album.id} 
-                    className="cursor-pointer hover:border-foreground transition-colors"
+                    className="cursor-pointer hover:shadow-lg transition-shadow group"
                     onClick={() => setSelectedAlbum(album)}
                   >
-                    <div className="aspect-video bg-secondary flex items-center justify-center rounded-t-lg overflow-hidden">
+                    <div className="aspect-video bg-secondary relative overflow-hidden">
                       {album.cover_photo_url ? (
-                        <img src={album.cover_photo_url} alt={album.name} className="w-full h-full object-cover" />
+                        <img
+                          src={album.cover_photo_url}
+                          alt={album.name}
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
-                        <Image className="w-12 h-12 text-muted-foreground" />
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Image className="w-12 h-12 text-muted-foreground" />
+                        </div>
                       )}
                     </div>
                     <CardHeader className="pb-2">
                       <CardTitle className="font-serif text-lg">{album.name}</CardTitle>
-                      <CardDescription>
-                        Created {new Date(album.created_at).toLocaleDateString()}
-                      </CardDescription>
+                      {album.description && (
+                        <CardDescription className="line-clamp-2">{album.description}</CardDescription>
+                      )}
                     </CardHeader>
-                    {album.description && (
-                      <CardContent className="pt-0">
-                        <p className="text-sm text-muted-foreground line-clamp-2">{album.description}</p>
-                      </CardContent>
-                    )}
                   </Card>
                 ))}
               </div>

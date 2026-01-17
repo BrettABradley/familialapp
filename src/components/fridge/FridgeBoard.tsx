@@ -55,47 +55,47 @@ export function FridgeBoard({
       aria-label="Family fridge board"
       className={cn("w-full select-none", className)}
     >
-      {/* Pixel-art fridge container */}
-      <div className="relative mx-auto max-w-3xl">
-        {/* Fridge body - blocky pixel style */}
+      {/* Pixel-art fridge container - more vertically stretched */}
+      <div className="relative mx-auto max-w-2xl">
+        {/* Fridge body - tall pixel style like Terraria */}
         <div
           className={cn(
             "relative overflow-hidden",
             // Blocky pixelated border
-            "border-[6px] border-zinc-600 dark:border-zinc-500",
+            "border-[8px] border-zinc-700 dark:border-zinc-500",
             "rounded-none",
             // Fridge color gradient (retro teal/mint like old fridges)
-            "bg-gradient-to-b from-emerald-200 via-emerald-300 to-emerald-400",
-            "dark:from-emerald-800 dark:via-emerald-900 dark:to-emerald-950",
+            "bg-gradient-to-b from-emerald-300 via-emerald-400 to-emerald-500",
+            "dark:from-emerald-700 dark:via-emerald-800 dark:to-emerald-900",
             // Pixel-art shadow effect
-            "shadow-[8px_8px_0_0_rgba(0,0,0,0.3)]"
+            "shadow-[10px_10px_0_0_rgba(0,0,0,0.35)]"
           )}
           style={{
             imageRendering: "pixelated",
           }}
         >
           {/* Top freezer section divider */}
-          <div className="absolute top-[25%] left-0 right-0 h-[6px] bg-zinc-600 dark:bg-zinc-500 z-10" />
+          <div className="absolute top-[18%] left-0 right-0 h-[8px] bg-zinc-700 dark:bg-zinc-500 z-10" />
 
-          {/* Fridge handle - blocky rectangle */}
+          {/* Fridge handle - tall blocky rectangle */}
           <div
             className={cn(
-              "absolute right-3 top-[30%] z-20",
-              "h-[35%] w-4",
+              "absolute right-4 top-[24%] z-20",
+              "h-[50%] w-5",
               "bg-zinc-500 dark:bg-zinc-400",
-              "border-2 border-zinc-700 dark:border-zinc-300",
-              "shadow-[2px_2px_0_0_rgba(0,0,0,0.3)]"
+              "border-[3px] border-zinc-700 dark:border-zinc-300",
+              "shadow-[3px_3px_0_0_rgba(0,0,0,0.3)]"
             )}
           />
 
           {/* Freezer handle */}
           <div
             className={cn(
-              "absolute right-3 top-[8%] z-20",
-              "h-[12%] w-4",
+              "absolute right-4 top-[5%] z-20",
+              "h-[10%] w-5",
               "bg-zinc-500 dark:bg-zinc-400",
-              "border-2 border-zinc-700 dark:border-zinc-300",
-              "shadow-[2px_2px_0_0_rgba(0,0,0,0.3)]"
+              "border-[3px] border-zinc-700 dark:border-zinc-300",
+              "shadow-[3px_3px_0_0_rgba(0,0,0,0.3)]"
             )}
           />
 
@@ -125,7 +125,8 @@ export function FridgeBoard({
           </div>
 
           {/* Pinned items area */}
-          <div className="relative aspect-[4/3] sm:aspect-[3/2] w-full p-4 pt-8">
+          {/* Taller aspect ratio for more fridge-like proportions */}
+          <div className="relative aspect-[3/4] sm:aspect-[2/3] w-full p-4 pt-12">
             {pins.slice(0, 8).map((pin, idx) => {
               const layout = PIN_LAYOUT[idx];
               const canDelete = canDeleteCircleId(pin.circle_id);
@@ -228,10 +229,10 @@ export function FridgeBoard({
           </div>
         </div>
 
-        {/* Fridge feet (pixel blocks) */}
-        <div className="flex justify-between px-4 -mt-1">
-          <div className="h-4 w-8 bg-zinc-700 dark:bg-zinc-600 shadow-[2px_2px_0_0_rgba(0,0,0,0.3)]" />
-          <div className="h-4 w-8 bg-zinc-700 dark:bg-zinc-600 shadow-[2px_2px_0_0_rgba(0,0,0,0.3)]" />
+        {/* Fridge feet (pixel blocks) - wider */}
+        <div className="flex justify-between px-6 -mt-1">
+          <div className="h-5 w-10 bg-zinc-800 dark:bg-zinc-600 shadow-[3px_3px_0_0_rgba(0,0,0,0.3)]" />
+          <div className="h-5 w-10 bg-zinc-800 dark:bg-zinc-600 shadow-[3px_3px_0_0_rgba(0,0,0,0.3)]" />
         </div>
       </div>
 

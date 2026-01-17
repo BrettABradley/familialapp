@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { CircleHeader } from "@/components/layout/CircleHeader";
 import { ArrowLeft, Plus, TreeDeciduous, Users, Edit, Trash2 } from "lucide-react";
 import icon from "@/assets/icon.png";
 
@@ -36,7 +37,7 @@ interface FamilyMember {
 }
 
 const FamilyTree = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
@@ -221,6 +222,11 @@ const FamilyTree = () => {
     }
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   if (loading || isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -271,20 +277,12 @@ const FamilyTree = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={icon} alt="Familial" className="h-8 w-auto" />
-            <span className="font-serif text-lg font-bold text-foreground">Familial</span>
-          </Link>
-          <Link to="/feed">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Feed
-            </Button>
-          </Link>
-        </div>
-      </header>
+      <CircleHeader
+        circles={circles}
+        selectedCircle={selectedCircle}
+        onCircleChange={setSelectedCircle}
+        onSignOut={handleSignOut}
+      />
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -297,158 +295,144 @@ const FamilyTree = () => {
               Map out your family connections
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            <Select value={selectedCircle} onValueChange={setSelectedCircle}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select circle" />
-              </SelectTrigger>
-              <SelectContent>
-                {circles.map((circle) => (
-                  <SelectItem key={circle.id} value={circle.id}>
-                    {circle.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {isAdmin && (
-              <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
+          {isAdmin && (
+            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Member
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="font-serif">Add Family Member</DialogTitle>
+                  <DialogDescription>
+                    Add someone to your family tree.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 mt-4 max-h-96 overflow-y-auto">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Name *</Label>
+                    <Input
+                      id="name"
+                      placeholder="Full name"
+                      value={newMember.name}
+                      onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+                      maxLength={100}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="birthDate">Birth Date</Label>
+                      <Input
+                        id="birthDate"
+                        type="date"
+                        value={newMember.birthDate}
+                        onChange={(e) => setNewMember({ ...newMember, birthDate: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="deathDate">Death Date</Label>
+                      <Input
+                        id="deathDate"
+                        type="date"
+                        value={newMember.deathDate}
+                        onChange={(e) => setNewMember({ ...newMember, deathDate: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gender">Gender</Label>
+                    <Select
+                      value={newMember.gender}
+                      onValueChange={(value) => setNewMember({ ...newMember, gender: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bio">Bio</Label>
+                    <Textarea
+                      id="bio"
+                      placeholder="A brief description..."
+                      value={newMember.bio}
+                      onChange={(e) => setNewMember({ ...newMember, bio: e.target.value })}
+                      maxLength={1000}
+                    />
+                  </div>
+                  {members.length > 0 && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>Parent 1</Label>
+                        <Select
+                          value={newMember.parent1Id}
+                          onValueChange={(value) => setNewMember({ ...newMember, parent1Id: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select parent" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {members.map((m) => (
+                              <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Parent 2</Label>
+                        <Select
+                          value={newMember.parent2Id}
+                          onValueChange={(value) => setNewMember({ ...newMember, parent2Id: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select parent" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {members.map((m) => (
+                              <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Spouse</Label>
+                        <Select
+                          value={newMember.spouseId}
+                          onValueChange={(value) => setNewMember({ ...newMember, spouseId: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select spouse" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {members.map((m) => (
+                              <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
+                  <Button 
+                    className="w-full" 
+                    onClick={handleAddMember}
+                    disabled={!newMember.name.trim()}
+                  >
                     Add Member
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md">
-                  <DialogHeader>
-                    <DialogTitle className="font-serif">Add Family Member</DialogTitle>
-                    <DialogDescription>
-                      Add someone to your family tree.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4 max-h-96 overflow-y-auto">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Name *</Label>
-                      <Input
-                        id="name"
-                        placeholder="Full name"
-                        value={newMember.name}
-                        onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
-                        maxLength={100}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="birthDate">Birth Date</Label>
-                        <Input
-                          id="birthDate"
-                          type="date"
-                          value={newMember.birthDate}
-                          onChange={(e) => setNewMember({ ...newMember, birthDate: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="deathDate">Death Date</Label>
-                        <Input
-                          id="deathDate"
-                          type="date"
-                          value={newMember.deathDate}
-                          onChange={(e) => setNewMember({ ...newMember, deathDate: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="gender">Gender</Label>
-                      <Select
-                        value={newMember.gender}
-                        onValueChange={(value) => setNewMember({ ...newMember, gender: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="male">Male</SelectItem>
-                          <SelectItem value="female">Female</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="bio">Bio</Label>
-                      <Textarea
-                        id="bio"
-                        placeholder="A brief description..."
-                        value={newMember.bio}
-                        onChange={(e) => setNewMember({ ...newMember, bio: e.target.value })}
-                        maxLength={1000}
-                      />
-                    </div>
-                    {members.length > 0 && (
-                      <>
-                        <div className="space-y-2">
-                          <Label>Parent 1</Label>
-                          <Select
-                            value={newMember.parent1Id}
-                            onValueChange={(value) => setNewMember({ ...newMember, parent1Id: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select parent" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">None</SelectItem>
-                              {members.map((m) => (
-                                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Parent 2</Label>
-                          <Select
-                            value={newMember.parent2Id}
-                            onValueChange={(value) => setNewMember({ ...newMember, parent2Id: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select parent" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">None</SelectItem>
-                              {members.map((m) => (
-                                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Spouse</Label>
-                          <Select
-                            value={newMember.spouseId}
-                            onValueChange={(value) => setNewMember({ ...newMember, spouseId: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select spouse" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">None</SelectItem>
-                              {members.map((m) => (
-                                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </>
-                    )}
-                    <Button 
-                      className="w-full" 
-                      onClick={handleAddMember}
-                      disabled={!newMember.name.trim()}
-                    >
-                      Add Member
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            )}
-          </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         {members.length === 0 ? (
@@ -501,16 +485,21 @@ const FamilyTree = () => {
                 </CardHeader>
                 <CardContent>
                   {member.bio && (
-                    <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{member.bio}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-3">{member.bio}</p>
                   )}
-                  <div className="text-xs text-muted-foreground space-y-1">
-                    {member.parent1_id && (
-                      <p>Parent: {members.find(m => m.id === member.parent1_id)?.name}</p>
-                    )}
-                    {member.spouse_id && (
-                      <p>Spouse: {members.find(m => m.id === member.spouse_id)?.name}</p>
-                    )}
-                  </div>
+                  {(member.parent1_id || member.parent2_id || member.spouse_id) && (
+                    <div className="mt-3 pt-3 border-t border-border space-y-1 text-xs text-muted-foreground">
+                      {member.parent1_id && (
+                        <p>Parent: {members.find(m => m.id === member.parent1_id)?.name}</p>
+                      )}
+                      {member.parent2_id && (
+                        <p>Parent: {members.find(m => m.id === member.parent2_id)?.name}</p>
+                      )}
+                      {member.spouse_id && (
+                        <p>Spouse: {members.find(m => m.id === member.spouse_id)?.name}</p>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}

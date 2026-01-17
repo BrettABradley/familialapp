@@ -11,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, LogOut, Plus, CalendarDays, MapPin, Clock, Trash2 } from "lucide-react";
+import { CircleHeader } from "@/components/layout/CircleHeader";
+import { Plus, CalendarDays, MapPin, Clock, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import icon from "@/assets/icon.png";
 
 interface Circle {
   id: string;
@@ -66,7 +66,7 @@ const Events = () => {
     if (circles.length > 0) {
       fetchEvents();
     }
-  }, [circles]);
+  }, [circles, selectedCircle]);
 
   const fetchCircles = async () => {
     if (!user) return;
@@ -104,7 +104,7 @@ const Events = () => {
   const fetchEvents = async () => {
     if (circles.length === 0) return;
     
-    const circleIds = circles.map(c => c.id);
+    const circleIds = selectedCircle ? [selectedCircle] : circles.map(c => c.id);
     
     const { data, error } = await supabase
       .from("events")
@@ -199,27 +199,12 @@ const Events = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={icon} alt="Familial" className="h-8 w-auto" />
-            <span className="font-serif text-lg font-bold text-foreground">Familial</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link to="/feed">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Feed
-              </Button>
-            </Link>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </header>
+      <CircleHeader
+        circles={circles}
+        selectedCircle={selectedCircle}
+        onCircleChange={setSelectedCircle}
+        onSignOut={handleSignOut}
+      />
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="flex items-center justify-between mb-8">
