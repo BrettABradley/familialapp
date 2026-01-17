@@ -4,13 +4,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Heart, MessageCircle, Send, LogOut, Users, Plus, Image, Calendar, User, Download, X, ChevronDown, ChevronUp, Pin } from "lucide-react";
-import icon from "@/assets/icon.png";
+import { CircleHeader } from "@/components/layout/CircleHeader";
+import { Heart, MessageCircle, Send, Users, Plus, Image, Download, X, ChevronDown, ChevronUp } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -349,55 +349,12 @@ const Feed = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-2">
-              <img src={icon} alt="Familial" className="h-8 w-auto" />
-              <span className="font-serif text-lg font-bold text-foreground">Familial</span>
-            </Link>
-            {selectedCircle && circles.length > 0 && (
-              <>
-                <span className="text-muted-foreground text-lg">/</span>
-                <span className="font-medium text-foreground">
-                  {circles.find(c => c.id === selectedCircle)?.name || "Circle"}
-                </span>
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-2 md:gap-4">
-            <Link to="/fridge">
-              <Button variant="ghost" size="sm">
-                <Pin className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Fridge</span>
-              </Button>
-            </Link>
-            <Link to="/events">
-              <Button variant="ghost" size="sm">
-                <Calendar className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Events</span>
-              </Button>
-            </Link>
-            <Link to="/circles">
-              <Button variant="ghost" size="sm">
-                <Users className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Circles</span>
-              </Button>
-            </Link>
-            <Link to="/profile">
-              <Button variant="ghost" size="sm">
-                <User className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Profile</span>
-              </Button>
-            </Link>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 md:mr-2" />
-              <span className="hidden md:inline">Sign Out</span>
-            </Button>
-          </div>
-        </div>
-      </header>
+      <CircleHeader
+        circles={circles}
+        selectedCircle={selectedCircle}
+        onCircleChange={setSelectedCircle}
+        onSignOut={handleSignOut}
+      />
 
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         {/* Create Post */}
