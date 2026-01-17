@@ -53,6 +53,8 @@ const Circles = () => {
   const [inviteEmail, setInviteEmail] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [profile, setProfile] = useState<{ display_name: string | null } | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -63,8 +65,15 @@ const Circles = () => {
   useEffect(() => {
     if (user) {
       fetchCircles();
+      fetchProfile();
     }
   }, [user]);
+
+  const fetchProfile = async () => {
+    if (!user) return;
+    const { data } = await supabase.from("profiles").select("display_name").eq("user_id", user.id).maybeSingle();
+    if (data) setProfile(data);
+  };
 
   const fetchCircles = async () => {
     if (!user) return;
@@ -160,6 +169,9 @@ const Circles = () => {
   const handleInviteMember = async () => {
     if (!inviteEmail.trim() || !selectedCircle || !user) return;
     
+    setIsSendingInvite(true);
+
+    // First create the invite record
     const { error } = await db.from("circle_invites").insert({
       circle_id: selectedCircle.id,
       invited_by: user.id,
@@ -167,12 +179,36 @@ const Circles = () => {
     });
 
     if (error) {
-      toast({ title: "Error", description: "Failed to send invite.", variant: "destructive" });
-    } else {
-      setInviteEmail("");
-      setIsInviteOpen(false);
-      toast({ title: "Invite created!", description: `Invitation recorded for ${inviteEmail}. (Email sending requires Resend API key)` });
+      toast({ title: "Error", description: "Failed to create invite.", variant: "destructive" });
+      setIsSendingInvite(false);
+      return;
     }
+
+    // Send email via edge function
+    try {
+      const { error: emailError } = await supabase.functions.invoke("send-circle-invite", {
+        body: {
+          email: inviteEmail,
+          circleName: selectedCircle.name,
+          inviterName: profile?.display_name || "A family member",
+          circleId: selectedCircle.id,
+        },
+      });
+
+      if (emailError) {
+        console.error("Email error:", emailError);
+        toast({ title: "Invite created", description: `Invitation saved, but email failed to send.`, variant: "default" });
+      } else {
+        toast({ title: "Invite sent!", description: `Invitation email sent to ${inviteEmail}.` });
+      }
+    } catch (err) {
+      console.error("Email send error:", err);
+      toast({ title: "Invite created", description: `Invitation saved, but email failed to send.` });
+    }
+
+    setInviteEmail("");
+    setIsInviteOpen(false);
+    setIsSendingInvite(false);
   };
 
   const handleUpdateRole = async (membership: CircleMembership, newRole: string) => {
@@ -314,7 +350,7 @@ const Circles = () => {
             <DialogHeader><DialogTitle className="font-serif">Invite to {selectedCircle?.name}</DialogTitle><DialogDescription>Send an invitation to join this circle.</DialogDescription></DialogHeader>
             <div className="space-y-4 mt-4">
               <div className="space-y-2"><Label htmlFor="email">Email Address</Label><Input id="email" type="email" placeholder="family@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} /></div>
-              <Button className="w-full" onClick={handleInviteMember} disabled={!inviteEmail.trim()}>Send Invitation</Button>
+              <Button className="w-full" onClick={handleInviteMember} disabled={!inviteEmail.trim() || isSendingInvite}>{isSendingInvite ? "Sending..." : "Send Invitation"}</Button>
             </div>
           </DialogContent>
         </Dialog>
