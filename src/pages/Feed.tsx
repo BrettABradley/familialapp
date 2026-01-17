@@ -352,10 +352,20 @@ const Feed = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={icon} alt="Familial" className="h-8 w-auto" />
-            <span className="font-serif text-lg font-bold text-foreground">Familial</span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link to="/" className="flex items-center gap-2">
+              <img src={icon} alt="Familial" className="h-8 w-auto" />
+              <span className="font-serif text-lg font-bold text-foreground">Familial</span>
+            </Link>
+            {selectedCircle && circles.length > 0 && (
+              <>
+                <span className="text-muted-foreground text-lg">/</span>
+                <span className="font-medium text-foreground">
+                  {circles.find(c => c.id === selectedCircle)?.name || "Circle"}
+                </span>
+              </>
+            )}
+          </div>
           <div className="flex items-center gap-2 md:gap-4">
             <Link to="/fridge">
               <Button variant="ghost" size="sm">
