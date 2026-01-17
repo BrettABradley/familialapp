@@ -190,8 +190,26 @@ const Messages = () => {
     );
   };
 
+  // Escape ILIKE wildcards to prevent pattern injection
+  const escapeILIKE = (str: string): string => {
+    return str.replace(/[%_\\]/g, '\\$&');
+  };
+
   const handleSearch = async () => {
-    if (!searchQuery.trim() || !user) return;
+    const trimmedQuery = searchQuery.trim();
+    
+    // Validate search input
+    if (!trimmedQuery || !user) return;
+    
+    // Length validation
+    if (trimmedQuery.length > 50) {
+      toast({
+        title: "Search query too long",
+        description: "Please use 50 characters or less",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSearching(true);
     
@@ -239,11 +257,14 @@ const Messages = () => {
       return;
     }
 
+    // Escape ILIKE wildcards in search query to prevent pattern injection
+    const escapedQuery = escapeILIKE(trimmedQuery);
+    
     const { data: profiles } = await supabase
       .from("profiles")
       .select("*")
       .in("user_id", Array.from(userIds))
-      .ilike("display_name", `%${searchQuery}%`);
+      .ilike("display_name", `%${escapedQuery}%`);
 
     setSearchResults(profiles || []);
     setIsSearching(false);
