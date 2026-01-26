@@ -634,6 +634,7 @@ export type Database = {
           offer_description: string | null
           offer_title: string
           price_per_impression: number | null
+          submitted_by: string | null
           target_locations: string[] | null
           updated_at: string
         }
@@ -649,6 +650,7 @@ export type Database = {
           offer_description?: string | null
           offer_title: string
           price_per_impression?: number | null
+          submitted_by?: string | null
           target_locations?: string[] | null
           updated_at?: string
         }
@@ -664,6 +666,7 @@ export type Database = {
           offer_description?: string | null
           offer_title?: string
           price_per_impression?: number | null
+          submitted_by?: string | null
           target_locations?: string[] | null
           updated_at?: string
         }
@@ -727,7 +730,42 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      store_offers_public: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          image_url: string | null
+          is_active: boolean | null
+          link_url: string | null
+          offer_description: string | null
+          offer_title: string | null
+          target_locations: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          image_url?: string | null
+          is_active?: boolean | null
+          link_url?: string | null
+          offer_description?: string | null
+          offer_title?: string | null
+          target_locations?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          image_url?: string | null
+          is_active?: boolean | null
+          link_url?: string | null
+          offer_description?: string | null
+          offer_title?: string | null
+          target_locations?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       can_create_circle: { Args: { _user_id: string }; Returns: boolean }

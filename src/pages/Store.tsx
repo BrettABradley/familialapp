@@ -127,6 +127,7 @@ const Store = () => {
         ? formData.targetLocations.split(",").map((l) => l.trim()).filter(Boolean)
         : [],
       is_active: false, // Requires approval
+      submitted_by: user.id, // Track who submitted the offer for rate limiting and ownership
     });
 
     if (error) {
