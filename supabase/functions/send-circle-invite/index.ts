@@ -8,6 +8,66 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// HTML escape function to prevent XSS in email templates
+function escapeHtml(text: string): string {
+  const htmlEntities: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return text.replace(/[&<>"']/g, (char) => htmlEntities[char] || char);
+}
+
+// Input validation for invite request
+function validateInviteInput(input: unknown): { valid: boolean; error?: string; data?: InviteRequest } {
+  if (!input || typeof input !== 'object') {
+    return { valid: false, error: "Invalid request body" };
+  }
+  
+  const { email, circleName, inviterName, circleId } = input as Record<string, unknown>;
+  
+  // Validate email format
+  if (!email || typeof email !== 'string') {
+    return { valid: false, error: "Email is required" };
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email) || email.length > 255) {
+    return { valid: false, error: "Invalid email format" };
+  }
+  
+  // Validate circleName
+  if (!circleName || typeof circleName !== 'string') {
+    return { valid: false, error: "Circle name is required" };
+  }
+  if (circleName.length > 100) {
+    return { valid: false, error: "Circle name must be less than 100 characters" };
+  }
+  
+  // Validate circleId (UUID format)
+  if (!circleId || typeof circleId !== 'string') {
+    return { valid: false, error: "Circle ID is required" };
+  }
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(circleId)) {
+    return { valid: false, error: "Invalid circle ID format" };
+  }
+  
+  // Validate inviterName (optional, but sanitize if present)
+  const sanitizedInviterName = typeof inviterName === 'string' ? inviterName.slice(0, 100) : "";
+  
+  return {
+    valid: true,
+    data: {
+      email: email.trim(),
+      circleName: circleName.trim(),
+      inviterName: sanitizedInviterName.trim(),
+      circleId: circleId.trim(),
+    }
+  };
+}
+
 interface InviteRequest {
   email: string;
   circleName: string;
@@ -45,14 +105,24 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const { email, circleName, inviterName, circleId }: InviteRequest = await req.json();
-
-    if (!email || !circleName || !circleId) {
-      return new Response(JSON.stringify({ error: "Missing required fields" }), {
+    // Validate and sanitize input
+    const requestBody = await req.json();
+    const validation = validateInviteInput(requestBody);
+    
+    if (!validation.valid || !validation.data) {
+      console.error("Validation failed:", validation.error);
+      return new Response(JSON.stringify({ error: validation.error }), {
         status: 400,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
+    
+    const { email, circleName, inviterName, circleId } = validation.data;
+    
+    // HTML-escape all user inputs for safe email rendering
+    const safeCircleName = escapeHtml(circleName);
+    const safeInviterName = escapeHtml(inviterName || "A family member");
+    const safeEmail = escapeHtml(email);
 
     console.log(`Sending invite to ${email} for circle ${circleName}`);
 
@@ -66,7 +136,7 @@ const handler = async (req: Request): Promise<Response> => {
       body: JSON.stringify({
         from: "Familial <noreply@yourdomain.com>", // TODO: Replace with your verified domain from resend.com/domains
         to: [email],
-        subject: `You're invited to join ${circleName} on Familial!`,
+        subject: `You're invited to join ${safeCircleName} on Familial!`,
         html: `
           <!DOCTYPE html>
           <html>
@@ -82,8 +152,8 @@ const handler = async (req: Request): Promise<Response> => {
                 </h1>
                 
                 <p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                  <strong>${inviterName || "Someone"}</strong> has invited you to join their family circle 
-                  <strong>"${circleName}"</strong> on Familial.
+                  <strong>${safeInviterName}</strong> has invited you to join their family circle 
+                  <strong>"${safeCircleName}"</strong> on Familial.
                 </p>
                 
                 <p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
@@ -102,7 +172,7 @@ const handler = async (req: Request): Promise<Response> => {
                 
                 <p style="color: #888; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0; 
                           border-top: 1px solid #eee; padding-top: 20px;">
-                  Once you sign up with this email address (${email}), you'll automatically 
+                  Once you sign up with this email address (${safeEmail}), you'll automatically 
                   be connected to the circle.
                 </p>
               </div>
