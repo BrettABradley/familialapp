@@ -787,6 +787,10 @@ export type Database = {
         Args: { _circle_id: string; _user_id: string }
         Returns: boolean
       }
+      shares_circle_with: {
+        Args: { _other_user_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "member"
