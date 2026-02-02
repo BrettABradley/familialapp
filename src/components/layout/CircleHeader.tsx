@@ -8,8 +8,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { LogOut, Users, Calendar, User, Pin, MessageSquare, Image, TreeDeciduous, ChevronDown } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetClose,
+} from "@/components/ui/sheet";
+import { LogOut, Users, Calendar, User, Pin, MessageSquare, Image, TreeDeciduous, Menu } from "lucide-react";
 import icon from "@/assets/icon.png";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Circle {
   id: string;
@@ -25,6 +34,16 @@ interface CircleHeaderProps {
   showNav?: boolean;
 }
 
+const navItems = [
+  { to: "/fridge", icon: Pin, label: "Fridge" },
+  { to: "/events", icon: Calendar, label: "Events" },
+  { to: "/albums", icon: Image, label: "Albums" },
+  { to: "/family-tree", icon: TreeDeciduous, label: "Tree" },
+  { to: "/messages", icon: MessageSquare, label: "Messages" },
+  { to: "/circles", icon: Users, label: "Circles" },
+  { to: "/profile", icon: User, label: "Profile" },
+];
+
 export function CircleHeader({
   circles,
   selectedCircle,
@@ -33,6 +52,8 @@ export function CircleHeader({
   showNav = true,
 }: CircleHeaderProps) {
   const currentCircle = circles.find((c) => c.id === selectedCircle);
+  const isMobile = useIsMobile();
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -69,54 +90,63 @@ export function CircleHeader({
           )}
         </div>
         {showNav && (
-          <div className="flex items-center gap-2 md:gap-4">
-            <Link to="/fridge">
-              <Button variant="ghost" size="sm">
-                <Pin className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Fridge</span>
+          <>
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-2 md:gap-4">
+              {navItems.map((item) => (
+                <Link key={item.to} to={item.to}>
+                  <Button variant="ghost" size="sm">
+                    <item.icon className="w-4 h-4 md:mr-2" />
+                    <span className="hidden md:inline">{item.label}</span>
+                  </Button>
+                </Link>
+              ))}
+              <Button variant="ghost" size="sm" onClick={onSignOut}>
+                <LogOut className="w-4 h-4 md:mr-2" />
+                <span className="hidden md:inline">Sign Out</span>
               </Button>
-            </Link>
-            <Link to="/events">
-              <Button variant="ghost" size="sm">
-                <Calendar className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Events</span>
-              </Button>
-            </Link>
-            <Link to="/albums">
-              <Button variant="ghost" size="sm">
-                <Image className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Albums</span>
-              </Button>
-            </Link>
-            <Link to="/family-tree">
-              <Button variant="ghost" size="sm">
-                <TreeDeciduous className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Tree</span>
-              </Button>
-            </Link>
-            <Link to="/messages">
-              <Button variant="ghost" size="sm">
-                <MessageSquare className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Messages</span>
-              </Button>
-            </Link>
-            <Link to="/circles">
-              <Button variant="ghost" size="sm">
-                <Users className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Circles</span>
-              </Button>
-            </Link>
-            <Link to="/profile">
-              <Button variant="ghost" size="sm">
-                <User className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Profile</span>
-              </Button>
-            </Link>
-            <Button variant="ghost" size="sm" onClick={onSignOut}>
-              <LogOut className="w-4 h-4 md:mr-2" />
-              <span className="hidden md:inline">Sign Out</span>
-            </Button>
-          </div>
+            </div>
+
+            {/* Mobile Navigation - Hamburger Menu */}
+            {isMobile && (
+              <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="sm" className="md:hidden min-h-[44px] min-w-[44px]">
+                    <Menu className="w-5 h-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[280px]">
+                  <SheetHeader>
+                    <SheetTitle className="text-left">Menu</SheetTitle>
+                  </SheetHeader>
+                  <nav className="flex flex-col gap-2 mt-6">
+                    {navItems.map((item) => (
+                      <SheetClose asChild key={item.to}>
+                        <Link to={item.to}>
+                          <Button variant="ghost" className="w-full justify-start h-12">
+                            <item.icon className="w-5 h-5 mr-3" />
+                            {item.label}
+                          </Button>
+                        </Link>
+                      </SheetClose>
+                    ))}
+                    <div className="border-t border-border my-2" />
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start h-12 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        setSheetOpen(false);
+                        onSignOut();
+                      }}
+                    >
+                      <LogOut className="w-5 h-5 mr-3" />
+                      Sign Out
+                    </Button>
+                  </nav>
+                </SheetContent>
+              </Sheet>
+            )}
+          </>
         )}
       </div>
     </header>

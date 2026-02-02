@@ -170,11 +170,11 @@ const Store = () => {
           <Link to="/" className="flex items-center gap-2">
             <img src={logo} alt="Familial" className="h-8 w-auto" />
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Link to="/">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Home
+              <Button variant="ghost" size="sm" className="min-h-[44px]">
+                <ArrowLeft className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Back to Home</span>
               </Button>
             </Link>
             {!user && (
