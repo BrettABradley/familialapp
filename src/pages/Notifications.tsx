@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { MobileNavigation } from "@/components/layout/MobileNavigation";
 import { Bell, ArrowLeft, Check, Trash2, Users, Heart, MessageCircle, Calendar, UserPlus } from "lucide-react";
 import icon from "@/assets/icon.png";
 
@@ -116,7 +117,7 @@ const Notifications = () => {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
@@ -124,9 +125,9 @@ const Notifications = () => {
             <span className="font-serif text-lg font-bold text-foreground">Familial</span>
           </Link>
           <Link to="/feed">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Feed
+            <Button variant="ghost" size="sm" className="min-h-[44px]">
+              <ArrowLeft className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Back to Feed</span>
             </Button>
           </Link>
         </div>
@@ -216,6 +217,7 @@ const Notifications = () => {
           </div>
         )}
       </main>
+      <MobileNavigation />
     </div>
   );
 };

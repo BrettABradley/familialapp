@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { MobileNavigation } from "@/components/layout/MobileNavigation";
 import { ArrowLeft, LogOut, Camera, Save } from "lucide-react";
 import icon from "@/assets/icon.png";
 
@@ -157,7 +158,7 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
@@ -165,16 +166,16 @@ const Profile = () => {
             <img src={icon} alt="Familial" className="h-8 w-auto" />
             <span className="font-serif text-lg font-bold text-foreground">Familial</span>
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Link to="/feed">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Feed
+              <Button variant="ghost" size="sm" className="min-h-[44px]">
+                <ArrowLeft className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Back to Feed</span>
               </Button>
             </Link>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
+            <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={handleSignOut}>
+              <LogOut className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Sign Out</span>
             </Button>
           </div>
         </div>
@@ -267,6 +268,7 @@ const Profile = () => {
           </CardContent>
         </Card>
       </main>
+      <MobileNavigation />
     </div>
   );
 };

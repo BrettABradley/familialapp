@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { CircleHeader } from "@/components/layout/CircleHeader";
+import { MobileNavigation } from "@/components/layout/MobileNavigation";
 import { ArrowLeft, Plus, TreeDeciduous, Users, Edit, Trash2 } from "lucide-react";
 import icon from "@/assets/icon.png";
 
@@ -276,7 +277,7 @@ const FamilyTree = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <CircleHeader
         circles={circles}
         selectedCircle={selectedCircle}
@@ -506,6 +507,7 @@ const FamilyTree = () => {
           </div>
         )}
       </main>
+      <MobileNavigation />
     </div>
   );
 };

@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { CircleHeader } from "@/components/layout/CircleHeader";
+import { MobileNavigation } from "@/components/layout/MobileNavigation";
 import { Plus, CalendarDays, MapPin, Clock, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -198,7 +199,7 @@ const Events = () => {
   const eventDates = events.map(e => new Date(e.event_date));
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <CircleHeader
         circles={circles}
         selectedCircle={selectedCircle}
@@ -207,7 +208,7 @@ const Events = () => {
       />
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="font-serif text-3xl font-bold text-foreground">Family Calendar</h1>
             <p className="text-muted-foreground mt-1">
@@ -394,6 +395,7 @@ const Events = () => {
           </div>
         </div>
       </main>
+      <MobileNavigation />
     </div>
   );
 };

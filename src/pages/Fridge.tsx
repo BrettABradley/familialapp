@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CircleHeader } from "@/components/layout/CircleHeader";
+import { MobileNavigation } from "@/components/layout/MobileNavigation";
 import { FridgeBoard, type FridgeBoardPin } from "@/components/fridge/FridgeBoard";
 import { Plus, Pin, Image, FileText, Calendar } from "lucide-react";
 
@@ -245,7 +246,7 @@ const Fridge = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <CircleHeader
         circles={circles}
         selectedCircle={selectedCircle}
@@ -254,7 +255,7 @@ const Fridge = () => {
       />
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="font-serif text-3xl font-bold text-foreground flex items-center gap-2">
               <Pin className="w-8 h-8" />
@@ -409,6 +410,7 @@ const Fridge = () => {
           />
         )}
       </main>
+      <MobileNavigation />
     </div>
   );
 };

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { CircleHeader } from "@/components/layout/CircleHeader";
+import { MobileNavigation } from "@/components/layout/MobileNavigation";
 import { ArrowLeft, Send, MessageSquare, Search, Users } from "lucide-react";
 import icon from "@/assets/icon.png";
 
@@ -374,7 +375,7 @@ const Messages = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <CircleHeader
         circles={circles}
         selectedCircle={selectedCircle}
@@ -560,6 +561,7 @@ const Messages = () => {
           </>
         )}
       </main>
+      <MobileNavigation />
     </div>
   );
 };
