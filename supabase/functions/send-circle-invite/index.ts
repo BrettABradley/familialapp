@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.39.0";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
@@ -8,7 +8,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// HTML escape function to prevent XSS in email templates
 function escapeHtml(text: string): string {
   const htmlEntities: Record<string, string> = {
     '&': '&amp;',
@@ -20,7 +19,13 @@ function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (char) => htmlEntities[char] || char);
 }
 
-// Input validation for invite request
+interface InviteRequest {
+  email: string;
+  circleName: string;
+  inviterName: string;
+  circleId: string;
+}
+
 function validateInviteInput(input: unknown): { valid: boolean; error?: string; data?: InviteRequest } {
   if (!input || typeof input !== 'object') {
     return { valid: false, error: "Invalid request body" };
@@ -28,7 +33,6 @@ function validateInviteInput(input: unknown): { valid: boolean; error?: string; 
   
   const { email, circleName, inviterName, circleId } = input as Record<string, unknown>;
   
-  // Validate email format
   if (!email || typeof email !== 'string') {
     return { valid: false, error: "Email is required" };
   }
@@ -37,7 +41,6 @@ function validateInviteInput(input: unknown): { valid: boolean; error?: string; 
     return { valid: false, error: "Invalid email format" };
   }
   
-  // Validate circleName
   if (!circleName || typeof circleName !== 'string') {
     return { valid: false, error: "Circle name is required" };
   }
@@ -45,7 +48,6 @@ function validateInviteInput(input: unknown): { valid: boolean; error?: string; 
     return { valid: false, error: "Circle name must be less than 100 characters" };
   }
   
-  // Validate circleId (UUID format)
   if (!circleId || typeof circleId !== 'string') {
     return { valid: false, error: "Circle ID is required" };
   }
@@ -54,7 +56,6 @@ function validateInviteInput(input: unknown): { valid: boolean; error?: string; 
     return { valid: false, error: "Invalid circle ID format" };
   }
   
-  // Validate inviterName (optional, but sanitize if present)
   const sanitizedInviterName = typeof inviterName === 'string' ? inviterName.slice(0, 100) : "";
   
   return {
@@ -68,21 +69,12 @@ function validateInviteInput(input: unknown): { valid: boolean; error?: string; 
   };
 }
 
-interface InviteRequest {
-  email: string;
-  circleName: string;
-  inviterName: string;
-  circleId: string;
-}
-
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Verify authentication
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization" }), {
@@ -105,7 +97,6 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Validate and sanitize input
     const requestBody = await req.json();
     const validation = validateInviteInput(requestBody);
     
@@ -119,14 +110,12 @@ const handler = async (req: Request): Promise<Response> => {
     
     const { email, circleName, inviterName, circleId } = validation.data;
     
-    // HTML-escape all user inputs for safe email rendering
     const safeCircleName = escapeHtml(circleName);
     const safeInviterName = escapeHtml(inviterName || "A family member");
     const safeEmail = escapeHtml(email);
 
     console.log(`Sending invite to ${email} for circle ${circleName}`);
 
-    // Send email via Resend API
     const emailResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -137,53 +126,7 @@ const handler = async (req: Request): Promise<Response> => {
         from: "Familial <noreply@familialmedia.com>",
         to: [email],
         subject: `You're invited to join ${safeCircleName} on Familial!`,
-        html: `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          </head>
-          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-              <div style="background-color: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                <h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 20px 0; font-weight: 600;">
-                  You're Invited! 🎉
-                </h1>
-                
-                <p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                  <strong>${safeInviterName}</strong> has invited you to join their family circle 
-                  <strong>"${safeCircleName}"</strong> on Familial.
-                </p>
-                
-                <p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
-                  Familial is a private space for families to share photos, events, messages, 
-                  and memories together.
-                </p>
-                
-                <div style="text-align: center; margin: 30px 0;">
-                  <a href="https://familialapp.lovable.app/auth" 
-                     style="display: inline-block; background-color: #1a1a1a; color: white; 
-                            text-decoration: none; padding: 14px 32px; border-radius: 8px; 
-                            font-weight: 600; font-size: 16px;">
-                    Join Familial
-                  </a>
-                </div>
-                
-                <p style="color: #888; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0; 
-                          border-top: 1px solid #eee; padding-top: 20px;">
-                  Once you sign up with this email address (${safeEmail}), you'll automatically 
-                  be connected to the circle.
-                </p>
-              </div>
-              
-              <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
-                © Familial - Connecting families everywhere
-              </p>
-            </div>
-          </body>
-          </html>
-        `,
+        html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5;"><div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;"><div style="background-color: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"><h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 20px 0; font-weight: 600;">You're Invited! 🎉</h1><p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;"><strong>${safeInviterName}</strong> has invited you to join their family circle <strong>"${safeCircleName}"</strong> on Familial.</p><p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Familial is a private space for families to share photos, events, messages, and memories together.</p><div style="text-align: center; margin: 30px 0;"><a href="https://familialapp.lovable.app/auth" style="display: inline-block; background-color: #1a1a1a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Join Familial</a></div><p style="color: #888; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0; border-top: 1px solid #eee; padding-top: 20px;">Once you sign up with this email address (${safeEmail}), you'll automatically be connected to the circle.</p></div><p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">© Familial - Connecting families everywhere</p></div></body></html>`,
       }),
     });
 
@@ -203,9 +146,10 @@ const handler = async (req: Request): Promise<Response> => {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error("Error sending invite email:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
