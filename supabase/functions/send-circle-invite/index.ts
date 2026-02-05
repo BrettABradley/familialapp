@@ -134,7 +134,7 @@ const handler = async (req: Request): Promise<Response> => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Familial <noreply@yourdomain.com>", // TODO: Replace with your verified domain from resend.com/domains
+        from: "Familial <noreply@familialmedia.com>",
         to: [email],
         subject: `You're invited to join ${safeCircleName} on Familial!`,
         html: `
