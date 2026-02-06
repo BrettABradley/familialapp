@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,9 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { MobileNavigation } from "@/components/layout/MobileNavigation";
-import { Plus, Users, LogOut, ArrowLeft, Trash2, UserPlus, Crown, Edit, Settings } from "lucide-react";
-import icon from "@/assets/icon.png";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit } from "lucide-react";
 
 interface Circle {
   id: string;
@@ -36,11 +36,12 @@ interface CircleMembership {
 }
 
 const Circles = () => {
-  const { user, loading, signOut } = useAuth();
+  const { user } = useAuth();
+  const { circles, isLoading: contextLoading, refetchCircles, profile } = useCircleContext();
   const navigate = useNavigate();
   const { toast } = useToast();
   const db: any = supabase;
-  const [circles, setCircles] = useState<Circle[]>([]);
+  
   const [memberships, setMemberships] = useState<CircleMembership[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -55,52 +56,9 @@ const Circles = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
-  const [profile, setProfile] = useState<{ display_name: string | null } | null>(null);
 
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate("/auth");
-    }
-  }, [user, loading, navigate]);
-
-  useEffect(() => {
-    if (user) {
-      fetchCircles();
-      fetchProfile();
-    }
-  }, [user]);
-
-  const fetchProfile = async () => {
-    if (!user) return;
-    const { data } = await supabase.from("profiles").select("display_name").eq("user_id", user.id).maybeSingle();
-    if (data) setProfile(data);
-  };
-
-  const fetchCircles = async () => {
-    if (!user) return;
-
-    const { data: ownedCircles } = await db.from("circles").select("*").eq("owner_id", user.id);
-    const { data: memberCircles } = await db
-      .from("circle_memberships")
-      .select("circle_id, circles(*)")
-      .eq("user_id", user.id);
-
-    const allCircles: Circle[] = [];
-    
-    if (ownedCircles) {
-      allCircles.push(...ownedCircles);
-    }
-    
-    if (memberCircles) {
-      memberCircles.forEach((m) => {
-        if (m.circles && !allCircles.find(c => c.id === (m.circles as Circle).id)) {
-          allCircles.push(m.circles as Circle);
-        }
-      });
-    }
-    
-    setCircles(allCircles);
-  };
+  // Type guard for circles with full properties
+  const circlesList = circles as unknown as Circle[];
 
   const fetchMemberships = async (circleId: string) => {
     const { data } = await db
@@ -142,7 +100,7 @@ const Circles = () => {
     setNewCircleName("");
     setNewCircleDescription("");
     setIsCreateOpen(false);
-    await fetchCircles();
+    await refetchCircles();
     setIsCreating(false);
   };
 
@@ -161,7 +119,7 @@ const Circles = () => {
     } else {
       toast({ title: "Updated!", description: "Circle information saved." });
       setIsEditOpen(false);
-      fetchCircles();
+      refetchCircles();
     }
 
     setIsUpdating(false);
@@ -172,7 +130,6 @@ const Circles = () => {
     
     setIsSendingInvite(true);
 
-    // First create the invite record
     const { error } = await db.from("circle_invites").insert({
       circle_id: selectedCircle.id,
       invited_by: user.id,
@@ -185,7 +142,6 @@ const Circles = () => {
       return;
     }
 
-    // Send email via edge function
     try {
       const { error: emailError } = await supabase.functions.invoke("send-circle-invite", {
         body: {
@@ -247,164 +203,171 @@ const Circles = () => {
     if (error) {
       toast({ title: "Error", description: "Failed to delete circle.", variant: "destructive" });
     } else {
-      fetchCircles();
+      refetchCircles();
       toast({ title: "Circle deleted" });
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
-  };
-
   const isOwner = (circle: Circle) => circle.owner_id === user?.id;
 
-  if (loading) {
+  if (contextLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
+      <main className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <Skeleton className="h-9 w-40 mb-2" />
+            <Skeleton className="h-5 w-64" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
+          {[1, 2].map(i => (
+            <Card key={i}>
+              <CardHeader>
+                <div className="flex items-start gap-3">
+                  <Skeleton className="h-12 w-12 rounded-full" />
+                  <div className="flex-1">
+                    <Skeleton className="h-5 w-32 mb-2" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-4 w-full mb-4" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-9 w-20" />
+                  <Skeleton className="h-9 w-24" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={icon} alt="Familial" className="h-8 w-auto" />
-            <span className="font-serif text-lg font-bold text-foreground">Familial</span>
-          </Link>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <Link to="/feed"><Button variant="ghost" size="sm" className="min-h-[44px]"><ArrowLeft className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Back to Feed</span></Button></Link>
-            <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={handleSignOut}><LogOut className="w-4 h-4 sm:mr-2" /><span className="hidden sm:inline">Sign Out</span></Button>
-          </div>
+    <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="font-serif text-3xl font-bold text-foreground">Your Circles</h1>
+          <p className="text-muted-foreground mt-1">Private spaces for your family and close friends</p>
         </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="font-serif text-3xl font-bold text-foreground">Your Circles</h1>
-            <p className="text-muted-foreground mt-1">Private spaces for your family and close friends</p>
-          </div>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Create Circle</Button></DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="font-serif">Create a New Circle</DialogTitle>
-                <DialogDescription>A circle is a private space for your family or close friends.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Circle Name</Label>
-                  <Input id="name" placeholder="e.g., Smith Family" value={newCircleName} onChange={(e) => setNewCircleName(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description (optional)</Label>
-                  <Textarea id="description" placeholder="What's this circle about?" value={newCircleDescription} onChange={(e) => setNewCircleDescription(e.target.value)} />
-                </div>
-                <Button className="w-full" onClick={handleCreateCircle} disabled={!newCircleName.trim() || isCreating}>{isCreating ? "Creating..." : "Create Circle"}</Button>
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Create Circle</Button></DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-serif">Create a New Circle</DialogTitle>
+              <DialogDescription>A circle is a private space for your family or close friends.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Circle Name</Label>
+                <Input id="name" placeholder="e.g., Smith Family" value={newCircleName} onChange={(e) => setNewCircleName(e.target.value)} />
               </div>
-            </DialogContent>
-          </Dialog>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description (optional)</Label>
+                <Textarea id="description" placeholder="What's this circle about?" value={newCircleDescription} onChange={(e) => setNewCircleDescription(e.target.value)} />
+              </div>
+              <Button className="w-full" onClick={handleCreateCircle} disabled={!newCircleName.trim() || isCreating}>{isCreating ? "Creating..." : "Create Circle"}</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {circlesList.length === 0 ? (
+        <Card><CardContent className="py-12 text-center"><Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><h3 className="font-serif text-xl font-semibold text-foreground mb-2">No circles yet</h3><p className="text-muted-foreground mb-6">Create your first circle to start sharing with your family.</p><Button onClick={() => setIsCreateOpen(true)}><Plus className="w-4 h-4 mr-2" />Create Your First Circle</Button></CardContent></Card>
+      ) : (
+        <div className="grid md:grid-cols-2 gap-6">
+          {circlesList.map((circle) => (
+            <Card key={circle.id} className="relative group">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12"><AvatarFallback className="bg-secondary text-foreground font-serif text-lg">{circle.name.charAt(0)}</AvatarFallback></Avatar>
+                    <div>
+                      <CardTitle className="font-serif text-lg flex items-center gap-2">{circle.name}{isOwner(circle) && <Crown className="w-4 h-4 text-muted-foreground" />}</CardTitle>
+                      <CardDescription>Created {new Date(circle.created_at).toLocaleDateString()}</CardDescription>
+                    </div>
+                  </div>
+                  {isOwner(circle) && (
+                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100" onClick={() => handleDeleteCircle(circle)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {circle.description && <p className="text-muted-foreground text-sm mb-4">{circle.description}</p>}
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { setSelectedCircle(circle); setIsInviteOpen(true); }}><UserPlus className="w-4 h-4 mr-2" />Invite</Button>
+                  <Button variant="outline" size="sm" onClick={() => { setSelectedCircle(circle); fetchMemberships(circle.id); setIsMembersOpen(true); }}><Users className="w-4 h-4 mr-2" />Members</Button>
+                  {isOwner(circle) && (
+                    <Button variant="outline" size="sm" onClick={() => { setSelectedCircle(circle); setEditName(circle.name); setEditDescription(circle.description || ""); setIsEditOpen(true); }}><Edit className="w-4 h-4 mr-2" />Edit</Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
+      )}
 
-        {circles.length === 0 ? (
-          <Card><CardContent className="py-12 text-center"><Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><h3 className="font-serif text-xl font-semibold text-foreground mb-2">No circles yet</h3><p className="text-muted-foreground mb-6">Create your first circle to start sharing with your family.</p><Button onClick={() => setIsCreateOpen(true)}><Plus className="w-4 h-4 mr-2" />Create Your First Circle</Button></CardContent></Card>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-6">
-            {circles.map((circle) => (
-              <Card key={circle.id} className="relative group">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-12 w-12"><AvatarFallback className="bg-secondary text-foreground font-serif text-lg">{circle.name.charAt(0)}</AvatarFallback></Avatar>
-                      <div>
-                        <CardTitle className="font-serif text-lg flex items-center gap-2">{circle.name}{isOwner(circle) && <Crown className="w-4 h-4 text-muted-foreground" />}</CardTitle>
-                        <CardDescription>Created {new Date(circle.created_at).toLocaleDateString()}</CardDescription>
-                      </div>
-                    </div>
-                    {isOwner(circle) && (
-                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100" onClick={() => handleDeleteCircle(circle)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {circle.description && <p className="text-muted-foreground text-sm mb-4">{circle.description}</p>}
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={() => { setSelectedCircle(circle); setIsInviteOpen(true); }}><UserPlus className="w-4 h-4 mr-2" />Invite</Button>
-                    <Button variant="outline" size="sm" onClick={() => { setSelectedCircle(circle); fetchMemberships(circle.id); setIsMembersOpen(true); }}><Users className="w-4 h-4 mr-2" />Members</Button>
-                    {isOwner(circle) && (
-                      <Button variant="outline" size="sm" onClick={() => { setSelectedCircle(circle); setEditName(circle.name); setEditDescription(circle.description || ""); setIsEditOpen(true); }}><Edit className="w-4 h-4 mr-2" />Edit</Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      {/* Invite Dialog */}
+      <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="font-serif">Invite to {selectedCircle?.name}</DialogTitle><DialogDescription>Send an invitation to join this circle.</DialogDescription></DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2"><Label htmlFor="email">Email Address</Label><Input id="email" type="email" placeholder="family@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} /></div>
+            <Button className="w-full" onClick={handleInviteMember} disabled={!inviteEmail.trim() || isSendingInvite}>{isSendingInvite ? "Sending..." : "Send Invitation"}</Button>
           </div>
-        )}
+        </DialogContent>
+      </Dialog>
 
-        {/* Invite Dialog */}
-        <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-          <DialogContent>
-            <DialogHeader><DialogTitle className="font-serif">Invite to {selectedCircle?.name}</DialogTitle><DialogDescription>Send an invitation to join this circle.</DialogDescription></DialogHeader>
-            <div className="space-y-4 mt-4">
-              <div className="space-y-2"><Label htmlFor="email">Email Address</Label><Input id="email" type="email" placeholder="family@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} /></div>
-              <Button className="w-full" onClick={handleInviteMember} disabled={!inviteEmail.trim() || isSendingInvite}>{isSendingInvite ? "Sending..." : "Send Invitation"}</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+      {/* Edit Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="font-serif">Edit {selectedCircle?.name}</DialogTitle></DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2"><Label>Name</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Description</Label><Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} /></div>
+            <Button className="w-full" onClick={handleUpdateCircle} disabled={!editName.trim() || isUpdating}>{isUpdating ? "Saving..." : "Save Changes"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-        {/* Edit Dialog */}
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent>
-            <DialogHeader><DialogTitle className="font-serif">Edit {selectedCircle?.name}</DialogTitle></DialogHeader>
-            <div className="space-y-4 mt-4">
-              <div className="space-y-2"><Label>Name</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} /></div>
-              <div className="space-y-2"><Label>Description</Label><Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} /></div>
-              <Button className="w-full" onClick={handleUpdateCircle} disabled={!editName.trim() || isUpdating}>{isUpdating ? "Saving..." : "Save Changes"}</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Members Dialog */}
-        <Dialog open={isMembersOpen} onOpenChange={setIsMembersOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle className="font-serif">{selectedCircle?.name} Members</DialogTitle></DialogHeader>
-            <div className="space-y-3 mt-4 max-h-96 overflow-y-auto">
-              {memberships.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">No members yet</p>
-              ) : (
-                memberships.map((member) => (
-                  <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border border-border">
-                    <Avatar className="h-10 w-10"><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
-                    <div className="flex-1">
-                      <p className="font-medium text-foreground">{member.profiles?.display_name || "Unknown"}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
-                    </div>
-                    {isOwner(selectedCircle!) && member.user_id !== user?.id && (
-                      <div className="flex items-center gap-2">
-                        <Select value={member.role} onValueChange={(val) => handleUpdateRole(member, val)}>
-                          <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="moderator">Mod</SelectItem>
-                            <SelectItem value="member">Member</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(member)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                      </div>
-                    )}
+      {/* Members Dialog */}
+      <Dialog open={isMembersOpen} onOpenChange={setIsMembersOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="font-serif">{selectedCircle?.name} Members</DialogTitle></DialogHeader>
+          <div className="space-y-3 mt-4 max-h-96 overflow-y-auto">
+            {memberships.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">No members yet</p>
+            ) : (
+              memberships.map((member) => (
+                <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border border-border">
+                  <Avatar className="h-10 w-10"><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">{member.profiles?.display_name || "Unknown"}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
                   </div>
-                ))
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      </main>
-      <MobileNavigation />
-    </div>
+                  {selectedCircle && isOwner(selectedCircle) && member.user_id !== user?.id && (
+                    <div className="flex items-center gap-2">
+                      <Select value={member.role} onValueChange={(val) => handleUpdateRole(member, val)}>
+                        <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="moderator">Mod</SelectItem>
+                          <SelectItem value="member">Member</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(member)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </main>
   );
 };
 

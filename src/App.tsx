@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -28,18 +29,24 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Public routes */}
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/feed" element={<Feed />} />
-            <Route path="/circles" element={<Circles />} />
             <Route path="/store" element={<Store />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/events" element={<Events />} />
-            <Route path="/fridge" element={<Fridge />} />
-            <Route path="/notifications" element={<Notifications />} />
-            <Route path="/family-tree" element={<FamilyTree />} />
-            <Route path="/albums" element={<Albums />} />
-            <Route path="/messages" element={<Messages />} />
+            
+            {/* Authenticated routes with persistent layout */}
+            <Route element={<AppLayout />}>
+              <Route path="/feed" element={<Feed />} />
+              <Route path="/circles" element={<Circles />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/events" element={<Events />} />
+              <Route path="/fridge" element={<Fridge />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/family-tree" element={<FamilyTree />} />
+              <Route path="/albums" element={<Albums />} />
+              <Route path="/messages" element={<Messages />} />
+            </Route>
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

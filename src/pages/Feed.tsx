@@ -1,17 +1,16 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useCircleContext } from "@/contexts/CircleContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CircleHeader } from "@/components/layout/CircleHeader";
-import { MobileNavigation } from "@/components/layout/MobileNavigation";
 import { Heart, MessageCircle, Send, Users, Plus, Image, Download, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Profile {
   id: string;
@@ -48,92 +47,33 @@ interface Post {
 }
 
 const Feed = () => {
-  const { user, loading, signOut } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { circles, selectedCircle, setSelectedCircle, profile, isLoading: contextLoading } = useCircleContext();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [posts, setPosts] = useState<Post[]>([]);
-  const [circles, setCircles] = useState<Circle[]>([]);
-  const [selectedCircle, setSelectedCircle] = useState<string>("");
   const [newPostContent, setNewPostContent] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isPosting, setIsPosting] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [isSubmittingComment, setIsSubmittingComment] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate("/auth");
-    }
-  }, [user, loading, navigate]);
-
-  useEffect(() => {
-    if (user) {
-      fetchProfile();
-      fetchCircles();
-    }
-  }, [user]);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true);
 
   useEffect(() => {
     if (circles.length > 0) {
       fetchPosts();
+    } else if (!contextLoading) {
+      setIsLoadingPosts(false);
     }
-  }, [circles]);
-
-  const fetchProfile = async () => {
-    if (!user) return;
-    
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    
-    if (!error && data) {
-      setProfile(data);
-    }
-  };
-
-  const fetchCircles = async () => {
-    if (!user) return;
-    
-    const { data: ownedCircles } = await supabase
-      .from("circles")
-      .select("*")
-      .eq("owner_id", user.id);
-
-    const { data: memberCircles } = await supabase
-      .from("circle_memberships")
-      .select("circle_id, circles(*)")
-      .eq("user_id", user.id);
-
-    const allCircles: Circle[] = [];
-    
-    if (ownedCircles) {
-      allCircles.push(...ownedCircles);
-    }
-    
-    if (memberCircles) {
-      memberCircles.forEach((m) => {
-        if (m.circles && !allCircles.find(c => c.id === (m.circles as Circle).id)) {
-          allCircles.push(m.circles as Circle);
-        }
-      });
-    }
-    
-    setCircles(allCircles);
-    if (allCircles.length > 0 && !selectedCircle) {
-      setSelectedCircle(allCircles[0].id);
-    }
-  };
+  }, [circles, contextLoading]);
 
   const fetchPosts = async () => {
     if (circles.length === 0) return;
     
+    setIsLoadingPosts(true);
     const circleIds = circles.map(c => c.id);
     
     const { data, error } = await supabase
@@ -152,6 +92,7 @@ const Feed = () => {
     if (!error && data) {
       setPosts(data as unknown as Post[]);
     }
+    setIsLoadingPosts(false);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -331,290 +272,302 @@ const Feed = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
-
   const hasUserReacted = (post: Post) => {
     return post.reactions?.some(r => r.user_id === user?.id);
   };
 
-  return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
-      <CircleHeader
-        circles={circles}
-        selectedCircle={selectedCircle}
-        onCircleChange={setSelectedCircle}
-        onSignOut={handleSignOut}
-      />
-
+  // Show skeleton while loading
+  if (contextLoading || isLoadingPosts) {
+    return (
       <main className="container mx-auto px-4 py-8 max-w-2xl">
-        {/* Create Post */}
-        {circles.length > 0 ? (
-          <Card className="mb-8">
+        <Card className="mb-8">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="flex-1">
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-24 w-full mb-4" />
+            <div className="flex justify-between">
+              <Skeleton className="h-9 w-28" />
+              <Skeleton className="h-9 w-20" />
+            </div>
+          </CardContent>
+        </Card>
+        {[1, 2, 3].map(i => (
+          <Card key={i} className="mb-6">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div>
+                  <Skeleton className="h-4 w-32 mb-2" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-16 w-full mb-4" />
+              <Skeleton className="h-48 w-full rounded-lg" />
+            </CardContent>
+          </Card>
+        ))}
+      </main>
+    );
+  }
+
+  return (
+    <main className="container mx-auto px-4 py-8 max-w-2xl">
+      {/* Create Post */}
+      {circles.length > 0 ? (
+        <Card className="mb-8">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <Avatar>
+                <AvatarImage src={profile?.avatar_url || undefined} />
+                <AvatarFallback>
+                  {profile?.display_name?.charAt(0).toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <p className="font-medium text-foreground">{profile?.display_name || "You"}</p>
+                <Select value={selectedCircle} onValueChange={setSelectedCircle}>
+                  <SelectTrigger className="w-fit h-7 text-xs border-none p-0 text-muted-foreground">
+                    <SelectValue placeholder="Select circle" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {circles.map((circle) => (
+                      <SelectItem key={circle.id} value={circle.id}>
+                        {circle.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Textarea
+              placeholder="What's happening with the family?"
+              value={newPostContent}
+              onChange={(e) => setNewPostContent(e.target.value)}
+              className="min-h-[100px] resize-none mb-4"
+            />
+            
+            {/* Image Previews */}
+            {previewUrls.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {previewUrls.map((url, index) => (
+                  <div key={index} className="relative aspect-square rounded-lg overflow-hidden">
+                    <img
+                      src={url}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="absolute top-2 right-2 bg-background/80 rounded-full p-1 hover:bg-background transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Image className="w-4 h-4 mr-2" />
+                Add Photos
+              </Button>
+              <Button 
+                onClick={handleCreatePost} 
+                disabled={(!newPostContent.trim() && selectedFiles.length === 0) || isPosting}
+              >
+                <Send className="w-4 h-4 mr-2" />
+                {isPosting ? "Posting..." : "Share"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="mb-8">
+          <CardContent className="py-12 text-center">
+            <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+              Create Your First Circle
+            </h3>
+            <p className="text-muted-foreground mb-6">
+              Circles are private spaces for your family or close friends.
+            </p>
+            <Link to="/circles">
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Create a Circle
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Posts Feed */}
+      <div className="space-y-6">
+        {posts.length === 0 && circles.length > 0 && (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-muted-foreground">
+                No posts yet. Be the first to share something with your circle!
+              </p>
+            </CardContent>
+          </Card>
+        )}
+        
+        {posts.map((post) => (
+          <Card key={post.id}>
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3">
                 <Avatar>
-                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarImage src={post.profiles?.avatar_url || undefined} />
                   <AvatarFallback>
-                    {profile?.display_name?.charAt(0).toUpperCase() || "U"}
+                    {post.profiles?.display_name?.charAt(0).toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1">
-                  <p className="font-medium text-foreground">{profile?.display_name || "You"}</p>
-                  <Select value={selectedCircle} onValueChange={setSelectedCircle}>
-                    <SelectTrigger className="w-fit h-7 text-xs border-none p-0 text-muted-foreground">
-                      <SelectValue placeholder="Select circle" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {circles.map((circle) => (
-                        <SelectItem key={circle.id} value={circle.id}>
-                          {circle.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div>
+                  <p className="font-medium text-foreground">
+                    {post.profiles?.display_name || "Unknown"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {post.circles?.name} • {new Date(post.created_at).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <Textarea
-                placeholder="What's happening with the family?"
-                value={newPostContent}
-                onChange={(e) => setNewPostContent(e.target.value)}
-                className="min-h-[100px] resize-none mb-4"
-              />
+              {post.content && (
+                <p className="text-foreground whitespace-pre-wrap mb-4">{post.content}</p>
+              )}
               
-              {/* Image Previews */}
-              {previewUrls.length > 0 && (
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  {previewUrls.map((url, index) => (
-                    <div key={index} className="relative aspect-square rounded-lg overflow-hidden">
+              {post.media_urls && post.media_urls.length > 0 && (
+                <div className={`grid gap-2 mb-4 ${post.media_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  {post.media_urls.map((url, index) => (
+                    <div key={index} className="relative group aspect-square rounded-lg overflow-hidden">
                       <img
                         src={url}
-                        alt={`Preview ${index + 1}`}
+                        alt={`Post image ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
                       <button
-                        onClick={() => removeFile(index)}
-                        className="absolute top-2 right-2 bg-background/80 rounded-full p-1 hover:bg-background transition-colors"
+                        onClick={() => handleDownloadImage(url)}
+                        className="absolute bottom-2 right-2 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
                       >
-                        <X className="w-4 h-4" />
+                        <Download className="w-4 h-4" />
                       </button>
                     </div>
                   ))}
                 </div>
               )}
 
-              <div className="flex items-center justify-between">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,video/*"
-                  multiple
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                <Button 
-                  variant="ghost" 
+              {/* Actions */}
+              <div className="flex items-center gap-4 pt-2 border-t border-border">
+                <Button
+                  variant="ghost"
                   size="sm"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => handleReaction(post.id)}
+                  className={hasUserReacted(post) ? "text-destructive" : ""}
                 >
-                  <Image className="w-4 h-4 mr-2" />
-                  Add Photos
+                  <Heart className={`w-4 h-4 mr-1 ${hasUserReacted(post) ? "fill-current" : ""}`} />
+                  {post.reactions?.length || 0}
                 </Button>
-                <Button 
-                  onClick={handleCreatePost} 
-                  disabled={(!newPostContent.trim() && selectedFiles.length === 0) || isPosting}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => toggleComments(post.id)}
                 >
-                  <Send className="w-4 h-4 mr-2" />
-                  {isPosting ? "Posting..." : "Share"}
+                  <MessageCircle className="w-4 h-4 mr-1" />
+                  {post.comments?.length || 0}
+                  {expandedComments.has(post.id) ? (
+                    <ChevronUp className="w-4 h-4 ml-1" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 ml-1" />
+                  )}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="mb-8">
-            <CardContent className="py-12 text-center">
-              <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
-                Create Your First Circle
-              </h3>
-              <p className="text-muted-foreground mb-6">
-                Circles are private spaces for your family or close friends.
-              </p>
-              <Link to="/circles">
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create a Circle
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Posts Feed */}
-        <div className="space-y-6">
-          {posts.length === 0 && circles.length > 0 && (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">
-                  No posts yet. Be the first to share something with your circle!
-                </p>
-              </CardContent>
-            </Card>
-          )}
-          
-          {posts.map((post) => (
-            <Card key={post.id}>
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <Avatar>
-                    <AvatarImage src={post.profiles?.avatar_url || undefined} />
-                    <AvatarFallback>
-                      {post.profiles?.display_name?.charAt(0).toUpperCase() || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {post.profiles?.display_name || "Unknown"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {post.circles?.name} • {new Date(post.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                {post.content && (
-                  <p className="text-foreground whitespace-pre-wrap mb-4">{post.content}</p>
-                )}
-                
-                {/* Media Grid */}
-                {post.media_urls && post.media_urls.length > 0 && (
-                  <div className={`grid gap-2 mb-4 ${post.media_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                    {post.media_urls.map((url, index) => (
-                      <div key={index} className="relative aspect-square rounded-lg overflow-hidden group">
-                        <img
-                          src={url}
-                          alt={`Photo ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        <button
-                          onClick={() => handleDownloadImage(url)}
-                          className="absolute bottom-2 right-2 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex items-center gap-4 pt-4 border-t border-border">
-                  <button
-                    onClick={() => handleReaction(post.id)}
-                    className={`flex items-center gap-2 text-sm transition-colors ${
-                      hasUserReacted(post) 
-                        ? "text-foreground" 
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Heart className={`w-4 h-4 ${hasUserReacted(post) ? "fill-current" : ""}`} />
-                    <span>{post.reactions?.length || 0}</span>
-                  </button>
-                  <button 
-                    onClick={() => toggleComments(post.id)}
-                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    <span>{post.comments?.length || 0}</span>
-                    {expandedComments.has(post.id) ? (
-                      <ChevronUp className="w-3 h-3" />
-                    ) : (
-                      <ChevronDown className="w-3 h-3" />
-                    )}
-                  </button>
-                </div>
-
-                {/* Comments Section */}
-                {expandedComments.has(post.id) && (
-                  <div className="mt-4 pt-4 border-t border-border space-y-4">
-                    {/* Comment Input */}
-                    <div className="flex gap-2">
+              {/* Comments Section */}
+              {expandedComments.has(post.id) && (
+                <div className="mt-4 pt-4 border-t border-border space-y-3">
+                  {post.comments?.map((comment) => (
+                    <div key={comment.id} className="flex gap-3">
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={profile?.avatar_url || undefined} />
+                        <AvatarImage src={comment.profiles?.avatar_url || undefined} />
                         <AvatarFallback className="text-xs">
-                          {profile?.display_name?.charAt(0).toUpperCase() || "U"}
+                          {comment.profiles?.display_name?.charAt(0).toUpperCase() || "U"}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1 flex gap-2">
-                        <Input
-                          placeholder="Write a comment..."
-                          value={commentInputs[post.id] || ""}
-                          onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                              e.preventDefault();
-                              handleSubmitComment(post.id);
-                            }
-                          }}
-                          className="h-8 text-sm"
-                        />
-                        <Button 
-                          size="sm" 
-                          onClick={() => handleSubmitComment(post.id)}
-                          disabled={!commentInputs[post.id]?.trim() || isSubmittingComment === post.id}
-                        >
-                          <Send className="w-3 h-3" />
-                        </Button>
+                      <div className="flex-1 bg-secondary rounded-lg px-3 py-2">
+                        <p className="text-sm font-medium text-foreground">
+                          {comment.profiles?.display_name || "Unknown"}
+                        </p>
+                        <p className="text-sm text-foreground">{comment.content}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(comment.created_at).toLocaleDateString()}
+                        </p>
                       </div>
                     </div>
-
-                    {/* Comments List */}
-                    {post.comments && post.comments.length > 0 && (
-                      <div className="space-y-3">
-                        {post.comments.map((comment) => (
-                          <div key={comment.id} className="flex gap-2">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={comment.profiles?.avatar_url || undefined} />
-                              <AvatarFallback className="text-xs">
-                                {comment.profiles?.display_name?.charAt(0).toUpperCase() || "U"}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 bg-muted rounded-lg px-3 py-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-foreground">
-                                  {comment.profiles?.display_name || "Unknown"}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(comment.created_at).toLocaleDateString()}
-                                </span>
-                              </div>
-                              <p className="text-sm text-foreground">{comment.content}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  ))}
+                  
+                  <div className="flex gap-2">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={profile?.avatar_url || undefined} />
+                      <AvatarFallback className="text-xs">
+                        {profile?.display_name?.charAt(0).toUpperCase() || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Write a comment..."
+                        value={commentInputs[post.id] || ""}
+                        onChange={(e) => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSubmitComment(post.id);
+                          }
+                        }}
+                        className="flex-1 bg-secondary rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => handleSubmitComment(post.id)}
+                        disabled={!commentInputs[post.id]?.trim() || isSubmittingComment === post.id}
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </main>
-      <MobileNavigation />
-    </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </main>
   );
 };
 

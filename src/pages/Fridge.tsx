@@ -1,21 +1,20 @@
 // @ts-nocheck
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CircleHeader } from "@/components/layout/CircleHeader";
-import { MobileNavigation } from "@/components/layout/MobileNavigation";
+import { Skeleton } from "@/components/ui/skeleton";
 import { FridgeBoard, type FridgeBoardPin } from "@/components/fridge/FridgeBoard";
-import { Plus, Pin, Image, FileText, Calendar } from "lucide-react";
-
+import { Plus, Pin, Image, FileText, Calendar, Users } from "lucide-react";
 
 interface Circle {
   id: string;
@@ -36,82 +35,71 @@ interface FridgePin {
 }
 
 const Fridge = () => {
-  const { user, loading, signOut } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading } = useCircleContext();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const db: any = supabase;
   
   const [pins, setPins] = useState<FridgePin[]>([]);
-  const [circles, setCircles] = useState<Circle[]>([]);
   const [adminCircles, setAdminCircles] = useState<Circle[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedCircle, setSelectedCircle] = useState<string>("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [pinType, setPinType] = useState("note");
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isLoadingPins, setIsLoadingPins] = useState(true);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate("/auth");
+    if (user && circles.length > 0) {
+      fetchAdminCircles();
     }
-  }, [user, loading, navigate]);
-
-  useEffect(() => {
-    if (user) {
-      fetchCircles();
-    }
-  }, [user]);
+  }, [user, circles]);
 
   useEffect(() => {
     if (circles.length > 0) {
       fetchPins();
+    } else if (!contextLoading) {
+      setIsLoadingPins(false);
     }
-  }, [circles, selectedCircle]);
+  }, [circles, selectedCircle, contextLoading]);
 
-  const fetchCircles = async () => {
+  const fetchAdminCircles = async () => {
     if (!user) return;
 
-    const { data: ownedCircles } = await db.from("circles").select("*").eq("owner_id", user.id);
+    const adminList: Circle[] = [];
 
+    // Owned circles are always admin
+    circles.forEach(c => {
+      if (c.owner_id === user.id) {
+        adminList.push(c);
+      }
+    });
+
+    // Check memberships for admin role
     const { data: memberCircles } = await db
       .from("circle_memberships")
       .select("circle_id, role, circles(*)")
-      .eq("user_id", user.id);
-
-    const allCircles: Circle[] = [];
-    const adminList: Circle[] = [];
-
-    if (ownedCircles) {
-      allCircles.push(...ownedCircles);
-      adminList.push(...ownedCircles);
-    }
+      .eq("user_id", user.id)
+      .eq("role", "admin");
 
     if (memberCircles) {
       memberCircles.forEach((m: any) => {
-        if (m.circles && !allCircles.find((c) => c.id === (m.circles as Circle).id)) {
-          allCircles.push(m.circles as Circle);
-        }
-        if (m.role === "admin" && m.circles) {
+        if (m.circles && !adminList.find((c) => c.id === (m.circles as Circle).id)) {
           adminList.push(m.circles as Circle);
         }
       });
     }
 
-    setCircles(allCircles);
     setAdminCircles(adminList);
-    if (allCircles.length > 0 && !selectedCircle) {
-      setSelectedCircle(allCircles[0].id);
-    }
   };
 
   const fetchPins = async () => {
     if (circles.length === 0) return;
 
-    // Filter by selected circle if one is selected
+    setIsLoadingPins(true);
     const circleIds = selectedCircle ? [selectedCircle] : circles.map((c) => c.id);
 
     const { data, error } = await db
@@ -124,6 +112,7 @@ const Fridge = () => {
     if (!error && data) {
       setPins(data as unknown as FridgePin[]);
     }
+    setIsLoadingPins(false);
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -222,196 +211,208 @@ const Fridge = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
-  };
-
-  if (loading) {
+  if (contextLoading || isLoadingPins) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
+      <main className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <Skeleton className="h-9 w-40 mb-2" />
+            <Skeleton className="h-5 w-64" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} className="aspect-square rounded-lg" />
+          ))}
+        </div>
+      </main>
+    );
+  }
+
+  if (circles.length === 0) {
+    return (
+      <main className="container mx-auto px-4 py-8 max-w-2xl">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+              Create a Circle First
+            </h3>
+            <p className="text-muted-foreground mb-6">
+              You need to create or join a circle before using the fridge.
+            </p>
+            <Link to="/circles">
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Create a Circle
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </main>
     );
   }
 
   const isAdmin = adminCircles.length > 0;
 
-  const getPinIcon = (type: string) => {
-    switch (type) {
-      case "image": return <Image className="w-4 h-4" />;
-      case "event": return <Calendar className="w-4 h-4" />;
-      default: return <FileText className="w-4 h-4" />;
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
-      <CircleHeader
-        circles={circles}
-        selectedCircle={selectedCircle}
-        onCircleChange={setSelectedCircle}
-        onSignOut={handleSignOut}
-      />
-
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="font-serif text-3xl font-bold text-foreground flex items-center gap-2">
-              <Pin className="w-8 h-8" />
-              Family Fridge
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Important notes, photos, and reminders for your family
-            </p>
-          </div>
-          {isAdmin && (
-            <Dialog open={isCreateOpen} onOpenChange={(open) => {
-              setIsCreateOpen(open);
-              if (!open) resetForm();
-            }}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Pin Something
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="font-serif">Pin to Fridge</DialogTitle>
-                  <DialogDescription>
-                    Add a note, photo, or reminder for your family.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label>Circle</Label>
-                    <Select value={selectedCircle} onValueChange={setSelectedCircle}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select circle" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {adminCircles.map((circle) => (
-                          <SelectItem key={circle.id} value={circle.id}>
-                            {circle.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <Select value={pinType} onValueChange={setPinType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="note">Note</SelectItem>
-                        <SelectItem value="image">Photo</SelectItem>
-                        <SelectItem value="event">Event/Reminder</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Title</Label>
-                    <Input
-                      id="title"
-                      placeholder="e.g., Grocery List"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="content">Content (optional)</Label>
-                    <Textarea
-                      id="content"
-                      placeholder="Add details..."
-                      value={content}
-                      onChange={(e) => setContent(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Image (optional)</Label>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageSelect}
-                      className="hidden"
-                    />
-                    {imagePreview ? (
-                      <div className="relative">
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-full aspect-video object-cover rounded-lg"
-                        />
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          className="absolute top-2 right-2"
-                          onClick={() => {
-                            setSelectedImage(null);
-                            URL.revokeObjectURL(imagePreview);
-                            setImagePreview(null);
-                          }}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <Image className="w-4 h-4 mr-2" />
-                        Add Image
-                      </Button>
-                    )}
-                  </div>
-
-                  <Button 
-                    className="w-full" 
-                    onClick={handleCreatePin}
-                    disabled={!title.trim() || !selectedCircle || isCreating}
-                  >
-                    {isCreating ? "Pinning..." : "Pin to Fridge"}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          )}
+    <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="font-serif text-3xl font-bold text-foreground flex items-center gap-2">
+            <Pin className="w-8 h-8" />
+            Family Fridge
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Important notes, photos, and reminders for your family
+          </p>
         </div>
+        {isAdmin && (
+          <Dialog open={isCreateOpen} onOpenChange={(open) => {
+            setIsCreateOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Pin Something
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="font-serif">Pin to Fridge</DialogTitle>
+                <DialogDescription>
+                  Add a note, photo, or reminder for your family.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label>Circle</Label>
+                  <Select value={selectedCircle} onValueChange={setSelectedCircle}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select circle" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {adminCircles.map((circle) => (
+                        <SelectItem key={circle.id} value={circle.id}>
+                          {circle.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-        {pins.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Pin className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
-                Nothing on the fridge yet
-              </h3>
-              <p className="text-muted-foreground">
-                {isAdmin 
-                  ? "Pin important notes, photos, and reminders for your family."
-                  : "Circle admins can pin items here."}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <FridgeBoard
-            pins={pins as unknown as FridgeBoardPin[]}
-            canDeleteCircleId={(circleId) => adminCircles.some((c) => c.id === circleId)}
-            onDelete={(pin) => handleDeletePin(pin as unknown as FridgePin)}
-          />
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <Select value={pinType} onValueChange={setPinType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="note">Note</SelectItem>
+                      <SelectItem value="image">Photo</SelectItem>
+                      <SelectItem value="event">Event/Reminder</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="title">Title</Label>
+                  <Input
+                    id="title"
+                    placeholder="e.g., Grocery List"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="content">Content (optional)</Label>
+                  <Textarea
+                    id="content"
+                    placeholder="Add details..."
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Image (optional)</Label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                  {imagePreview ? (
+                    <div className="relative">
+                      <img
+                        src={imagePreview}
+                        alt="Preview"
+                        className="w-full aspect-video object-cover rounded-lg"
+                      />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="absolute top-2 right-2"
+                        onClick={() => {
+                          setSelectedImage(null);
+                          URL.revokeObjectURL(imagePreview);
+                          setImagePreview(null);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Image className="w-4 h-4 mr-2" />
+                      Add Image
+                    </Button>
+                  )}
+                </div>
+
+                <Button 
+                  className="w-full" 
+                  onClick={handleCreatePin}
+                  disabled={!title.trim() || !selectedCircle || isCreating}
+                >
+                  {isCreating ? "Pinning..." : "Pin to Fridge"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
-      </main>
-      <MobileNavigation />
-    </div>
+      </div>
+
+      {pins.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Pin className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+              Nothing on the fridge yet
+            </h3>
+            <p className="text-muted-foreground">
+              {isAdmin 
+                ? "Pin important notes, photos, and reminders for your family."
+                : "Circle admins can pin items here."}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <FridgeBoard
+          pins={pins as unknown as FridgeBoardPin[]}
+          canDeleteCircleId={(circleId) => adminCircles.some((c) => c.id === circleId)}
+          onDelete={(pin) => handleDeletePin(pin as unknown as FridgePin)}
+        />
+      )}
+    </main>
   );
 };
 

@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { MobileNavigation } from "@/components/layout/MobileNavigation";
-import { Bell, ArrowLeft, Check, Trash2, Users, Heart, MessageCircle, Calendar, UserPlus } from "lucide-react";
-import icon from "@/assets/icon.png";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Bell, Check, Trash2, Heart, MessageCircle, Calendar, UserPlus, Users } from "lucide-react";
 
 interface Notification {
   id: string;
@@ -20,17 +19,11 @@ interface Notification {
 }
 
 const Notifications = () => {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { isLoading: contextLoading } = useCircleContext();
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate("/auth");
-    }
-  }, [user, loading, navigate]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -41,6 +34,7 @@ const Notifications = () => {
   const fetchNotifications = async () => {
     if (!user) return;
     
+    setIsLoadingNotifications(true);
     const { data, error } = await supabase
       .from("notifications")
       .select("*")
@@ -51,7 +45,7 @@ const Notifications = () => {
     if (!error && data) {
       setNotifications(data);
     }
-    setIsLoading(false);
+    setIsLoadingNotifications(false);
   };
 
   const markAsRead = async (id: string) => {
@@ -106,119 +100,121 @@ const Notifications = () => {
     }
   };
 
-  if (loading || isLoading) {
+  if (contextLoading || isLoadingNotifications) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
+      <main className="container mx-auto px-4 py-8 max-w-2xl">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <Skeleton className="h-9 w-40 mb-2" />
+            <Skeleton className="h-5 w-32" />
+          </div>
+          <Skeleton className="h-9 w-32" />
+        </div>
+        {[1, 2, 3, 4].map(i => (
+          <Card key={i} className="mb-3">
+            <CardContent className="py-4">
+              <div className="flex items-start gap-4">
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <div className="flex-1">
+                  <Skeleton className="h-5 w-48 mb-2" />
+                  <Skeleton className="h-4 w-64 mb-2" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </main>
     );
   }
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={icon} alt="Familial" className="h-8 w-auto" />
-            <span className="font-serif text-lg font-bold text-foreground">Familial</span>
-          </Link>
-          <Link to="/feed">
-            <Button variant="ghost" size="sm" className="min-h-[44px]">
-              <ArrowLeft className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Back to Feed</span>
-            </Button>
-          </Link>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8 max-w-2xl">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="font-serif text-3xl font-bold text-foreground flex items-center gap-3">
-              <Bell className="w-8 h-8" />
-              Notifications
-            </h1>
-            {unreadCount > 0 && (
-              <p className="text-muted-foreground mt-1">
-                {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
-              </p>
-            )}
-          </div>
+    <main className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="font-serif text-3xl font-bold text-foreground flex items-center gap-3">
+            <Bell className="w-8 h-8" />
+            Notifications
+          </h1>
           {unreadCount > 0 && (
-            <Button variant="outline" size="sm" onClick={markAllAsRead}>
-              <Check className="w-4 h-4 mr-2" />
-              Mark all read
-            </Button>
+            <p className="text-muted-foreground mt-1">
+              {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
+            </p>
           )}
         </div>
+        {unreadCount > 0 && (
+          <Button variant="outline" size="sm" onClick={markAllAsRead}>
+            <Check className="w-4 h-4 mr-2" />
+            Mark all read
+          </Button>
+        )}
+      </div>
 
-        {notifications.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Bell className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
-                No notifications yet
-              </h3>
-              <p className="text-muted-foreground">
-                You'll see updates from your circles here.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {notifications.map((notification) => (
-              <Card 
-                key={notification.id} 
-                className={`transition-colors ${!notification.is_read ? 'bg-secondary/30' : ''}`}
-              >
-                <CardContent className="py-4">
-                  <div className="flex items-start gap-4">
-                    <div className={`p-2 rounded-full ${!notification.is_read ? 'bg-foreground text-background' : 'bg-secondary text-foreground'}`}>
-                      {getNotificationIcon(notification.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-foreground ${!notification.is_read ? 'font-medium' : ''}`}>
-                        {notification.title}
+      {notifications.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Bell className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+              No notifications yet
+            </h3>
+            <p className="text-muted-foreground">
+              You'll see updates from your circles here.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {notifications.map((notification) => (
+            <Card 
+              key={notification.id} 
+              className={`transition-colors ${!notification.is_read ? 'bg-secondary/30' : ''}`}
+            >
+              <CardContent className="py-4">
+                <div className="flex items-start gap-4">
+                  <div className={`p-2 rounded-full ${!notification.is_read ? 'bg-foreground text-background' : 'bg-secondary text-foreground'}`}>
+                    {getNotificationIcon(notification.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-foreground ${!notification.is_read ? 'font-medium' : ''}`}>
+                      {notification.title}
+                    </p>
+                    {notification.message && (
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                        {notification.message}
                       </p>
-                      {notification.message && (
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                          {notification.message}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {new Date(notification.created_at).toLocaleDateString()} at{' '}
-                        {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {!notification.is_read && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => markAsRead(notification.id)}
-                        >
-                          <Check className="w-4 h-4" />
-                        </Button>
-                      )}
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {new Date(notification.created_at).toLocaleDateString()} at{' '}
+                      {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {!notification.is_read && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => deleteNotification(notification.id)}
+                        onClick={() => markAsRead(notification.id)}
                       >
-                        <Trash2 className="w-4 h-4 text-destructive" />
+                        <Check className="w-4 h-4" />
                       </Button>
-                    </div>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteNotification(notification.id)}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </main>
-      <MobileNavigation />
-    </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </main>
   );
 };
 
