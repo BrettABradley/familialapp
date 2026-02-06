@@ -1,13 +1,398 @@
+# Familial Mobile App Development Documentation
+## Combined PDR (Technical) + MDR (Marketing) for MANUS AI
 
+---
 
-# Marketing Design Report (MDR) for Familial Mobile Application
-## Visual Identity, Brand Voice, and Feature Messaging Guide for MANUS AI
+# PART 1: Product Development Report (PDR)
+## Technical Architecture and Implementation Guide
 
 ---
 
 ## Executive Summary
 
-This document provides the complete marketing and design specifications for the Familial mobile application. It covers the visual identity system, typography, color scheme, brand voice, feature messaging, and UI component patterns. This guide ensures visual and messaging consistency when MANUS AI develops the mobile application.
+This document provides a comprehensive Product Development Report for converting the Familial web application into native mobile applications (iOS and Android) using the MANUS AI autonomous agent platform. Familial is a private social network SaaS designed for families and close friend groups, featuring circle-based privacy, social feeds, media archival, events calendar, family tree visualization, and a digital "Family Fridge."
+
+---
+
+## 1. Project Overview
+
+### 1.1 Product Vision
+Familial is a private social network that connects families without algorithms, ads, or public data harvesting. The platform prioritizes privacy through user-defined "Circles" and provides a safe space for family communication and memory preservation.
+
+### 1.2 Target Users
+- Families seeking private digital spaces
+- Grandparents and elderly family members (primary mobile users)
+- Parents managing family activities and photo sharing
+- Extended family members staying connected across distances
+
+### 1.3 Business Model
+SaaS subscription model with potential tiered pricing for advanced features.
+
+---
+
+## 2. Current Technical Architecture
+
+### 2.1 Frontend Stack
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| React | 18.3.1 | UI Framework |
+| TypeScript | - | Type Safety |
+| Vite | - | Build Tool |
+| Tailwind CSS | - | Styling |
+| React Router DOM | 6.30.1 | Navigation |
+| TanStack Query | 5.83.0 | Server State Management |
+| Radix UI | Various | Component Primitives |
+| Lucide React | 0.462.0 | Icons |
+| date-fns | 3.6.0 | Date Utilities |
+| Zod | 3.25.76 | Schema Validation |
+| Recharts | 2.15.4 | Data Visualization |
+
+### 2.2 Backend Stack (Lovable Cloud / Supabase)
+| Service | Purpose |
+|---------|---------|
+| PostgreSQL Database | Primary data store |
+| Supabase Auth | User authentication |
+| Supabase Storage | Media file storage (avatars, post-media) |
+| Edge Functions (Deno) | Serverless backend logic |
+| Row Level Security (RLS) | Data access control |
+| Resend API | Transactional emails |
+
+### 2.3 Existing API Endpoints
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/functions/v1/send-circle-invite` | POST | Send email invitations to join circles |
+
+---
+
+## 3. Database Schema
+
+### 3.1 Core Tables
+
+```text
++-------------------+     +---------------------+     +------------------+
+|     profiles      |     |      circles        |     | circle_members   |
++-------------------+     +---------------------+     +------------------+
+| id (PK)           |     | id (PK)             |     | id (PK)          |
+| user_id (FK)      |     | name                |     | circle_id (FK)   |
+| display_name      |     | description         |     | user_id (FK)     |
+| avatar_url        |     | owner_id (FK)       |     | role             |
+| bio               |     | avatar_url          |     | joined_at        |
+| location          |     | created_at          |     +------------------+
++-------------------+     +---------------------+
+```
+
+### 3.2 Complete Table List
+1. **profiles** - User profile information
+2. **circles** - Private family/friend groups
+3. **circle_memberships** - User-circle relationships with roles
+4. **circle_invites** - Pending invitations with tokens
+5. **posts** - Social feed content with media
+6. **comments** - Post comments
+7. **reactions** - Post reactions (hearts)
+8. **events** - Calendar events per circle
+9. **photo_albums** - Organized photo collections
+10. **album_photos** - Individual photos in albums
+11. **fridge_pins** - Family fridge pinned items
+12. **family_tree_members** - Genealogy data
+13. **notifications** - User notifications
+14. **private_messages** - Direct messaging
+15. **user_roles** - Admin/moderator roles
+16. **photo_permissions** - Download access control
+
+---
+
+## 4. Feature Inventory
+
+### 4.1 Authentication Module
+| Feature | Description | Mobile Considerations |
+|---------|-------------|----------------------|
+| Email/Password Auth | Standard authentication | Biometric login option |
+| Email Verification | Confirm user emails | Deep linking for verification |
+| Session Management | JWT-based sessions | Secure token storage |
+
+### 4.2 Circles Module
+| Feature | Description | Mobile Considerations |
+|---------|-------------|----------------------|
+| Create Circle | Start new family group | Simple form UI |
+| Edit Circle | Update name/description | Admin-only access |
+| Delete Circle | Remove circle entirely | Confirmation dialog |
+| Invite Members | Email-based invitations | Share sheet integration |
+| Manage Members | Role assignment (admin/mod/member) | Easy role picker |
+| View Members | List all circle members | Searchable list |
+
+### 4.3 Social Feed Module
+| Feature | Description | Mobile Considerations |
+|---------|-------------|----------------------|
+| Create Post | Text + up to 4 images | Native camera/gallery access |
+| View Feed | Chronological posts | Pull-to-refresh |
+| React to Posts | Heart reactions | Haptic feedback |
+| Comment on Posts | Text comments | Keyboard handling |
+| Download Photos | Save to device | Native save functionality |
+| Circle Selector | Filter by circle | Dropdown or swipe navigation |
+
+### 4.4 Events Calendar Module
+| Feature | Description | Mobile Considerations |
+|---------|-------------|----------------------|
+| Create Event | Title, date, time, location | Native date/time pickers |
+| View Calendar | Monthly calendar view | Touch-friendly calendar |
+| Event List | Upcoming events | Scrollable list |
+| Delete Event | Remove events | Swipe-to-delete |
+
+### 4.5 Photo Albums Module
+| Feature | Description | Mobile Considerations |
+|---------|-------------|----------------------|
+| Create Album | Named collections | Simple creation flow |
+| Upload Photos | Batch image upload | Native image picker |
+| View Album | Photo grid | Pinch-to-zoom |
+| Delete Photos/Albums | Content removal | Confirmation dialogs |
+
+### 4.6 Family Fridge Module
+| Feature | Description | Mobile Considerations |
+|---------|-------------|----------------------|
+| Pin Items | Notes, photos, reminders | Quick-add FAB |
+| View Fridge | Grid of pinned items | Visual fridge metaphor |
+| Delete Pins | Remove items | Swipe or long-press |
+| Pin Types | Note, Image, Event | Type-specific icons |
+
+### 4.7 Family Tree Module
+| Feature | Description | Mobile Considerations |
+|---------|-------------|----------------------|
+| Add Members | Name, dates, gender, bio | Form with relationships |
+| View Tree | Member cards | Potential tree visualization |
+| Link Relationships | Parent/spouse connections | Relationship picker |
+| Delete Members | Remove from tree | Admin-only |
+
+### 4.8 Messages Module
+| Feature | Description | Mobile Considerations |
+|---------|-------------|----------------------|
+| Conversation List | All active chats | Unread indicators |
+| Direct Messages | 1:1 messaging | Real-time updates |
+| Search Members | Find circle members | Debounced search |
+| Mark as Read | Read status tracking | Auto-mark on view |
+
+### 4.9 Notifications Module
+| Feature | Description | Mobile Considerations |
+|---------|-------------|----------------------|
+| View Notifications | List of all notifications | Push notification integration |
+| Mark as Read | Individual/bulk read | Swipe actions |
+| Delete Notifications | Remove notifications | Swipe-to-delete |
+| Notification Types | Reaction, comment, invite, event | Type-specific icons |
+
+### 4.10 Profile Module
+| Feature | Description | Mobile Considerations |
+|---------|-------------|----------------------|
+| View Profile | Current user info | Profile card |
+| Edit Profile | Name, bio, location | Inline editing |
+| Avatar Upload | Profile photo | Camera/gallery access |
+
+---
+
+## 5. Mobile-Specific Requirements
+
+### 5.1 Native Capabilities Required
+
+```text
++---------------------------+-----------------------------------+
+| Capability                | Use Case                          |
++---------------------------+-----------------------------------+
+| Camera                    | Profile photos, posts, albums     |
+| Photo Library             | Select existing photos            |
+| Push Notifications        | Real-time alerts                  |
+| Biometric Auth            | FaceID/TouchID login              |
+| Haptic Feedback           | Reaction/action confirmation      |
+| Share Sheet               | Share invites, content            |
+| Local Storage             | Offline data caching              |
+| Background Refresh        | Fetch new content                 |
+| Deep Linking              | Email verification, invite links  |
+| Calendar Integration      | Export events (optional)          |
++---------------------------+-----------------------------------+
+```
+
+### 5.2 UI/UX Requirements
+- **Minimum touch target**: 44x44 pixels
+- **Bottom navigation**: Primary nav for thumb access
+- **Pull-to-refresh**: All list views
+- **Skeleton loaders**: Already implemented, maintain consistency
+- **Safe area handling**: Account for notches and home indicators
+- **Dark mode support**: System preference detection
+
+### 5.3 Offline Capabilities
+- Cache recent feed posts
+- Queue posts for upload when offline
+- Store draft messages
+- Display cached profile data
+
+---
+
+## 6. Development Approach: Capacitor (Recommended)
+
+**Approach**: Wrap existing React app in native container
+
+**Pros**:
+- Reuse 100% of existing React codebase
+- Faster development timeline
+- Single codebase for web + mobile
+- Native plugin access for camera, notifications, etc.
+
+**Required Plugins**:
+```text
+@capacitor/core
+@capacitor/cli
+@capacitor/ios
+@capacitor/android
+@capacitor/camera
+@capacitor/filesystem
+@capacitor/push-notifications
+@capacitor/share
+@capacitor/haptics
+@capacitor/local-notifications
+@capacitor/app (for deep linking)
+```
+
+---
+
+## 7. Implementation Plan
+
+### Phase 1: Project Setup (Week 1)
+1. Install Capacitor dependencies
+2. Initialize Capacitor project
+3. Configure app ID: `app.lovable.familial`
+4. Configure app name: `Familial`
+5. Add iOS and Android platforms
+6. Configure live reload for development
+
+### Phase 2: Core Mobile Adaptations (Week 2-3)
+1. Add safe area padding (already using pb-safe)
+2. Implement biometric authentication
+3. Configure deep linking for invite emails
+4. Add haptic feedback to interactions
+5. Implement native camera access for uploads
+6. Add photo library access
+
+### Phase 3: Push Notifications (Week 3-4)
+1. Configure Firebase Cloud Messaging (Android)
+2. Configure APNs (iOS)
+3. Create notification service edge function
+4. Implement notification permission request
+5. Handle notification taps and deep links
+
+### Phase 4: Offline Support (Week 4-5)
+1. Implement service worker for caching
+2. Add offline detection UI
+3. Queue offline actions for sync
+4. Cache critical data locally
+
+### Phase 5: Testing & Polish (Week 5-6)
+1. Device-specific testing (various screen sizes)
+2. Performance optimization
+3. Accessibility audit
+4. App store asset preparation
+5. Beta testing
+
+---
+
+## 8. App Store Requirements
+
+### 8.1 iOS App Store
+| Requirement | Specification |
+|-------------|---------------|
+| App Icon | 1024x1024 PNG |
+| Screenshots | 6.7", 6.5", 5.5" (required) |
+| Privacy Policy URL | Required |
+| App Description | Up to 4000 characters |
+| Keywords | 100 character limit |
+| Developer Account | Apple Developer Program ($99/year) |
+
+### 8.2 Google Play Store
+| Requirement | Specification |
+|-------------|---------------|
+| App Icon | 512x512 PNG |
+| Feature Graphic | 1024x500 |
+| Screenshots | Minimum 2 per device type |
+| Privacy Policy URL | Required |
+| App Description | 4000 character limit |
+| Developer Account | Google Play Console ($25 one-time) |
+
+---
+
+## 9. Security Considerations
+
+### 9.1 Current Security Measures
+- Row Level Security (RLS) on all tables
+- JWT-based authentication
+- HTTPS-only API communication
+- Input validation and sanitization
+- Secure password requirements (min 6 chars)
+
+### 9.2 Mobile-Specific Security
+- Secure token storage (Keychain/Keystore)
+- Biometric authentication gate
+- Certificate pinning (optional)
+- Jailbreak/root detection (optional)
+- Screen capture prevention for sensitive data (optional)
+
+---
+
+## 10. MANUS AI Integration Points
+
+### 10.1 Tasks for MANUS Agent
+1. **Capacitor Configuration** - Initialize project with correct app ID, configure platforms
+2. **Native Plugin Integration** - Camera, push notifications, share sheet, biometric auth
+3. **Code Modifications** - Add native camera capture, push handling, deep link routing
+4. **Build Configuration** - iOS Xcode project, Android Gradle, app signing, icons
+
+### 10.2 Key Information
+
+**App Identifier**: `app.lovable.familial`
+
+**Existing URLs**:
+- Preview: `https://id-preview--f7454400-93af-4f43-90a6-0d52ff08c778.lovable.app`
+- Production: `https://familialapp.lovable.app`
+
+**Backend API**:
+- Supabase Project ID: `qxkwxolssapayqyfdwqc`
+- API URL: Available via environment variable `VITE_SUPABASE_URL`
+
+**Configured Secrets**:
+- `RESEND_API_KEY` - For email sending
+
+---
+
+## 11. File Structure Summary
+```text
+src/
+├── components/
+│   ├── fridge/          # Fridge board components
+│   ├── landing/         # Marketing page components
+│   ├── layout/          # App layout (header, nav, skeleton)
+│   └── ui/              # Reusable UI components (shadcn)
+├── contexts/
+│   └── CircleContext    # Shared circle/profile state
+├── hooks/
+│   ├── useAuth          # Authentication hook
+│   └── use-mobile       # Mobile detection hook
+├── integrations/
+│   └── supabase/        # Database client and types
+├── pages/
+│   ├── Feed.tsx         # Social feed
+│   ├── Circles.tsx      # Circle management
+│   ├── Events.tsx       # Calendar
+│   ├── Albums.tsx       # Photo albums
+│   ├── Messages.tsx     # Direct messaging
+│   ├── Fridge.tsx       # Family fridge
+│   ├── FamilyTree.tsx   # Genealogy
+│   ├── Notifications.tsx # User notifications
+│   ├── Profile.tsx      # User profile
+│   └── Auth.tsx         # Authentication
+└── supabase/
+    └── functions/       # Edge functions
+        └── send-circle-invite/
+```
+
+---
+
+# PART 2: Marketing Design Report (MDR)
+## Visual Identity, Brand Voice, and Feature Messaging Guide
 
 ---
 
@@ -39,23 +424,12 @@ This document provides the complete marketing and design specifications for the 
 
 ### 2.1 Primary Fonts
 
-```text
-+-------------------+------------------+-------------------------+
-| Font Family       | Usage            | Emotional Purpose       |
-+-------------------+------------------+-------------------------+
-| Playfair Display  | Headings (h1-h6) | Elegance, legacy,       |
-|                   | Feature titles   | "storybook" feel        |
-|                   | Pricing names    |                         |
-+-------------------+------------------+-------------------------+
-| Inter             | Body text        | Modern, readable,       |
-|                   | Buttons          | professional            |
-|                   | Navigation       |                         |
-|                   | Descriptions     |                         |
-+-------------------+------------------+-------------------------+
-```
+| Font Family | Usage | Emotional Purpose |
+|-------------|-------|-------------------|
+| Playfair Display | Headings (h1-h6), Feature titles, Pricing names | Elegance, legacy, "storybook" feel |
+| Inter | Body text, Buttons, Navigation, Descriptions | Modern, readable, professional |
 
 ### 2.2 Font Loading
-Fonts are loaded via Google Fonts:
 ```css
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 ```
@@ -89,39 +463,31 @@ The color system is **monochromatic black and white** — intentionally minimal 
 
 ### 3.2 Light Mode Palette
 
-```text
-+----------------------+----------------+---------------------------+
-| Token                | HSL Value      | Usage                     |
-+----------------------+----------------+---------------------------+
-| --background         | 0 0% 100%      | Page background (white)   |
-| --foreground         | 0 0% 8%        | Primary text (near-black) |
-| --primary            | 0 0% 8%        | Buttons, links, icons     |
-| --primary-foreground | 0 0% 100%      | Text on primary buttons   |
-| --secondary          | 0 0% 96%       | Card backgrounds, badges  |
-| --secondary-foreground| 0 0% 8%       | Text on secondary         |
-| --muted              | 0 0% 96%       | Disabled states           |
-| --muted-foreground   | 0 0% 45%       | Subtle text (gray)        |
-| --border             | 0 0% 90%       | Borders, dividers         |
-| --card               | 0 0% 100%      | Card surfaces             |
-| --destructive        | 0 72% 51%      | Error states (red)        |
-+----------------------+----------------+---------------------------+
-```
+| Token | HSL Value | Usage |
+|-------|-----------|-------|
+| --background | 0 0% 100% | Page background (white) |
+| --foreground | 0 0% 8% | Primary text (near-black) |
+| --primary | 0 0% 8% | Buttons, links, icons |
+| --primary-foreground | 0 0% 100% | Text on primary buttons |
+| --secondary | 0 0% 96% | Card backgrounds, badges |
+| --secondary-foreground | 0 0% 8% | Text on secondary |
+| --muted | 0 0% 96% | Disabled states |
+| --muted-foreground | 0 0% 45% | Subtle text (gray) |
+| --border | 0 0% 90% | Borders, dividers |
+| --card | 0 0% 100% | Card surfaces |
+| --destructive | 0 72% 51% | Error states (red) |
 
 ### 3.3 Dark Mode Palette
 
-```text
-+----------------------+----------------+---------------------------+
-| Token                | HSL Value      | Usage                     |
-+----------------------+----------------+---------------------------+
-| --background         | 0 0% 4%        | Page background (dark)    |
-| --foreground         | 0 0% 98%       | Primary text (near-white) |
-| --primary            | 0 0% 98%       | Buttons, links, icons     |
-| --primary-foreground | 0 0% 4%        | Text on primary buttons   |
-| --secondary          | 0 0% 15%       | Card backgrounds          |
-| --muted-foreground   | 0 0% 65%       | Subtle text (gray)        |
-| --border             | 0 0% 18%       | Borders, dividers         |
-+----------------------+----------------+---------------------------+
-```
+| Token | HSL Value | Usage |
+|-------|-----------|-------|
+| --background | 0 0% 4% | Page background (dark) |
+| --foreground | 0 0% 98% | Primary text (near-white) |
+| --primary | 0 0% 98% | Buttons, links, icons |
+| --primary-foreground | 0 0% 4% | Text on primary buttons |
+| --secondary | 0 0% 15% | Card backgrounds |
+| --muted-foreground | 0 0% 65% | Subtle text (gray) |
+| --border | 0 0% 18% | Borders, dividers |
 
 ### 3.4 Hero Section Gradient
 ```css
@@ -158,19 +524,15 @@ The color system is **monochromatic black and white** — intentionally minimal 
 
 ### 5.1 Button Variants
 
-```text
-+----------------+----------------------------+----------------------+
-| Variant        | Style                      | Usage                |
-+----------------+----------------------------+----------------------+
-| default        | Black bg, white text       | Primary actions      |
-| hero           | Black bg, shadow, lift     | CTA buttons          |
-| hero-outline   | Border, transparent bg     | Secondary CTA        |
-| outline        | Border only                | Less emphasis        |
-| ghost          | No border, hover bg        | Navigation items     |
-| secondary      | Gray bg                    | Tertiary actions     |
-| destructive    | Red bg                     | Danger actions       |
-+----------------+----------------------------+----------------------+
-```
+| Variant | Style | Usage |
+|---------|-------|-------|
+| default | Black bg, white text | Primary actions |
+| hero | Black bg, shadow, lift | CTA buttons |
+| hero-outline | Border, transparent bg | Secondary CTA |
+| outline | Border only | Less emphasis |
+| ghost | No border, hover bg | Navigation items |
+| secondary | Gray bg | Tertiary actions |
+| destructive | Red bg | Danger actions |
 
 ### 5.2 Button Sizes
 | Size | Height | Padding | Font Size | Border Radius |
@@ -241,12 +603,12 @@ Each section follows this consistent pattern:
 
 | Feature | Title | Description | Why It Matters |
 |---------|-------|-------------|----------------|
-| Circles | Create Your Circles | Organize connections into meaningful groups — Immediate Family, College Friends, Work Crew. Share exactly what you want, with exactly who you want. | Solves the "one-size-fits-all" problem of mainstream social media. Families can have multiple contexts. |
-| Feed | Algorithm-Free Feed | See every post from your circles, in chronological order. No hidden content, no suggested posts, no viral distractions. | Eliminates the frustration of missing important family updates because an algorithm hid them. |
-| Privacy | True Privacy | Your family photos stay with your family. No data harvesting, no AI training, no advertisers. Your memories belong to you. | Addresses growing concern about children's photos being used to train AI models. |
-| Albums | Living Scrapbook | Every photo, video, and milestone is archived in a beautiful timeline. Create a digital family album that grows with you. | Replaces scattered photos across devices with one unified family archive. |
-| Events | Event Coordination | Built-in calendar for birthdays, reunions, and gatherings. Never miss a celebration, and keep all the planning in one place. | Eliminates the chaos of planning via group text threads. |
-| Messaging | Threaded Conversations | Comments and reactions that stay organized. Unlike chaotic group chats, every conversation stays connected to its context. | Photos and discussions stay linked, making it easy to find memories later. |
+| Circles | Create Your Circles | Organize connections into meaningful groups — Immediate Family, College Friends, Work Crew. Share exactly what you want, with exactly who you want. | Solves the "one-size-fits-all" problem of mainstream social media. |
+| Feed | Algorithm-Free Feed | See every post from your circles, in chronological order. No hidden content, no suggested posts, no viral distractions. | Eliminates frustration of missing important family updates. |
+| Privacy | True Privacy | Your family photos stay with your family. No data harvesting, no AI training, no advertisers. Your memories belong to you. | Addresses concern about children's photos being used to train AI. |
+| Albums | Living Scrapbook | Every photo, video, and milestone is archived in a beautiful timeline. Create a digital family album that grows with you. | Replaces scattered photos with one unified family archive. |
+| Events | Event Coordination | Built-in calendar for birthdays, reunions, and gatherings. Never miss a celebration. | Eliminates chaos of planning via group text threads. |
+| Messaging | Threaded Conversations | Comments and reactions that stay organized. Every conversation stays connected to its context. | Photos and discussions stay linked for easy memory finding. |
 
 ### 7.2 How It Works Messaging
 
@@ -257,7 +619,7 @@ Each section follows this consistent pattern:
 | 03 | Start Sharing | Post photos, updates, and memories. Choose exactly which circles see each post. Watch your family story grow. |
 
 ### 7.3 Trust Indicators (Hero Section)
-- **100% Ad-Free** — Communicates revenue model isn't based on attention harvesting
+- **100% Ad-Free** — Revenue model isn't based on attention harvesting
 - **End-to-End Privacy** — Technical assurance of data protection
 - **Family-First Design** — UX priority on accessibility for all ages
 
@@ -267,15 +629,11 @@ Each section follows this consistent pattern:
 
 ### 8.1 Tier Overview
 
-```text
-+-------------+--------+--------+------------------------------------+
-| Tier        | Price  | Users  | Key Features                       |
-+-------------+--------+--------+------------------------------------+
-| Free        | $0     | 8      | 1 circle, unlimited posts/photos   |
-| Family      | $5/mo  | 20     | 2 circles, events, albums          |
-| Extended    | $10/mo | 50     | 3 circles, family tree, messaging  |
-+-------------+--------+--------+------------------------------------+
-```
+| Tier | Price | Users | Key Features |
+|------|-------|-------|--------------|
+| Free | $0 | 8 | 1 circle, unlimited posts/photos |
+| Family | $5/mo | 20 | 2 circles, events, albums |
+| Extended | $10/mo | 50 | 3 circles, family tree, messaging |
 
 ### 8.2 Pricing Messaging Strategy
 - **Lead with "Free"**: Lower barrier to entry
@@ -297,43 +655,19 @@ Each section follows this consistent pattern:
 
 ---
 
-## 9. Testimonial Strategy
+## 9. Voice and Tone Guidelines
 
-### 9.1 Testimonial Personas
+### 9.1 Brand Voice Characteristics
 
-| Persona | Quote Focus | Why It Works |
-|---------|-------------|--------------|
-| Mother of 3 | Privacy for kids' photos | Addresses parental concern about children online |
-| Expat Family Member | Staying connected across distance | Resonates with diaspora families |
-| Multi-generational | Simplicity for elderly | Overcomes "my parents won't use it" objection |
+| Characteristic | Do This | Avoid This |
+|----------------|---------|------------|
+| Warm | "The people who matter" | "Your network connections" |
+| Clear | "No ads, ever." | "Ad-free experience options" |
+| Confident | "Your memories belong to you." | "We try our best to protect..." |
+| Inclusive | "Simple enough for everyone" | "Easy for non-technical users" |
+| Anti-Algorithm | "Chronological order" | "Smart feed optimization" |
 
-### 9.2 Testimonial Format
-- 5-star rating (visual credibility)
-- First-person quote in quotation marks
-- Avatar initials (builds trust without requiring real photos)
-- Role/context descriptor (relatable situation)
-
----
-
-## 10. Voice and Tone Guidelines
-
-### 10.1 Brand Voice Characteristics
-
-```text
-+------------------+----------------------------+----------------------------------+
-| Characteristic   | Do This                    | Avoid This                       |
-+------------------+----------------------------+----------------------------------+
-| Warm             | "The people who matter"    | "Your network connections"       |
-| Clear            | "No ads, ever."            | "Ad-free experience options"     |
-| Confident        | "Your memories belong to   | "We try our best to protect..."  |
-|                  | you."                      |                                  |
-| Inclusive        | "Simple enough for         | "Easy for non-technical users"   |
-|                  | everyone"                  |                                  |
-| Anti-Algorithm   | "Chronological order"      | "Smart feed optimization"        |
-+------------------+----------------------------+----------------------------------+
-```
-
-### 10.2 Key Phrases to Use
+### 9.2 Key Phrases to Use
 - "Private by design"
 - "The people who matter most"
 - "No ads. No algorithms. Ever."
@@ -341,7 +675,7 @@ Each section follows this consistent pattern:
 - "Your family story"
 - "Simple enough for grandparents"
 
-### 10.3 Phrases to Avoid
+### 9.3 Phrases to Avoid
 - "Social network" (use "private family space" instead)
 - "Users" (use "family members" or "people")
 - "Content" (use "moments," "memories," or "updates")
@@ -350,9 +684,9 @@ Each section follows this consistent pattern:
 
 ---
 
-## 11. Animation and Interaction Patterns
+## 10. Animation and Interaction Patterns
 
-### 11.1 Entry Animations
+### 10.1 Entry Animations
 ```css
 .animate-fade-up {
   animation: fadeUp 0.6s ease-out forwards;
@@ -367,7 +701,7 @@ Each section follows this consistent pattern:
 }
 ```
 
-### 11.2 Animation Staggering
+### 10.2 Animation Staggering
 Hero elements use `animation-delay` for cascading reveal:
 - Badge: 0s
 - Headline: 0.1s
@@ -375,16 +709,15 @@ Hero elements use `animation-delay` for cascading reveal:
 - CTA Buttons: 0.3s
 - Trust Indicators: 0.4s
 
-### 11.3 Hover Interactions
+### 10.3 Hover Interactions
 - **Buttons**: Lift effect (`hover:-translate-y-0.5`) with shadow increase
 - **Cards**: Border darkens, shadow appears (`hover:shadow-lg`)
 - **Links**: Color transition from muted to foreground
 
 ---
 
-## 12. Responsive Design Breakpoints
+## 11. Responsive Design Breakpoints
 
-### 12.1 Breakpoint System
 | Breakpoint | Width | Primary Consideration |
 |------------|-------|----------------------|
 | Default | < 640px | Mobile phones (single column) |
@@ -394,7 +727,7 @@ Hero elements use `animation-delay` for cascading reveal:
 | xl | >= 1280px | Desktops |
 | 2xl | >= 1400px | Large monitors (max container) |
 
-### 12.2 Mobile-First Priorities
+### Mobile-First Priorities
 - Bottom navigation for app pages (thumb zone)
 - Minimum 44x44px touch targets
 - Stack layouts on mobile, grid on desktop
@@ -402,38 +735,21 @@ Hero elements use `animation-delay` for cascading reveal:
 
 ---
 
-## 13. Support and Contact Integration
+## 12. Support and Contact Integration
 
-### 13.1 Phone Support
+### 12.1 Phone Support
 - **Number**: 520-759-5200
 - **Display**: Visible in header (desktop), footer, and pricing section
 - **Purpose**: Personal touch for a family product; builds trust
 
-### 13.2 Support Domain
+### 12.2 Support Domain
 - **URL**: support.familialmedia.com
 - **Purpose**: Dedicated support portal
 
 ---
 
-## 14. Implementation Notes for MANUS AI
+## 13. Mobile App Onboarding Flow Recommendation
 
-### 14.1 Mobile App Considerations
-1. **Fonts**: Bundle Playfair Display and Inter locally for offline support
-2. **Colors**: Use the same HSL token system; detect system dark mode preference
-3. **Icons**: Use Lucide icons or equivalent vector icons
-4. **Animations**: Keep animations subtle (0.2-0.6s) for mobile performance
-5. **Touch**: Ensure all interactive elements meet 44x44px minimum
-
-### 14.2 App Store Marketing Assets Needed
-| Asset | Specification |
-|-------|---------------|
-| App Icon | 1024x1024 (iOS), 512x512 (Android) |
-| Feature Graphic | 1024x500 (Google Play) |
-| Screenshots | 6.7", 6.5", 5.5" for iOS; phone + tablet for Android |
-| App Description | Use Hero copy + Feature descriptions |
-| Keywords | family, private, social, photos, events, circles |
-
-### 14.3 Onboarding Flow Recommendation
 1. Welcome screen with logo and tagline
 2. "Create Account" with email/password
 3. "Create Your First Circle" with name input
@@ -442,9 +758,8 @@ Hero elements use `animation-delay` for cascading reveal:
 
 ---
 
-## Appendix: Design Token Reference
+## Appendix: Complete Design Token Reference
 
-### Complete CSS Custom Properties
 ```css
 :root {
   --background: 0 0% 100%;
@@ -467,4 +782,3 @@ Hero elements use `animation-delay` for cascading reveal:
 **Application**: Familial - Private Family Social Network
 **Date**: February 6, 2026
 **Version**: 1.0
-
