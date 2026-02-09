@@ -80,10 +80,10 @@ const Feed = () => {
       .from("posts")
       .select(`
         *,
-        profiles!posts_author_id_fkey(id, user_id, display_name, avatar_url),
+        profiles!posts_author_id_profiles_fkey(id, user_id, display_name, avatar_url),
         circles!posts_circle_id_fkey(id, name),
         reactions(id, user_id, reaction_type),
-        comments(id, content, author_id, created_at, profiles!comments_author_id_fkey(id, user_id, display_name, avatar_url))
+        comments(id, content, author_id, created_at, profiles!comments_author_id_profiles_fkey(id, user_id, display_name, avatar_url))
       `)
       .in("circle_id", circleIds)
       .order("created_at", { ascending: false })
