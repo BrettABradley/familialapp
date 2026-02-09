@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
@@ -39,7 +38,7 @@ const Fridge = () => {
   const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading } = useCircleContext();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const db: any = supabase;
+  
   
   const [pins, setPins] = useState<FridgePin[]>([]);
   const [adminCircles, setAdminCircles] = useState<Circle[]>([]);
@@ -79,7 +78,7 @@ const Fridge = () => {
     });
 
     // Check memberships for admin role
-    const { data: memberCircles } = await db
+    const { data: memberCircles } = await (supabase as any)
       .from("circle_memberships")
       .select("circle_id, role, circles(*)")
       .eq("user_id", user.id)
@@ -102,7 +101,7 @@ const Fridge = () => {
     setIsLoadingPins(true);
     const circleIds = selectedCircle ? [selectedCircle] : circles.map((c) => c.id);
 
-    const { data, error } = await db
+    const { data, error } = await (supabase as any)
       .from("fridge_pins")
       .select(`*, circles!fridge_pins_circle_id_fkey(id, name)`)
       .in("circle_id", circleIds)
@@ -144,15 +143,15 @@ const Fridge = () => {
       const fileExt = selectedImage.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await db.storage.from("post-media").upload(fileName, selectedImage);
+      const { error: uploadError } = await supabase.storage.from("post-media").upload(fileName, selectedImage);
 
       if (!uploadError) {
-        const { data: publicUrlData } = db.storage.from("post-media").getPublicUrl(fileName);
+        const { data: publicUrlData } = supabase.storage.from("post-media").getPublicUrl(fileName);
         imageUrl = publicUrlData.publicUrl;
       }
     }
 
-    const { error } = await db.from("fridge_pins").insert({
+    const { error } = await supabase.from("fridge_pins").insert({
       title: title.trim(),
       content: content.trim() ? content.trim() : null,
       circle_id: selectedCircle,
@@ -194,7 +193,7 @@ const Fridge = () => {
   const handleDeletePin = async (pin: FridgePin) => {
     if (!confirm(`Delete "${pin.title}" from the fridge?`)) return;
 
-    const { error } = await db.from("fridge_pins").delete().eq("id", pin.id);
+    const { error } = await supabase.from("fridge_pins").delete().eq("id", pin.id);
 
     if (error) {
       toast({
@@ -236,9 +235,9 @@ const Fridge = () => {
         <Card>
           <CardContent className="py-12 text-center">
             <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+            <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
               Create a Circle First
-            </h3>
+            </h2>
             <p className="text-muted-foreground mb-6">
               You need to create or join a circle before using the fridge.
             </p>
@@ -324,6 +323,7 @@ const Fridge = () => {
                     placeholder="e.g., Grocery List"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
+                    maxLength={100}
                   />
                 </div>
 
@@ -334,6 +334,7 @@ const Fridge = () => {
                     placeholder="Add details..."
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
+                    maxLength={1000}
                   />
                 </div>
 
@@ -395,9 +396,9 @@ const Fridge = () => {
         <Card>
           <CardContent className="py-12 text-center">
             <Pin className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+            <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
               Nothing on the fridge yet
-            </h3>
+            </h2>
             <p className="text-muted-foreground">
               {isAdmin 
                 ? "Pin important notes, photos, and reminders for your family."

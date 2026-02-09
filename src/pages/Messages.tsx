@@ -309,9 +309,9 @@ const Messages = () => {
         <Card>
           <CardContent className="py-12 text-center">
             <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+            <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
               Create a Circle First
-            </h3>
+            </h2>
             <p className="text-muted-foreground mb-6">
               You need to create or join a circle before sending messages.
             </p>
@@ -333,7 +333,7 @@ const Messages = () => {
         // Chat View
         <div className="flex flex-col h-[calc(100vh-200px)]">
           <div className="flex items-center gap-3 pb-4 border-b border-border mb-4">
-            <Button variant="ghost" size="sm" onClick={() => setSelectedUser(null)}>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedUser(null)} aria-label="Back to conversations">
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <Avatar>
@@ -394,7 +394,7 @@ const Messages = () => {
               }}
               maxLength={5000}
             />
-            <Button onClick={handleSendMessage} disabled={!newMessage.trim() || isSending}>
+            <Button onClick={handleSendMessage} disabled={!newMessage.trim() || isSending} aria-label="Send message">
               <Send className="w-4 h-4" />
             </Button>
           </div>
@@ -460,9 +460,9 @@ const Messages = () => {
             <Card>
               <CardContent className="py-12 text-center">
                 <MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+                <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
                   No conversations yet
-                </h3>
+                </h2>
                 <p className="text-muted-foreground">
                   Search for a circle member to start a conversation.
                 </p>

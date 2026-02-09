@@ -262,9 +262,9 @@ const Albums = () => {
         <Card>
           <CardContent className="py-12 text-center">
             <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+            <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
               Create a Circle First
-            </h3>
+            </h2>
             <p className="text-muted-foreground mb-6">
               You need to create or join a circle before creating photo albums.
             </p>
@@ -310,7 +310,7 @@ const Albums = () => {
                 {isUploading ? "Uploading..." : "Add Photos"}
               </Button>
               {user && selectedAlbum.created_by === user.id && (
-                <Button variant="outline" onClick={() => handleDeleteAlbum(selectedAlbum)}>
+               <Button variant="outline" onClick={() => handleDeleteAlbum(selectedAlbum)} aria-label={`Delete album ${selectedAlbum.name}`}>
                   <Trash2 className="w-4 h-4 text-destructive" />
                 </Button>
               )}
@@ -321,9 +321,9 @@ const Albums = () => {
             <Card>
               <CardContent className="py-12 text-center">
                 <Image className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
-                  No photos yet
-                </h3>
+            <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
+                   No photos yet
+                 </h2>
                 <p className="text-muted-foreground mb-6">
                   Add some photos to this album.
                 </p>
@@ -342,6 +342,7 @@ const Albums = () => {
                     <button
                       onClick={() => handleDeletePhoto(photo)}
                       className="absolute top-2 right-2 bg-background/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
+                      aria-label="Delete photo"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -415,9 +416,9 @@ const Albums = () => {
             <Card>
               <CardContent className="py-12 text-center">
                 <Image className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+                <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
                   No albums yet
-                </h3>
+                </h2>
                 <p className="text-muted-foreground mb-6">
                   Create an album to start organizing your photos.
                 </p>
