@@ -49,14 +49,25 @@ const Notifications = () => {
   };
 
   const markAsRead = async (id: string) => {
-    await supabase
-      .from("notifications")
-      .update({ is_read: true })
-      .eq("id", id);
-    
     setNotifications(prev => 
       prev.map(n => n.id === id ? { ...n, is_read: true } : n)
     );
+
+    const { error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("id", id);
+
+    if (error) {
+      setNotifications(prev => 
+        prev.map(n => n.id === id ? { ...n, is_read: false } : n)
+      );
+      toast({
+        title: "Error",
+        description: "Failed to mark notification as read.",
+        variant: "destructive",
+      });
+    }
   };
 
   const markAllAsRead = async () => {
@@ -75,12 +86,22 @@ const Notifications = () => {
   };
 
   const deleteNotification = async (id: string) => {
-    await supabase
+    const prev = notifications;
+    setNotifications(p => p.filter(n => n.id !== id));
+
+    const { error } = await supabase
       .from("notifications")
       .delete()
       .eq("id", id);
-    
-    setNotifications(prev => prev.filter(n => n.id !== id));
+
+    if (error) {
+      setNotifications(prev);
+      toast({
+        title: "Error",
+        description: "Failed to delete notification.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getNotificationIcon = (type: string) => {
@@ -156,9 +177,9 @@ const Notifications = () => {
         <Card>
           <CardContent className="py-12 text-center">
             <Bell className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+            <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
               No notifications yet
-            </h3>
+            </h2>
             <p className="text-muted-foreground">
               You'll see updates from your circles here.
             </p>
@@ -196,6 +217,7 @@ const Notifications = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => markAsRead(notification.id)}
+                        aria-label="Mark as read"
                       >
                         <Check className="w-4 h-4" />
                       </Button>
@@ -204,6 +226,7 @@ const Notifications = () => {
                       variant="ghost"
                       size="sm"
                       onClick={() => deleteNotification(notification.id)}
+                      aria-label="Delete notification"
                     >
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>

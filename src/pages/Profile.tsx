@@ -168,6 +168,7 @@ const Profile = () => {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
                 className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-2 hover:bg-primary/90 transition-colors"
+                aria-label="Upload profile photo"
               >
                 <Camera className="w-4 h-4" />
               </button>
@@ -203,6 +204,7 @@ const Profile = () => {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Your name"
+                maxLength={100}
               />
             </div>
 
@@ -215,6 +217,7 @@ const Profile = () => {
                 placeholder="Tell your family a little about yourself..."
                 className="resize-none"
                 rows={3}
+                maxLength={1000}
               />
             </div>
 
@@ -225,6 +228,7 @@ const Profile = () => {
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="City, State"
+                maxLength={200}
               />
             </div>
           </div>

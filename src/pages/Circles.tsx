@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
@@ -40,7 +39,7 @@ const Circles = () => {
   const { circles, isLoading: contextLoading, refetchCircles, profile } = useCircleContext();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const db: any = supabase;
+  
   
   const [memberships, setMemberships] = useState<CircleMembership[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -61,7 +60,7 @@ const Circles = () => {
   const circlesList = circles as unknown as Circle[];
 
   const fetchMemberships = async (circleId: string) => {
-    const { data } = await db
+    const { data } = await (supabase as any)
       .from("circle_memberships")
       .select(`*, profiles!circle_memberships_user_id_fkey(display_name, avatar_url)`)
       .eq("circle_id", circleId);
@@ -76,7 +75,7 @@ const Circles = () => {
 
     setIsCreating(true);
 
-    const { data, error } = await db
+    const { data, error } = await supabase
       .from("circles")
       .insert({
         name: newCircleName.trim(),
@@ -109,7 +108,7 @@ const Circles = () => {
 
     setIsUpdating(true);
 
-    const { error } = await db
+    const { error } = await supabase
       .from("circles")
       .update({ name: editName.trim(), description: editDescription.trim() || null })
       .eq("id", selectedCircle.id);
@@ -130,7 +129,7 @@ const Circles = () => {
     
     setIsSendingInvite(true);
 
-    const { error } = await db.from("circle_invites").insert({
+    const { error } = await supabase.from("circle_invites").insert({
       circle_id: selectedCircle.id,
       invited_by: user.id,
       email: inviteEmail,
@@ -169,7 +168,7 @@ const Circles = () => {
   };
 
   const handleUpdateRole = async (membership: CircleMembership, newRole: string) => {
-    const { error } = await db
+    const { error } = await supabase
       .from("circle_memberships")
       .update({ role: newRole })
       .eq("id", membership.id);
@@ -185,7 +184,7 @@ const Circles = () => {
   const handleRemoveMember = async (membership: CircleMembership) => {
     if (!confirm("Remove this member from the circle?")) return;
 
-    const { error } = await db.from("circle_memberships").delete().eq("id", membership.id);
+    const { error } = await supabase.from("circle_memberships").delete().eq("id", membership.id);
 
     if (error) {
       toast({ title: "Error", description: "Failed to remove member.", variant: "destructive" });
@@ -198,7 +197,7 @@ const Circles = () => {
   const handleDeleteCircle = async (circle: Circle) => {
     if (!confirm(`Delete "${circle.name}"? This cannot be undone.`)) return;
     
-    const { error } = await db.from("circles").delete().eq("id", circle.id);
+    const { error } = await supabase.from("circles").delete().eq("id", circle.id);
 
     if (error) {
       toast({ title: "Error", description: "Failed to delete circle.", variant: "destructive" });
@@ -263,11 +262,11 @@ const Circles = () => {
             <div className="space-y-4 mt-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Circle Name</Label>
-                <Input id="name" placeholder="e.g., Smith Family" value={newCircleName} onChange={(e) => setNewCircleName(e.target.value)} />
+                <Input id="name" placeholder="e.g., Smith Family" value={newCircleName} onChange={(e) => setNewCircleName(e.target.value)} maxLength={100} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="description">Description (optional)</Label>
-                <Textarea id="description" placeholder="What's this circle about?" value={newCircleDescription} onChange={(e) => setNewCircleDescription(e.target.value)} />
+                <Textarea id="description" placeholder="What's this circle about?" value={newCircleDescription} onChange={(e) => setNewCircleDescription(e.target.value)} maxLength={500} />
               </div>
               <Button className="w-full" onClick={handleCreateCircle} disabled={!newCircleName.trim() || isCreating}>{isCreating ? "Creating..." : "Create Circle"}</Button>
             </div>
@@ -276,7 +275,7 @@ const Circles = () => {
       </div>
 
       {circlesList.length === 0 ? (
-        <Card><CardContent className="py-12 text-center"><Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><h3 className="font-serif text-xl font-semibold text-foreground mb-2">No circles yet</h3><p className="text-muted-foreground mb-6">Create your first circle to start sharing with your family.</p><Button onClick={() => setIsCreateOpen(true)}><Plus className="w-4 h-4 mr-2" />Create Your First Circle</Button></CardContent></Card>
+        <Card><CardContent className="py-12 text-center"><Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><h2 className="font-serif text-xl font-semibold text-foreground mb-2">No circles yet</h2><p className="text-muted-foreground mb-6">Create your first circle to start sharing with your family.</p><Button onClick={() => setIsCreateOpen(true)}><Plus className="w-4 h-4 mr-2" />Create Your First Circle</Button></CardContent></Card>
       ) : (
         <div className="grid md:grid-cols-2 gap-6">
           {circlesList.map((circle) => (
@@ -291,7 +290,7 @@ const Circles = () => {
                     </div>
                   </div>
                   {isOwner(circle) && (
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100" onClick={() => handleDeleteCircle(circle)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100" onClick={() => handleDeleteCircle(circle)} aria-label={`Delete circle ${circle.name}`}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                   )}
                 </div>
               </CardHeader>
@@ -326,8 +325,8 @@ const Circles = () => {
         <DialogContent>
           <DialogHeader><DialogTitle className="font-serif">Edit {selectedCircle?.name}</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-4">
-            <div className="space-y-2"><Label>Name</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Description</Label><Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Name</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={100} /></div>
+            <div className="space-y-2"><Label>Description</Label><Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} maxLength={500} /></div>
             <Button className="w-full" onClick={handleUpdateCircle} disabled={!editName.trim() || isUpdating}>{isUpdating ? "Saving..." : "Save Changes"}</Button>
           </div>
         </DialogContent>
@@ -358,7 +357,7 @@ const Circles = () => {
                           <SelectItem value="member">Member</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(member)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(member)} aria-label={`Remove ${member.profiles?.display_name || 'member'}`}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                     </div>
                   )}
                 </div>

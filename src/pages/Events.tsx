@@ -225,6 +225,7 @@ const Events = () => {
                   placeholder="e.g., Grandma's Birthday"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  maxLength={200}
                 />
               </div>
 
@@ -255,6 +256,7 @@ const Events = () => {
                     placeholder="Place"
                     value={eventLocation}
                     onChange={(e) => setEventLocation(e.target.value)}
+                    maxLength={300}
                   />
                 </div>
               </div>
@@ -266,6 +268,7 @@ const Events = () => {
                   placeholder="Add details..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  maxLength={2000}
                 />
               </div>
 
@@ -355,6 +358,7 @@ const Events = () => {
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={() => handleDeleteEvent(event)}
+                        aria-label={`Delete event ${event.title}`}
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>

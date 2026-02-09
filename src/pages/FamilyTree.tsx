@@ -217,9 +217,9 @@ const FamilyTree = () => {
         <Card>
           <CardContent className="py-12 text-center">
             <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+            <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
               Create a Circle First
-            </h3>
+            </h2>
             <p className="text-muted-foreground mb-6">
               You need to create or join a circle before building a family tree.
             </p>
@@ -391,9 +391,9 @@ const FamilyTree = () => {
         <Card>
           <CardContent className="py-12 text-center">
             <TreeDeciduous className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+            <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
               No family members yet
-            </h3>
+            </h2>
             <p className="text-muted-foreground mb-6">
               {isAdmin 
                 ? "Start building your family tree by adding members."
@@ -429,6 +429,7 @@ const FamilyTree = () => {
                       size="sm"
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={() => handleDeleteMember(member)}
+                      aria-label={`Delete ${member.name}`}
                     >
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>

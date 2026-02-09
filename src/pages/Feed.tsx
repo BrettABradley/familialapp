@@ -194,17 +194,44 @@ const Feed = () => {
     const post = posts.find(p => p.id === postId);
     const existingReaction = post?.reactions?.find(r => r.user_id === user.id);
     
-    if (existingReaction) {
-      await supabase.from("reactions").delete().eq("id", existingReaction.id);
-    } else {
-      await supabase.from("reactions").insert({
-        post_id: postId,
-        user_id: user.id,
-        reaction_type: "heart",
+    // Optimistic update
+    setPosts(prev => prev.map(p => {
+      if (p.id !== postId) return p;
+      if (existingReaction) {
+        return { ...p, reactions: p.reactions?.filter(r => r.id !== existingReaction.id) };
+      } else {
+        return { ...p, reactions: [...(p.reactions || []), { id: crypto.randomUUID(), user_id: user.id, reaction_type: "heart" }] };
+      }
+    }));
+
+    try {
+      if (existingReaction) {
+        const { error } = await supabase.from("reactions").delete().eq("id", existingReaction.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("reactions").insert({
+          post_id: postId,
+          user_id: user.id,
+          reaction_type: "heart",
+        });
+        if (error) throw error;
+      }
+    } catch {
+      // Revert optimistic update
+      setPosts(prev => prev.map(p => {
+        if (p.id !== postId) return p;
+        if (existingReaction) {
+          return { ...p, reactions: [...(p.reactions || []), existingReaction] };
+        } else {
+          return { ...p, reactions: p.reactions?.filter(r => r.user_id !== user.id) };
+        }
+      }));
+      toast({
+        title: "Error",
+        description: "Failed to update reaction. Please try again.",
+        variant: "destructive",
       });
     }
-    
-    fetchPosts();
   };
 
   const toggleComments = (postId: string) => {
@@ -241,7 +268,18 @@ const Feed = () => {
       });
     } else {
       setCommentInputs(prev => ({ ...prev, [postId]: "" }));
-      fetchPosts();
+      // Optimistic update for comment
+      const newComment: Comment = {
+        id: crypto.randomUUID(),
+        content,
+        author_id: user.id,
+        created_at: new Date().toISOString(),
+        profiles: profile ? { id: profile.id, user_id: profile.user_id, display_name: profile.display_name, avatar_url: profile.avatar_url } : undefined,
+      };
+      setPosts(prev => prev.map(p => {
+        if (p.id !== postId) return p;
+        return { ...p, comments: [...(p.comments || []), newComment] };
+      }));
     }
 
     setIsSubmittingComment(null);
@@ -350,11 +388,12 @@ const Feed = () => {
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            <Textarea
+             <Textarea
               placeholder="What's happening with the family?"
               value={newPostContent}
               onChange={(e) => setNewPostContent(e.target.value)}
               className="min-h-[100px] resize-none mb-4"
+              maxLength={5000}
             />
             
             {/* Image Previews */}
@@ -370,6 +409,7 @@ const Feed = () => {
                     <button
                       onClick={() => removeFile(index)}
                       className="absolute top-2 right-2 bg-background/80 rounded-full p-1 hover:bg-background transition-colors"
+                      aria-label={`Remove image ${index + 1}`}
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -409,9 +449,9 @@ const Feed = () => {
         <Card className="mb-8">
           <CardContent className="py-12 text-center">
             <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+            <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
               Create Your First Circle
-            </h3>
+            </h2>
             <p className="text-muted-foreground mb-6">
               Circles are private spaces for your family or close friends.
             </p>
@@ -474,6 +514,7 @@ const Feed = () => {
                       <button
                         onClick={() => handleDownloadImage(url)}
                         className="absolute bottom-2 right-2 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
+                        aria-label="Download image"
                       >
                         <Download className="w-4 h-4" />
                       </button>
@@ -556,6 +597,7 @@ const Feed = () => {
                         size="sm"
                         onClick={() => handleSubmitComment(post.id)}
                         disabled={!commentInputs[post.id]?.trim() || isSubmittingComment === post.id}
+                        aria-label="Send comment"
                       >
                         <Send className="w-4 h-4" />
                       </Button>
