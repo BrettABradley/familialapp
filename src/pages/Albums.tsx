@@ -185,8 +185,24 @@ const Albums = () => {
     });
   };
 
+  const extractStoragePath = (publicUrl: string): string | null => {
+    try {
+      const url = new URL(publicUrl);
+      const match = url.pathname.match(/\/storage\/v1\/object\/public\/post-media\/(.+)/);
+      return match ? match[1] : null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleDeletePhoto = async (photo: AlbumPhoto) => {
     if (!confirm("Are you sure you want to delete this photo?")) return;
+
+    // Delete from storage first
+    const storagePath = extractStoragePath(photo.photo_url);
+    if (storagePath) {
+      await supabase.storage.from("post-media").remove([storagePath]);
+    }
 
     const { error } = await supabase
       .from("album_photos")
@@ -209,6 +225,21 @@ const Albums = () => {
 
   const handleDeleteAlbum = async (album: Album) => {
     if (!confirm(`Are you sure you want to delete "${album.name}"? All photos will be removed.`)) return;
+
+    // Fetch all photos to clean up storage
+    const { data: albumPhotos } = await supabase
+      .from("album_photos")
+      .select("photo_url")
+      .eq("album_id", album.id);
+
+    if (albumPhotos && albumPhotos.length > 0) {
+      const paths = albumPhotos
+        .map(p => extractStoragePath(p.photo_url))
+        .filter((p): p is string => p !== null);
+      if (paths.length > 0) {
+        await supabase.storage.from("post-media").remove(paths);
+      }
+    }
 
     const { error } = await supabase
       .from("photo_albums")

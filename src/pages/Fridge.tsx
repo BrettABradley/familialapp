@@ -78,9 +78,9 @@ const Fridge = () => {
     });
 
     // Check memberships for admin role
-    const { data: memberCircles } = await (supabase as any)
+    const { data: memberCircles } = await supabase
       .from("circle_memberships")
-      .select("circle_id, role, circles(*)")
+      .select("circle_id, role, circles!circle_memberships_circle_id_fkey(*)")
       .eq("user_id", user.id)
       .eq("role", "admin");
 
@@ -101,7 +101,7 @@ const Fridge = () => {
     setIsLoadingPins(true);
     const circleIds = selectedCircle ? [selectedCircle] : circles.map((c) => c.id);
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("fridge_pins")
       .select(`*, circles!fridge_pins_circle_id_fkey(id, name)`)
       .in("circle_id", circleIds)
