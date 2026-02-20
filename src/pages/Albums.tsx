@@ -162,7 +162,7 @@ const Albums = () => {
         .upload(fileName, file);
 
       if (uploadError) {
-        console.error("Upload error:", uploadError);
+        // Upload failed silently, skip this file
         continue;
       }
 
