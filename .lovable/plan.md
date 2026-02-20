@@ -1,197 +1,166 @@
 
 
-# Cookbook Audit Implementation Plan
+# Fix All Outstanding Issues + Enable Multiple Circles
 
 ## Overview
 
-This plan addresses all issues identified across the 9 audit questions, mapped to the cookbook's 7 sections. The work is organized into 8 discrete tasks.
+This plan addresses all 13 outstanding issues from the audit document, with highest priority on enabling users to create more than one circle. The work is organized into 10 tasks.
 
 ---
 
-## Task 1: Security -- API Keys & Secrets
+## Task 1: Enable Multiple Circles (HIGHEST PRIORITY)
 
-**Cookbook Section:** Security: API Keys and Secrets
+**Issue:** Every user is limited to 1 circle because the `can_create_circle()` database function defaults `max_circles` to 1 when no `user_plans` row exists -- and the `user_plans` table is currently empty for all users.
 
-**Current State:** The `.env` file contains only `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_SUPABASE_PROJECT_ID` -- all publishable, client-safe values. Sensitive keys (`RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) are configured as server-side secrets only, used exclusively in the `send-circle-invite` edge function. No secrets are hardcoded in source files.
+**Changes:**
+1. Create a database migration to change the default in `can_create_circle()` from 1 to 3 (or a reasonable free-tier default)
+2. Alternatively, auto-insert a `user_plans` row via a trigger on `auth.users` (similar to the existing `handle_new_user` trigger for profiles), setting `max_circles = 3` for all new users
+3. Backfill existing users: insert `user_plans` rows for any user who already has a profile but no plan
+4. Add a user-friendly error message in `Circles.tsx` when the circle creation fails due to the plan limit, instead of showing the raw database error
 
-**Finding:** PASS -- No changes needed. The architecture correctly separates publishable client keys from sensitive server-side secrets.
-
-**Prompt Used:** "Are any of my API keys, database credentials, or other secrets visible in the frontend code or committed to version control?"
-
----
-
-## Task 2: Security -- Authorization (IDOR) & SQL Injection
-
-**Cookbook Section:** Security: Authorization + Database Queries
-
-**Current State:** All data access is scoped through Supabase RLS policies using `auth.uid()` and helper functions like `is_circle_member()`, `shares_circle_with()`, and `is_circle_admin()`. The Supabase JS SDK uses parameterized queries internally, preventing SQL injection. The `Messages.tsx` search function includes an `escapeILIKE()` utility to sanitize wildcards.
-
-**Finding:** PASS -- No structural changes needed. RLS enforces server-side authorization on every table regardless of what IDs a client sends.
-
-**Prompt Used:** "As a logged-in user, can I view or modify data belonging to another user by changing an ID in the URL?"
+**Technical approach:** Update the `can_create_circle` function to default to 3 instead of 1. This is the simplest fix since it requires no trigger changes and immediately applies to all users.
 
 ---
 
-## Task 3: Security -- Input Validation
+## Task 2: Fix `supabase as any` Casts in Circles.tsx and Fridge.tsx
 
-**Cookbook Section:** Security: Input Validation
+**Issue:** `Circles.tsx` (line 63) and `Fridge.tsx` (lines 81, 104) use `(supabase as any)` to bypass TypeScript mismatches on queries with relationship hints.
 
-**Current State:** Server-side validation triggers exist for all major tables (`validate_post`, `validate_comment`, `validate_circle`, `validate_event`, `validate_private_message`, `validate_fridge_pin`, `validate_notification`, `validate_family_tree_member`, `validate_photo_album`, `validate_store_offer`). Rate limiting triggers are also in place (`check_message_rate_limit`, `check_post_rate_limit`, `check_comment_rate_limit`, `check_invite_rate_limit`, `check_fridge_pin_rate_limit`, `check_store_offer_rate_limit`). Client-side `maxLength` attributes are used on some but not all input fields.
-
-**Changes Needed:**
-- Add `maxLength` attributes to input fields that are missing them:
-  - `Feed.tsx`: Post content textarea (max 5000)
-  - `Circles.tsx`: Circle name input (max 100), description textarea (max 500)
-  - `Events.tsx`: Title (max 200), description (max 2000), location (max 300)
-  - `Fridge.tsx`: Title (max 100), content (max 1000)
-  - `Messages.tsx`: Message input already has maxLength={5000} -- PASS
-  - `Profile.tsx`: Display name (max 100), bio (max 1000), location (max 200)
-
-This is a defense-in-depth measure. The server-side triggers already enforce these limits, but client-side `maxLength` prevents users from typing beyond limits and avoids confusing server errors.
+**Changes:**
+1. Add foreign key constraints via migration:
+   - `circle_memberships.user_id -> profiles.user_id`
+   - `circle_memberships.circle_id -> circles.id` (verify existing)
+   - `fridge_pins.circle_id -> circles.id` (verify existing)
+2. Update `types.ts` will auto-regenerate after migration
+3. Replace `(supabase as any)` with properly typed `supabase` calls using explicit relationship hints matching the new FK names
+4. Remove `as unknown as` casts where the types now align
 
 ---
 
-## Task 4: Security -- Dependencies
+## Task 3: Make Comment Submission Truly Optimistic in Feed.tsx
 
-**Cookbook Section:** Security: Dependencies
+**Issue:** `handleSubmitComment` only updates UI after the database insert succeeds, unlike `handleReaction` which is truly optimistic.
 
-**Current State:** All listed dependencies are recent versions. No known critical vulnerabilities in the current stack. The project uses `date-fns` (not `moment.js`), which is the recommended lightweight alternative.
-
-**Finding:** PASS -- Dependencies are current.
-
----
-
-## Task 5: UI/UX -- Design Consistency, Loading States, Empty States, Error States
-
-**Cookbook Section:** UI/UX: Design Consistency + Loading States + Empty States + Error States
-
-**Current State:**
-- **Design Consistency:** All pages use the same HSL token system from `index.css`, `font-serif` for headings, `font-sans` (Inter) for body text, and consistent card/button patterns. PASS.
-- **Loading States:** Every page has skeleton loaders that match the layout of loaded content. Buttons show "Creating...", "Saving...", "Sending..." text and are disabled during async operations. PASS.
-- **Empty States:** Every list view has a dedicated empty state with an icon, heading, description, and call-to-action. PASS.
-- **Error States:** All mutations use toast notifications with clear, non-technical messages. PASS.
-
-**One Gap Found:** The `handleReaction` function in `Feed.tsx` (line 191-208) silently fails -- no error toast if the reaction insert/delete fails. Same for `markAsRead` and `deleteNotification` in `Notifications.tsx`.
-
-**Changes Needed:**
-- Add `try/catch` with toast error handling to `handleReaction` in `Feed.tsx`
-- Add `try/catch` with toast error handling to `markAsRead` and `deleteNotification` in `Notifications.tsx`
+**Changes:**
+- Restructure `handleSubmitComment` to:
+  1. Immediately append the comment to local state
+  2. Clear the input
+  3. Attempt the database insert
+  4. On failure, revert the local state and show an error toast
 
 ---
 
-## Task 6: Accessibility -- Semantic HTML, Keyboard Navigation, Screen Reader Support
+## Task 4: Add Realtime Subscriptions to Messages.tsx
 
-**Cookbook Section:** Accessibility: Semantic HTML + Screen Reader Support
+**Issue:** Messages page does not use Supabase Realtime. Users must refresh to see new messages.
 
-**Current State:**
-- All pages use `<main>` as the top-level content wrapper. PASS.
-- `MobileNavigation.tsx` uses `<nav>`. PASS.
-- `CircleHeader` uses `<header>`. PASS.
-- Focus indicators are preserved via Tailwind's `focus-visible:ring-2` on all interactive components. PASS.
-
-**Gaps Found:**
-1. **Heading hierarchy jumps:** Several pages skip from `<h1>` to `<h3>` (e.g., Feed empty state at line 412, Messages empty state, Albums empty state, Fridge empty state). Should use `<h2>`.
-2. **Missing `aria-label` on icon-only buttons:** Multiple icon-only buttons lack accessible names:
-   - Feed.tsx: Download button (line 474-479), remove preview button (line 370-375), Send comment button (line 555-561)
-   - Circles.tsx: Delete circle button (line 294), remove member button (line 361)
-   - Events.tsx: Delete event button (line 353-359)
-   - Notifications.tsx: Mark as read button (line 195-201), delete button (line 203-209)
-   - Albums.tsx: Delete photo button (line 342-348), delete album button (line 313-315)
-   - FamilyTree.tsx: Delete member button (line 427-434)
-   - Profile.tsx: Camera/upload avatar button (line 167-173)
-   - Messages.tsx: Back button (line 236), Send message button (line 268)
-
-**Changes Needed:**
-- Change `<h3>` to `<h2>` in all empty-state headings across pages
-- Add `aria-label` attributes to all icon-only `<Button>` and `<button>` elements listed above
+**Changes:**
+1. Create a migration to enable realtime on `private_messages`: `ALTER PUBLICATION supabase_realtime ADD TABLE public.private_messages;`
+2. In `Messages.tsx`, add a `useEffect` that subscribes to `postgres_changes` on `private_messages` filtered to the current user
+3. On `INSERT` events where the user is the recipient, append the new message to `messages` state and update the conversations list
+4. Clean up the subscription on unmount
 
 ---
 
-## Task 7: Code Quality -- Component Structure, Error Handling, @ts-nocheck
+## Task 5: Add Error Handling to `markAllAsRead` in Notifications.tsx
 
-**Cookbook Section:** Code Quality: Component Structure + Error Handling in Code
+**Issue:** `markAllAsRead` does not check for database errors. If the update fails, the UI still shows all as read.
 
-**Current State:**
-- `Feed.tsx` is 574 lines -- a monolithic component handling post creation, file upload, reactions, comments, and rendering
-- `Circles.tsx` uses `// @ts-nocheck` (line 1) and casts `supabase` to `any` (line 43)
-- `Fridge.tsx` uses `// @ts-nocheck` (line 1) and casts `supabase` to `any` (line 42)
-- `handleReaction` in Feed.tsx has no error handling
-- `markAsRead` and `deleteNotification` in Notifications.tsx have no error handling
-
-**Changes Needed:**
-
-### 7a. Refactor Feed.tsx into smaller components
-Extract the following into separate files:
-- `src/components/feed/CreatePostForm.tsx` -- Post creation form with file upload (lines 325-426)
-- `src/components/feed/PostCard.tsx` -- Individual post rendering with reactions and comments (lines 440-567)
-- `src/components/feed/PostMediaGrid.tsx` -- Media grid within a post (lines 465-483)
-- `src/hooks/useFeedPosts.ts` -- Custom hook for fetching posts, handling reactions, and submitting comments
-
-This reduces Feed.tsx from 574 lines to approximately 80 lines (imports, hook usage, and layout).
-
-### 7b. Remove @ts-nocheck from Circles.tsx and Fridge.tsx
-- Remove `// @ts-nocheck` directive
-- Remove `const db: any = supabase` casts
-- Fix the underlying type issues by using proper type assertions on Supabase query results instead of `as unknown as` chains
-- Use the existing types from `@/integrations/supabase/types.ts` where possible
-
-### 7c. Add error handling to silent mutations
-- Wrap `handleReaction` in try/catch with toast feedback
-- Wrap `markAsRead` in try/catch with toast feedback  
-- Wrap `deleteNotification` in try/catch with toast feedback
+**Changes:**
+- Capture the `error` from the Supabase update call
+- Only update local state if no error occurred
+- Show a destructive toast on failure
 
 ---
 
-## Task 8: Performance -- Unnecessary Re-renders
+## Task 6: Refactor Feed.tsx into Smaller Components
 
-**Cookbook Section:** Performance: Rendering Performance
+**Issue:** Feed.tsx is 616 lines handling post creation, file upload, reactions, comments, and rendering.
 
-**Current State:**
-- `handleReaction` in Feed.tsx calls `fetchPosts()` after every like/unlike, re-fetching all 50 posts with their profiles, reactions, and comments from the database. This is the most significant performance issue.
-- `handleSubmitComment` does the same -- full re-fetch after one comment.
-- No list virtualization, but posts are capped at 50 via `.limit(50)`, which is a reasonable ceiling for DOM nodes.
+**Changes:**
+1. Create `src/hooks/useFeedPosts.ts` -- custom hook containing:
+   - `posts` state, `fetchPosts`, `handleReaction`, `handleSubmitComment`
+   - All post-related state management
+2. Create `src/components/feed/CreatePostForm.tsx` -- post creation form with file upload (current lines 362-466)
+3. Create `src/components/feed/PostCard.tsx` -- single post rendering with reactions and comments (current lines 480-609)
+4. Create `src/components/feed/PostMediaGrid.tsx` -- media grid within a post (current lines 505-523)
+5. Reduce `Feed.tsx` to ~80 lines: imports, hook usage, layout shell
 
-**Changes Needed:**
+---
 
-### 8a. Implement optimistic updates for reactions
-Instead of calling `fetchPosts()` after a reaction:
-- Immediately update the local `posts` state to add/remove the reaction
-- If the database call fails, revert the local state and show an error toast
+## Task 7: Add Storage Cleanup on Photo/Album Deletion
 
-### 8b. Implement optimistic updates for comments
-Instead of calling `fetchPosts()` after a comment:
-- Immediately append the new comment to the local post's comments array using the current user's profile data
-- If the database call fails, revert and show an error toast
+**Issue:** Deleting photos or albums removes database records but leaves orphaned files in the `post-media` storage bucket.
 
-This eliminates two full network round-trips per interaction and makes the UI feel instant.
+**Changes:**
+- In `Albums.tsx` `handleDeletePhoto`: before deleting the DB record, extract the storage path from the `photo_url` and call `supabase.storage.from("post-media").remove([path])`
+- In `Albums.tsx` `handleDeleteAlbum`: fetch all photos in the album first, delete their storage files, then delete the album record
+- Add the same cleanup to `Feed.tsx` if posts with media are ever deleted (currently posts cannot be deleted from the UI, so this is lower priority)
+
+---
+
+## Task 8: Add Pagination to Feed, Events, and Notifications
+
+**Issue:** All queries use `.limit(50)` with no way to load older content.
+
+**Changes:**
+1. **Feed.tsx:** Add a "Load More" button at the bottom. Use cursor-based pagination keyed on `created_at` of the last post. Append older posts to the existing array.
+2. **Events.tsx:** Add the same "Load More" pattern.
+3. **Notifications.tsx:** Add the same "Load More" pattern.
+
+Each page will track a `hasMore` boolean (set to `false` when fewer than 50 items are returned) and show/hide the button accordingly.
+
+---
+
+## Task 9: Fix `markAsRead` Error Handling in Notifications.tsx
+
+**Issue:** The individual `markAsRead` function (lines 53-69) does optimistic update but the revert path only fires on error. However, `deleteNotification` (lines 87-101) has the same pattern but already has proper error handling. Both are fine per the last audit pass. The remaining gap is `markAllAsRead` (covered in Task 5).
+
+**Status:** Already addressed by Task 5. No additional work needed.
+
+---
+
+## Task 10: Document Known Limitations (No Code Changes)
+
+These items are acknowledged limitations that cannot be resolved purely in code:
+
+- **No native mobile app:** Capacitor integration is a strategic initiative, not a bug fix. The responsive web layout serves mobile users adequately.
+- **Family Tree lacks visual tree rendering:** The flat grid is a feature gap requiring a tree visualization library (e.g., react-flow or d3-hierarchy). This is a significant feature addition, not a bug fix.
+- **Resend domain verification:** External configuration dependency. Invitation emails work for verified domains only. Cannot be fixed in code.
+- **No automated testing:** Adding a test suite is a separate initiative. The existing `vitest` setup is ready but needs test authoring.
+- **Store offer review/approval workflow:** No admin dashboard exists. This is a feature gap requiring an admin UI and role-based access.
 
 ---
 
 ## Implementation Order
 
 ```text
-1. Task 3  - Add maxLength to inputs (quick, low risk)
-2. Task 6  - Fix heading hierarchy + aria-labels (quick, low risk)
-3. Task 5  - Add error handling to silent mutations (quick)
-4. Task 7b - Remove @ts-nocheck from Circles.tsx and Fridge.tsx
-5. Task 7a - Refactor Feed.tsx into smaller components
-6. Task 8  - Add optimistic updates for reactions and comments
+1. Task 1  - Enable multiple circles (database migration, highest priority)
+2. Task 2  - Fix supabase as any casts (database migration + code)
+3. Task 5  - Fix markAllAsRead error handling (quick code fix)
+4. Task 3  - Make comments truly optimistic (code refactor)
+5. Task 4  - Add Realtime to Messages (migration + code)
+6. Task 7  - Add storage cleanup on deletion (code)
+7. Task 6  - Refactor Feed.tsx into components (code refactor)
+8. Task 8  - Add pagination (code)
 ```
 
-Tasks 1, 2, and 4 require no code changes (they passed the audit).
+Tasks 9 and 10 require no code changes.
 
 ---
 
 ## Summary Table
 
-| # | Cookbook Section | Item | Status |
-|---|----------------|------|--------|
-| 1 | Security | API Keys and Secrets | PASS -- no changes |
-| 2 | Security | Authorization (IDOR) + Database Queries (SQLi) | PASS -- RLS enforced |
-| 3 | Security | Input Validation | ADD client-side maxLength to 6 pages |
-| 4 | Security | Dependencies | PASS -- all current |
-| 5 | UI/UX | Design Consistency, Loading, Empty, Error States | ADD error toasts to 3 silent mutations |
-| 6 | Accessibility | Semantic HTML + Screen Reader Support | FIX heading hierarchy + add 15+ aria-labels |
-| 7 | Code Quality | Component Structure + Error Handling | REFACTOR Feed.tsx, REMOVE @ts-nocheck |
-| 8 | Performance | Rendering Performance | ADD optimistic updates for reactions/comments |
+| # | Category | Issue | Action |
+|---|----------|-------|--------|
+| 1 | Critical | Users can only create 1 circle | Change default max_circles from 1 to 3 |
+| 2 | Bug | `supabase as any` casts | Add FK constraints, fix types |
+| 3 | Bug | Comments not truly optimistic | Restructure to optimistic-first |
+| 4 | Bug | Messages not realtime | Add Supabase Realtime subscription |
+| 5 | Bug | markAllAsRead no error handling | Add error check and toast |
+| 6 | Code Quality | Feed.tsx monolith (616 lines) | Extract components and hook |
+| 7 | Bug | Orphaned storage files | Delete storage objects on record delete |
+| 8 | Feature | No pagination | Add "Load More" to Feed, Events, Notifications |
+| 9 | N/A | Already covered by Task 5 | No action |
+| 10 | Documentation | Known limitations | Acknowledged, no code fix |
 
