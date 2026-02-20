@@ -5,7 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 interface Circle {
   id: string;
   name: string;
+  description: string | null;
   owner_id: string;
+  created_at: string;
 }
 
 interface Profile {
@@ -45,12 +47,12 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: ownedCircles } = await supabase
       .from("circles")
-      .select("id, name, owner_id")
+      .select("id, name, description, owner_id, created_at")
       .eq("owner_id", user.id);
 
     const { data: memberCircles } = await supabase
       .from("circle_memberships")
-      .select("circle_id, circles(id, name, owner_id)")
+      .select("circle_id, circles(id, name, description, owner_id, created_at)")
       .eq("user_id", user.id);
 
     const allCircles: Circle[] = [];
