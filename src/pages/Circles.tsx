@@ -155,13 +155,13 @@ const Circles = () => {
       });
 
       if (emailError) {
-        console.error("Email error:", emailError);
+        // Email send failed
         toast({ title: "Invite created", description: `Invitation saved, but email failed to send.`, variant: "default" });
       } else {
         toast({ title: "Invite sent!", description: `Invitation email sent to ${inviteEmail}.` });
       }
     } catch (err) {
-      console.error("Email send error:", err);
+      // Email send failed
       toast({ title: "Invite created", description: `Invitation saved, but email failed to send.` });
     }
 

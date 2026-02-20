@@ -50,7 +50,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
       const { error } = await supabase.storage.from("post-media").upload(fileName, file);
-      if (error) { console.error("Upload error:", error); continue; }
+      if (error) { continue; }
       const { data } = supabase.storage.from("post-media").getPublicUrl(fileName);
       uploadedUrls.push(data.publicUrl);
     }
