@@ -120,6 +120,13 @@ export type Database = {
             referencedRelation: "circles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "circle_memberships_user_id_profiles_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
         ]
       }
       circles: {
@@ -362,6 +369,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "circles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fridge_pins_pinned_by_profiles_fkey"
+            columns: ["pinned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }

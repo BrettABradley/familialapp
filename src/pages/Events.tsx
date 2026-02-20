@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, CalendarDays, MapPin, Clock, Trash2 } from "lucide-react";
+import { Plus, CalendarDays, MapPin, Clock, Trash2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface Circle {
@@ -48,6 +48,9 @@ const Events = () => {
   const [eventLocation, setEventLocation] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+
+  const PAGE_SIZE = 50;
 
   useEffect(() => {
     if (circles.length > 0) {
@@ -57,22 +60,31 @@ const Events = () => {
     }
   }, [circles, selectedCircle, contextLoading]);
 
-  const fetchEvents = async () => {
+  const fetchEvents = async (reset = true) => {
     if (circles.length === 0) return;
     
-    setIsLoadingEvents(true);
+    if (reset) setIsLoadingEvents(true);
     const circleIds = selectedCircle ? [selectedCircle] : circles.map(c => c.id);
+    const cursor = !reset && events.length > 0 ? events[events.length - 1].event_date : null;
     
-    const { data, error } = await supabase
+    let query = supabase
       .from("events")
       .select(`*, circles!events_circle_id_fkey(id, name)`)
       .in("circle_id", circleIds)
       .gte("event_date", new Date().toISOString().split("T")[0])
       .order("event_date", { ascending: true })
-      .limit(50);
+      .limit(PAGE_SIZE);
+
+    if (cursor) {
+      query = query.gt("event_date", cursor);
+    }
+
+    const { data, error } = await query;
 
     if (!error && data) {
-      setEvents(data as unknown as Event[]);
+      const typed = data as unknown as Event[];
+      setEvents(prev => reset ? typed : [...prev, ...typed]);
+      setHasMore(typed.length === PAGE_SIZE);
     }
     setIsLoadingEvents(false);
   };
@@ -367,6 +379,14 @@ const Events = () => {
                 </CardContent>
               </Card>
             ))
+          )}
+          {hasMore && (
+            <div className="text-center py-4">
+              <Button variant="outline" onClick={() => fetchEvents(false)}>
+                <Loader2 className="w-4 h-4 mr-2" />
+                Load More
+              </Button>
+            </div>
           )}
         </div>
       </div>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Bell, Check, Trash2, Heart, MessageCircle, Calendar, UserPlus, Users } from "lucide-react";
+import { Bell, Check, Trash2, Heart, MessageCircle, Calendar, UserPlus, Users, Loader2 } from "lucide-react";
 
 interface Notification {
   id: string;
@@ -24,6 +24,9 @@ const Notifications = () => {
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+
+  const PAGE_SIZE = 50;
 
   useEffect(() => {
     if (user) {
@@ -31,19 +34,28 @@ const Notifications = () => {
     }
   }, [user]);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (reset = true) => {
     if (!user) return;
     
-    setIsLoadingNotifications(true);
-    const { data, error } = await supabase
+    if (reset) setIsLoadingNotifications(true);
+    const cursor = !reset && notifications.length > 0 ? notifications[notifications.length - 1].created_at : null;
+
+    let query = supabase
       .from("notifications")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(PAGE_SIZE);
+
+    if (cursor) {
+      query = query.lt("created_at", cursor);
+    }
+
+    const { data, error } = await query;
 
     if (!error && data) {
-      setNotifications(data);
+      setNotifications(prev => reset ? data : [...prev, ...data]);
+      setHasMore(data.length === PAGE_SIZE);
     }
     setIsLoadingNotifications(false);
   };
@@ -73,12 +85,21 @@ const Notifications = () => {
   const markAllAsRead = async () => {
     if (!user) return;
     
-    await supabase
+    const { error } = await supabase
       .from("notifications")
       .update({ is_read: true })
       .eq("user_id", user.id)
       .eq("is_read", false);
     
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to mark notifications as read.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     toast({
       title: "All notifications marked as read",
@@ -235,6 +256,15 @@ const Notifications = () => {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {hasMore && notifications.length > 0 && (
+        <div className="text-center py-4">
+          <Button variant="outline" onClick={() => fetchNotifications(false)}>
+            <Loader2 className="w-4 h-4 mr-2" />
+            Load More
+          </Button>
         </div>
       )}
     </main>

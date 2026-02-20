@@ -55,6 +55,48 @@ const Messages = () => {
     }
   }, [user]);
 
+  // Realtime subscription for new messages
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('private-messages-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'private_messages',
+        },
+        (payload) => {
+          const newMsg = payload.new as Message;
+          // Only process messages relevant to this user
+          if (newMsg.sender_id !== user.id && newMsg.recipient_id !== user.id) return;
+
+          // If currently viewing the conversation with this sender, add the message
+          if (selectedUser && (newMsg.sender_id === selectedUser.user_id || newMsg.recipient_id === selectedUser.user_id)) {
+            setMessages(prev => [...prev, newMsg]);
+            // Mark as read if we're the recipient
+            if (newMsg.recipient_id === user.id) {
+              supabase
+                .from("private_messages")
+                .update({ is_read: true })
+                .eq("id", newMsg.id)
+                .then();
+            }
+          }
+
+          // Refresh conversations list
+          fetchConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, selectedUser]);
+
   useEffect(() => {
     if (selectedUser) {
       fetchMessages();

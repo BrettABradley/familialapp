@@ -60,9 +60,9 @@ const Circles = () => {
   const circlesList = circles as unknown as Circle[];
 
   const fetchMemberships = async (circleId: string) => {
-    const { data } = await (supabase as any)
+    const { data } = await supabase
       .from("circle_memberships")
-      .select(`*, profiles!circle_memberships_user_id_fkey(display_name, avatar_url)`)
+      .select(`*, profiles!circle_memberships_user_id_profiles_fkey(display_name, avatar_url)`)
       .eq("circle_id", circleId);
 
     if (data) {
@@ -86,7 +86,10 @@ const Circles = () => {
       .maybeSingle();
 
     if (error) {
-      toast({ title: "Error", description: error.message || "Failed to create circle.", variant: "destructive" });
+      const message = error.message?.includes("can_create_circle")
+        ? "You've reached your circle limit. Upgrade your plan to create more circles."
+        : error.message || "Failed to create circle.";
+      toast({ title: "Error", description: message, variant: "destructive" });
       setIsCreating(false);
       return;
     }
