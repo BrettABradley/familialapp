@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Camera, Save } from "lucide-react";
+import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 
 const Profile = () => {
   const { user } = useAuth();
@@ -23,6 +24,8 @@ const Profile = () => {
   const [location, setLocation] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -32,32 +35,35 @@ const Profile = () => {
     }
   }, [profile]);
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
+    setPendingFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setCropImageSrc(reader.result as string);
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
+
+  const handleCroppedUpload = async (blob: Blob) => {
+    setCropImageSrc(null);
+    if (!user) return;
 
     setIsUploading(true);
-
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+    const ext = pendingFile?.name.split(".").pop() || "jpg";
+    const fileName = `${user.id}/${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from("avatars")
-      .upload(fileName, file, { upsert: true });
+      .upload(fileName, blob, { upsert: true, contentType: blob.type });
 
     if (uploadError) {
-      toast({
-        title: "Upload failed",
-        description: "Could not upload avatar. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Upload failed", description: "Could not upload avatar. Please try again.", variant: "destructive" });
       setIsUploading(false);
       return;
     }
 
-    const { data: publicUrlData } = supabase.storage
-      .from("avatars")
-      .getPublicUrl(fileName);
+    const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(fileName);
 
     const { error: updateError } = await supabase
       .from("profiles")
@@ -65,20 +71,14 @@ const Profile = () => {
       .eq("user_id", user.id);
 
     if (updateError) {
-      toast({
-        title: "Error",
-        description: "Could not update profile avatar.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Could not update profile avatar.", variant: "destructive" });
     } else {
-      toast({
-        title: "Avatar updated!",
-        description: "Your profile picture has been changed.",
-      });
+      toast({ title: "Avatar updated!", description: "Your profile picture has been changed." });
       refetchProfile();
     }
 
     setIsUploading(false);
+    setPendingFile(null);
   };
 
   const handleSave = async () => {
@@ -176,7 +176,7 @@ const Profile = () => {
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                onChange={handleAvatarUpload}
+                onChange={handleFileSelect}
                 className="hidden"
               />
             </div>
@@ -184,6 +184,15 @@ const Profile = () => {
               <p className="text-sm text-muted-foreground">Uploading...</p>
             )}
           </div>
+
+          {cropImageSrc && (
+            <AvatarCropDialog
+              open={!!cropImageSrc}
+              imageSrc={cropImageSrc}
+              onClose={() => { setCropImageSrc(null); setPendingFile(null); }}
+              onCropComplete={handleCroppedUpload}
+            />
+          )}
 
           {/* Profile Fields */}
           <div className="space-y-4">
