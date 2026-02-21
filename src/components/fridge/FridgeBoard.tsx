@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { Trash2, Mic } from "lucide-react";
+import { Trash2, Mic, X } from "lucide-react";
 import { getMediaType } from "@/lib/mediaUtils";
 
 export interface FridgeBoardPin {
@@ -51,6 +53,8 @@ export function FridgeBoard({
   onDelete: (pin: FridgeBoardPin) => void;
   className?: string;
 }) {
+  const [enlargedPin, setEnlargedPin] = useState<FridgeBoardPin | null>(null);
+
   return (
     <section
       aria-label="Family fridge board"
@@ -171,7 +175,7 @@ export function FridgeBoard({
                       )}
                     />
 
-                    {/* Photo/Media area */}
+                    {/* Photo/Media area - clickable */}
                     {pin.image_url ? (
                       getMediaType(pin.image_url) === 'audio' ? (
                         <div className="flex aspect-square items-center justify-center bg-zinc-100 flex-col gap-1 p-2">
@@ -185,8 +189,9 @@ export function FridgeBoard({
                           src={pin.image_url}
                           alt={pin.title}
                           loading="lazy"
-                          className="block w-full aspect-square object-cover bg-zinc-200"
+                          className="block w-full aspect-square object-cover bg-zinc-200 cursor-pointer"
                           style={{ imageRendering: "auto" }}
+                          onClick={() => setEnlargedPin(pin)}
                         />
                       )
                     ) : (
@@ -257,6 +262,72 @@ export function FridgeBoard({
           </span>
         )}
       </div>
+
+      {/* Enlarged pin dialog */}
+      <Dialog open={!!enlargedPin} onOpenChange={(open) => !open && setEnlargedPin(null)}>
+        <DialogContent
+          className={cn(
+            "max-w-md p-0 overflow-hidden border-0 bg-transparent shadow-none",
+            "[&>button]:hidden"
+          )}
+        >
+          <DialogTitle className="sr-only">
+            {enlargedPin?.title || "Enlarged photo"}
+          </DialogTitle>
+          {enlargedPin?.image_url && (
+            <div
+              className={cn(
+                "relative bg-white p-3 pb-12",
+                "border-[6px] border-zinc-300",
+                "shadow-[8px_8px_0_0_rgba(0,0,0,0.25)]",
+                "mx-auto max-w-sm"
+              )}
+              style={{ transform: `rotate(${(Math.random() * 4 - 2).toFixed(1)}deg)` }}
+            >
+              {/* Magnet */}
+              <div
+                className={cn(
+                  "absolute -top-4 left-1/2 -translate-x-1/2 z-10",
+                  "h-7 w-7 rounded-none",
+                  "bg-red-600",
+                  "border-2 border-black/30",
+                  "shadow-[3px_3px_0_0_rgba(0,0,0,0.3)]"
+                )}
+              />
+              {getMediaType(enlargedPin.image_url) === 'video' ? (
+                <video
+                  src={enlargedPin.image_url}
+                  controls
+                  className="w-full rounded-none bg-zinc-200"
+                />
+              ) : (
+                <img
+                  src={enlargedPin.image_url}
+                  alt={enlargedPin.title}
+                  className="w-full rounded-none bg-zinc-200"
+                />
+              )}
+              <div className="absolute bottom-0 left-0 right-0 px-3 pb-2">
+                <p className="truncate text-sm font-bold text-zinc-800 font-mono">
+                  {enlargedPin.title}
+                </p>
+                <p className="truncate text-xs text-zinc-500 font-mono">
+                  {enlargedPin.circles?.name || ""}
+                </p>
+              </div>
+              {/* Close button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-1 right-1 h-7 w-7 rounded-none text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
+                onClick={() => setEnlargedPin(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
