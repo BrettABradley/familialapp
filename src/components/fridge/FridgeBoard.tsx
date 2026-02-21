@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Trash2 } from "lucide-react";
+import { Trash2, Mic } from "lucide-react";
+import { getMediaType } from "@/lib/mediaUtils";
 
 export interface FridgeBoardPin {
   id: string;
@@ -170,15 +171,24 @@ export function FridgeBoard({
                       )}
                     />
 
-                    {/* Photo area */}
+                    {/* Photo/Media area */}
                     {pin.image_url ? (
-                      <img
-                        src={pin.image_url}
-                        alt={pin.title}
-                        loading="lazy"
-                        className="block w-full aspect-square object-cover bg-zinc-200"
-                        style={{ imageRendering: "auto" }}
-                      />
+                      getMediaType(pin.image_url) === 'audio' ? (
+                        <div className="flex aspect-square items-center justify-center bg-zinc-100 flex-col gap-1 p-2">
+                          <Mic className="w-6 h-6 text-zinc-500" />
+                          <audio controls className="w-full" preload="metadata" style={{ maxHeight: '32px' }}>
+                            <source src={pin.image_url} />
+                          </audio>
+                        </div>
+                      ) : (
+                        <img
+                          src={pin.image_url}
+                          alt={pin.title}
+                          loading="lazy"
+                          className="block w-full aspect-square object-cover bg-zinc-200"
+                          style={{ imageRendering: "auto" }}
+                        />
+                      )
                     ) : (
                       <div className="flex aspect-square items-center justify-center bg-zinc-100 text-center text-[10px] text-zinc-500 p-1 font-mono">
                         {pin.title}

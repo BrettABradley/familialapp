@@ -1,9 +1,10 @@
-import { useAuth } from "@/hooks/useAuth";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp } from "lucide-react";
+import { LinkifiedText } from "@/components/shared/LinkifiedText";
+import { getMediaType } from "@/lib/mediaUtils";
 import type { Post } from "@/hooks/useFeedPosts";
 
 interface PostCardProps {
@@ -19,6 +20,43 @@ interface PostCardProps {
   onDownloadImage: (url: string) => void;
 }
 
+const MediaItem = ({ url, index, onDownload }: { url: string; index: number; onDownload: (url: string) => void }) => {
+  const mediaType = getMediaType(url);
+
+  if (mediaType === 'video') {
+    return (
+      <div className="relative group rounded-lg overflow-hidden">
+        <video controls className="w-full rounded-lg max-h-[400px]" preload="metadata">
+          <source src={url} />
+        </video>
+      </div>
+    );
+  }
+
+  if (mediaType === 'audio') {
+    return (
+      <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg">
+        <audio controls className="w-full" preload="metadata">
+          <source src={url} />
+        </audio>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative group aspect-square rounded-lg overflow-hidden">
+      <img src={url} alt={`Post image ${index + 1}`} className="w-full h-full object-cover" />
+      <button
+        onClick={() => onDownload(url)}
+        className="absolute bottom-2 right-2 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
+        aria-label="Download image"
+      >
+        <Download className="w-4 h-4" />
+      </button>
+    </div>
+  );
+};
+
 export const PostCard = ({
   post,
   isExpanded,
@@ -32,6 +70,10 @@ export const PostCard = ({
   onDownloadImage,
 }: PostCardProps) => {
   const { profile } = useCircleContext();
+
+  // Separate media by type for layout
+  const imageUrls = post.media_urls?.filter(u => getMediaType(u) === 'image') || [];
+  const otherMedia = post.media_urls?.filter(u => getMediaType(u) !== 'image') || [];
 
   return (
     <Card>
@@ -50,21 +92,26 @@ export const PostCard = ({
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        {post.content && <p className="text-foreground whitespace-pre-wrap mb-4">{post.content}</p>}
+        {post.content && (
+          <p className="text-foreground whitespace-pre-wrap mb-4">
+            <LinkifiedText text={post.content} />
+          </p>
+        )}
 
-        {post.media_urls && post.media_urls.length > 0 && (
-          <div className={`grid gap-2 mb-4 ${post.media_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-            {post.media_urls.map((url, index) => (
-              <div key={index} className="relative group aspect-square rounded-lg overflow-hidden">
-                <img src={url} alt={`Post image ${index + 1}`} className="w-full h-full object-cover" />
-                <button
-                  onClick={() => onDownloadImage(url)}
-                  className="absolute bottom-2 right-2 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
-                  aria-label="Download image"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-              </div>
+        {/* Image grid */}
+        {imageUrls.length > 0 && (
+          <div className={`grid gap-2 mb-4 ${imageUrls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {imageUrls.map((url, index) => (
+              <MediaItem key={index} url={url} index={index} onDownload={onDownloadImage} />
+            ))}
+          </div>
+        )}
+
+        {/* Video and audio items */}
+        {otherMedia.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {otherMedia.map((url, index) => (
+              <MediaItem key={index} url={url} index={index} onDownload={onDownloadImage} />
             ))}
           </div>
         )}
