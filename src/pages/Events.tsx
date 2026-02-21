@@ -76,7 +76,7 @@ interface Event {
 
 const Events = () => {
   const { user } = useAuth();
-  const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading } = useCircleContext();
+  const { circles, selectedCircle, setSelectedCircle, profile, isLoading: contextLoading } = useCircleContext();
   const { toast } = useToast();
 
   const [events, setEvents] = useState<Event[]>([]);
@@ -322,9 +322,13 @@ const Events = () => {
         .select("id, event_id, user_id, status")
         .single();
       if (!error && data) {
+        const enriched: Rsvp = {
+          ...(data as unknown as Rsvp),
+          profiles: profile ? { display_name: profile.display_name, avatar_url: profile.avatar_url } : undefined,
+        };
         setRsvps(prev => ({
           ...prev,
-          [eventId]: [...(prev[eventId] || []), data as unknown as Rsvp],
+          [eventId]: [...(prev[eventId] || []), enriched],
         }));
       }
     }
