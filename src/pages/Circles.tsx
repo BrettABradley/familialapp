@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit } from "lucide-react";
+import PendingInvites from "@/components/circles/PendingInvites";
 
 interface Circle {
   id: string;
@@ -276,6 +277,8 @@ const Circles = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      <PendingInvites />
 
       {circlesList.length === 0 ? (
         <Card><CardContent className="py-12 text-center"><Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><h2 className="font-serif text-xl font-semibold text-foreground mb-2">No circles yet</h2><p className="text-muted-foreground mb-6">Create your first circle to start sharing with your family.</p><Button onClick={() => setIsCreateOpen(true)}><Plus className="w-4 h-4 mr-2" />Create Your First Circle</Button></CardContent></Card>
