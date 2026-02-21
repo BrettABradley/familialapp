@@ -47,11 +47,13 @@ export function FridgeBoard({
   canDeleteCircleId,
   onDelete,
   className,
+  circleName,
 }: {
   pins: FridgeBoardPin[];
   canDeleteCircleId: (circleId: string) => boolean;
   onDelete: (pin: FridgeBoardPin) => void;
   className?: string;
+  circleName?: string;
 }) {
   const [enlargedPin, setEnlargedPin] = useState<FridgeBoardPin | null>(null);
 
@@ -126,7 +128,7 @@ export function FridgeBoard({
               "shadow-[2px_2px_0_0_rgba(0,0,0,0.2)]"
             )}
           >
-            Familial
+            {circleName || "Familial"}
           </div>
 
           {/* Pinned items area */}
