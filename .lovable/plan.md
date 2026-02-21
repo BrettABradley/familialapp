@@ -1,90 +1,49 @@
 
 
-# Join by Code + Navigation Reorder
+# Deduplicate Pending Invites for the Same Circle
 
-## Overview
-Two changes: (1) Add a "Join by Code" feature so users can enter a circle's invite code to join without needing an email invite, and (2) reorder the navigation to match the requested layout and remove the Family Tree page.
+## Problem
+A user can receive multiple invites to the same circle (e.g., from different family members). Currently, accepting or declining one invite leaves the other duplicate invites still showing as pending. This is confusing -- the user shouldn't have to respond to the same circle invite multiple times.
 
----
+## Solution
 
-## 1. Join by Code
+Two changes, both in `PendingInvites.tsx`:
 
-### Database Migration
-- Add a new RLS INSERT policy on `circle_memberships` allowing a user to join if they provide a valid invite code. Since the invite code check happens in the frontend (we look up the circle by code first), the existing unique constraint prevents duplicates.
-- No new tables needed -- the `invite_code` column on `circles` already exists.
+### 1. Deduplicate the displayed invites
+When fetching invites, group them by `circle_id` and only show one card per circle (the most recent invite). This way even if 3 people invited the user to the same circle, they see one clean card.
 
-### Frontend (Circles.tsx)
-- Add a "Join by Code" section/dialog alongside "Create Circle"
-- Simple input field for the 8-character code + "Join" button
-- Flow: query `circles` table by `invite_code`, then insert into `circle_memberships` with role `member`, then refetch circles
-- Show appropriate error/success toasts
+### 2. Resolve all duplicates on accept/decline
+When accepting or declining, update ALL pending invites for the same `circle_id` and email -- not just the single invite that was clicked. This clears out every duplicate in one action.
 
-### RLS Consideration
-- The user needs to SELECT from `circles` by invite code to find the circle ID. Add a SELECT policy: "Users can look up circles by invite code" that allows authenticated users to select a circle row where the invite_code matches (this is safe since it only exposes the circle name/id, not sensitive data).
-- Add an INSERT policy on `circle_memberships`: "Users can join via invite code" allowing self-insert when the circle has a matching invite code.
+- **Accept**: mark all pending invites for that circle as "accepted", then join the circle
+- **Decline**: mark all pending invites for that circle as "declined"
 
----
-
-## 2. Navigation Reorder + Remove Family Tree
-
-### New nav order (desktop header + mobile)
-1. Circles
-2. Feed (currently "Home" on mobile)
-3. Fridge
-4. Events
-5. Albums
-6. Messages
-7. Profile
-
-### Files to update
-- **CircleHeader.tsx**: Reorder `navItems` array, remove TreeDeciduous import and the Family Tree entry
-- **MobileNavigation.tsx**: Update `navItems` and `moreItems` arrays to match the new order, remove Family Tree
-- **App.tsx**: Remove the `/family-tree` route and FamilyTree import
+The user can still be re-invited later (a new invite row would be created with "pending" status), so declining doesn't permanently block them.
 
 ---
 
 ## Technical Details
 
-### Database Migration SQL
+### PendingInvites.tsx changes
+
+**Deduplication in `fetchInvites`:**
+After filtering valid invites, deduplicate by `circle_id` -- keep only the most recent invite per circle.
+
+**In `handleAccept`:**
+Replace the single-invite update:
 ```text
--- Allow authenticated users to look up a circle by invite code
-CREATE POLICY "Users can look up circles by invite code"
-  ON public.circles FOR SELECT
-  USING (auth.uid() IS NOT NULL);
-
--- Allow users to self-join a circle (for join-by-code flow)
-CREATE POLICY "Users can join via invite code"
-  ON public.circle_memberships FOR INSERT
-  WITH CHECK (
-    auth.uid() = user_id
-    AND EXISTS (
-      SELECT 1 FROM public.circles c
-      WHERE c.id = circle_memberships.circle_id
-    )
-  );
+.update({ status: "accepted" }).eq("id", invite.id)
 ```
-
-Note: The existing "Users can join via invite" policy only covers email-based invites. This new policy covers code-based joins. We keep both.
-
-### Circles.tsx Changes
-- Add a "Join with Code" dialog with an Input for the code
-- `handleJoinByCode`: query circles by invite_code, insert membership, refetch, show toast
-- Place a "Join with Code" button next to "Create Circle" in the header area
-
-### Navigation Arrays (CircleHeader.tsx)
+with a bulk update targeting all pending invites for the same circle and email:
 ```text
-const navItems = [
-  { to: "/circles", icon: Users, label: "Circles" },
-  { to: "/feed", icon: Home, label: "Feed" },
-  { to: "/fridge", icon: Pin, label: "Fridge" },
-  { to: "/events", icon: Calendar, label: "Events" },
-  { to: "/albums", icon: Image, label: "Albums" },
-  { to: "/messages", icon: MessageSquare, label: "Messages" },
-  { to: "/profile", icon: User, label: "Profile" },
-];
+.update({ status: "accepted" })
+.eq("circle_id", invite.circle_id)
+.eq("email", user.email)
+.eq("status", "pending")
 ```
+Then remove all invites with that `circle_id` from local state.
 
-### MobileNavigation.tsx
-Primary tabs: Circles, Feed, Fridge, Events, More
-More menu: Albums, Messages, Profile
+**In `handleDecline`:**
+Same pattern -- update all pending invites for that circle/email combo to "declined", then remove all matching from local state.
 
+No database migration needed -- the existing RLS UPDATE policy on `circle_invites` already allows the invited user to update any of their own pending invites.
