@@ -6,6 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserPlus, X, Check, Loader2 } from "lucide-react";
+import { checkCircleCapacity } from "@/lib/circleLimits";
+import UpgradePlanDialog from "@/components/circles/UpgradePlanDialog";
 
 interface PendingInvite {
   id: string;
@@ -33,6 +35,8 @@ const PendingInvites = ({ compact = false, onCountChange }: PendingInvitesProps)
   const [invites, setInvites] = useState<PendingInvite[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+  const [upgradeInfo, setUpgradeInfo] = useState<{ plan: string; currentCount: number; limit: number; circleId: string }>({ plan: "free", currentCount: 0, limit: 8, circleId: "" });
 
   const fetchInvites = async () => {
     if (!user?.email) return;
@@ -89,6 +93,25 @@ const PendingInvites = ({ compact = false, onCountChange }: PendingInvitesProps)
     if (!user) return;
     setProcessingIds((prev) => new Set(prev).add(invite.id));
 
+    // Check member limit before accepting
+    if (invite.circles) {
+      const { data: circleDetail } = await supabase
+        .from("circles")
+        .select("owner_id")
+        .eq("id", invite.circle_id)
+        .maybeSingle();
+
+      if (circleDetail) {
+        const capacity = await checkCircleCapacity(invite.circle_id, circleDetail.owner_id);
+        if (capacity.isFull) {
+          setUpgradeInfo({ plan: capacity.plan, currentCount: capacity.currentCount, limit: capacity.limit, circleId: invite.circle_id });
+          setUpgradeDialogOpen(true);
+          setProcessingIds((prev) => { const s = new Set(prev); s.delete(invite.id); return s; });
+          return;
+        }
+      }
+    }
+
     const { error: joinError } = await supabase
       .from("circle_memberships")
       .insert({ circle_id: invite.circle_id, user_id: user.id, role: "member" });
@@ -135,55 +158,76 @@ const PendingInvites = ({ compact = false, onCountChange }: PendingInvitesProps)
     setProcessingIds((prev) => { const s = new Set(prev); s.delete(invite.id); return s; });
   };
 
-  if (isLoading || invites.length === 0) return null;
+  if (isLoading || invites.length === 0) return (
+    <>
+      <UpgradePlanDialog
+        isOpen={upgradeDialogOpen}
+        onClose={() => setUpgradeDialogOpen(false)}
+        currentPlan={upgradeInfo.plan}
+        currentCount={upgradeInfo.currentCount}
+        limit={upgradeInfo.limit}
+        circleId={upgradeInfo.circleId}
+      />
+    </>
+  );
 
   return (
-    <div className={compact ? "space-y-2" : "space-y-3 mb-8"}>
-      {invites.map((invite) => {
-        const isProcessing = processingIds.has(invite.id);
-        return (
-          <Card key={invite.id} className="border-primary/20 bg-primary/5">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-4">
-                <div className="p-2 rounded-full bg-primary/10 text-primary">
-                  <UserPlus className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground">
-                    {compact ? "Invite:" : "You've been invited to join"}{" "}
-                    <span className="font-semibold">{invite.circles?.name ?? "a circle"}</span>
-                  </p>
-                  {invite.circles?.description && !compact && (
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
-                      {invite.circles.description}
+    <>
+      <div className={compact ? "space-y-2" : "space-y-3 mb-8"}>
+        {invites.map((invite) => {
+          const isProcessing = processingIds.has(invite.id);
+          return (
+            <Card key={invite.id} className="border-primary/20 bg-primary/5">
+              <CardContent className="py-4">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 rounded-full bg-primary/10 text-primary">
+                    <UserPlus className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground">
+                      {compact ? "Invite:" : "You've been invited to join"}{" "}
+                      <span className="font-semibold">{invite.circles?.name ?? "a circle"}</span>
                     </p>
-                  )}
+                    {invite.circles?.description && !compact && (
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
+                        {invite.circles.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleAccept(invite)}
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 mr-1" />}
+                      Accept
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDecline(invite)}
+                      disabled={isProcessing}
+                    >
+                      <X className="w-4 h-4 mr-1" />
+                      Decline
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => handleAccept(invite)}
-                    disabled={isProcessing}
-                  >
-                    {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 mr-1" />}
-                    Accept
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDecline(invite)}
-                    disabled={isProcessing}
-                  >
-                    <X className="w-4 h-4 mr-1" />
-                    Decline
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+      <UpgradePlanDialog
+        isOpen={upgradeDialogOpen}
+        onClose={() => setUpgradeDialogOpen(false)}
+        currentPlan={upgradeInfo.plan}
+        currentCount={upgradeInfo.currentCount}
+        limit={upgradeInfo.limit}
+        circleId={upgradeInfo.circleId}
+      />
+    </>
   );
 };
 
