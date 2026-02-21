@@ -247,7 +247,8 @@ const Events = () => {
     setEditDescription(event.description || "");
     setEditTime(event.event_time || "");
     setEditLocation(event.location || "");
-    setEditDate(new Date(event.event_date + "T00:00:00"));
+    const [year, month, day] = event.event_date.split("-").map(Number);
+    setEditDate(new Date(year, month - 1, day));
     setEditAlbumId(event.album_id || "none");
   };
 
@@ -601,7 +602,7 @@ const Events = () => {
             </div>
             <div className="space-y-2">
               <Label>Date</Label>
-              <Calendar mode="single" selected={editDate} onSelect={setEditDate} className="rounded-md border" />
+              <Calendar mode="single" selected={editDate} onSelect={(day) => { if (day) setEditDate(day); }} className="rounded-md border" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
