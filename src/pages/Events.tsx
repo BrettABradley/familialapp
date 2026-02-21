@@ -20,6 +20,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, CalendarDays, MapPin, Clock, Trash2, Loader2, Image, Pencil, Check, X, UserCheck, HelpCircle, XCircle, Users } from "lucide-react";
 import { format, parse } from "date-fns";
 
+const formatDateToYMD = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
 const formatTime12h = (time: string): string => {
   try {
     const parsed = parse(time, "HH:mm:ss", new Date());
@@ -218,7 +225,7 @@ const Events = () => {
         description: description || null,
         circle_id: selectedCircle,
         created_by: user.id,
-        event_date: format(selectedDate, "yyyy-MM-dd"),
+        event_date: formatDateToYMD(selectedDate),
         event_time: eventTime || null,
         location: eventLocation || null,
         album_id: selectedAlbumId && selectedAlbumId !== "none" ? selectedAlbumId : null,
@@ -261,7 +268,7 @@ const Events = () => {
       .update({
         title: editTitle.trim(),
         description: editDescription.trim() || null,
-        event_date: format(editDate, "yyyy-MM-dd"),
+        event_date: formatDateToYMD(editDate),
         event_time: editTime || null,
         location: editLocation.trim() || null,
         album_id: editAlbumId && editAlbumId !== "none" ? editAlbumId : null,
