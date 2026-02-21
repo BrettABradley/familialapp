@@ -1,143 +1,130 @@
 
 
-# Enforce Member Limits with Upgrade Flow and Extra-Seat Purchases
+## Plan: Circle Limits, Ownership Transfer, and Album Enhancements
 
-## Overview
-When a circle reaches its member limit, block new invites/joins and prompt the user to either upgrade their plan or (if already on Extended) purchase extra member slots. Any circle member can trigger the upgrade -- not just the admin.
+### Problem 1: Free Account Circle Limit Not Enforced
 
-## What Needs to Happen
+The `can_create_circle` database function defaults to a limit of 3 when no `user_plans` row exists. However, the `user_plans` table is currently **empty** -- no rows are created for new signups. While the default of 3 matches the Free tier pricing, this is fragile. We need to:
 
-### 1. Enable Stripe Integration
-Stripe is not yet connected. We need to enable it first to handle:
-- Plan upgrades (Free to Family at $7/mo, Free/Family to Extended at $15/mo)
-- Extra member packs for Extended users ($5 per 7 extra members)
+- **Auto-create a `user_plans` row on signup** via the existing `handle_new_user` trigger, ensuring every user gets a concrete Free tier row (max_circles=3, max_members_per_circle=8).
+- **Also show the user their remaining circle slots** in the UI so they know they have a limit.
+- Fix the `user_plans` table default for `max_circles` from 1 to 3 (so if a row is created without specifying, it matches Free tier).
 
-### 2. Database Changes
+### Problem 2: Circle Ownership Transfer
 
-**Add `extra_members` column to `user_plans`:**
-Tracks how many extra member slots the circle owner has purchased.
+Currently only owners can edit/delete circles. We need to add:
 
-```text
-ALTER TABLE public.user_plans
-  ADD COLUMN extra_members integer NOT NULL DEFAULT 0;
+- A **"Transfer Ownership"** option in the circle management UI (visible only to the current owner).
+- A dropdown/select to pick from existing circle members.
+- Update the `circles.owner_id` to the new owner. This requires a new RLS policy or a database function since the current UPDATE policy only allows the owner.
+
+### Problem 3: Circle Deletion by Admin
+
+Circle deletion already works for owners (the trash icon on hover). However, circle admins (non-owners with admin role) cannot delete circles. We should:
+
+- Allow circle admins to also see the delete button and delete the circle via the existing RLS policy (which currently only allows `owner_id = auth.uid()`).
+- **Decision**: Keep delete restricted to owners only, since ownership can now be transferred. Admins who need to delete can request ownership transfer first. This is safer.
+
+### Problem 4: Album "Created by" Attribution
+
+Albums store `created_by` but the UI doesn't show who created them. We need to:
+
+- Fetch the creator's profile (display_name) when displaying albums.
+- Show "Created by [Name]" on each album card and in the album detail view.
+
+### Problem 5: Album Deletion by Creator/Admin
+
+Album deletion already works for the creator in the detail view. We should also:
+
+- Make sure circle admins can delete any album (the RLS policy already supports this via `is_circle_admin`).
+- Add a delete button on album cards in the list view (not just detail view) for the creator/admin.
+
+---
+
+### Technical Implementation
+
+**1. Database Migration**
+
+```sql
+-- Fix user_plans defaults to match Free tier
+ALTER TABLE public.user_plans ALTER COLUMN max_circles SET DEFAULT 3;
+
+-- Update handle_new_user to also create a user_plans row
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  INSERT INTO public.profiles (user_id, display_name)
+  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)));
+  
+  INSERT INTO public.user_plans (user_id, plan, max_circles, max_members_per_circle)
+  VALUES (NEW.id, 'free', 3, 8)
+  ON CONFLICT DO NOTHING;
+  
+  RETURN NEW;
+END;
+$$;
+
+-- Backfill: create user_plans rows for existing users who don't have one
+INSERT INTO public.user_plans (user_id, plan, max_circles, max_members_per_circle)
+SELECT p.user_id, 'free', 3, 8
+FROM public.profiles p
+WHERE NOT EXISTS (SELECT 1 FROM public.user_plans up WHERE up.user_id = p.user_id);
+
+-- Allow owners to transfer ownership (update owner_id)
+-- The existing UPDATE policy only allows owner to update, which covers transfer
+-- But we need a function to handle the transfer safely
+CREATE OR REPLACE FUNCTION public.transfer_circle_ownership(_circle_id uuid, _new_owner_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  -- Verify caller is current owner
+  IF NOT EXISTS (SELECT 1 FROM circles WHERE id = _circle_id AND owner_id = auth.uid()) THEN
+    RAISE EXCEPTION 'Only the circle owner can transfer ownership';
+  END IF;
+  
+  -- Verify new owner is a member of the circle
+  IF NOT EXISTS (SELECT 1 FROM circle_memberships WHERE circle_id = _circle_id AND user_id = _new_owner_id) THEN
+    RAISE EXCEPTION 'New owner must be a member of the circle';
+  END IF;
+  
+  -- Transfer ownership
+  UPDATE circles SET owner_id = _new_owner_id WHERE id = _circle_id;
+  
+  -- Remove new owner from memberships (owners are implicit members)
+  DELETE FROM circle_memberships WHERE circle_id = _circle_id AND user_id = _new_owner_id;
+  
+  -- Add old owner as admin member
+  INSERT INTO circle_memberships (circle_id, user_id, role) VALUES (_circle_id, auth.uid(), 'admin')
+  ON CONFLICT DO NOTHING;
+END;
+$$;
 ```
 
-**Create a helper function `get_circle_member_limit()`:**
-Returns the effective member limit for a circle based on the owner's plan:
-`max_members_per_circle + extra_members`
+**2. Circles Page (`src/pages/Circles.tsx`)**
 
-### 3. Enforcement Points
+- Add a "Transfer Ownership" button in the circle card (owner only).
+- Open a dialog showing circle members with a "Transfer" button next to each.
+- Call the `transfer_circle_ownership` database function via `supabase.rpc()`.
 
-**A. Invite flow (`handleInviteMember` in Circles.tsx):**
-Before creating an invite, count current members + pending invites for that circle. If at or over the limit, show an upgrade dialog instead.
+**3. Albums Page (`src/pages/Albums.tsx`)**
 
-**B. Join-by-code flow (`handleJoinByCode` in Circles.tsx):**
-Same check -- if the circle is full, show a message that the circle has reached its limit.
+- Update the album fetch query to join with `profiles` to get creator display name.
+- Show "Created by [Name]" on album cards in the grid view.
+- Show "Created by [Name]" in the album detail header.
+- Add a delete button on album cards in the list view for creator/admins.
 
-**C. Accept-invite flow (`handleAccept` in PendingInvites.tsx):**
-Check member count before joining. If full, show message.
+**4. Files to Change**
 
-**D. Database trigger (defense in depth):**
-Add a `BEFORE INSERT` trigger on `circle_memberships` that rejects if the circle is at capacity.
+| File | Change |
+|------|--------|
+| Database migration | Fix defaults, backfill user_plans, add transfer function |
+| `src/pages/Circles.tsx` | Add transfer ownership dialog and handler |
+| `src/pages/Albums.tsx` | Add "Created by" display, delete button on album cards |
 
-### 4. Upgrade/Purchase UI
-
-**New component: `UpgradePlanDialog`**
-- Shown when a member limit is hit
-- Displays current plan and options:
-  - If on Free: upgrade to Family ($7/mo) or Extended ($15/mo)
-  - If on Family: upgrade to Extended ($15/mo)
-  - If on Extended: purchase extra member pack ($5 for 7 members)
-- Any circle member can see and use this dialog
-- Stripe Checkout handles the payment
-
-### 5. Stripe Products and Edge Functions
-
-**Products to create in Stripe:**
-- Family Plan: $7/month subscription
-- Extended Plan: $15/month subscription
-- Extra Members Pack: $5 one-time payment (adds 7 members)
-
-**Edge function: `create-checkout`**
-Handles creating Stripe Checkout sessions for upgrades and extra member purchases.
-
-**Edge function: `stripe-webhook`**
-Handles Stripe webhook events to:
-- Update `user_plans.plan` and `max_members_per_circle` on subscription start
-- Increment `user_plans.extra_members` by 7 on successful extra-member payment
-
-### 6. Flow Diagram
-
-```text
-User clicks "Invite" or "Join"
-       |
-   Check member count vs limit
-       |
-  Under limit? --> Proceed normally
-       |
-  At limit? --> Show UpgradePlanDialog
-       |
-  User picks upgrade option
-       |
-  Stripe Checkout --> Payment
-       |
-  Webhook updates user_plans
-       |
-  User retries invite/join --> Success
-```
-
-## Technical Details
-
-### Member count check (reusable function)
-```text
-async function getCircleMemberCount(circleId: string): Promise<number> {
-  // Count owner (1) + memberships
-  const { count } = await supabase
-    .from("circle_memberships")
-    .select("id", { count: "exact", head: true })
-    .eq("circle_id", circleId);
-  return (count ?? 0) + 1; // +1 for owner
-}
-
-async function getCircleMemberLimit(circleOwnerId: string): Promise<number> {
-  const { data } = await supabase
-    .from("user_plans")
-    .select("max_members_per_circle, extra_members")
-    .eq("user_id", circleOwnerId)
-    .maybeSingle();
-  return (data?.max_members_per_circle ?? 8) + (data?.extra_members ?? 0);
-}
-```
-
-### Database trigger on circle_memberships
-```text
-CREATE FUNCTION enforce_circle_member_limit() RETURNS trigger ...
-  -- Get circle owner
-  -- Get their plan limits (max_members_per_circle + extra_members)
-  -- Count current members + 1 (owner)
-  -- If count >= limit, RAISE EXCEPTION
-```
-
-### UpgradePlanDialog component
-- Props: `circleId`, `circleOwnerId`, `currentCount`, `limit`, `isOpen`, `onClose`
-- Fetches the circle owner's current plan
-- Shows upgrade options based on plan tier
-- Calls `create-checkout` edge function to start Stripe flow
-- Any authenticated circle member can trigger this
-
-### Pricing update
-Add a note to the Extended tier on the Pricing page:
-"Need more? Add 7 members for $5"
-
-## Prerequisites
-- Stripe must be enabled and connected before implementation can proceed
-- The Stripe secret key will be needed for the edge functions
-
-## Implementation Order
-1. Enable Stripe integration
-2. Database migration (add `extra_members` column + enforcement trigger)
-3. Create Stripe products/prices
-4. Build `create-checkout` and `stripe-webhook` edge functions
-5. Build `UpgradePlanDialog` component
-6. Add member-limit checks to invite, join, and accept flows
-7. Update Pricing.tsx with extra-member add-on note
