@@ -53,18 +53,18 @@ export const useFeedPosts = () => {
   const [isSubmittingComment, setIsSubmittingComment] = useState<string | null>(null);
 
   useEffect(() => {
-    if (circles.length > 0) {
+    if (selectedCircle) {
       fetchPosts(true);
     } else if (!contextLoading) {
       setIsLoadingPosts(false);
     }
-  }, [circles, contextLoading]);
+  }, [selectedCircle, contextLoading]);
 
   const fetchPosts = async (reset = false) => {
-    if (circles.length === 0) return;
+    if (!selectedCircle) return;
 
     if (reset) setIsLoadingPosts(true);
-    const circleIds = circles.map(c => c.id);
+    const circleIds = [selectedCircle];
     const cursor = !reset && posts.length > 0 ? posts[posts.length - 1].created_at : null;
 
     let query = supabase
