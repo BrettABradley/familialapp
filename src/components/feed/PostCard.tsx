@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp, Trash2, Pencil, Check, X } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { LinkifiedText } from "@/components/shared/LinkifiedText";
 import { getMediaType } from "@/lib/mediaUtils";
 import type { Post } from "@/hooks/useFeedPosts";
@@ -23,6 +24,7 @@ interface PostCardProps {
   onSubmitComment: (postId: string) => void;
   onDownloadImage: (url: string) => void;
   onDelete?: (postId: string) => void;
+  onEdit?: (postId: string, newContent: string) => Promise<void>;
 }
 
 const MediaItem = ({ url, index, onDownload }: { url: string; index: number; onDownload: (url: string) => void }) => {
@@ -75,8 +77,25 @@ export const PostCard = ({
   onSubmitComment,
   onDownloadImage,
   onDelete,
+  onEdit,
 }: PostCardProps) => {
   const { profile } = useCircleContext();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(post.content || "");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const handleSaveEdit = async () => {
+    if (!onEdit) return;
+    setIsSavingEdit(true);
+    await onEdit(post.id, editContent);
+    setIsEditing(false);
+    setIsSavingEdit(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditContent(post.content || "");
+    setIsEditing(false);
+  };
 
   // Separate media by type for layout
   const imageUrls = post.media_urls?.filter(u => getMediaType(u) === 'image') || [];
@@ -96,7 +115,14 @@ export const PostCard = ({
               {post.circles?.name} • {new Date(post.created_at).toLocaleDateString()}
             </p>
           </div>
-          {isOwnPost && onDelete && (
+          {isOwnPost && (
+            <div className="flex items-center gap-1">
+              {onEdit && !isEditing && (
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => { setEditContent(post.content || ""); setIsEditing(true); }}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+              {onDelete && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8">
@@ -114,15 +140,34 @@ export const PostCard = ({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+              )}
+            </div>
           )}
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        {post.content && (
+        {isEditing ? (
+          <div className="mb-4 space-y-2">
+            <Textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              className="min-h-[80px] resize-none"
+              maxLength={5000}
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" size="sm" onClick={handleCancelEdit} disabled={isSavingEdit}>
+                <X className="w-4 h-4 mr-1" />Cancel
+              </Button>
+              <Button size="sm" onClick={handleSaveEdit} disabled={isSavingEdit}>
+                <Check className="w-4 h-4 mr-1" />{isSavingEdit ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        ) : post.content ? (
           <p className="text-foreground whitespace-pre-wrap mb-4">
             <LinkifiedText text={post.content} />
           </p>
-        )}
+        ) : null}
 
         {/* Image grid */}
         {imageUrls.length > 0 && (
