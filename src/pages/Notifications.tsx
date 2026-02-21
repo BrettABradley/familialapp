@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Bell, Check, Trash2, Heart, MessageCircle, Calendar, UserPlus, Users, Loader2 } from "lucide-react";
+import PendingInvites from "@/components/circles/PendingInvites";
 
 interface Notification {
   id: string;
@@ -193,6 +194,8 @@ const Notifications = () => {
           </Button>
         )}
       </div>
+
+      <PendingInvites compact />
 
       {notifications.length === 0 ? (
         <Card>
