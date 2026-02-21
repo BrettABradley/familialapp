@@ -451,6 +451,7 @@ const Fridge = () => {
           pins={pins as unknown as FridgeBoardPin[]}
           canDeleteCircleId={(circleId) => adminCircles.some((c) => c.id === circleId)}
           onDelete={(pin) => handleDeletePin(pin as unknown as FridgePin)}
+          circleName={selectedCircle ? circles.find(c => c.id === selectedCircle)?.name : undefined}
         />
       )}
     </main>

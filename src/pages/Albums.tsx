@@ -48,6 +48,7 @@ const Albums = () => {
   const albumIdParam = searchParams.get("album");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const [enlargedPhoto, setEnlargedPhoto] = useState<AlbumPhoto | null>(null);
   
   const [albums, setAlbums] = useState<Album[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
@@ -438,11 +439,11 @@ const Albums = () => {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {photos.map((photo) => (
-                <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden">
+                <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer" onClick={() => setEnlargedPhoto(photo)}>
                   <img src={photo.photo_url} alt={photo.caption || "Photo"} className="w-full h-full object-cover" />
                   {user && photo.uploaded_by === user.id && (
                     <button
-                      onClick={() => handleDeletePhoto(photo)}
+                      onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo); }}
                       className="absolute top-2 right-2 bg-background/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
                       aria-label="Delete photo"
                     >
@@ -453,6 +454,25 @@ const Albums = () => {
               ))}
             </div>
           )}
+
+          {/* Enlarged photo dialog */}
+          <Dialog open={!!enlargedPhoto} onOpenChange={(open) => !open && setEnlargedPhoto(null)}>
+            <DialogContent className="max-w-3xl p-2 sm:p-4">
+              <DialogTitle className="sr-only">{enlargedPhoto?.caption || "Photo"}</DialogTitle>
+              {enlargedPhoto && (
+                <div className="flex flex-col items-center">
+                  <img
+                    src={enlargedPhoto.photo_url}
+                    alt={enlargedPhoto.caption || "Photo"}
+                    className="max-h-[80vh] w-auto rounded-md object-contain"
+                  />
+                  {enlargedPhoto.caption && (
+                    <p className="mt-3 text-sm text-muted-foreground">{enlargedPhoto.caption}</p>
+                  )}
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </>
       ) : (
         // Albums List View
