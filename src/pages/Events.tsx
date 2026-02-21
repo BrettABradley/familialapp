@@ -20,6 +20,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, CalendarDays, MapPin, Clock, Trash2, Loader2, Image, Pencil, Check, X, UserCheck, HelpCircle, XCircle, Users } from "lucide-react";
 import { format, parse } from "date-fns";
 
+/** Parse "YYYY-MM-DD" as local date (avoids UTC-midnight timezone shift). */
+const parseLocalDate = (dateStr: string): Date => {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+
 const formatDateToYMD = (date: Date): string => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -375,7 +381,7 @@ const Events = () => {
   }
 
   const allEvents = [...events, ...pastEvents];
-  const eventDates = allEvents.map(e => new Date(e.event_date));
+  const eventDates = allEvents.map(e => parseLocalDate(e.event_date));
 
   const renderRsvpSection = (event: Event) => {
     const eventRsvps = rsvps[event.id] || [];
@@ -462,7 +468,7 @@ const Events = () => {
             <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mt-2">
               <span className="flex items-center gap-1">
                 <CalendarDays className="w-4 h-4" />
-                {format(new Date(event.event_date), "MMM d, yyyy")}
+                {format(parseLocalDate(event.event_date), "MMM d, yyyy")}
               </span>
               {event.event_time && (
                 <span className="flex items-center gap-1">
