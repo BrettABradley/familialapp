@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound, ArrowRightLeft } from "lucide-react";
+import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound, ArrowRightLeft, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import PendingInvites from "@/components/circles/PendingInvites";
 import UpgradePlanDialog from "@/components/circles/UpgradePlanDialog";
@@ -68,6 +68,7 @@ const Circles = () => {
   const [upgradeInfo, setUpgradeInfo] = useState<{ plan: string; currentCount: number; limit: number; circleId: string }>({ plan: "free", currentCount: 0, limit: 8, circleId: "" });
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
+  const [isLeaveTransferOpen, setIsLeaveTransferOpen] = useState(false);
   const [circleCount, setCircleCount] = useState(0);
   const [circleLimit, setCircleLimit] = useState(3);
 
@@ -317,6 +318,67 @@ const Circles = () => {
     setIsJoining(false);
   };
 
+  const handleLeaveCircle = async (circle: Circle) => {
+    if (!user) return;
+
+    if (isOwner(circle)) {
+      // Owner needs to transfer ownership first
+      setSelectedCircle(circle);
+      await fetchMemberships(circle.id);
+      setIsLeaveTransferOpen(true);
+      return;
+    }
+
+    if (!confirm(`Leave "${circle.name}"? You'll need a new invite to rejoin.`)) return;
+
+    const { error } = await supabase
+      .from("circle_memberships")
+      .delete()
+      .eq("circle_id", circle.id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      toast({ title: "Error", description: "Failed to leave circle.", variant: "destructive" });
+    } else {
+      toast({ title: "Left circle", description: `You've left "${circle.name}".` });
+      await refetchCircles();
+    }
+  };
+
+  const handleTransferAndLeave = async (newOwnerId: string) => {
+    if (!selectedCircle || !user) return;
+    if (!confirm("Transfer ownership and leave this circle? This cannot be undone.")) return;
+    setIsTransferring(true);
+
+    const { error: transferError } = await supabase.rpc("transfer_circle_ownership", {
+      _circle_id: selectedCircle.id,
+      _new_owner_id: newOwnerId,
+    });
+
+    if (transferError) {
+      toast({ title: "Error", description: transferError.message || "Failed to transfer ownership.", variant: "destructive" });
+      setIsTransferring(false);
+      return;
+    }
+
+    // Now leave (transfer made us a member with admin role)
+    const { error: leaveError } = await supabase
+      .from("circle_memberships")
+      .delete()
+      .eq("circle_id", selectedCircle.id)
+      .eq("user_id", user.id);
+
+    if (leaveError) {
+      toast({ title: "Ownership transferred", description: "Ownership transferred but could not leave. You are now an admin member.", variant: "default" });
+    } else {
+      toast({ title: "Left circle", description: `Ownership transferred and you've left "${selectedCircle.name}".` });
+    }
+
+    setIsLeaveTransferOpen(false);
+    setIsTransferring(false);
+    await refetchCircles();
+  };
+
   const isOwner = (circle: Circle) => circle.owner_id === user?.id;
 
   const handleTransferOwnership = async (newOwnerId: string) => {
@@ -475,6 +537,9 @@ const Circles = () => {
                   {isOwner(circle) && (
                     <Button variant="outline" size="sm" onClick={() => { setSelectedCircle(circle); setEditName(circle.name); setEditDescription(circle.description || ""); setIsEditOpen(true); }}><Edit className="w-4 h-4 mr-2" />Edit</Button>
                   )}
+                  <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleLeaveCircle(circle)}>
+                    <LogOut className="w-4 h-4 mr-2" />Leave
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -569,6 +634,38 @@ const Circles = () => {
             ))}
             {memberships.filter(m => m.user_id !== user?.id).length === 0 && (
               <p className="text-muted-foreground text-center py-4">No other members to transfer to</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer & Leave Dialog (for owners leaving) */}
+      <Dialog open={isLeaveTransferOpen} onOpenChange={setIsLeaveTransferOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Transfer Ownership to Leave</DialogTitle>
+            <DialogDescription>
+              As the owner of "{selectedCircle?.name}", you must transfer ownership to another member before leaving. Select the new owner below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-4 max-h-96 overflow-y-auto">
+            {memberships.filter(m => m.user_id !== user?.id).map((member) => (
+              <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border border-border">
+                <Avatar className="h-10 w-10"><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
+                <div className="flex-1">
+                  <p className="font-medium text-foreground">{member.profiles?.display_name || "Unknown"}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => handleTransferAndLeave(member.user_id)} disabled={isTransferring}>
+                  <Crown className="w-4 h-4 mr-1" />Transfer & Leave
+                </Button>
+              </div>
+            ))}
+            {memberships.filter(m => m.user_id !== user?.id).length === 0 && (
+              <div className="text-center py-4">
+                <p className="text-muted-foreground mb-2">No other members to transfer ownership to.</p>
+                <p className="text-sm text-muted-foreground">You can delete the circle instead, or invite someone first.</p>
+              </div>
             )}
           </div>
         </DialogContent>
