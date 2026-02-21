@@ -23,7 +23,9 @@ const Feed = () => {
     handleSubmitComment,
     toggleComments,
     handleDownloadImage,
+    handleDeletePost,
     hasUserReacted,
+    user,
   } = useFeedPosts();
 
   if (contextLoading || isLoadingPosts) {
@@ -102,11 +104,13 @@ const Feed = () => {
             commentInput={commentInputs[post.id] || ""}
             isSubmittingComment={isSubmittingComment === post.id}
             hasUserReacted={hasUserReacted(post) || false}
+            isOwnPost={post.author_id === user?.id}
             onReaction={handleReaction}
             onToggleComments={toggleComments}
             onCommentInputChange={(postId, value) => setCommentInputs(prev => ({ ...prev, [postId]: value }))}
             onSubmitComment={handleSubmitComment}
             onDownloadImage={handleDownloadImage}
+            onDelete={handleDeletePost}
           />
         ))}
 
