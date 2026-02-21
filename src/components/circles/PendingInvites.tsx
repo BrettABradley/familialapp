@@ -37,15 +37,34 @@ const PendingInvites = ({ compact = false, onCountChange }: PendingInvitesProps)
   const fetchInvites = async () => {
     if (!user?.email) return;
 
-    const { data, error } = await supabase
-      .from("circle_invites")
-      .select("id, circle_id, email, status, created_at, expires_at, circles(id, name, description)")
-      .eq("email", user.email)
-      .eq("status", "pending");
+    // Fetch invites and user's current circles in parallel
+    const [invitesResult, membershipsResult, ownedResult] = await Promise.all([
+      supabase
+        .from("circle_invites")
+        .select("id, circle_id, email, status, created_at, expires_at, circles(id, name, description)")
+        .eq("email", user.email)
+        .eq("status", "pending"),
+      supabase
+        .from("circle_memberships")
+        .select("circle_id")
+        .eq("user_id", user.id),
+      supabase
+        .from("circles")
+        .select("id")
+        .eq("owner_id", user.id),
+    ]);
 
-    if (!error && data) {
-      const valid = (data as unknown as PendingInvite[]).filter(
-        (inv) => new Date(inv.expires_at) > new Date() && inv.circles != null
+    if (!invitesResult.error && invitesResult.data) {
+      // Build set of circles user already belongs to
+      const joinedCircleIds = new Set<string>();
+      membershipsResult.data?.forEach((m) => joinedCircleIds.add(m.circle_id));
+      ownedResult.data?.forEach((c) => joinedCircleIds.add(c.id));
+
+      const valid = (invitesResult.data as unknown as PendingInvite[]).filter(
+        (inv) =>
+          new Date(inv.expires_at) > new Date() &&
+          inv.circles != null &&
+          !joinedCircleIds.has(inv.circle_id)
       );
       // Deduplicate by circle_id — keep most recent invite per circle
       const byCircle = new Map<string, PendingInvite>();
