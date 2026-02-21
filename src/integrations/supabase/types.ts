@@ -135,6 +135,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          invite_code: string
           name: string
           owner_id: string
           updated_at: string
@@ -144,6 +145,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          invite_code?: string
           name: string
           owner_id: string
           updated_at?: string
@@ -153,6 +155,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          invite_code?: string
           name?: string
           owner_id?: string
           updated_at?: string

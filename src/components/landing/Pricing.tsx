@@ -10,7 +10,7 @@ const tiers = [
     period: "/forever",
     description: "Perfect for small families getting started",
     features: [
-      "1 circle only",
+      "Up to 3 circles",
       "Up to 8 family members",
       "Unlimited posts & photos",
       "Basic circle management",

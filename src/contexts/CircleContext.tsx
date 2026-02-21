@@ -8,6 +8,7 @@ interface Circle {
   description: string | null;
   owner_id: string;
   created_at: string;
+  invite_code: string;
 }
 
 interface Profile {
@@ -48,12 +49,12 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
 
     const { data: ownedCircles } = await supabase
       .from("circles")
-      .select("id, name, description, owner_id, created_at")
+      .select("id, name, description, owner_id, created_at, invite_code")
       .eq("owner_id", user.id);
 
     const { data: memberCircles } = await supabase
       .from("circle_memberships")
-      .select("circle_id, circles(id, name, description, owner_id, created_at)")
+      .select("circle_id, circles(id, name, description, owner_id, created_at, invite_code)")
       .eq("user_id", user.id);
 
     const allCircles: Circle[] = [];
