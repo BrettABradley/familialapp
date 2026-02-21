@@ -279,12 +279,12 @@ const Store = () => {
                 Transparent Pricing, Zero Data Sales
               </h3>
               <p className="text-muted-foreground mb-2">
-                Starting at <span className="text-foreground font-semibold">$0.01 per impression</span>. 
+                Starting at <span className="text-foreground font-semibold">$0.02 per user</span> in our userbase. 
                 Custom packages available for larger campaigns.
               </p>
               <p className="text-sm text-muted-foreground mb-6">
-                Unlike other platforms, Familial never sells user data to advertisers or third parties. 
-                Offers are matched by location only — no profiling, no tracking, no data harvesting.
+                Unlike other platforms, Familial never tracks, profiles, or sells user data. 
+                Offers are matched by region only — no impression tracking, no behavioral monitoring, no data harvesting.
               </p>
               <a href="tel:520-759-5200">
                 <Button size="lg">
