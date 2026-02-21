@@ -18,7 +18,21 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, CalendarDays, MapPin, Clock, Trash2, Loader2, Image, Pencil, Check, X, UserCheck, HelpCircle, XCircle, Users } from "lucide-react";
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
+
+const formatTime12h = (time: string): string => {
+  try {
+    const parsed = parse(time, "HH:mm:ss", new Date());
+    return format(parsed, "h:mm a");
+  } catch {
+    try {
+      const parsed = parse(time, "HH:mm", new Date());
+      return format(parsed, "h:mm a");
+    } catch {
+      return time;
+    }
+  }
+};
 
 interface Circle {
   id: string;
@@ -441,7 +455,7 @@ const Events = () => {
               {event.event_time && (
                 <span className="flex items-center gap-1">
                   <Clock className="w-4 h-4" />
-                  {event.event_time}
+                  {formatTime12h(event.event_time)}
                 </span>
               )}
               {event.location && (
