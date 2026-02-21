@@ -33,7 +33,7 @@ const tiers = [
       "Priority support",
       "Advanced privacy controls",
     ],
-    cta: "Start Free Trial",
+    cta: "Buy Now",
     popular: true,
   },
   {
@@ -50,7 +50,7 @@ const tiers = [
       "Admin tools & analytics",
       "Need more? Add 7 members for $5",
     ],
-    cta: "Start Free Trial",
+    cta: "Buy Now",
     popular: false,
   },
 ];

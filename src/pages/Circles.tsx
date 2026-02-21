@@ -109,10 +109,23 @@ const Circles = () => {
 
     if (error) {
       const isLimitError = error.message?.includes("can_create_circle") || error.code === "42501";
-      const message = isLimitError
-        ? "You've reached your circle creation limit. Would you like to upgrade your plan?"
-        : "Failed to create circle. Please try again.";
-      toast({ title: isLimitError ? "Plan Limit Reached" : "Error", description: message, variant: "destructive" });
+      if (isLimitError) {
+        toast({
+          title: "Plan Limit Reached",
+          description: (
+            <span>
+              You've reached your circle creation limit.{" "}
+              <a href="/#pricing" className="underline font-medium text-primary hover:text-primary/80">
+                Upgrade your plan
+              </a>{" "}
+              to create more circles.
+            </span>
+          ),
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Error", description: "Failed to create circle. Please try again.", variant: "destructive" });
+      }
       setIsCreating(false);
       return;
     }
