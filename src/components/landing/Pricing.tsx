@@ -11,7 +11,7 @@ const tiers = [
     description: "Perfect for small families getting started",
     features: [
       "Up to 3 circles",
-      "Up to 8 family members",
+      "Up to 8 members per circle",
       "Unlimited posts & photos",
       "Basic circle management",
       "Mobile & web access",
@@ -27,7 +27,7 @@ const tiers = [
     description: "For growing families who want more",
     features: [
       "Up to 2 circles",
-      "Up to 20 family members",
+      "Up to 20 members per circle",
       "Event planning & calendars",
       "Photo albums",
       "Priority support",
@@ -38,12 +38,12 @@ const tiers = [
   },
   {
     name: "Extended",
-    price: "$10",
+    price: "$15",
     period: "/month",
     description: "For large families and reunions",
     features: [
       "Up to 3 circles",
-      "Up to 50 family members",
+      "Up to 35 members per circle",
       "Family tree features",
       "Private messaging",
       "Video sharing",
