@@ -18,14 +18,15 @@ interface PendingInvite {
     id: string;
     name: string;
     description: string | null;
-  };
+  } | null;
 }
 
 interface PendingInvitesProps {
   compact?: boolean;
+  onCountChange?: (count: number) => void;
 }
 
-const PendingInvites = ({ compact = false }: PendingInvitesProps) => {
+const PendingInvites = ({ compact = false, onCountChange }: PendingInvitesProps) => {
   const { user } = useAuth();
   const { refetchCircles } = useCircleContext();
   const { toast } = useToast();
@@ -43,11 +44,11 @@ const PendingInvites = ({ compact = false }: PendingInvitesProps) => {
       .eq("status", "pending");
 
     if (!error && data) {
-      // Filter out expired invites client-side
       const valid = (data as unknown as PendingInvite[]).filter(
-        (inv) => new Date(inv.expires_at) > new Date()
+        (inv) => new Date(inv.expires_at) > new Date() && inv.circles != null
       );
       setInvites(valid);
+      onCountChange?.(valid.length);
     }
     setIsLoading(false);
   };
@@ -60,7 +61,6 @@ const PendingInvites = ({ compact = false }: PendingInvitesProps) => {
     if (!user) return;
     setProcessingIds((prev) => new Set(prev).add(invite.id));
 
-    // Insert membership
     const { error: joinError } = await supabase
       .from("circle_memberships")
       .insert({ circle_id: invite.circle_id, user_id: user.id, role: "member" });
@@ -71,14 +71,15 @@ const PendingInvites = ({ compact = false }: PendingInvitesProps) => {
       return;
     }
 
-    // Mark invite as accepted
     await supabase
       .from("circle_invites")
       .update({ status: "accepted" })
       .eq("id", invite.id);
 
-    setInvites((prev) => prev.filter((i) => i.id !== invite.id));
-    toast({ title: "Joined!", description: `You've joined "${invite.circles.name}".` });
+    const updated = invites.filter((i) => i.id !== invite.id);
+    setInvites(updated);
+    onCountChange?.(updated.length);
+    toast({ title: "Joined!", description: `You've joined "${invite.circles?.name}".` });
     await refetchCircles();
     setProcessingIds((prev) => { const s = new Set(prev); s.delete(invite.id); return s; });
   };
@@ -94,7 +95,9 @@ const PendingInvites = ({ compact = false }: PendingInvitesProps) => {
     if (error) {
       toast({ title: "Error", description: "Failed to decline invite.", variant: "destructive" });
     } else {
-      setInvites((prev) => prev.filter((i) => i.id !== invite.id));
+      const updated = invites.filter((i) => i.id !== invite.id);
+      setInvites(updated);
+      onCountChange?.(updated.length);
       toast({ title: "Invite declined" });
     }
     setProcessingIds((prev) => { const s = new Set(prev); s.delete(invite.id); return s; });
@@ -104,12 +107,6 @@ const PendingInvites = ({ compact = false }: PendingInvitesProps) => {
 
   return (
     <div className={compact ? "space-y-2" : "space-y-3 mb-8"}>
-      {!compact && (
-        <h2 className="font-serif text-xl font-semibold text-foreground flex items-center gap-2">
-          <UserPlus className="w-5 h-5" />
-          Pending Invitations
-        </h2>
-      )}
       {invites.map((invite) => {
         const isProcessing = processingIds.has(invite.id);
         return (
@@ -122,9 +119,9 @@ const PendingInvites = ({ compact = false }: PendingInvitesProps) => {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-foreground">
                     {compact ? "Invite:" : "You've been invited to join"}{" "}
-                    <span className="font-semibold">{invite.circles.name}</span>
+                    <span className="font-semibold">{invite.circles?.name ?? "a circle"}</span>
                   </p>
-                  {invite.circles.description && !compact && (
+                  {invite.circles?.description && !compact && (
                     <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
                       {invite.circles.description}
                     </p>
