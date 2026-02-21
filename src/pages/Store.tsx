@@ -137,6 +137,18 @@ const Store = () => {
         variant: "destructive",
       });
     } else {
+      // Send email notification (fire-and-forget, don't block on failure)
+      supabase.functions.invoke("notify-store-offer", {
+        body: {
+          companyName: formData.companyName.trim(),
+          companyEmail: formData.companyEmail.trim(),
+          companyPhone: formData.companyPhone?.trim() || "",
+          offerTitle: formData.offerTitle.trim(),
+          offerDescription: formData.offerDescription?.trim() || "",
+          targetLocations: formData.targetLocations?.trim() || "",
+        },
+      }).catch((err) => console.error("Email notification failed:", err));
+
       toast({
         title: "Offer Submitted!",
         description: "We'll review your offer and get back to you within 24-48 hours.",
