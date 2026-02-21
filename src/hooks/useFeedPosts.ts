@@ -118,15 +118,22 @@ export const useFeedPosts = () => {
 
     try {
       if (existingReaction) {
-        const { error } = await supabase.from("reactions").delete().eq("id", existingReaction.id);
+        const { error } = await supabase.from("reactions").delete().eq("post_id", postId).eq("user_id", user.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("reactions").insert({
+        const { data, error } = await supabase.from("reactions").insert({
           post_id: postId,
           user_id: user.id,
           reaction_type: "heart",
-        });
+        }).select("id").single();
         if (error) throw error;
+        // Update with real ID from DB
+        if (data) {
+          setPosts(prev => prev.map(p => {
+            if (p.id !== postId) return p;
+            return { ...p, reactions: p.reactions?.map(r => r.user_id === user.id && r.id !== data.id ? { ...r, id: data.id } : r) };
+          }));
+        }
       }
     } catch {
       setPosts(prev => prev.map(p => {
