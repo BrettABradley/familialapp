@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,10 +22,19 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [newPostContent, setNewPostContent] = useState("");
+  const DRAFT_KEY = "familial_post_draft";
+
+  const [newPostContent, setNewPostContent] = useState(() => {
+    try { return sessionStorage.getItem(DRAFT_KEY) || ""; } catch { return ""; }
+  });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isPosting, setIsPosting] = useState(false);
+
+  // Persist draft text to sessionStorage
+  useEffect(() => {
+    try { sessionStorage.setItem(DRAFT_KEY, newPostContent); } catch { /* ignore */ }
+  }, [newPostContent]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -95,6 +104,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
       toast({ title: "Error", description: "Failed to create post.", variant: "destructive" });
     } else {
       setNewPostContent("");
+      try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
       setSelectedFiles([]);
       previewUrls.forEach(url => URL.revokeObjectURL(url));
       setPreviewUrls([]);
