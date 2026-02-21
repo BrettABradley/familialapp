@@ -22,7 +22,7 @@ const tiers = [
   },
   {
     name: "Family",
-    price: "$5",
+    price: "$7",
     period: "/month",
     description: "For growing families who want more",
     features: [
