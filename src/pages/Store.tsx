@@ -201,8 +201,11 @@ const Store = () => {
           <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl font-bold text-foreground mb-6">
             Familial Store
           </h1>
-          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-4">
             Connect your business with local families through targeted, respectful advertising that adds value to their lives.
+          </p>
+          <p className="text-base text-muted-foreground max-w-xl mx-auto mb-8 font-medium">
+            🔒 We never sell, share, or monetize user data. Your family's privacy is non-negotiable.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <div className="flex items-center gap-2 px-4 py-2 bg-secondary rounded-full">
@@ -273,11 +276,15 @@ const Store = () => {
           <Card className="max-w-3xl mx-auto mb-16 border-2 border-foreground">
             <CardContent className="py-8 text-center">
               <h3 className="font-serif text-2xl font-bold text-foreground mb-4">
-                Transparent Pricing
+                Transparent Pricing, Zero Data Sales
               </h3>
-              <p className="text-muted-foreground mb-6">
+              <p className="text-muted-foreground mb-2">
                 Starting at <span className="text-foreground font-semibold">$0.01 per impression</span>. 
                 Custom packages available for larger campaigns.
+              </p>
+              <p className="text-sm text-muted-foreground mb-6">
+                Unlike other platforms, Familial never sells user data to advertisers or third parties. 
+                Offers are matched by location only — no profiling, no tracking, no data harvesting.
               </p>
               <a href="tel:520-759-5200">
                 <Button size="lg">
