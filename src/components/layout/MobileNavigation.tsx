@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Pin, Calendar, MessageSquare, MoreHorizontal, User, Users, Image, TreeDeciduous, Bell } from "lucide-react";
+import { Home, Pin, Calendar, MoreHorizontal, User, Users, Image, MessageSquare } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Sheet,
@@ -11,17 +11,15 @@ import {
 import { useState } from "react";
 
 const navItems = [
-  { to: "/feed", icon: Home, label: "Home" },
+  { to: "/circles", icon: Users, label: "Circles" },
+  { to: "/feed", icon: Home, label: "Feed" },
   { to: "/fridge", icon: Pin, label: "Fridge" },
   { to: "/events", icon: Calendar, label: "Events" },
-  { to: "/messages", icon: MessageSquare, label: "Messages" },
 ];
 
 const moreItems = [
   { to: "/albums", icon: Image, label: "Albums" },
-  { to: "/family-tree", icon: TreeDeciduous, label: "Family Tree" },
-  { to: "/circles", icon: Users, label: "Circles" },
-  { to: "/notifications", icon: Bell, label: "Notifications" },
+  { to: "/messages", icon: MessageSquare, label: "Messages" },
   { to: "/profile", icon: User, label: "Profile" },
 ];
 

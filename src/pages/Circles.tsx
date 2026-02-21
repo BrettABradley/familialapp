@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check } from "lucide-react";
+import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import PendingInvites from "@/components/circles/PendingInvites";
 
@@ -49,15 +49,18 @@ const Circles = () => {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
+  const [isJoinOpen, setIsJoinOpen] = useState(false);
   const [selectedCircle, setSelectedCircle] = useState<Circle | null>(null);
   const [newCircleName, setNewCircleName] = useState("");
   const [newCircleDescription, setNewCircleDescription] = useState("");
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
+  const [joinCode, setJoinCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Type guard for circles with full properties
@@ -214,6 +217,47 @@ const Circles = () => {
     }
   };
 
+  const handleJoinByCode = async () => {
+    if (!joinCode.trim() || !user) return;
+    setIsJoining(true);
+
+    const { data: circle, error: lookupError } = await supabase
+      .from("circles")
+      .select("id, name")
+      .eq("invite_code", joinCode.trim())
+      .maybeSingle();
+
+    if (lookupError || !circle) {
+      toast({ title: "Invalid code", description: "No circle found with that invite code.", variant: "destructive" });
+      setIsJoining(false);
+      return;
+    }
+
+    // Check if already a member or owner
+    const alreadyIn = circlesList.some((c) => c.id === circle.id);
+    if (alreadyIn) {
+      toast({ title: "Already a member", description: `You're already in "${circle.name}".` });
+      setIsJoining(false);
+      setJoinCode("");
+      setIsJoinOpen(false);
+      return;
+    }
+
+    const { error: joinError } = await supabase
+      .from("circle_memberships")
+      .insert({ circle_id: circle.id, user_id: user.id, role: "member" });
+
+    if (joinError) {
+      toast({ title: "Join failed", description: joinError.message || "Could not join circle.", variant: "destructive" });
+    } else {
+      toast({ title: "Joined!", description: `You're now a member of "${circle.name}".` });
+      await refetchCircles();
+      setJoinCode("");
+      setIsJoinOpen(false);
+    }
+    setIsJoining(false);
+  };
+
   const isOwner = (circle: Circle) => circle.owner_id === user?.id;
 
   if (contextLoading) {
@@ -259,26 +303,44 @@ const Circles = () => {
           <h1 className="font-serif text-3xl font-bold text-foreground">Your Circles</h1>
           <p className="text-muted-foreground mt-1">Private spaces for your family and close friends</p>
         </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Create Circle</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="font-serif">Create a New Circle</DialogTitle>
-              <DialogDescription>A circle is a private space for your family or close friends.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Circle Name</Label>
-                <Input id="name" placeholder="e.g., Smith Family" value={newCircleName} onChange={(e) => setNewCircleName(e.target.value)} maxLength={100} />
+        <div className="flex gap-2">
+          <Dialog open={isJoinOpen} onOpenChange={setIsJoinOpen}>
+            <DialogTrigger asChild><Button variant="outline"><KeyRound className="w-4 h-4 mr-2" />Join with Code</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="font-serif">Join a Circle</DialogTitle>
+                <DialogDescription>Enter the invite code shared by your family or friends.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="joinCode">Invite Code</Label>
+                  <Input id="joinCode" placeholder="e.g., a1b2c3d4" value={joinCode} onChange={(e) => setJoinCode(e.target.value)} maxLength={8} />
+                </div>
+                <Button className="w-full" onClick={handleJoinByCode} disabled={!joinCode.trim() || isJoining}>{isJoining ? "Joining..." : "Join Circle"}</Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description (optional)</Label>
-                <Textarea id="description" placeholder="What's this circle about?" value={newCircleDescription} onChange={(e) => setNewCircleDescription(e.target.value)} maxLength={500} />
+            </DialogContent>
+          </Dialog>
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Create Circle</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="font-serif">Create a New Circle</DialogTitle>
+                <DialogDescription>A circle is a private space for your family or close friends.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Circle Name</Label>
+                  <Input id="name" placeholder="e.g., Smith Family" value={newCircleName} onChange={(e) => setNewCircleName(e.target.value)} maxLength={100} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description (optional)</Label>
+                  <Textarea id="description" placeholder="What's this circle about?" value={newCircleDescription} onChange={(e) => setNewCircleDescription(e.target.value)} maxLength={500} />
+                </div>
+                <Button className="w-full" onClick={handleCreateCircle} disabled={!newCircleName.trim() || isCreating}>{isCreating ? "Creating..." : "Create Circle"}</Button>
               </div>
-              <Button className="w-full" onClick={handleCreateCircle} disabled={!newCircleName.trim() || isCreating}>{isCreating ? "Creating..." : "Create Circle"}</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {pendingCount > 0 && (
