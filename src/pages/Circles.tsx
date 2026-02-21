@@ -365,7 +365,7 @@ const Circles = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-serif text-3xl font-bold text-foreground">Your Circles</h1>
-          <p className="text-muted-foreground mt-1">Private spaces for your family and close friends · {circleCount}/{circleLimit} circles used</p>
+          <p className="text-muted-foreground mt-1">Private spaces for your family and close friends · {circleCount}/{circleLimit} circles created</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={isJoinOpen} onOpenChange={setIsJoinOpen}>
