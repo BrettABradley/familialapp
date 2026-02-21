@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit } from "lucide-react";
+import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import PendingInvites from "@/components/circles/PendingInvites";
 
@@ -23,6 +23,7 @@ interface Circle {
   description: string | null;
   owner_id: string;
   created_at: string;
+  invite_code: string;
 }
 
 interface CircleMembership {
@@ -57,6 +58,7 @@ const Circles = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Type guard for circles with full properties
   const circlesList = circles as unknown as Circle[];
@@ -309,7 +311,24 @@ const Circles = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                {circle.description && <p className="text-muted-foreground text-sm mb-4">{circle.description}</p>}
+                {circle.description && <p className="text-muted-foreground text-sm mb-3">{circle.description}</p>}
+                <div className="flex items-center gap-2 mb-3 p-2 rounded-md bg-secondary/50 border border-border">
+                  <span className="text-xs text-muted-foreground">Invite Code:</span>
+                  <code className="text-sm font-mono font-semibold text-foreground">{circle.invite_code}</code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 ml-auto"
+                    onClick={() => {
+                      navigator.clipboard.writeText(circle.invite_code);
+                      setCopiedId(circle.id);
+                      setTimeout(() => setCopiedId(null), 2000);
+                      toast({ title: "Copied!", description: "Invite code copied to clipboard." });
+                    }}
+                  >
+                    {copiedId === circle.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  </Button>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" onClick={() => { setSelectedCircle(circle); setIsInviteOpen(true); }}><UserPlus className="w-4 h-4 mr-2" />Invite</Button>
                   <Button variant="outline" size="sm" onClick={() => { setSelectedCircle(circle); fetchMemberships(circle.id); setIsMembersOpen(true); }}><Users className="w-4 h-4 mr-2" />Members</Button>
