@@ -16,6 +16,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import PendingInvites from "@/components/circles/PendingInvites";
+import UpgradePlanDialog from "@/components/circles/UpgradePlanDialog";
+import { checkCircleCapacity } from "@/lib/circleLimits";
 
 interface Circle {
   id: string;
@@ -62,6 +64,8 @@ const Circles = () => {
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
+  const [upgradeInfo, setUpgradeInfo] = useState<{ plan: string; currentCount: number; limit: number; circleId: string }>({ plan: "free", currentCount: 0, limit: 8, circleId: "" });
 
   // Type guard for circles with full properties
   const circlesList = circles as unknown as Circle[];
@@ -138,6 +142,15 @@ const Circles = () => {
     if (!inviteEmail.trim() || !selectedCircle || !user) return;
     
     setIsSendingInvite(true);
+
+    // Check member limit before inviting
+    const capacity = await checkCircleCapacity(selectedCircle.id, selectedCircle.owner_id);
+    if (capacity.isFull) {
+      setUpgradeInfo({ plan: capacity.plan, currentCount: capacity.currentCount, limit: capacity.limit, circleId: selectedCircle.id });
+      setUpgradeDialogOpen(true);
+      setIsSendingInvite(false);
+      return;
+    }
 
     const { error } = await supabase.from("circle_invites").insert({
       circle_id: selectedCircle.id,
@@ -243,12 +256,33 @@ const Circles = () => {
       return;
     }
 
+    // Check member limit before joining
+    const { data: circleDetail } = await supabase
+      .from("circles")
+      .select("owner_id")
+      .eq("id", circle.id)
+      .maybeSingle();
+
+    if (circleDetail) {
+      const capacity = await checkCircleCapacity(circle.id, circleDetail.owner_id);
+      if (capacity.isFull) {
+        setUpgradeInfo({ plan: capacity.plan, currentCount: capacity.currentCount, limit: capacity.limit, circleId: circle.id });
+        setUpgradeDialogOpen(true);
+        setIsJoining(false);
+        setIsJoinOpen(false);
+        return;
+      }
+    }
+
     const { error: joinError } = await supabase
       .from("circle_memberships")
       .insert({ circle_id: circle.id, user_id: user.id, role: "member" });
 
     if (joinError) {
-      toast({ title: "Join failed", description: joinError.message || "Could not join circle.", variant: "destructive" });
+      const msg = joinError.message?.includes("member limit")
+        ? "This circle has reached its member limit."
+        : joinError.message || "Could not join circle.";
+      toast({ title: "Join failed", description: msg, variant: "destructive" });
     } else {
       toast({ title: "Joined!", description: `You're now a member of "${circle.name}".` });
       await refetchCircles();
@@ -461,6 +495,16 @@ const Circles = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Upgrade Plan Dialog */}
+      <UpgradePlanDialog
+        isOpen={upgradeDialogOpen}
+        onClose={() => setUpgradeDialogOpen(false)}
+        currentPlan={upgradeInfo.plan}
+        currentCount={upgradeInfo.currentCount}
+        limit={upgradeInfo.limit}
+        circleId={upgradeInfo.circleId}
+      />
     </main>
   );
 };

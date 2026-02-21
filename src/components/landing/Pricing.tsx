@@ -48,6 +48,7 @@ const tiers = [
       "Private messaging",
       "Video sharing",
       "Admin tools & analytics",
+      "Need more? Add 7 members for $5",
     ],
     cta: "Start Free Trial",
     popular: false,
