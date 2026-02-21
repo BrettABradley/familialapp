@@ -38,12 +38,42 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const acceptPendingInvites = async () => {
+    if (!user?.email) return;
+
+    // Query pending invites for this user's email
+    const { data: pendingInvites } = await supabase
+      .from("circle_invites")
+      .select("id, circle_id")
+      .eq("email", user.email)
+      .eq("status", "pending");
+
+    if (!pendingInvites || pendingInvites.length === 0) return;
+
+    // Join each circle and mark invite as accepted
+    for (const invite of pendingInvites) {
+      await supabase
+        .from("circle_memberships")
+        .insert({ circle_id: invite.circle_id, user_id: user.id, role: "member" })
+        .select()
+        .maybeSingle();
+
+      await supabase
+        .from("circle_invites")
+        .update({ status: "accepted" })
+        .eq("id", invite.id);
+    }
+  };
+
   const fetchCircles = async () => {
     if (!user) {
       setCircles([]);
       setSelectedCircle("");
       return;
     }
+
+    // Accept any pending invites before fetching circles
+    await acceptPendingInvites();
 
     const { data: ownedCircles } = await supabase
       .from("circles")
