@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { LinkifiedText } from "@/components/shared/LinkifiedText";
 import { getMediaType } from "@/lib/mediaUtils";
 import type { Post } from "@/hooks/useFeedPosts";
@@ -13,11 +16,13 @@ interface PostCardProps {
   commentInput: string;
   isSubmittingComment: boolean;
   hasUserReacted: boolean;
+  isOwnPost: boolean;
   onReaction: (postId: string) => void;
   onToggleComments: (postId: string) => void;
   onCommentInputChange: (postId: string, value: string) => void;
   onSubmitComment: (postId: string) => void;
   onDownloadImage: (url: string) => void;
+  onDelete?: (postId: string) => void;
 }
 
 const MediaItem = ({ url, index, onDownload }: { url: string; index: number; onDownload: (url: string) => void }) => {
@@ -63,11 +68,13 @@ export const PostCard = ({
   commentInput,
   isSubmittingComment,
   hasUserReacted,
+  isOwnPost,
   onReaction,
   onToggleComments,
   onCommentInputChange,
   onSubmitComment,
   onDownloadImage,
+  onDelete,
 }: PostCardProps) => {
   const { profile } = useCircleContext();
 
@@ -83,12 +90,31 @@ export const PostCard = ({
             <AvatarImage src={post.profiles?.avatar_url || undefined} />
             <AvatarFallback>{post.profiles?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
           </Avatar>
-          <div>
+          <div className="flex-1">
             <p className="font-medium text-foreground">{post.profiles?.display_name || "Unknown"}</p>
             <p className="text-xs text-muted-foreground">
               {post.circles?.name} • {new Date(post.created_at).toLocaleDateString()}
             </p>
           </div>
+          {isOwnPost && onDelete && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete post?</AlertDialogTitle>
+                  <AlertDialogDescription>This action cannot be undone. Your post and its comments will be permanently removed.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => onDelete(post.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </CardHeader>
       <CardContent className="pt-0">
@@ -117,10 +143,37 @@ export const PostCard = ({
         )}
 
         <div className="flex items-center gap-4 pt-2 border-t border-border">
-          <Button variant="ghost" size="sm" onClick={() => onReaction(post.id)} className={hasUserReacted ? "text-destructive" : ""}>
-            <Heart className={`w-4 h-4 mr-1 ${hasUserReacted ? "fill-current" : ""}`} />
-            {post.reactions?.length || 0}
-          </Button>
+          <div className="flex items-center">
+            <Button variant="ghost" size="sm" onClick={() => onReaction(post.id)} className={hasUserReacted ? "text-destructive" : ""}>
+              <Heart className={`w-4 h-4 mr-1 ${hasUserReacted ? "fill-current" : ""}`} />
+              {post.reactions?.length || 0}
+            </Button>
+            {(post.reactions?.length || 0) > 0 && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="text-xs text-muted-foreground hover:text-foreground hover:underline ml-[-4px]">
+                    {post.reactions!.length === 1
+                      ? post.reactions![0].profiles?.display_name || "1 person"
+                      : `${post.reactions!.length} people`}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-2" align="start">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">Liked by</p>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {post.reactions!.map(r => (
+                      <div key={r.id} className="flex items-center gap-2">
+                        <Avatar className="h-5 w-5">
+                          <AvatarImage src={r.profiles?.avatar_url || undefined} />
+                          <AvatarFallback className="text-[8px]">{r.profiles?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm text-foreground truncate">{r.profiles?.display_name || "Unknown"}</span>
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
           <Button variant="ghost" size="sm" onClick={() => onToggleComments(post.id)}>
             <MessageCircle className="w-4 h-4 mr-1" />
             {post.comments?.length || 0}

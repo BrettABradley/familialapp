@@ -25,6 +25,13 @@ export interface Comment {
   profiles?: Profile;
 }
 
+export interface Reaction {
+  id: string;
+  user_id: string;
+  reaction_type: string;
+  profiles?: Profile;
+}
+
 export interface Post {
   id: string;
   content: string | null;
@@ -34,7 +41,7 @@ export interface Post {
   circle_id: string;
   profiles?: Profile;
   circles?: Circle;
-  reactions?: { id: string; user_id: string; reaction_type: string }[];
+  reactions?: Reaction[];
   comments?: Comment[];
 }
 
@@ -72,8 +79,8 @@ export const useFeedPosts = () => {
       .select(`
         *,
         profiles!posts_author_id_profiles_fkey(id, user_id, display_name, avatar_url),
-        circles!posts_circle_id_fkey(id, name),
-        reactions(id, user_id, reaction_type),
+        circles!posts_circle_id_fkey(id, name, owner_id),
+        reactions(id, user_id, reaction_type, profiles:profiles!reactions_user_id_profiles_fkey(id, user_id, display_name, avatar_url)),
         comments(id, content, author_id, created_at, profiles!comments_author_id_profiles_fkey(id, user_id, display_name, avatar_url))
       `)
       .in("circle_id", circleIds)
@@ -198,6 +205,21 @@ export const useFeedPosts = () => {
     }
   };
 
+  const handleDeletePost = async (postId: string) => {
+    const postToDelete = posts.find(p => p.id === postId);
+    if (!postToDelete || postToDelete.author_id !== user?.id) return;
+
+    setPosts(prev => prev.filter(p => p.id !== postId));
+
+    const { error } = await supabase.from("posts").delete().eq("id", postId);
+    if (error) {
+      if (postToDelete) setPosts(prev => [...prev, postToDelete].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      toast({ title: "Error", description: "Failed to delete post.", variant: "destructive" });
+    } else {
+      toast({ title: "Deleted", description: "Post removed." });
+    }
+  };
+
   const hasUserReacted = (post: Post) => post.reactions?.some(r => r.user_id === user?.id);
 
   return {
@@ -213,6 +235,8 @@ export const useFeedPosts = () => {
     handleSubmitComment,
     toggleComments,
     handleDownloadImage,
+    handleDeletePost,
     hasUserReacted,
+    user,
   };
 };
