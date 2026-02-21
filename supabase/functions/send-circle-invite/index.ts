@@ -110,7 +110,66 @@ const handler = async (req: Request): Promise<Response> => {
     }
     
     const { email, circleName, inviterName, circleId } = validation.data;
-    
+
+    // Check if user is already a member or owner, or has a pending invite
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // Look up user by email using admin API
+    const { data: authUser } = await supabaseAdmin.auth.admin.listUsers();
+    const targetUser = authUser?.users?.find((u) => u.email === email);
+
+    if (targetUser) {
+      // Check if already a member
+      const { data: membership } = await supabaseAdmin
+        .from("circle_memberships")
+        .select("id")
+        .eq("circle_id", circleId)
+        .eq("user_id", targetUser.id)
+        .maybeSingle();
+
+      if (membership) {
+        return new Response(JSON.stringify({ error: "This person is already a member of this circle" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+
+      // Check if they own the circle
+      const { data: ownedCircle } = await supabaseAdmin
+        .from("circles")
+        .select("id")
+        .eq("id", circleId)
+        .eq("owner_id", targetUser.id)
+        .maybeSingle();
+
+      if (ownedCircle) {
+        return new Response(JSON.stringify({ error: "This person is the owner of this circle" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+    }
+
+    // Check for existing pending invite
+    const { data: existingInvite } = await supabaseAdmin
+      .from("circle_invites")
+      .select("id")
+      .eq("circle_id", circleId)
+      .eq("email", email)
+      .eq("status", "pending")
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+
+    if (existingInvite) {
+      return new Response(JSON.stringify({ error: "A pending invite already exists for this email" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
     const safeCircleName = escapeHtml(circleName);
     const safeInviterName = escapeHtml(inviterName || "A family member");
     const safeEmail = escapeHtml(email);
