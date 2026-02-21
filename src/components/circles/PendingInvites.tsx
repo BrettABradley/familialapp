@@ -47,8 +47,17 @@ const PendingInvites = ({ compact = false, onCountChange }: PendingInvitesProps)
       const valid = (data as unknown as PendingInvite[]).filter(
         (inv) => new Date(inv.expires_at) > new Date() && inv.circles != null
       );
-      setInvites(valid);
-      onCountChange?.(valid.length);
+      // Deduplicate by circle_id — keep most recent invite per circle
+      const byCircle = new Map<string, PendingInvite>();
+      valid.forEach((inv) => {
+        const existing = byCircle.get(inv.circle_id);
+        if (!existing || new Date(inv.created_at) > new Date(existing.created_at)) {
+          byCircle.set(inv.circle_id, inv);
+        }
+      });
+      const deduped = Array.from(byCircle.values());
+      setInvites(deduped);
+      onCountChange?.(deduped.length);
     }
     setIsLoading(false);
   };
@@ -74,9 +83,11 @@ const PendingInvites = ({ compact = false, onCountChange }: PendingInvitesProps)
     await supabase
       .from("circle_invites")
       .update({ status: "accepted" })
-      .eq("id", invite.id);
+      .eq("circle_id", invite.circle_id)
+      .eq("email", user.email!)
+      .eq("status", "pending");
 
-    const updated = invites.filter((i) => i.id !== invite.id);
+    const updated = invites.filter((i) => i.circle_id !== invite.circle_id);
     setInvites(updated);
     onCountChange?.(updated.length);
     toast({ title: "Joined!", description: `You've joined "${invite.circles?.name}".` });
@@ -90,12 +101,14 @@ const PendingInvites = ({ compact = false, onCountChange }: PendingInvitesProps)
     const { error } = await supabase
       .from("circle_invites")
       .update({ status: "declined" })
-      .eq("id", invite.id);
+      .eq("circle_id", invite.circle_id)
+      .eq("email", user?.email!)
+      .eq("status", "pending");
 
     if (error) {
       toast({ title: "Error", description: "Failed to decline invite.", variant: "destructive" });
     } else {
-      const updated = invites.filter((i) => i.id !== invite.id);
+      const updated = invites.filter((i) => i.circle_id !== invite.circle_id);
       setInvites(updated);
       onCountChange?.(updated.length);
       toast({ title: "Invite declined" });
