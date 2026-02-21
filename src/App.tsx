@@ -14,7 +14,7 @@ import Profile from "./pages/Profile";
 import Events from "./pages/Events";
 import Fridge from "./pages/Fridge";
 import Notifications from "./pages/Notifications";
-import FamilyTree from "./pages/FamilyTree";
+
 import Albums from "./pages/Albums";
 import Messages from "./pages/Messages";
 import NotFound from "./pages/NotFound";
@@ -42,7 +42,7 @@ const App = () => (
               <Route path="/events" element={<Events />} />
               <Route path="/fridge" element={<Fridge />} />
               <Route path="/notifications" element={<Notifications />} />
-              <Route path="/family-tree" element={<FamilyTree />} />
+              
               <Route path="/albums" element={<Albums />} />
               <Route path="/messages" element={<Messages />} />
             </Route>
