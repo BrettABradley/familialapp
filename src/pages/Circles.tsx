@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound } from "lucide-react";
+import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound, ArrowRightLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import PendingInvites from "@/components/circles/PendingInvites";
 import UpgradePlanDialog from "@/components/circles/UpgradePlanDialog";
@@ -66,6 +66,17 @@ const Circles = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
   const [upgradeInfo, setUpgradeInfo] = useState<{ plan: string; currentCount: number; limit: number; circleId: string }>({ plan: "free", currentCount: 0, limit: 8, circleId: "" });
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [circleCount, setCircleCount] = useState(0);
+  const [circleLimit, setCircleLimit] = useState(3);
+
+  useEffect(() => {
+    if (user) {
+      supabase.rpc("get_circle_count").then(({ data }) => setCircleCount(data ?? 0));
+      supabase.rpc("get_circle_limit").then(({ data }) => setCircleLimit(data ?? 3));
+    }
+  }, [user, circles]);
 
   // Type guard for circles with full properties
   const circlesList = circles as unknown as Circle[];
@@ -294,6 +305,25 @@ const Circles = () => {
 
   const isOwner = (circle: Circle) => circle.owner_id === user?.id;
 
+  const handleTransferOwnership = async (newOwnerId: string) => {
+    if (!selectedCircle) return;
+    if (!confirm("Are you sure you want to transfer ownership? You will become an admin member.")) return;
+    setIsTransferring(true);
+    const { error } = await supabase.rpc("transfer_circle_ownership", {
+      _circle_id: selectedCircle.id,
+      _new_owner_id: newOwnerId,
+    });
+    if (error) {
+      toast({ title: "Error", description: error.message || "Failed to transfer ownership.", variant: "destructive" });
+    } else {
+      toast({ title: "Ownership transferred!", description: "You are now an admin member of this circle." });
+      setIsTransferOpen(false);
+      setIsMembersOpen(false);
+      await refetchCircles();
+    }
+    setIsTransferring(false);
+  };
+
   if (contextLoading) {
     return (
       <main className="container mx-auto px-4 py-8 max-w-4xl">
@@ -335,7 +365,7 @@ const Circles = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-serif text-3xl font-bold text-foreground">Your Circles</h1>
-          <p className="text-muted-foreground mt-1">Private spaces for your family and close friends</p>
+          <p className="text-muted-foreground mt-1">Private spaces for your family and close friends · {circleCount}/{circleLimit} circles used</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={isJoinOpen} onOpenChange={setIsJoinOpen}>
@@ -476,7 +506,7 @@ const Circles = () => {
                     <p className="font-medium text-foreground">{member.profiles?.display_name || "Unknown"}</p>
                     <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
                   </div>
-                  {selectedCircle && isOwner(selectedCircle) && member.user_id !== user?.id && (
+                   {selectedCircle && isOwner(selectedCircle) && member.user_id !== user?.id && (
                     <div className="flex items-center gap-2">
                       <Select value={member.role} onValueChange={(val) => handleUpdateRole(member, val)}>
                         <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
@@ -491,6 +521,40 @@ const Circles = () => {
                   )}
                 </div>
               ))
+            )}
+          </div>
+          {selectedCircle && isOwner(selectedCircle) && memberships.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <Button variant="outline" className="w-full" onClick={() => setIsTransferOpen(true)}>
+                <ArrowRightLeft className="w-4 h-4 mr-2" />Transfer Ownership
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer Ownership Dialog */}
+      <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif">Transfer Ownership of {selectedCircle?.name}</DialogTitle>
+            <DialogDescription>Select a member to become the new owner. You will become an admin.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-4 max-h-96 overflow-y-auto">
+            {memberships.filter(m => m.user_id !== user?.id).map((member) => (
+              <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border border-border">
+                <Avatar className="h-10 w-10"><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
+                <div className="flex-1">
+                  <p className="font-medium text-foreground">{member.profiles?.display_name || "Unknown"}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => handleTransferOwnership(member.user_id)} disabled={isTransferring}>
+                  <Crown className="w-4 h-4 mr-1" />Transfer
+                </Button>
+              </div>
+            ))}
+            {memberships.filter(m => m.user_id !== user?.id).length === 0 && (
+              <p className="text-muted-foreground text-center py-4">No other members to transfer to</p>
             )}
           </div>
         </DialogContent>

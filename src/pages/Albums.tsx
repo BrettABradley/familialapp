@@ -27,6 +27,7 @@ interface Album {
   cover_photo_url: string | null;
   created_by: string;
   created_at: string;
+  creator_name?: string;
 }
 
 interface AlbumPhoto {
@@ -96,12 +97,15 @@ const Albums = () => {
     setIsLoadingAlbums(true);
     const { data, error } = await supabase
       .from("photo_albums")
-      .select("*")
+      .select("*, profiles!photo_albums_created_by_fkey(display_name)")
       .eq("circle_id", selectedCircle)
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setAlbums(data);
+      setAlbums(data.map((a: any) => ({
+        ...a,
+        creator_name: a.profiles?.display_name || "Unknown",
+      })));
     }
     setIsLoadingAlbums(false);
   };
@@ -325,6 +329,9 @@ const Albums = () => {
               {selectedAlbum.description && (
                 <p className="text-muted-foreground mt-1">{selectedAlbum.description}</p>
               )}
+              {selectedAlbum.creator_name && (
+                <p className="text-sm text-muted-foreground mt-1">Created by {selectedAlbum.creator_name}</p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -448,9 +455,18 @@ const Albums = () => {
               {albums.map((album) => (
                 <Card 
                   key={album.id} 
-                  className="cursor-pointer hover:shadow-lg transition-shadow group"
+                  className="cursor-pointer hover:shadow-lg transition-shadow group relative"
                   onClick={() => setSelectedAlbum(album)}
                 >
+                  {user && (album.created_by === user.id) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteAlbum(album); }}
+                      className="absolute top-2 right-2 z-10 bg-background/80 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
+                      aria-label={`Delete album ${album.name}`}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </button>
+                  )}
                   <div className="aspect-video bg-secondary relative overflow-hidden">
                     {album.cover_photo_url ? (
                       <img src={album.cover_photo_url} alt={album.name} className="w-full h-full object-cover" />
@@ -462,7 +478,10 @@ const Albums = () => {
                   </div>
                   <CardHeader>
                     <CardTitle className="font-serif text-lg">{album.name}</CardTitle>
-                    <CardDescription>{new Date(album.created_at).toLocaleDateString()}</CardDescription>
+                    <CardDescription>
+                      {album.creator_name && `Created by ${album.creator_name} · `}
+                      {new Date(album.created_at).toLocaleDateString()}
+                    </CardDescription>
                   </CardHeader>
                 </Card>
               ))}

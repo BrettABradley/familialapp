@@ -571,6 +571,13 @@ export type Database = {
             referencedRelation: "circles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "photo_albums_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
         ]
       }
       photo_permissions: {
@@ -920,6 +927,10 @@ export type Database = {
       shares_circle_with: {
         Args: { _other_user_id: string; _user_id: string }
         Returns: boolean
+      }
+      transfer_circle_ownership: {
+        Args: { _circle_id: string; _new_owner_id: string }
+        Returns: undefined
       }
     }
     Enums: {
