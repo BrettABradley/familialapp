@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users } from "lucide-react";
+import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users, Camera } from "lucide-react";
 
 interface Circle {
   id: string;
@@ -46,6 +46,7 @@ const Albums = () => {
   const circleIdParam = searchParams.get("circle");
   const albumIdParam = searchParams.get("album");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   
   const [albums, setAlbums] = useState<Album[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
@@ -53,6 +54,7 @@ const Albums = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
   
   const [newAlbum, setNewAlbum] = useState({
     name: "",
@@ -131,20 +133,53 @@ const Albums = () => {
       });
 
     if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create album. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to create album. Please try again.", variant: "destructive" });
     } else {
       setNewAlbum({ name: "", description: "" });
       setIsCreateOpen(false);
       fetchAlbums();
-      toast({
-        title: "Album created!",
-        description: `${newAlbum.name} is ready for photos.`,
-      });
+      toast({ title: "Album created!", description: `${newAlbum.name} is ready for photos.` });
     }
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user || !selectedAlbum) return;
+
+    setIsUploadingCover(true);
+
+    const fileExt = file.name.split(".").pop();
+    const fileName = `covers/${selectedAlbum.id}/${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("post-media")
+      .upload(fileName, file, { upsert: true });
+
+    if (uploadError) {
+      toast({ title: "Error", description: "Failed to upload cover photo.", variant: "destructive" });
+      setIsUploadingCover(false);
+      return;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("post-media")
+      .getPublicUrl(fileName);
+
+    const { error: updateError } = await supabase
+      .from("photo_albums")
+      .update({ cover_photo_url: publicUrlData.publicUrl })
+      .eq("id", selectedAlbum.id);
+
+    if (updateError) {
+      toast({ title: "Error", description: "Failed to update cover photo.", variant: "destructive" });
+    } else {
+      setSelectedAlbum({ ...selectedAlbum, cover_photo_url: publicUrlData.publicUrl });
+      fetchAlbums();
+      toast({ title: "Cover updated!", description: "Album cover photo has been changed." });
+    }
+
+    setIsUploadingCover(false);
+    if (coverInputRef.current) coverInputRef.current.value = "";
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,10 +196,7 @@ const Albums = () => {
         .from("post-media")
         .upload(fileName, file);
 
-      if (uploadError) {
-        // Upload failed silently, skip this file
-        continue;
-      }
+      if (uploadError) continue;
 
       const { data: publicUrlData } = supabase.storage
         .from("post-media")
@@ -179,10 +211,7 @@ const Albums = () => {
 
     fetchPhotos();
     setIsUploading(false);
-    toast({
-      title: "Photos uploaded!",
-      description: `${files.length} photo(s) added to the album.`,
-    });
+    toast({ title: "Photos uploaded!", description: `${files.length} photo(s) added to the album.` });
   };
 
   const extractStoragePath = (publicUrl: string): string | null => {
@@ -198,35 +227,24 @@ const Albums = () => {
   const handleDeletePhoto = async (photo: AlbumPhoto) => {
     if (!confirm("Are you sure you want to delete this photo?")) return;
 
-    // Delete from storage first
     const storagePath = extractStoragePath(photo.photo_url);
     if (storagePath) {
       await supabase.storage.from("post-media").remove([storagePath]);
     }
 
-    const { error } = await supabase
-      .from("album_photos")
-      .delete()
-      .eq("id", photo.id);
+    const { error } = await supabase.from("album_photos").delete().eq("id", photo.id);
 
     if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete photo.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to delete photo.", variant: "destructive" });
     } else {
       fetchPhotos();
-      toast({
-        title: "Photo deleted",
-      });
+      toast({ title: "Photo deleted" });
     }
   };
 
   const handleDeleteAlbum = async (album: Album) => {
     if (!confirm(`Are you sure you want to delete "${album.name}"? All photos will be removed.`)) return;
 
-    // Fetch all photos to clean up storage
     const { data: albumPhotos } = await supabase
       .from("album_photos")
       .select("photo_url")
@@ -241,24 +259,14 @@ const Albums = () => {
       }
     }
 
-    const { error } = await supabase
-      .from("photo_albums")
-      .delete()
-      .eq("id", album.id);
+    const { error } = await supabase.from("photo_albums").delete().eq("id", album.id);
 
     if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete album.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to delete album.", variant: "destructive" });
     } else {
       setSelectedAlbum(null);
       fetchAlbums();
-      toast({
-        title: "Album deleted",
-        description: `${album.name} has been removed.`,
-      });
+      toast({ title: "Album deleted", description: `${album.name} has been removed.` });
     }
   };
 
@@ -293,18 +301,9 @@ const Albums = () => {
         <Card>
           <CardContent className="py-12 text-center">
             <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
-              Create a Circle First
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              You need to create or join a circle before creating photo albums.
-            </p>
-            <Link to="/circles">
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Create a Circle
-              </Button>
-            </Link>
+            <h2 className="font-serif text-xl font-semibold text-foreground mb-2">Create a Circle First</h2>
+            <p className="text-muted-foreground mb-6">You need to create or join a circle before creating photo albums.</p>
+            <Link to="/circles"><Button><Plus className="w-4 h-4 mr-2" />Create a Circle</Button></Link>
           </CardContent>
         </Card>
       </main>
@@ -329,6 +328,21 @@ const Albums = () => {
             </div>
             <div className="flex items-center gap-2">
               <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleCoverUpload}
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                onClick={() => coverInputRef.current?.click()}
+                disabled={isUploadingCover}
+              >
+                <Camera className="w-4 h-4 mr-2" />
+                {isUploadingCover ? "Uploading..." : "Set Cover"}
+              </Button>
+              <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
@@ -341,34 +355,37 @@ const Albums = () => {
                 {isUploading ? "Uploading..." : "Add Photos"}
               </Button>
               {user && selectedAlbum.created_by === user.id && (
-               <Button variant="outline" onClick={() => handleDeleteAlbum(selectedAlbum)} aria-label={`Delete album ${selectedAlbum.name}`}>
+                <Button variant="outline" onClick={() => handleDeleteAlbum(selectedAlbum)} aria-label={`Delete album ${selectedAlbum.name}`}>
                   <Trash2 className="w-4 h-4 text-destructive" />
                 </Button>
               )}
             </div>
           </div>
 
+          {/* Cover Photo Preview */}
+          {selectedAlbum.cover_photo_url && (
+            <div className="mb-6 rounded-lg overflow-hidden aspect-[3/1] relative">
+              <img
+                src={selectedAlbum.cover_photo_url}
+                alt={`${selectedAlbum.name} cover`}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
           {photos.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <Image className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
-                   No photos yet
-                 </h2>
-                <p className="text-muted-foreground mb-6">
-                  Add some photos to this album.
-                </p>
+                <h2 className="font-serif text-xl font-semibold text-foreground mb-2">No photos yet</h2>
+                <p className="text-muted-foreground mb-6">Add some photos to this album.</p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {photos.map((photo) => (
                 <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden">
-                  <img
-                    src={photo.photo_url}
-                    alt={photo.caption || "Photo"}
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={photo.photo_url} alt={photo.caption || "Photo"} className="w-full h-full object-cover" />
                   {user && photo.uploaded_by === user.id && (
                     <button
                       onClick={() => handleDeletePhoto(photo)}
@@ -392,52 +409,27 @@ const Albums = () => {
                 <Image className="w-8 h-8" />
                 Photo Albums
               </h1>
-              <p className="text-muted-foreground mt-1">
-                Organize and share family memories
-              </p>
+              <p className="text-muted-foreground mt-1">Organize and share family memories</p>
             </div>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Album
-                </Button>
+                <Button><Plus className="w-4 h-4 mr-2" />Create Album</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle className="font-serif">Create Photo Album</DialogTitle>
-                  <DialogDescription>
-                    Create a new album to organize your photos.
-                  </DialogDescription>
+                  <DialogDescription>Create a new album to organize your photos.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 mt-4">
                   <div className="space-y-2">
                     <Label htmlFor="albumName">Album Name *</Label>
-                    <Input
-                      id="albumName"
-                      placeholder="e.g., Summer Vacation 2024"
-                      value={newAlbum.name}
-                      onChange={(e) => setNewAlbum({ ...newAlbum, name: e.target.value })}
-                      maxLength={100}
-                    />
+                    <Input id="albumName" placeholder="e.g., Summer Vacation 2024" value={newAlbum.name} onChange={(e) => setNewAlbum({ ...newAlbum, name: e.target.value })} maxLength={100} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="albumDesc">Description</Label>
-                    <Textarea
-                      id="albumDesc"
-                      placeholder="What's this album about?"
-                      value={newAlbum.description}
-                      onChange={(e) => setNewAlbum({ ...newAlbum, description: e.target.value })}
-                      maxLength={500}
-                    />
+                    <Textarea id="albumDesc" placeholder="What's this album about?" value={newAlbum.description} onChange={(e) => setNewAlbum({ ...newAlbum, description: e.target.value })} maxLength={500} />
                   </div>
-                  <Button 
-                    className="w-full" 
-                    onClick={handleCreateAlbum}
-                    disabled={!newAlbum.name.trim()}
-                  >
-                    Create Album
-                  </Button>
+                  <Button className="w-full" onClick={handleCreateAlbum} disabled={!newAlbum.name.trim()}>Create Album</Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -447,12 +439,8 @@ const Albums = () => {
             <Card>
               <CardContent className="py-12 text-center">
                 <Image className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <h2 className="font-serif text-xl font-semibold text-foreground mb-2">
-                  No albums yet
-                </h2>
-                <p className="text-muted-foreground mb-6">
-                  Create an album to start organizing your photos.
-                </p>
+                <h2 className="font-serif text-xl font-semibold text-foreground mb-2">No albums yet</h2>
+                <p className="text-muted-foreground mb-6">Create an album to start organizing your photos.</p>
               </CardContent>
             </Card>
           ) : (
@@ -465,11 +453,7 @@ const Albums = () => {
                 >
                   <div className="aspect-video bg-secondary relative overflow-hidden">
                     {album.cover_photo_url ? (
-                      <img
-                        src={album.cover_photo_url}
-                        alt={album.name}
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={album.cover_photo_url} alt={album.name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Image className="w-12 h-12 text-muted-foreground" />
@@ -478,9 +462,7 @@ const Albums = () => {
                   </div>
                   <CardHeader>
                     <CardTitle className="font-serif text-lg">{album.name}</CardTitle>
-                    <CardDescription>
-                      {new Date(album.created_at).toLocaleDateString()}
-                    </CardDescription>
+                    <CardDescription>{new Date(album.created_at).toLocaleDateString()}</CardDescription>
                   </CardHeader>
                 </Card>
               ))}
