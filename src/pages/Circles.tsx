@@ -108,10 +108,11 @@ const Circles = () => {
       .maybeSingle();
 
     if (error) {
-      const message = error.message?.includes("can_create_circle")
-        ? "You've reached your circle limit. Upgrade your plan to create more circles."
-        : error.message || "Failed to create circle.";
-      toast({ title: "Error", description: message, variant: "destructive" });
+      const isLimitError = error.message?.includes("can_create_circle") || error.code === "42501";
+      const message = isLimitError
+        ? "You've reached your circle creation limit. Would you like to upgrade your plan?"
+        : "Failed to create circle. Please try again.";
+      toast({ title: isLimitError ? "Plan Limit Reached" : "Error", description: message, variant: "destructive" });
       setIsCreating(false);
       return;
     }
