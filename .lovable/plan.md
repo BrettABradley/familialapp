@@ -1,61 +1,58 @@
+# Update Pricing Tiers: Per-Circle Member Limits + Price Change
+
+## Summary
+
+Update the pricing display and database to reflect the correct member limits (per circle) and raise the Extended plan price from $10 to $15/month.
+
+---
+
+## Changes
+
+### 1. Pricing Display (Pricing.tsx)
+
+Update the tier feature text to clarify "per circle" and change Extended price:
+
+- **Free**: "Up to 8 members per circle" (was "Up to 8 family members")
+- **Family ($5/mo)**: "Up to 20 members per circle" (was "Up to 20 family members")
+- **Extended**: Price changes from "$10" to "$15", text becomes "Up to 35 members per circle"
+
+### 2. Database: Add `max_members_per_circle` column
+
+Add a new column to `user_plans` to store and enforce member-per-circle limits:
 
 
-# Fix Invite Spam: Filter Already-Joined + Prevent Duplicates
+| Plan     | max_circles | max_members_per_circle |
+| -------- | ----------- | ---------------------- |
+| free     | 3           | 8                      |
+| family   | 2           | 20                     |
+| extended | 3           | 35                     |
 
-## Problem
-- autumnfhopkins@gmail.com has 12 pending invites across 2 circles she's **already a member of**
-- The system allows sending unlimited duplicate invites to the same email for the same circle
-- The UI deduplicates visually but stale invites pile up in the database
 
-## Solution (3 layers of protection)
+### 3. Enforcement (optional, for now)
 
-### 1. Frontend: Filter out invites for circles the user already belongs to
-In `PendingInvites.tsx`, after fetching invites, also fetch the user's current circle memberships and owned circles. Exclude any invite where the user is already a member or owner. This provides an immediate fix.
+The member limit can be enforced later when inviting or joining circles. For now, this plan focuses on:
 
-### 2. Database: Clean up existing stale invites
-Run a migration that marks all pending invites as "accepted" where the user is already a member of that circle. This clears the 12+ stale invites for autumnfhopkins and any similar cases for other users.
-
-### 3. Database: Prevent duplicate pending invites at insert time
-Add a validation trigger on `circle_invites` that checks before inserting:
-- If the invited email already belongs to a member of that circle, reject the invite
-- If there's already a pending (non-expired) invite for the same email + circle combo, reject the invite
-
-This prevents the spam at the source.
+- Updating the pricing UI to show the correct numbers
+- Storing the limit in the database so it's ready to enforce
 
 ---
 
 ## Technical Details
 
-### PendingInvites.tsx changes
-After fetching invites, also query the user's circle memberships and owned circles, then filter:
+### Pricing.tsx text changes
+
+- Free tier line 14: `"Up to 8 members per circle"`
+- Family tier line 30: `"Up to 20 members per circle"`
+- Extended tier line 43: `price: "$15"`
+- Extended tier line 46: `"Up to 50 members per circle"`
+
+### Database migration
+
 ```text
-// Fetch user's circles
-const memberCircleIds = [...memberships, ...ownedCircles].map(c => c.id or c.circle_id)
+ALTER TABLE public.user_plans
+  ADD COLUMN max_members_per_circle integer NOT NULL DEFAULT 8;
 
-// Filter out invites for circles user already belongs to
-const valid = invites.filter(inv => !memberCircleIds.includes(inv.circle_id))
+-- Update existing plans
+UPDATE public.user_plans SET max_members_per_circle = 20 WHERE plan = 'family';
+UPDATE public.user_plans SET max_members_per_circle = 50 WHERE plan = 'extended';
 ```
-
-### Database Migration
-
-**Step 1 -- Clean up stale data:**
-```text
-UPDATE circle_invites ci
-SET status = 'accepted'
-WHERE ci.status = 'pending'
-AND EXISTS (
-  SELECT 1 FROM auth.users au
-  JOIN circle_memberships cm ON cm.user_id = au.id
-  WHERE au.email = ci.email AND cm.circle_id = ci.circle_id
-);
-```
-
-**Step 2 -- Prevent future duplicates via trigger:**
-```text
-CREATE FUNCTION validate_circle_invite() RETURNS trigger ...
-  -- Reject if email user is already a member
-  -- Reject if there's already a pending non-expired invite for same email+circle
-```
-
-**Step 3 -- Also prevent duplicate invites at the send-invite level:**
-Add the same check in the edge function `send-circle-invite` if it exists, or in the frontend invite form.
