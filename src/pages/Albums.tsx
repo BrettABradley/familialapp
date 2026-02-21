@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users, Camera } from "lucide-react";
+import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users, Camera, Pencil, Check } from "lucide-react";
 
 interface Circle {
   id: string;
@@ -61,6 +61,24 @@ const Albums = () => {
     name: "",
     description: "",
   });
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editTitleValue, setEditTitleValue] = useState("");
+
+  const handleSaveTitle = async () => {
+    if (!editTitleValue.trim() || !selectedAlbum) return;
+    const { error } = await supabase
+      .from("photo_albums")
+      .update({ name: editTitleValue.trim() })
+      .eq("id", selectedAlbum.id);
+    if (error) {
+      toast({ title: "Error", description: "Failed to update album title.", variant: "destructive" });
+    } else {
+      setSelectedAlbum({ ...selectedAlbum, name: editTitleValue.trim() });
+      setEditingTitle(false);
+      fetchAlbums();
+      toast({ title: "Title updated!" });
+    }
+  };
 
   useEffect(() => {
     if (circleIdParam && circles.length > 0) {
@@ -325,7 +343,36 @@ const Albums = () => {
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Albums
               </Button>
-              <h1 className="font-serif text-3xl font-bold text-foreground">{selectedAlbum.name}</h1>
+              {editingTitle ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={editTitleValue}
+                    onChange={(e) => setEditTitleValue(e.target.value)}
+                    className="font-serif text-2xl font-bold h-auto py-1"
+                    maxLength={100}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSaveTitle();
+                      if (e.key === "Escape") setEditingTitle(false);
+                    }}
+                  />
+                  <Button size="sm" variant="ghost" onClick={handleSaveTitle} disabled={!editTitleValue.trim()}>
+                    <Check className="w-4 h-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingTitle(false)}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <h1 className="font-serif text-3xl font-bold text-foreground">{selectedAlbum.name}</h1>
+                  {user && selectedAlbum.created_by === user.id && (
+                    <Button size="sm" variant="ghost" onClick={() => { setEditTitleValue(selectedAlbum.name); setEditingTitle(true); }}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
               {selectedAlbum.description && (
                 <p className="text-muted-foreground mt-1">{selectedAlbum.description}</p>
               )}

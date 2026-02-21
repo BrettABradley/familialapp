@@ -203,6 +203,7 @@ export type Database = {
       }
       events: {
         Row: {
+          album_id: string | null
           circle_id: string
           created_at: string
           created_by: string
@@ -215,6 +216,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          album_id?: string | null
           circle_id: string
           created_at?: string
           created_by: string
@@ -227,6 +229,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          album_id?: string | null
           circle_id?: string
           created_at?: string
           created_by?: string
@@ -239,6 +242,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "events_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "photo_albums"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "events_circle_id_fkey"
             columns: ["circle_id"]
