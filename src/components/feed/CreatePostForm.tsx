@@ -8,7 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Image, X } from "lucide-react";
+import { Send, Paperclip, X } from "lucide-react";
+import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
+import { validateFileSize, getFileMediaType } from "@/lib/mediaUtils";
 
 interface CreatePostFormProps {
   onPostCreated: () => void;
@@ -28,13 +30,32 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length + selectedFiles.length > 4) {
-      toast({ title: "Too many files", description: "You can upload up to 4 images per post.", variant: "destructive" });
+      toast({ title: "Too many files", description: "You can upload up to 4 files per post.", variant: "destructive" });
       return;
     }
+
+    for (const file of files) {
+      const error = validateFileSize(file);
+      if (error) {
+        toast({ title: "File too large", description: error, variant: "destructive" });
+        return;
+      }
+    }
+
     setSelectedFiles(prev => [...prev, ...files]);
     files.forEach(file => {
       setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]);
     });
+  };
+
+  const handleVoiceRecording = (blob: Blob) => {
+    if (selectedFiles.length >= 4) {
+      toast({ title: "Too many files", description: "You can upload up to 4 files per post.", variant: "destructive" });
+      return;
+    }
+    const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
+    setSelectedFiles(prev => [...prev, file]);
+    setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]);
   };
 
   const removeFile = (index: number) => {
@@ -83,6 +104,32 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     setIsPosting(false);
   };
 
+  const renderPreview = (url: string, index: number) => {
+    const file = selectedFiles[index];
+    const mediaType = getFileMediaType(file);
+
+    return (
+      <div key={index} className="relative rounded-lg overflow-hidden">
+        {mediaType === 'video' ? (
+          <video src={url} className="w-full aspect-video object-cover" muted />
+        ) : mediaType === 'audio' ? (
+          <div className="p-3 bg-secondary rounded-lg">
+            <audio controls src={url} className="w-full" />
+          </div>
+        ) : (
+          <img src={url} alt={`Preview ${index + 1}`} className="w-full aspect-square object-cover" />
+        )}
+        <button
+          onClick={() => removeFile(index)}
+          className="absolute top-2 right-2 bg-background/80 rounded-full p-1 hover:bg-background transition-colors"
+          aria-label={`Remove file ${index + 1}`}
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  };
+
   return (
     <Card className="mb-8">
       <CardHeader className="pb-4">
@@ -116,25 +163,17 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
         />
         {previewUrls.length > 0 && (
           <div className="grid grid-cols-2 gap-2 mb-4">
-            {previewUrls.map((url, index) => (
-              <div key={index} className="relative aspect-square rounded-lg overflow-hidden">
-                <img src={url} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
-                <button
-                  onClick={() => removeFile(index)}
-                  className="absolute top-2 right-2 bg-background/80 rounded-full p-1 hover:bg-background transition-colors"
-                  aria-label={`Remove image ${index + 1}`}
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+            {previewUrls.map((url, index) => renderPreview(url, index))}
           </div>
         )}
-        <div className="flex items-center justify-between">
-          <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple onChange={handleFileSelect} className="hidden" />
-          <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>
-            <Image className="w-4 h-4 mr-2" />Add Photos
-          </Button>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*" multiple onChange={handleFileSelect} className="hidden" />
+            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>
+              <Paperclip className="w-4 h-4 mr-2" />Add Media
+            </Button>
+            <VoiceRecorder onRecordingComplete={handleVoiceRecording} />
+          </div>
           <Button onClick={handleCreatePost} disabled={(!newPostContent.trim() && selectedFiles.length === 0) || isPosting}>
             <Send className="w-4 h-4 mr-2" />{isPosting ? "Posting..." : "Share"}
           </Button>

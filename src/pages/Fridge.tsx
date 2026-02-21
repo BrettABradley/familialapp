@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FridgeBoard, type FridgeBoardPin } from "@/components/fridge/FridgeBoard";
-import { Plus, Pin, Image, FileText, Calendar, Users } from "lucide-react";
+import { Plus, Pin, Image, FileText, Calendar, Users, Mic } from "lucide-react";
+import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 
 interface Circle {
   id: string;
@@ -311,6 +312,7 @@ const Fridge = () => {
                     <SelectContent>
                       <SelectItem value="note">Note</SelectItem>
                       <SelectItem value="image">Photo</SelectItem>
+                      <SelectItem value="voice_note">Voice Note</SelectItem>
                       <SelectItem value="event">Event/Reminder</SelectItem>
                     </SelectContent>
                   </Select>
@@ -339,43 +341,81 @@ const Fridge = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Image (optional)</Label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="hidden"
-                  />
-                  {imagePreview ? (
-                    <div className="relative">
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-full aspect-video object-cover rounded-lg"
-                      />
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="absolute top-2 right-2"
-                        onClick={() => {
-                          setSelectedImage(null);
-                          URL.revokeObjectURL(imagePreview);
-                          setImagePreview(null);
-                        }}
-                      >
-                        Remove
-                      </Button>
-                    </div>
+                  <Label>{pinType === 'voice_note' ? 'Voice Note' : 'Image (optional)'}</Label>
+                  {pinType === 'voice_note' ? (
+                    <>
+                      {imagePreview ? (
+                        <div className="p-3 bg-secondary rounded-lg space-y-2">
+                          <audio controls src={imagePreview} className="w-full" />
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedImage(null);
+                              URL.revokeObjectURL(imagePreview);
+                              setImagePreview(null);
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <VoiceRecorder onRecordingComplete={(blob) => {
+                            const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
+                            setSelectedImage(file);
+                            setImagePreview(URL.createObjectURL(file));
+                          }} />
+                          <div className="text-xs text-muted-foreground">Or upload an audio file:</div>
+                          <input
+                            type="file"
+                            accept="audio/*"
+                            onChange={handleImageSelect}
+                            className="text-sm"
+                          />
+                        </div>
+                      )}
+                    </>
                   ) : (
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Image className="w-4 h-4 mr-2" />
-                      Add Image
-                    </Button>
+                    <>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                      />
+                      {imagePreview ? (
+                        <div className="relative">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full aspect-video object-cover rounded-lg"
+                          />
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="absolute top-2 right-2"
+                            onClick={() => {
+                              setSelectedImage(null);
+                              URL.revokeObjectURL(imagePreview);
+                              setImagePreview(null);
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <Image className="w-4 h-4 mr-2" />
+                          Add Image
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
 
