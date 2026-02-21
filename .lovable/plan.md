@@ -1,20 +1,31 @@
 
+# Fix Circle Invitation Email Failures
 
-## Fix Favicon White Background
+## Problem
+The circle invitation emails fail to send because the edge function uses `noreply@familialmedia.com` as the sender address. Resend requires a verified domain to send from custom addresses. If the domain isn't verified in your Resend account, all email sends will fail silently.
 
-### Problem
-The current `public/favicon.png` still contains a white background despite previous attempts to remove it. The cache-busting parameter (`?v=2`) was added but the underlying image file is the issue.
+## Solution
+Update the edge function to use Resend's default sender address (`onboarding@resend.dev`) which works without domain verification. This gets invitations working immediately. You can switch back to your custom domain later once it's verified.
 
-### Plan
+## Changes
 
-1. **Copy the uploaded image directly** as `public/favicon.png` using the original upload (`Familial_PNG_Black_-_watermark-3.png`) without any processing
-2. **Bump the cache-busting parameter** in `index.html` from `?v=2` to `?v=3` to force browsers to reload
+### 1. Update `supabase/functions/send-circle-invite/index.ts`
+- Change the `from` field from `"Familial <noreply@familialmedia.com>"` to `"Familial <onboarding@resend.dev>"`
+- Add better error logging so we can see the exact Resend API error in logs
 
-### Important Note
-If the original uploaded PNG has a white background embedded in it (i.e., it was not exported with transparency), the favicon will still appear with a white background. In that case, you would need to re-export the logo from your design tool (Canva, Figma, etc.) with:
-- **Transparent background** enabled
-- **PNG format** (not JPG, which doesn't support transparency)
+### 2. Improve error visibility in `src/pages/Circles.tsx`
+- Log the actual error from the edge function to the console so failures are easier to debug in the future
 
-### Technical Details
-- File change: `public/favicon.png` -- replaced with direct copy of uploaded file
-- File change: `index.html` -- update `href="/favicon.png?v=2"` to `href="/favicon.png?v=3"`
+## Technical Details
+
+The key change is on one line in the edge function:
+
+```
+// Before
+from: "Familial <noreply@familialmedia.com>",
+
+// After  
+from: "Familial <onboarding@resend.dev>",
+```
+
+Note: With `onboarding@resend.dev`, Resend's free tier limits you to sending only to the email address associated with your Resend account. To send to any email, you'll need to verify the `familialmedia.com` domain in your Resend dashboard and switch the sender back.
