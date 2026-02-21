@@ -227,6 +227,23 @@ export const useFeedPosts = () => {
     }
   };
 
+  const handleEditPost = async (postId: string, newContent: string) => {
+    if (!user) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post || post.author_id !== user.id) return;
+
+    const oldContent = post.content;
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, content: newContent || null } : p));
+
+    const { error } = await supabase.from("posts").update({ content: newContent || null }).eq("id", postId);
+    if (error) {
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, content: oldContent } : p));
+      toast({ title: "Error", description: "Failed to edit post.", variant: "destructive" });
+    } else {
+      toast({ title: "Updated", description: "Post edited successfully." });
+    }
+  };
+
   const hasUserReacted = (post: Post) => post.reactions?.some(r => r.user_id === user?.id);
 
   return {
@@ -243,6 +260,7 @@ export const useFeedPosts = () => {
     toggleComments,
     handleDownloadImage,
     handleDeletePost,
+    handleEditPost,
     hasUserReacted,
     user,
   };

@@ -24,6 +24,7 @@ const Feed = () => {
     toggleComments,
     handleDownloadImage,
     handleDeletePost,
+    handleEditPost,
     hasUserReacted,
     user,
   } = useFeedPosts();
@@ -111,6 +112,7 @@ const Feed = () => {
             onSubmitComment={handleSubmitComment}
             onDownloadImage={handleDownloadImage}
             onDelete={handleDeletePost}
+            onEdit={handleEditPost}
           />
         ))}
 
