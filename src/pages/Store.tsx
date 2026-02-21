@@ -253,7 +253,7 @@ const Store = () => {
               </CardHeader>
               <CardContent>
                 <CardDescription>
-                  Your offers are shown to families in your target areas based on user locations.
+                  Your offers are shown to families in your target areas based on region or state.
                 </CardDescription>
               </CardContent>
             </Card>
@@ -262,11 +262,11 @@ const Store = () => {
                 <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
                   <BarChart className="w-8 h-8 text-foreground" />
                 </div>
-                <CardTitle className="font-serif text-xl">3. Track Results</CardTitle>
+                <CardTitle className="font-serif text-xl">3. Results</CardTitle>
               </CardHeader>
               <CardContent>
                 <CardDescription>
-                  Monitor impressions and engagement. Pay only for verified family views.
+                  The more Familial the offer, the more likely you are to get results. Craft offers that genuinely help families.
                 </CardDescription>
               </CardContent>
             </Card>
