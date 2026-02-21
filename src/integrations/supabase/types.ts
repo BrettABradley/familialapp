@@ -706,6 +706,7 @@ export type Database = {
       user_plans: {
         Row: {
           created_at: string
+          extra_members: number
           max_circles: number
           max_members_per_circle: number
           plan: string
@@ -714,6 +715,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          extra_members?: number
           max_circles?: number
           max_members_per_circle?: number
           plan?: string
@@ -722,6 +724,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          extra_members?: number
           max_circles?: number
           max_members_per_circle?: number
           plan?: string
