@@ -155,7 +155,7 @@ const Circles = () => {
       });
 
       if (emailError) {
-        // Email send failed
+        console.error("Circle invite email error:", emailError);
         toast({ title: "Invite created", description: `Invitation saved, but email failed to send.`, variant: "default" });
       } else {
         toast({ title: "Invite sent!", description: `Invitation email sent to ${inviteEmail}.` });
