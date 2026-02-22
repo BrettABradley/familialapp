@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Send, MessageSquare, Search, Users, Plus, UsersRound } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, Search, Users, Plus, UsersRound, Pencil, Camera } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -42,6 +42,7 @@ interface GroupChat {
   circle_id: string;
   created_by: string;
   created_at: string;
+  avatar_url?: string | null;
 }
 
 interface GroupMessage {
@@ -79,6 +80,11 @@ const Messages = () => {
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+
+  // Group chat edit state
+  const [isEditGroupOpen, setIsEditGroupOpen] = useState(false);
+  const [editGroupName, setEditGroupName] = useState("");
+  const [isUploadingGroupAvatar, setIsUploadingGroupAvatar] = useState(false);
 
   useEffect(() => {
     if (user && selectedCircle) {
@@ -291,6 +297,50 @@ const Messages = () => {
     setChatView("group");
   };
 
+
+  const handleEditGroup = () => {
+    if (!selectedGroup) return;
+    setEditGroupName(selectedGroup.name);
+    setIsEditGroupOpen(true);
+  };
+
+  const handleSaveGroupName = async () => {
+    if (!selectedGroup || !editGroupName.trim()) return;
+    const { error } = await supabase
+      .from("group_chats")
+      .update({ name: editGroupName.trim() })
+      .eq("id", selectedGroup.id);
+    if (error) {
+      toast({ title: "Error", description: "Failed to update group name.", variant: "destructive" });
+    } else {
+      setSelectedGroup({ ...selectedGroup, name: editGroupName.trim() });
+      setGroupChats(prev => prev.map(g => g.id === selectedGroup.id ? { ...g, name: editGroupName.trim() } : g));
+      setIsEditGroupOpen(false);
+    }
+  };
+
+  const handleGroupAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!selectedGroup || !user || !e.target.files?.[0]) return;
+    setIsUploadingGroupAvatar(true);
+    const file = e.target.files[0];
+    const filePath = `group-chats/${selectedGroup.id}/${Date.now()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file);
+    if (uploadError) {
+      toast({ title: "Error", description: "Failed to upload image.", variant: "destructive" });
+      setIsUploadingGroupAvatar(false);
+      return;
+    }
+    const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(filePath);
+    const { error } = await supabase.from("group_chats").update({ avatar_url: publicUrl }).eq("id", selectedGroup.id);
+    if (error) {
+      toast({ title: "Error", description: "Failed to update avatar.", variant: "destructive" });
+    } else {
+      setSelectedGroup({ ...selectedGroup, avatar_url: publicUrl });
+      setGroupChats(prev => prev.map(g => g.id === selectedGroup.id ? { ...g, avatar_url: publicUrl } : g));
+    }
+    setIsUploadingGroupAvatar(false);
+  };
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !user) return;
     setIsSending(true);
@@ -396,9 +446,37 @@ const Messages = () => {
         <div className="flex flex-col h-[calc(100vh-200px)]">
           <div className="flex items-center gap-3 pb-4 border-b border-border mb-4">
             <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(null); setChatView("list"); }}><ArrowLeft className="w-4 h-4" /></Button>
-            <div className="p-2 rounded-full bg-secondary"><UsersRound className="w-5 h-5" /></div>
-            <h2 className="font-serif text-xl font-bold text-foreground">{selectedGroup.name}</h2>
+            <div className="relative group cursor-pointer">
+              {selectedGroup.avatar_url ? (
+                <Avatar><AvatarImage src={selectedGroup.avatar_url} /><AvatarFallback><UsersRound className="w-5 h-5" /></AvatarFallback></Avatar>
+              ) : (
+                <div className="p-2 rounded-full bg-secondary"><UsersRound className="w-5 h-5" /></div>
+              )}
+              {selectedGroup.created_by === user?.id && (
+                <label className="absolute inset-0 flex items-center justify-center bg-foreground/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  <Camera className="w-4 h-4 text-background" />
+                  <input type="file" accept="image/*" className="hidden" onChange={handleGroupAvatarUpload} disabled={isUploadingGroupAvatar} />
+                </label>
+              )}
+            </div>
+            <h2 className="font-serif text-xl font-bold text-foreground flex-1">{selectedGroup.name}</h2>
+            {selectedGroup.created_by === user?.id && (
+              <Button variant="ghost" size="icon" onClick={handleEditGroup}><Pencil className="w-4 h-4" /></Button>
+            )}
           </div>
+
+          {/* Edit Group Name Dialog */}
+          <Dialog open={isEditGroupOpen} onOpenChange={setIsEditGroupOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="font-serif">Edit Group Name</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 mt-2">
+                <Input value={editGroupName} onChange={(e) => setEditGroupName(e.target.value)} maxLength={100} placeholder="Group name" />
+                <Button className="w-full" onClick={handleSaveGroupName} disabled={!editGroupName.trim()}>Save</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <div className="flex-1 overflow-y-auto space-y-4 mb-4">
             {groupMessages.length === 0 ? (
               <div className="text-center py-12"><MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><p className="text-muted-foreground">Start the group conversation</p></div>
@@ -523,7 +601,11 @@ const Messages = () => {
               <Card key={gc.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedGroup(gc)}>
                 <CardContent className="py-4">
                   <div className="flex items-center gap-4">
-                    <div className="p-2 rounded-full bg-secondary"><UsersRound className="w-5 h-5" /></div>
+                    {gc.avatar_url ? (
+                      <Avatar><AvatarImage src={gc.avatar_url} /><AvatarFallback><UsersRound className="w-5 h-5" /></AvatarFallback></Avatar>
+                    ) : (
+                      <div className="p-2 rounded-full bg-secondary"><UsersRound className="w-5 h-5" /></div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-foreground">{gc.name}</p>
                       <p className="text-xs text-muted-foreground">Created {new Date(gc.created_at).toLocaleDateString()}</p>

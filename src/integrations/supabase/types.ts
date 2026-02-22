@@ -503,6 +503,7 @@ export type Database = {
       }
       group_chats: {
         Row: {
+          avatar_url: string | null
           circle_id: string
           created_at: string
           created_by: string
@@ -510,6 +511,7 @@ export type Database = {
           name: string
         }
         Insert: {
+          avatar_url?: string | null
           circle_id: string
           created_at?: string
           created_by: string
@@ -517,6 +519,7 @@ export type Database = {
           name: string
         }
         Update: {
+          avatar_url?: string | null
           circle_id?: string
           created_at?: string
           created_by?: string
@@ -1011,6 +1014,10 @@ export type Database = {
       }
       is_circle_member: {
         Args: { _circle_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_group_chat_member: {
+        Args: { _group_chat_id: string; _user_id: string }
         Returns: boolean
       }
       shares_circle_with: {
