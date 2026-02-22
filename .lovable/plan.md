@@ -1,93 +1,118 @@
 
 
-## Plan: Voice Notes, Video Uploads, and Clickable Links
+# Feed Image Lightbox, Profile Revamp, and Linked Profiles
 
-### 1. Feed: Support Video and Voice Note Uploads
+This plan covers three interconnected features:
 
-**CreatePostForm.tsx** changes:
-- Update the file input `accept` attribute to include audio: `accept="image/*,video/*,audio/*"`
-- Add a separate "Record Voice Note" button using the browser's `MediaRecorder` API for quick in-app voice recording
-- Add file size validation: reject files over 100MB for videos, 10MB for audio, 20MB for images
-- Update the preview grid to show video thumbnails (using `<video>` element) and audio players (using `<audio>` element) instead of only `<img>`
-- Change the "Add Photos" button label to "Add Media"
+## 1. Feed Image Lightbox (click to expand images)
 
-**PostCard.tsx** changes:
-- Detect media type from URL file extension (image vs video vs audio)
-- Render `<video controls>` for video files (.mp4, .mov, .webm, .avi)
-- Render `<audio controls>` for audio files (.mp3, .wav, .ogg, .webm, .m4a)
-- Keep `<img>` for image files
-- Add clickable link detection in post content: parse URLs in text and render them as `<a href="..." target="_blank" rel="noopener noreferrer">` tags so links open properly in new tabs
+Add a full-screen dialog/lightbox to the `PostCard` component so clicking any image in a post opens it enlarged, similar to the album photo lightbox already built.
 
-### 2. Fridge: Voice Note Pin Type
+- Add `enlargedImage` state to `PostCard`
+- Wrap each image in the media grid with a clickable element
+- Render a `Dialog` with the full-size image when clicked
+- Include left/right navigation if the post has multiple images
 
-**Fridge.tsx** changes:
-- Add "Voice Note" as a new pin type option in the type dropdown
-- When "Voice Note" is selected, show a file picker for audio files OR a "Record" button using `MediaRecorder`
-- Upload audio to the existing `post-media` storage bucket
-- Store the audio URL in the `image_url` column (reusing the existing field for media)
+## 2. Profile Page Split: Public Profile View + Settings (gear icon)
 
-**FridgeBoard.tsx** changes:
-- When a pin has an audio URL (detected by file extension), render a small audio player instead of an image inside the polaroid frame
-- Show a speaker/microphone icon for voice note pins without a visual
+**Restructure the current `/profile` route into two distinct experiences:**
 
-### 3. New Component: VoiceRecorder
+### A. New Public Profile Page (`/profile/:userId`)
+- Shows the user's avatar (large), display name, bio, location
+- Shows a gallery of profile images the user has uploaded (new feature)
+- Viewable by anyone who shares a circle with this user (RLS already handles this via `shares_circle_with`)
+- When viewing your own profile, show a gear icon that links to `/settings`
 
-Create **src/components/shared/VoiceRecorder.tsx**:
-- A reusable record button component using `navigator.mediaDevices.getUserMedia` and `MediaRecorder`
-- Shows record/stop controls and a waveform-style visual indicator
-- Returns a `Blob` when recording finishes
-- Max recording duration: 2 minutes
-- Used by both the Feed CreatePostForm and the Fridge pin dialog
+### B. Settings Page (`/settings`)
+- Move all the current edit functionality (display name, bio, location, avatar upload) here
+- Change the nav icon from "Profile" to use a `Settings` (gear) icon
+- Keep the same edit form, just relocated
 
-### 4. New Utility: LinkifiedText
+### C. Profile Images (new storage + table)
+- Create a new `profile_images` database table: `id`, `user_id`, `image_url`, `caption`, `created_at`
+- RLS: users can insert/update/delete their own; anyone sharing a circle can view
+- Create a new `profile-images` storage bucket (public)
+- On the public profile page, show a grid of uploaded images with the ability to add more (if it's your own profile)
 
-Create **src/components/shared/LinkifiedText.tsx**:
-- A component that takes a string and renders it with URLs automatically converted to clickable `<a>` tags
-- Uses a regex to detect URLs (http/https/www patterns)
-- Links open in a new tab with `target="_blank" rel="noopener noreferrer"`
-- Styled with underline and primary color to be clearly clickable
+## 3. Clickable Author Names in Feed Posts
 
-### 5. Storage Bucket Update
+- In `PostCard`, wrap the author's display name in a `Link` to `/profile/:userId` where `userId` is the post's `author_id`
+- Same for comment author names
+- This lets circle members navigate to any poster's public profile
 
-**Database migration** to increase the file size limit on the `post-media` bucket:
-- Update the storage bucket to allow files up to 100MB (for video uploads)
-- Add an RLS policy if not already present for authenticated uploads
+## Route and Navigation Changes
 
----
+- Add route `/profile/:userId` for viewing any user's profile
+- Add route `/settings` for editing your own profile
+- Update `MobileNavigation` to change the "Profile" item to point to `/settings` with a gear icon
+- Update `CircleHeader` (desktop nav) similarly
 
-### Technical Details
+## Database Migration
 
-**File type detection helper** (used in PostCard and FridgeBoard):
-```typescript
-function getMediaType(url: string): 'image' | 'video' | 'audio' {
-  const ext = url.split('.').pop()?.toLowerCase().split('?')[0];
-  if (['mp4','mov','webm','avi','mkv'].includes(ext)) return 'video';
-  if (['mp3','wav','ogg','m4a','aac','webm'].includes(ext)) return 'audio';
-  return 'image';
-}
+```sql
+-- Profile images table
+CREATE TABLE public.profile_images (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  image_url text NOT NULL,
+  caption text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.profile_images ENABLE ROW LEVEL SECURITY;
+
+-- Owner can manage their own images
+CREATE POLICY "Users can insert own profile images"
+  ON public.profile_images FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own profile images"
+  ON public.profile_images FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- Circle members can view
+CREATE POLICY "Circle members can view profile images"
+  ON public.profile_images FOR SELECT
+  USING (
+    auth.uid() = user_id
+    OR shares_circle_with(auth.uid(), user_id)
+  );
+
+-- Storage bucket
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('profile-images', 'profile-images', true);
+
+-- Storage policies
+CREATE POLICY "Users can upload profile images"
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'profile-images' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+CREATE POLICY "Anyone can view profile images"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'profile-images');
+
+CREATE POLICY "Users can delete own profile images"
+  ON storage.objects FOR DELETE
+  USING (bucket_id = 'profile-images' AND (storage.foldername(name))[1] = auth.uid()::text);
 ```
 
-**VoiceRecorder** uses standard browser APIs:
-- `navigator.mediaDevices.getUserMedia({ audio: true })`
-- `MediaRecorder` with `audio/webm` mime type
-- Returns recorded blob for upload
+## Files to Create/Modify
 
-**LinkifiedText** regex pattern:
-```typescript
-const URL_REGEX = /(https?:\/\/[^\s<]+|www\.[^\s<]+)/gi;
-```
+| File | Action |
+|------|--------|
+| `src/pages/ProfileView.tsx` | **Create** - Public profile page with avatar, bio, image gallery |
+| `src/pages/Settings.tsx` | **Create** - Renamed from current Profile (edit form) |
+| `src/pages/Profile.tsx` | **Delete** or redirect to new structure |
+| `src/components/feed/PostCard.tsx` | **Modify** - Add image lightbox dialog + clickable author names |
+| `src/components/layout/MobileNavigation.tsx` | **Modify** - Change Profile to Settings with gear icon |
+| `src/components/layout/CircleHeader.tsx` | **Modify** - Update nav link |
+| `src/App.tsx` | **Modify** - Add `/profile/:userId` and `/settings` routes |
 
-**Files to create:**
-- `src/components/shared/VoiceRecorder.tsx`
-- `src/components/shared/LinkifiedText.tsx`
-- `src/lib/mediaUtils.ts` (getMediaType helper)
+## Summary of User-Facing Changes
 
-**Files to modify:**
-- `src/components/feed/CreatePostForm.tsx`
-- `src/components/feed/PostCard.tsx`
-- `src/pages/Fridge.tsx`
-- `src/components/fridge/FridgeBoard.tsx`
-
-**Database migration:**
-- Update `post-media` bucket file size limit to 100MB
+1. Clicking any image in the feed opens it full-size in a lightbox
+2. The "Profile" tab becomes "Settings" (gear icon) for editing your info
+3. A new public profile page shows your avatar, bio, location, and uploaded images
+4. Clicking any person's name on a post takes you to their public profile
+5. You can upload personal images to your profile that circle members can browse
 
