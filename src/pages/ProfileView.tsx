@@ -93,6 +93,30 @@ const ProfileView = () => {
 
     const { data: publicUrlData } = supabase.storage.from("profile-images").getPublicUrl(fileName);
 
+    // Content moderation check
+    try {
+      const { data: modResult, error: modError } = await supabase.functions.invoke("moderate-content", {
+        body: { imageUrls: [publicUrlData.publicUrl] },
+      });
+
+      if (!modError && modResult && !modResult.allowed) {
+        toast({
+          title: "Content not allowed",
+          description: "This image may violate our community guidelines. Please review and try again.",
+          variant: "destructive",
+        });
+        // Cleanup uploaded file
+        await supabase.storage.from("profile-images").remove([fileName]);
+        setIsUploading(false);
+        setPendingFile(null);
+        setUploadCaption("");
+        return;
+      }
+    } catch (err) {
+      console.error("Moderation check failed:", err);
+      // Fail-open
+    }
+
     const { data: newImage, error: insertError } = await supabase
       .from("profile_images")
       .insert({ user_id: user.id, image_url: publicUrlData.publicUrl, caption: uploadCaption.trim() || null })

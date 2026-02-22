@@ -31,6 +31,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isPosting, setIsPosting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [moderationStatus, setModerationStatus] = useState<string | null>(null);
 
   // Persist draft text to sessionStorage
   useEffect(() => {
@@ -94,8 +95,44 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const handleCreatePost = async () => {
     if ((!newPostContent.trim() && selectedFiles.length === 0) || !selectedCircle || !user) return;
     setIsPosting(true);
+    setModerationStatus(null);
     let mediaUrls: string[] = [];
     if (selectedFiles.length > 0) mediaUrls = await uploadFiles();
+
+    // Content moderation check
+    setModerationStatus("checking");
+    try {
+      const { data: modResult, error: modError } = await supabase.functions.invoke("moderate-content", {
+        body: {
+          text: newPostContent.trim() || undefined,
+          imageUrls: mediaUrls.length > 0 ? mediaUrls : undefined,
+        },
+      });
+
+      if (modError) {
+        console.error("Moderation error:", modError);
+        // Fail-open: if moderation service fails, allow the post
+      } else if (modResult && !modResult.allowed) {
+        toast({
+          title: "Content not allowed",
+          description: "This content may violate our community guidelines. Please review and try again.",
+          variant: "destructive",
+        });
+        // Cleanup uploaded files
+        for (const url of mediaUrls) {
+          const path = url.split("/post-media/")[1];
+          if (path) await supabase.storage.from("post-media").remove([path]);
+        }
+        setIsPosting(false);
+        setUploadProgress(null);
+        setModerationStatus(null);
+        return;
+      }
+    } catch (err) {
+      console.error("Moderation check failed:", err);
+      // Fail-open
+    }
+    setModerationStatus(null);
 
     const { error } = await supabase.from("posts").insert({
       content: newPostContent || null,
@@ -204,7 +241,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
             <VoiceRecorder onRecordingComplete={handleVoiceRecording} />
           </div>
           <Button onClick={handleCreatePost} disabled={(!newPostContent.trim() && selectedFiles.length === 0) || isPosting}>
-            <Send className="w-4 h-4 mr-2" />{isPosting ? "Uploading..." : "Share"}
+            <Send className="w-4 h-4 mr-2" />{moderationStatus === "checking" ? "Checking content..." : isPosting ? "Uploading..." : "Share"}
           </Button>
         </div>
       </CardContent>
