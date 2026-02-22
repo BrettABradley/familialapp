@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, MapPin, ImagePlus, Trash2, Play } from "lucide-react";
+import { Settings, MapPin, ImagePlus, Trash2, Play, Download } from "lucide-react";
 import { getMediaType } from "@/lib/mediaUtils";
+import { Textarea } from "@/components/ui/textarea";
 
 interface ProfileData {
   user_id: string;
@@ -38,6 +39,9 @@ const ProfileView = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [enlargedImage, setEnlargedImage] = useState<ProfileImage | null>(null);
+  const [uploadCaption, setUploadCaption] = useState("");
+  const [showCaptionInput, setShowCaptionInput] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const isOwnProfile = user?.id === userId;
 
@@ -59,22 +63,31 @@ const ProfileView = () => {
     fetchData();
   }, [userId]);
 
-  const handleUploadImage = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
     event.target.value = "";
+    setPendingFile(file);
+    setUploadCaption("");
+    setShowCaptionInput(true);
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!pendingFile || !user) return;
 
     setIsUploading(true);
-    const ext = file.name.split(".").pop() || "jpg";
+    setShowCaptionInput(false);
+    const ext = pendingFile.name.split(".").pop() || "jpg";
     const fileName = `${user.id}/${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from("profile-images")
-      .upload(fileName, file, { contentType: file.type });
+      .upload(fileName, pendingFile, { contentType: pendingFile.type });
 
     if (uploadError) {
       toast({ title: "Upload failed", description: uploadError.message, variant: "destructive" });
       setIsUploading(false);
+      setPendingFile(null);
       return;
     }
 
@@ -82,18 +95,36 @@ const ProfileView = () => {
 
     const { data: newImage, error: insertError } = await supabase
       .from("profile_images")
-      .insert({ user_id: user.id, image_url: publicUrlData.publicUrl })
+      .insert({ user_id: user.id, image_url: publicUrlData.publicUrl, caption: uploadCaption.trim() || null })
       .select()
       .single();
 
     if (insertError) {
-      toast({ title: "Error", description: "Could not save image.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not save media.", variant: "destructive" });
     } else if (newImage) {
       setImages((prev) => [newImage, ...prev]);
-      toast({ title: "Image uploaded!" });
+      toast({ title: "Media uploaded!" });
     }
 
     setIsUploading(false);
+    setPendingFile(null);
+    setUploadCaption("");
+  };
+
+  const handleDownload = async (url: string, filename?: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename || url.split("/").pop() || "download";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    } catch {
+      toast({ title: "Download failed", variant: "destructive" });
+    }
   };
 
   const handleDeleteImage = async (image: ProfileImage) => {
@@ -185,7 +216,7 @@ const ProfileView = () => {
                   <ImagePlus className="h-4 w-4 mr-2" />
                   {isUploading ? "Uploading..." : "Add Media"}
                 </Button>
-                <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleUploadImage} className="hidden" />
+                <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
               </>
             )}
           </div>
@@ -245,19 +276,53 @@ const ProfileView = () => {
               {enlargedImage.caption && (
                 <p className="mt-3 text-sm text-muted-foreground">{enlargedImage.caption}</p>
               )}
-              {isOwnProfile && (
+              <div className="flex items-center gap-2 mt-3">
                 <Button
-                  variant="destructive"
+                  variant="outline"
                   size="sm"
-                  className="mt-3"
-                  onClick={() => handleDeleteImage(enlargedImage)}
+                  onClick={() => handleDownload(enlargedImage.image_url)}
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Photo
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
                 </Button>
-              )}
+                {isOwnProfile && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDeleteImage(enlargedImage)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                )}
+              </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Caption Input Dialog */}
+      <Dialog open={showCaptionInput} onOpenChange={(open) => { if (!open) { setShowCaptionInput(false); setPendingFile(null); } }}>
+        <DialogContent className="max-w-md">
+          <div className="space-y-4">
+            <h3 className="font-serif text-lg font-semibold">Add a caption</h3>
+            <Textarea
+              value={uploadCaption}
+              onChange={(e) => setUploadCaption(e.target.value)}
+              placeholder="Write a caption (optional)..."
+              className="resize-none"
+              rows={3}
+              maxLength={500}
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setShowCaptionInput(false); setPendingFile(null); }}>
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmUpload} disabled={isUploading}>
+                {isUploading ? "Uploading..." : "Upload"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </main>
