@@ -284,6 +284,37 @@ export const useFeedPosts = () => {
     }
   };
 
+  const handleDeleteComment = async (postId: string, commentId: string) => {
+    if (!user) return;
+    const post = posts.find(p => p.id === postId);
+    const comment = post?.comments?.find(c => c.id === commentId);
+    if (!comment || comment.author_id !== user.id) return;
+
+    // Optimistic: remove the comment and its replies
+    setPosts(prev => prev.map(p => {
+      if (p.id !== postId) return p;
+      const idsToRemove = new Set<string>([commentId]);
+      // Also remove replies to this comment
+      const collectChildren = (parentId: string) => {
+        p.comments?.forEach(c => {
+          if (c.parent_comment_id === parentId) {
+            idsToRemove.add(c.id);
+            collectChildren(c.id);
+          }
+        });
+      };
+      collectChildren(commentId);
+      return { ...p, comments: (p.comments || []).filter(c => !idsToRemove.has(c.id)) };
+    }));
+
+    const { error } = await supabase.from("comments").delete().eq("id", commentId);
+    if (error) {
+      // Revert
+      fetchPosts(true);
+      toast({ title: "Error", description: "Failed to delete comment.", variant: "destructive" });
+    }
+  };
+
   const hasUserReacted = (post: Post) => post.reactions?.some(r => r.user_id === user?.id);
 
   return {
@@ -301,6 +332,7 @@ export const useFeedPosts = () => {
     handleDownloadImage,
     handleDeletePost,
     handleEditPost,
+    handleDeleteComment,
     hasUserReacted,
     user,
   };

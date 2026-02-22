@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -10,6 +11,9 @@ import { PostCard } from "@/components/feed/PostCard";
 
 const Feed = () => {
   const { circles, isLoading: contextLoading } = useCircleContext();
+  const [searchParams] = useSearchParams();
+  const highlightPostId = searchParams.get("post");
+  const scrolledRef = useRef(false);
   const {
     posts,
     isLoadingPosts,
@@ -25,9 +29,24 @@ const Feed = () => {
     handleDownloadImage,
     handleDeletePost,
     handleEditPost,
+    handleDeleteComment,
     hasUserReacted,
     user,
   } = useFeedPosts();
+
+  useEffect(() => {
+    if (highlightPostId && !isLoadingPosts && posts.length > 0 && !scrolledRef.current) {
+      scrolledRef.current = true;
+      const el = document.getElementById(`post-${highlightPostId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        // Auto-expand comments for the linked post
+        if (!expandedComments.has(highlightPostId)) {
+          toggleComments(highlightPostId);
+        }
+      }
+    }
+  }, [highlightPostId, isLoadingPosts, posts]);
 
   if (contextLoading || isLoadingPosts) {
     return (
@@ -98,22 +117,25 @@ const Feed = () => {
         )}
 
         {posts.map((post) => (
-          <PostCard
-            key={post.id}
-            post={post}
-            isExpanded={expandedComments.has(post.id)}
-            commentInput={commentInputs[post.id] || ""}
-            isSubmittingComment={isSubmittingComment === post.id}
-            hasUserReacted={hasUserReacted(post) || false}
-            isOwnPost={post.author_id === user?.id}
-            onReaction={handleReaction}
-            onToggleComments={toggleComments}
-            onCommentInputChange={(postId, value) => setCommentInputs(prev => ({ ...prev, [postId]: value }))}
-            onSubmitComment={handleSubmitComment}
-            onDownloadImage={handleDownloadImage}
-            onDelete={handleDeletePost}
-            onEdit={handleEditPost}
-          />
+          <div key={post.id} id={`post-${post.id}`}>
+            <PostCard
+              post={post}
+              isExpanded={expandedComments.has(post.id)}
+              commentInput={commentInputs[post.id] || ""}
+              isSubmittingComment={isSubmittingComment === post.id}
+              hasUserReacted={hasUserReacted(post) || false}
+              isOwnPost={post.author_id === user?.id}
+              currentUserId={user?.id}
+              onReaction={handleReaction}
+              onToggleComments={toggleComments}
+              onCommentInputChange={(postId, value) => setCommentInputs(prev => ({ ...prev, [postId]: value }))}
+              onSubmitComment={handleSubmitComment}
+              onDownloadImage={handleDownloadImage}
+              onDelete={handleDeletePost}
+              onEdit={handleEditPost}
+              onDeleteComment={handleDeleteComment}
+            />
+          </div>
         ))}
 
         {hasMore && (
