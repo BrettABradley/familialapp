@@ -11,6 +11,7 @@ import {
 import { useState } from "react";
 
 const navItems = [
+  { to: "/profile", icon: User, label: "Profile" },
   { to: "/circles", icon: Users, label: "Circles" },
   { to: "/feed", icon: Home, label: "Feed" },
   { to: "/fridge", icon: Pin, label: "Fridge" },

@@ -35,13 +35,13 @@ interface CircleHeaderProps {
 }
 
 const navItems = [
+  { to: "/profile", icon: User, label: "Profile" },
   { to: "/circles", icon: Users, label: "Circles" },
   { to: "/feed", icon: Home, label: "Feed" },
   { to: "/fridge", icon: Pin, label: "Fridge" },
   { to: "/events", icon: Calendar, label: "Events" },
   { to: "/albums", icon: Image, label: "Albums" },
   { to: "/messages", icon: MessageSquare, label: "Messages" },
-  { to: "/profile", icon: User, label: "Profile" },
 ];
 
 export function CircleHeader({
