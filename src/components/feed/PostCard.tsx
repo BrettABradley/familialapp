@@ -294,8 +294,8 @@ export const PostCard = ({
 
         {isExpanded && (() => {
           const topLevelComments = post.comments?.filter(c => !(c as any).parent_comment_id) || [];
-          const replies = post.comments?.filter(c => (c as any).parent_comment_id) || [];
-          const getReplies = (commentId: string) => replies.filter(r => (r as any).parent_comment_id === commentId);
+          const allReplies = post.comments?.filter(c => (c as any).parent_comment_id) || [];
+          const getReplies = (commentId: string) => allReplies.filter(r => (r as any).parent_comment_id === commentId);
 
           const renderComment = (comment: typeof topLevelComments[0], isReply = false) => (
             <div key={comment.id} className={`flex gap-3 ${isReply ? "ml-10" : ""}`}>
@@ -312,51 +312,75 @@ export const PostCard = ({
                 <p className="text-sm text-foreground">{comment.content}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-xs text-muted-foreground">{new Date(comment.created_at).toLocaleDateString()}</p>
-                  {!isReply && (
-                    <button
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                      onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
-                    >
-                      Reply
-                    </button>
-                  )}
+                  <button
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                  >
+                    Reply
+                  </button>
                 </div>
               </div>
             </div>
           );
 
+          // Find the top-level parent for a reply (to nest reply input under the right thread)
+          const getTopParent = (commentId: string): string => {
+            const comment = post.comments?.find(c => c.id === commentId);
+            if (!comment || !(comment as any).parent_comment_id) return commentId;
+            return getTopParent((comment as any).parent_comment_id);
+          };
+
+          const renderReplyInput = (parentCommentId: string) => {
+            const parentComment = post.comments?.find(c => c.id === parentCommentId);
+            return (
+              <div className="flex gap-2 ml-10">
+                <Avatar className="h-6 w-6">
+                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarFallback className="text-xs">{profile?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 flex gap-2">
+                  <input
+                    type="text"
+                    placeholder={`Reply to ${parentComment?.profiles?.display_name || "Unknown"}...`}
+                    value={commentInput}
+                    onChange={(e) => onCommentInputChange(post.id, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmitComment(post.id, parentCommentId); setReplyingTo(null); }
+                    }}
+                    className="flex-1 bg-secondary rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    autoFocus
+                  />
+                  <Button size="sm" onClick={() => { onSubmitComment(post.id, parentCommentId); setReplyingTo(null); }} disabled={!commentInput?.trim() || isSubmittingComment} aria-label="Send reply">
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          };
+
           return (
             <div className="mt-4 pt-4 border-t border-border space-y-3">
-              {topLevelComments.map((comment) => (
-                <div key={comment.id} className="space-y-2">
-                  {renderComment(comment)}
-                  {getReplies(comment.id).map(reply => renderComment(reply, true))}
-                  {replyingTo === comment.id && (
-                    <div className="flex gap-2 ml-10">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={profile?.avatar_url || undefined} />
-                        <AvatarFallback className="text-xs">{profile?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 flex gap-2">
-                        <input
-                          type="text"
-                          placeholder={`Reply to ${comment.profiles?.display_name || "Unknown"}...`}
-                          value={commentInput}
-                          onChange={(e) => onCommentInputChange(post.id, e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmitComment(post.id, comment.id); setReplyingTo(null); }
-                          }}
-                          className="flex-1 bg-secondary rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                          autoFocus
-                        />
-                        <Button size="sm" onClick={() => { onSubmitComment(post.id, comment.id); setReplyingTo(null); }} disabled={!commentInput?.trim() || isSubmittingComment} aria-label="Send reply">
-                          <Send className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+              {topLevelComments.map((comment) => {
+                const commentReplies = getReplies(comment.id);
+                // Also get nested replies (replies to replies, which have parent pointing to a reply)
+                const allNestedReplies: typeof topLevelComments = [];
+                const collectReplies = (parentId: string) => {
+                  const children = allReplies.filter(r => (r as any).parent_comment_id === parentId);
+                  children.forEach(child => {
+                    allNestedReplies.push(child);
+                    collectReplies(child.id);
+                  });
+                };
+                collectReplies(comment.id);
+
+                return (
+                  <div key={comment.id} className="space-y-2">
+                    {renderComment(comment)}
+                    {allNestedReplies.map(reply => renderComment(reply, true))}
+                    {replyingTo && (replyingTo === comment.id || allNestedReplies.some(r => r.id === replyingTo)) && renderReplyInput(replyingTo)}
+                  </div>
+                );
+              })}
               <div className="flex gap-2">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={profile?.avatar_url || undefined} />

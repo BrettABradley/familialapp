@@ -185,6 +185,37 @@ export const useFeedPosts = () => {
       }));
       setCommentInputs(prev => ({ ...prev, [postId]: content }));
       toast({ title: "Error", description: "Failed to add comment.", variant: "destructive" });
+    } else {
+      // Create notification for post author (comment) or parent comment author (reply)
+      const post = posts.find(p => p.id === postId);
+      const displayName = profile?.display_name || "Someone";
+
+      if (parentCommentId) {
+        // Reply notification — notify the parent comment author
+        const parentComment = post?.comments?.find(c => c.id === parentCommentId);
+        if (parentComment && parentComment.author_id !== user.id) {
+          supabase.from("notifications").insert({
+            user_id: parentComment.author_id,
+            type: "comment_reply",
+            title: "Reply to your comment",
+            message: `${displayName} replied: "${content.slice(0, 100)}"`,
+            related_post_id: postId,
+            related_user_id: user.id,
+          }).then();
+        }
+      }
+
+      // Always notify the post author about comments (unless it's their own)
+      if (post && post.author_id !== user.id) {
+        supabase.from("notifications").insert({
+          user_id: post.author_id,
+          type: "comment",
+          title: parentCommentId ? "New reply on your post" : "New comment on your post",
+          message: `${displayName}: "${content.slice(0, 100)}"`,
+          related_post_id: postId,
+          related_user_id: user.id,
+        }).then();
+      }
     }
 
     setIsSubmittingComment(null);
