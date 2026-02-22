@@ -114,7 +114,7 @@ export function CircleHeader({
   };
 
   const notifBell = (
-    <Popover open={bellOpen} onOpenChange={setBellOpen}>
+    <Popover open={bellOpen} onOpenChange={setBellOpen} modal={true}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className="relative">
           <Bell className="w-4 h-4" />
