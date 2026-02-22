@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,13 +11,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Camera, Save } from "lucide-react";
+import { Camera, Save, ArrowLeft } from "lucide-react";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 
 const Settings = () => {
   const { user } = useAuth();
   const { profile, isLoading: contextLoading, refetchProfile } = useCircleContext();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [displayName, setDisplayName] = useState("");
@@ -129,7 +131,12 @@ const Settings = () => {
     <main className="container mx-auto px-4 py-8 max-w-2xl">
       <Card>
         <CardHeader>
-          <CardTitle className="font-serif text-2xl">Settings</CardTitle>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/profile")} className="h-8 w-8">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <CardTitle className="font-serif text-2xl">Settings</CardTitle>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-col items-center gap-4">
