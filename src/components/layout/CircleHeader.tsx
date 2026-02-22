@@ -237,6 +237,7 @@ export function CircleHeader({
               )}
             </>
           )}
+          {showNav && notifBell}
         </div>
         {showNav && (
           <>
@@ -250,7 +251,6 @@ export function CircleHeader({
                   </Button>
                 </Link>
               ))}
-              {notifBell}
               <Button variant="ghost" size="sm" onClick={onSignOut}>
                 <LogOut className="w-4 h-4 md:mr-2" />
                 <span className="hidden md:inline">Sign Out</span>
@@ -260,7 +260,6 @@ export function CircleHeader({
             {/* Mobile Navigation - Hamburger Menu */}
             {isMobile && (
               <div className="flex items-center gap-1 md:hidden">
-                {notifBell}
                 <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
                   <SheetTrigger asChild>
                     <Button variant="ghost" size="sm" className="min-h-[44px] min-w-[44px]">
