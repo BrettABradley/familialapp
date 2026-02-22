@@ -79,6 +79,7 @@ interface Event {
   title: string;
   description: string | null;
   event_date: string;
+  end_date: string | null;
   event_time: string | null;
   location: string | null;
   created_at: string;
@@ -97,6 +98,7 @@ const Events = () => {
   const [rsvps, setRsvps] = useState<Record<string, Rsvp[]>>({});
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedEndDate, setSelectedEndDate] = useState<Date | undefined>();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [eventTime, setEventTime] = useState("");
@@ -116,6 +118,7 @@ const Events = () => {
   const [editTime, setEditTime] = useState("");
   const [editLocation, setEditLocation] = useState("");
   const [editDate, setEditDate] = useState<Date | undefined>();
+  const [editEndDate, setEditEndDate] = useState<Date | undefined>();
   const [editAlbumId, setEditAlbumId] = useState<string>("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
@@ -232,6 +235,7 @@ const Events = () => {
         circle_id: selectedCircle,
         created_by: user.id,
         event_date: formatDateToYMD(selectedDate),
+        end_date: selectedEndDate ? formatDateToYMD(selectedEndDate) : null,
         event_time: eventTime || null,
         location: eventLocation || null,
         album_id: selectedAlbumId && selectedAlbumId !== "none" ? selectedAlbumId : null,
@@ -246,6 +250,7 @@ const Events = () => {
       setEventLocation("");
       setSelectedAlbumId("");
       setSelectedDate(new Date());
+      setSelectedEndDate(undefined);
       setIsCreateOpen(false);
       fetchEvents();
       fetchPastEvents();
@@ -262,6 +267,7 @@ const Events = () => {
     setEditLocation(event.location || "");
     const [year, month, day] = event.event_date.split("-").map(Number);
     setEditDate(new Date(year, month - 1, day));
+    setEditEndDate(event.end_date ? parseLocalDate(event.end_date) : undefined);
     setEditAlbumId(event.album_id || "none");
   };
 
@@ -275,6 +281,7 @@ const Events = () => {
         title: editTitle.trim(),
         description: editDescription.trim() || null,
         event_date: formatDateToYMD(editDate),
+        end_date: editEndDate ? formatDateToYMD(editEndDate) : null,
         event_time: editTime || null,
         location: editLocation.trim() || null,
         album_id: editAlbumId && editAlbumId !== "none" ? editAlbumId : null,
@@ -381,7 +388,17 @@ const Events = () => {
   }
 
   const allEvents = [...events, ...pastEvents];
-  const eventDates = allEvents.map(e => parseLocalDate(e.event_date));
+  // Build array of all event dates (including ranges) for calendar highlights
+  const eventDates: Date[] = [];
+  for (const e of allEvents) {
+    const start = parseLocalDate(e.event_date);
+    const end = e.end_date ? parseLocalDate(e.end_date) : start;
+    const current = new Date(start);
+    while (current <= end) {
+      eventDates.push(new Date(current));
+      current.setDate(current.getDate() + 1);
+    }
+  }
 
   const renderRsvpSection = (event: Event) => {
     const eventRsvps = rsvps[event.id] || [];
@@ -469,6 +486,9 @@ const Events = () => {
               <span className="flex items-center gap-1">
                 <CalendarDays className="w-4 h-4" />
                 {format(parseLocalDate(event.event_date), "MMM d, yyyy")}
+                {event.end_date && event.end_date !== event.event_date && (
+                  <> – {format(parseLocalDate(event.end_date), "MMM d, yyyy")}</>
+                )}
               </span>
               {event.event_time && (
                 <span className="flex items-center gap-1">
@@ -564,8 +584,12 @@ const Events = () => {
                 <Input id="title" placeholder="e.g., Grandma's Birthday" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} />
               </div>
               <div className="space-y-2">
-                <Label>Date</Label>
-                <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} className="rounded-md border" />
+                <Label>Start Date</Label>
+                <Calendar mode="single" selected={selectedDate} onSelect={(day) => { setSelectedDate(day); if (day && selectedEndDate && day > selectedEndDate) setSelectedEndDate(undefined); }} className="rounded-md border" />
+              </div>
+              <div className="space-y-2">
+                <Label>End Date (optional, for multi-day)</Label>
+                <Calendar mode="single" selected={selectedEndDate} onSelect={setSelectedEndDate} disabled={(date) => !!(selectedDate && date < selectedDate)} className="rounded-md border" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -614,8 +638,12 @@ const Events = () => {
               <Input id="edit-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} maxLength={200} />
             </div>
             <div className="space-y-2">
-              <Label>Date</Label>
-              <Calendar mode="single" selected={editDate} onSelect={(day) => { if (day) setEditDate(day); }} className="rounded-md border" />
+              <Label>Start Date</Label>
+              <Calendar mode="single" selected={editDate} onSelect={(day) => { if (day) { setEditDate(day); if (editEndDate && day > editEndDate) setEditEndDate(undefined); } }} className="rounded-md border" />
+            </div>
+            <div className="space-y-2">
+              <Label>End Date (optional, for multi-day)</Label>
+              <Calendar mode="single" selected={editEndDate} onSelect={setEditEndDate} disabled={(date) => !!(editDate && date < editDate)} className="rounded-md border" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
