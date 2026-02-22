@@ -131,8 +131,10 @@ const Notifications = () => {
       case "reaction":
         return <Heart className="w-4 h-4" />;
       case "comment":
+      case "comment_reply":
         return <MessageCircle className="w-4 h-4" />;
       case "invite":
+      case "circle_invite":
         return <UserPlus className="w-4 h-4" />;
       case "event":
         return <Calendar className="w-4 h-4" />;
