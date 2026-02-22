@@ -93,30 +93,6 @@ const ProfileView = () => {
 
     const { data: publicUrlData } = supabase.storage.from("profile-images").getPublicUrl(fileName);
 
-    // Content moderation check
-    try {
-      const { data: modResult, error: modError } = await supabase.functions.invoke("moderate-content", {
-        body: { imageUrls: [publicUrlData.publicUrl] },
-      });
-
-      if (!modError && modResult && !modResult.allowed) {
-        toast({
-          title: "Content not allowed",
-          description: "This image may violate our community guidelines. Please review and try again.",
-          variant: "destructive",
-        });
-        // Cleanup uploaded file
-        await supabase.storage.from("profile-images").remove([fileName]);
-        setIsUploading(false);
-        setPendingFile(null);
-        setUploadCaption("");
-        return;
-      }
-    } catch (err) {
-      console.error("Moderation check failed:", err);
-      // Fail-open
-    }
-
     const { data: newImage, error: insertError } = await supabase
       .from("profile_images")
       .insert({ user_id: user.id, image_url: publicUrlData.publicUrl, caption: uploadCaption.trim() || null })
@@ -128,6 +104,32 @@ const ProfileView = () => {
     } else if (newImage) {
       setImages((prev) => [newImage, ...prev]);
       toast({ title: "Media uploaded!" });
+
+      // Silent background moderation — fire-and-forget
+      const imageId = newImage.id;
+      const imageUrl = publicUrlData.publicUrl;
+      const storagePath = fileName;
+
+      (async () => {
+        try {
+          const { data: modResult, error: modError } = await supabase.functions.invoke("moderate-content", {
+            body: { imageUrls: [imageUrl] },
+          });
+
+          if (!modError && modResult && !modResult.allowed) {
+            await supabase.from("profile_images").delete().eq("id", imageId);
+            await supabase.storage.from("profile-images").remove([storagePath]);
+            setImages((prev) => prev.filter((i) => i.id !== imageId));
+            toast({
+              title: "Image removed",
+              description: "This image was removed because it may violate our community guidelines.",
+              variant: "destructive",
+            });
+          }
+        } catch (err) {
+          console.error("Background moderation failed:", err);
+        }
+      })();
     }
 
     setIsUploading(false);
