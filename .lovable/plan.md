@@ -1,45 +1,39 @@
 
 
-## Make Content Moderation Invisible to Users
+## Video Thumbnail Preview in Feed
 
-The goal is to run moderation completely in the background so users never see "Checking content..." or feel any friction. The post will appear to go through normally -- and only if content is flagged will they get a notification.
+### Problem
+When videos are posted in the feed, they show a blank grey/white box until the user hits play. The current `poster` attribute using `url#t=0.5` doesn't work reliably across browsers, and the fade-in-on-load effect makes it worse by hiding the video element until data loads.
 
-### Approach: Silent Background Moderation
+### Solution
+Generate a real thumbnail from the video's first frame using an off-screen `<video>` + `<canvas>` technique. This captures an actual frame from the video and uses it as the poster image, so users always see a preview.
 
-Instead of blocking the post while moderation runs, we flip the flow:
-
-1. **Post publishes immediately** -- the user sees "Uploading..." then "Posted!" as normal, no mention of content checking
-2. **Moderation runs in the background** after the post is inserted into the database
-3. **If flagged**, the post is automatically deleted from the database and storage, and the user gets a toast saying it was removed for violating guidelines
-4. **If allowed**, nothing happens -- the post stays up seamlessly
-
-This means zero disruption to the normal posting experience.
+### How It Works
+1. When a video `MediaItem` mounts, a hidden `<video>` element loads the video URL
+2. It seeks to 0.5 seconds (to skip potential black frames)
+3. Once seeked, it draws the current frame onto a `<canvas>`
+4. The canvas is converted to a data URL and set as the `poster` attribute on the visible video player
+5. The video fades in smoothly once the thumbnail is ready
 
 ### Changes
 
-**`src/components/feed/CreatePostForm.tsx`**
-- Remove the `moderationStatus` state entirely
-- Remove the "Checking content..." button text -- button just shows "Uploading..." then "Share"
-- Move the moderation call to **after** the post is inserted into the DB
-- Run it with a fire-and-forget async call (no `await` blocking the UI)
-- If moderation denies the post: delete the post row from the DB, delete media from storage, and show a toast
-- The user flow becomes: click Share -> upload media -> insert post -> show "Posted!" -> moderation quietly runs behind the scenes
+**`src/components/feed/PostCard.tsx`**
+- Extract the video rendering into a dedicated `VideoPlayer` component within the file
+- Add a `useEffect` that:
+  - Creates a temporary offscreen `<video>` element
+  - Sets `crossOrigin="anonymous"` and seeks to 0.5s
+  - On `seeked` event, draws the frame to an offscreen `<canvas>`
+  - Calls `canvas.toDataURL()` and stores it in state as the poster
+- The visible `<video>` element uses this generated poster
+- Remove the `opacity: 0` / `onLoadedData` fade trick (no longer needed since the poster provides immediate visual content)
+- Show a subtle loading skeleton/placeholder while the thumbnail generates (typically under 1 second)
 
-**`src/pages/ProfileView.tsx`**
-- Same pattern: upload the image, insert the DB row, show success -- then run moderation silently
-- If flagged, delete the image row and storage file, and show a toast
+### What Users Will See
+- Videos in the feed immediately show a thumbnail of the first frame instead of a blank grey box
+- The play button overlays the thumbnail as expected
+- No layout shift or flash of empty content
 
-### What the User Experiences
-
-| Scenario | What happens |
-|---|---|
-| Normal content | Post appears instantly, no extra wait, no "checking" message |
-| Flagged content | Post appears briefly (1-2 seconds), then disappears with a toast: "This post was removed because it may violate our community guidelines." |
-
-### Technical Details
-
-- The moderation function call is wrapped in a standalone async function that runs without blocking the main flow
-- On denial, it calls `supabase.from("posts").delete().eq("id", postId)` to remove the post
-- The `onPostCreated()` callback still fires immediately so the feed refreshes, and if the post gets removed, the next refresh will reflect that
-- No new dependencies or edge function changes needed -- only the frontend timing changes
-
+### Technical Notes
+- `crossOrigin="anonymous"` is needed for canvas to read pixels from the video (Supabase storage supports CORS)
+- Falls back gracefully: if thumbnail generation fails (e.g., CORS issues), the video still works normally, just without a poster
+- No backend changes needed -- this is purely a frontend enhancement
