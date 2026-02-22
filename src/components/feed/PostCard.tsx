@@ -30,75 +30,26 @@ interface PostCardProps {
 }
 
 const VideoPlayer = ({ url }: { url: string }) => {
-  const [poster, setPoster] = useState<string | null>(null);
-  const [isReady, setIsReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const video = document.createElement('video');
-    video.crossOrigin = 'anonymous';
-    video.muted = true;
-    video.preload = 'metadata';
-    video.src = url;
-
-    const handleSeeked = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-          if (!cancelled) {
-            setPoster(dataUrl);
-            setIsReady(true);
-          }
-        }
-      } catch {
-        // CORS or other error — fall back gracefully
-        if (!cancelled) setIsReady(true);
-      }
-      video.removeEventListener('seeked', handleSeeked);
-      video.src = '';
-      video.load();
-    };
-
-    const handleLoaded = () => {
-      video.currentTime = 0.5;
-    };
-
-    const handleError = () => {
-      if (!cancelled) setIsReady(true);
-    };
-
-    video.addEventListener('loadeddata', handleLoaded);
-    video.addEventListener('seeked', handleSeeked);
-    video.addEventListener('error', handleError);
-
-    return () => {
-      cancelled = true;
-      video.removeEventListener('loadeddata', handleLoaded);
-      video.removeEventListener('seeked', handleSeeked);
-      video.removeEventListener('error', handleError);
-      video.src = '';
-      video.load();
-    };
-  }, [url]);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [showPlaceholder, setShowPlaceholder] = useState(true);
 
   return (
     <div className="relative group rounded-lg overflow-hidden bg-secondary">
-      {!isReady && (
-        <div className="w-full aspect-video rounded-lg bg-muted animate-pulse" />
+      {showPlaceholder && (
+        <div className="w-full aspect-video rounded-lg bg-muted animate-pulse absolute inset-0 z-10" />
       )}
       <video
+        ref={videoRef}
         controls
-        src={url}
-        className={`w-full rounded-lg max-h-[400px] transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0 absolute inset-0'}`}
-        preload="metadata"
+        className="w-full rounded-lg max-h-[400px]"
+        preload="auto"
         playsInline
-        poster={poster || undefined}
-      />
+        onLoadedData={() => setShowPlaceholder(false)}
+      >
+        <source src={url} type="video/mp4" />
+        <source src={url} type="video/quicktime" />
+        <source src={url} />
+      </video>
     </div>
   );
 };
