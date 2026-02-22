@@ -20,6 +20,7 @@ interface PostCardProps {
   isSubmittingComment: boolean;
   hasUserReacted: boolean;
   isOwnPost: boolean;
+  currentUserId?: string;
   onReaction: (postId: string) => void;
   onToggleComments: (postId: string) => void;
   onCommentInputChange: (postId: string, value: string) => void;
@@ -27,6 +28,7 @@ interface PostCardProps {
   onDownloadImage: (url: string) => void;
   onDelete?: (postId: string) => void;
   onEdit?: (postId: string, newContent: string) => Promise<void>;
+  onDeleteComment?: (postId: string, commentId: string) => void;
 }
 
 const VideoPlayer = ({ url }: { url: string }) => {
@@ -93,6 +95,7 @@ export const PostCard = ({
   isSubmittingComment,
   hasUserReacted,
   isOwnPost,
+  currentUserId,
   onReaction,
   onToggleComments,
   onCommentInputChange,
@@ -100,6 +103,7 @@ export const PostCard = ({
   onDownloadImage,
   onDelete,
   onEdit,
+  onDeleteComment,
 }: PostCardProps) => {
   const { profile } = useCircleContext();
   const [isEditing, setIsEditing] = useState(false);
@@ -306,9 +310,21 @@ export const PostCard = ({
                 </Avatar>
               </Link>
               <div className="flex-1 bg-secondary rounded-lg px-3 py-2">
-                <Link to={`/profile/${comment.author_id}`} className="text-sm font-medium text-foreground hover:underline">
-                  {comment.profiles?.display_name || "Unknown"}
-                </Link>
+                <div className="flex items-center justify-between">
+                  <Link to={`/profile/${comment.author_id}`} className="text-sm font-medium text-foreground hover:underline">
+                    {comment.profiles?.display_name || "Unknown"}
+                  </Link>
+                  {currentUserId === comment.author_id && onDeleteComment && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                      onClick={() => onDeleteComment(post.id, comment.id)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
                 <p className="text-sm text-foreground">{comment.content}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-xs text-muted-foreground">{new Date(comment.created_at).toLocaleDateString()}</p>
