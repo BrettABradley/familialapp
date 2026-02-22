@@ -11,6 +11,8 @@ import Feed from "./pages/Feed";
 import Circles from "./pages/Circles";
 import Store from "./pages/Store";
 import Profile from "./pages/Profile";
+import ProfileView from "./pages/ProfileView";
+import Settings from "./pages/Settings";
 import Events from "./pages/Events";
 import Fridge from "./pages/Fridge";
 import Notifications from "./pages/Notifications";
@@ -39,6 +41,8 @@ const App = () => (
               <Route path="/feed" element={<Feed />} />
               <Route path="/circles" element={<Circles />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/profile/:userId" element={<ProfileView />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/events" element={<Events />} />
               <Route path="/fridge" element={<Fridge />} />
               <Route path="/notifications" element={<Notifications />} />
