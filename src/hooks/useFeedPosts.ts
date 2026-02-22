@@ -22,6 +22,7 @@ export interface Comment {
   content: string;
   author_id: string;
   created_at: string;
+  parent_comment_id?: string | null;
   profiles?: Profile;
 }
 
@@ -81,7 +82,7 @@ export const useFeedPosts = () => {
         profiles!posts_author_id_profiles_fkey(id, user_id, display_name, avatar_url),
         circles!posts_circle_id_fkey(id, name, owner_id),
         reactions(id, user_id, reaction_type, profiles:profiles!reactions_user_id_profiles_fkey(id, user_id, display_name, avatar_url)),
-        comments(id, content, author_id, created_at, profiles!comments_author_id_profiles_fkey(id, user_id, display_name, avatar_url))
+        comments(id, content, author_id, created_at, parent_comment_id, profiles!comments_author_id_profiles_fkey(id, user_id, display_name, avatar_url))
       `)
       .in("circle_id", circleIds)
       .order("created_at", { ascending: false })
@@ -148,7 +149,7 @@ export const useFeedPosts = () => {
     }
   };
 
-  const handleSubmitComment = async (postId: string) => {
+  const handleSubmitComment = async (postId: string, parentCommentId?: string) => {
     const content = commentInputs[postId]?.trim();
     if (!content || !user) return;
 
@@ -160,6 +161,7 @@ export const useFeedPosts = () => {
       content,
       author_id: user.id,
       created_at: new Date().toISOString(),
+      parent_comment_id: parentCommentId || null,
       profiles: profile ? { id: profile.id, user_id: profile.user_id, display_name: profile.display_name, avatar_url: profile.avatar_url } : undefined,
     };
 
@@ -169,9 +171,12 @@ export const useFeedPosts = () => {
       return { ...p, comments: [...(p.comments || []), newComment] };
     }));
 
+    const insertData: any = { post_id: postId, author_id: user.id, content };
+    if (parentCommentId) insertData.parent_comment_id = parentCommentId;
+
     const { error } = await supabase
       .from("comments")
-      .insert({ post_id: postId, author_id: user.id, content });
+      .insert(insertData);
 
     if (error) {
       setPosts(prev => prev.map(p => {
