@@ -259,43 +259,48 @@ const ProfileView = () => {
         <DialogContent className="max-w-3xl p-2 bg-background/95">
           {enlargedImage && (
             <div className="flex flex-col items-center">
-              {getMediaType(enlargedImage.image_url) === 'video' ? (
-                <video
-                  src={enlargedImage.image_url}
-                  controls
-                  autoPlay
-                  className="max-h-[80vh] w-auto rounded-lg"
-                />
-              ) : (
-                <img
-                  src={enlargedImage.image_url}
-                  alt={enlargedImage.caption || "Profile photo"}
-                  className="max-h-[80vh] w-auto object-contain rounded-lg"
-                />
-              )}
-              {enlargedImage.caption && (
-                <p className="mt-3 text-sm text-muted-foreground">{enlargedImage.caption}</p>
-              )}
-              <div className="flex items-center gap-2 mt-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDownload(enlargedImage.image_url)}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
-                {isOwnProfile && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleDeleteImage(enlargedImage)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
+              <div className="relative group">
+                {getMediaType(enlargedImage.image_url) === 'video' ? (
+                  <video
+                    src={enlargedImage.image_url}
+                    controls
+                    autoPlay
+                    className="max-h-[80vh] w-auto rounded-lg"
+                  />
+                ) : (
+                  <img
+                    src={enlargedImage.image_url}
+                    alt={enlargedImage.caption || "Profile photo"}
+                    className="max-h-[80vh] w-auto object-contain rounded-lg"
+                  />
                 )}
+                <button
+                  onClick={() => handleDownload(enlargedImage.image_url)}
+                  className="absolute bottom-2 right-2 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
+                  aria-label="Download"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
               </div>
+              {(profileData?.display_name || enlargedImage.caption) && (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {profileData?.display_name && (
+                    <span className="font-semibold text-foreground">{profileData.display_name}: </span>
+                  )}
+                  {enlargedImage.caption}
+                </p>
+              )}
+              {isOwnProfile && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => handleDeleteImage(enlargedImage)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              )}
             </div>
           )}
         </DialogContent>
