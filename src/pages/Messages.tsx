@@ -56,7 +56,7 @@ type ChatView = "list" | "dm" | "group";
 
 const Messages = () => {
   const { user } = useAuth();
-  const { circles, isLoading: contextLoading } = useCircleContext();
+  const { circles, selectedCircle, isLoading: contextLoading } = useCircleContext();
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -65,7 +65,7 @@ const Messages = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [allCircleMembers, setAllCircleMembers] = useState<Profile[]>([]);
+  const [circleMembers, setCircleMembers] = useState<Profile[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [isSending, setIsSending] = useState(false);
@@ -81,12 +81,14 @@ const Messages = () => {
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (user) {
+    if (user && selectedCircle) {
       fetchConversations();
-      fetchAllCircleMembers();
+      fetchCircleMembers();
       fetchGroupChats();
+    } else if (!contextLoading) {
+      setIsLoadingConversations(false);
     }
-  }, [user]);
+  }, [user, selectedCircle]);
 
   // Realtime for DMs
   useEffect(() => {
@@ -135,36 +137,39 @@ const Messages = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, groupMessages]);
 
-  const fetchAllCircleMembers = async () => {
-    if (!user) return;
+  const fetchCircleMembers = async () => {
+    if (!user || !selectedCircle) return;
 
-    const { data: ownedCircles } = await supabase.from("circles").select("id").eq("owner_id", user.id);
-    const { data: memberCircles } = await supabase.from("circle_memberships").select("circle_id").eq("user_id", user.id);
-
-    const circleIds = [
-      ...(ownedCircles?.map(c => c.id) || []),
-      ...(memberCircles?.map(c => c.circle_id) || []),
-    ];
-
-    if (circleIds.length === 0) return;
-
-    const { data: memberships } = await supabase.from("circle_memberships").select("user_id").in("circle_id", circleIds);
-    const { data: circleOwners } = await supabase.from("circles").select("owner_id").in("id", circleIds);
+    // Get memberships for the selected circle
+    const { data: memberships } = await supabase.from("circle_memberships").select("user_id").eq("circle_id", selectedCircle);
+    // Get the circle owner
+    const { data: circle } = await supabase.from("circles").select("owner_id").eq("id", selectedCircle).single();
 
     const userIds = new Set<string>();
     memberships?.forEach(m => userIds.add(m.user_id));
-    circleOwners?.forEach(c => userIds.add(c.owner_id));
+    if (circle) userIds.add(circle.owner_id);
     userIds.delete(user.id);
 
-    if (userIds.size === 0) return;
+    if (userIds.size === 0) { setCircleMembers([]); return; }
 
     const { data: profiles } = await supabase.from("profiles").select("*").in("user_id", Array.from(userIds));
-    setAllCircleMembers(profiles || []);
+    setCircleMembers(profiles || []);
   };
 
   const fetchConversations = async () => {
-    if (!user) return;
+    if (!user || !selectedCircle) return;
     setIsLoadingConversations(true);
+
+    // Get member IDs for this circle
+    const { data: memberships } = await supabase.from("circle_memberships").select("user_id").eq("circle_id", selectedCircle);
+    const { data: circle } = await supabase.from("circles").select("owner_id").eq("id", selectedCircle).single();
+    const circleMemberIds = new Set<string>();
+    memberships?.forEach(m => circleMemberIds.add(m.user_id));
+    if (circle) circleMemberIds.add(circle.owner_id);
+    circleMemberIds.delete(user.id);
+
+    if (circleMemberIds.size === 0) { setConversations([]); setIsLoadingConversations(false); return; }
+
     const { data: allMessages } = await supabase
       .from("private_messages")
       .select("*")
@@ -173,21 +178,28 @@ const Messages = () => {
 
     if (!allMessages) { setIsLoadingConversations(false); return; }
 
+    // Filter messages to only those with circle members
+    const filteredMessages = allMessages.filter(msg => {
+      const otherId = msg.sender_id === user.id ? msg.recipient_id : msg.sender_id;
+      return circleMemberIds.has(otherId);
+    });
+
     const userIds = new Set<string>();
-    allMessages.forEach(msg => {
+    filteredMessages.forEach(msg => {
       if (msg.sender_id !== user.id) userIds.add(msg.sender_id);
       if (msg.recipient_id !== user.id) userIds.add(msg.recipient_id);
     });
 
-    if (userIds.size === 0) { setIsLoadingConversations(false); return; }
+    if (userIds.size === 0) { setConversations([]); setIsLoadingConversations(false); return; }
 
     const { data: profiles } = await supabase.from("profiles").select("*").in("user_id", Array.from(userIds));
     if (!profiles) { setIsLoadingConversations(false); return; }
 
     const convs: Conversation[] = [];
     profiles.forEach(profile => {
-      const userMessages = allMessages.filter(msg => msg.sender_id === profile.user_id || msg.recipient_id === profile.user_id);
+      const userMessages = filteredMessages.filter(msg => msg.sender_id === profile.user_id || msg.recipient_id === profile.user_id);
       const lastMessage = userMessages[0];
+      if (!lastMessage) return;
       const unreadCount = userMessages.filter(msg => msg.sender_id === profile.user_id && !msg.is_read).length;
       convs.push({ user: profile, lastMessage, unreadCount });
     });
@@ -213,11 +225,11 @@ const Messages = () => {
   };
 
   const fetchGroupChats = async () => {
-    if (!user) return;
+    if (!user || !selectedCircle) return;
     const { data: memberOf } = await supabase.from("group_chat_members").select("group_chat_id").eq("user_id", user.id);
-    if (!memberOf || memberOf.length === 0) return;
+    if (!memberOf || memberOf.length === 0) { setGroupChats([]); return; }
     const groupIds = memberOf.map(m => m.group_chat_id);
-    const { data } = await supabase.from("group_chats").select("*").in("id", groupIds).order("created_at", { ascending: false });
+    const { data } = await supabase.from("group_chats").select("*").in("id", groupIds).eq("circle_id", selectedCircle).order("created_at", { ascending: false });
     if (data) setGroupChats(data as GroupChat[]);
   };
 
@@ -246,9 +258,8 @@ const Messages = () => {
   const handleCreateGroup = async () => {
     if (!newGroupName.trim() || !user || selectedMemberIds.size === 0) return;
 
-    // Need circle_id — use the first circle
-    const circleId = circles[0]?.id;
-    if (!circleId) return;
+    if (!selectedCircle) return;
+    const circleId = selectedCircle;
 
     const { data: group, error } = await supabase
       .from("group_chats")
@@ -311,8 +322,8 @@ const Messages = () => {
   };
 
   const filteredMembers = searchQuery.trim()
-    ? allCircleMembers.filter(p => p.display_name?.toLowerCase().includes(searchQuery.toLowerCase()))
-    : allCircleMembers;
+    ? circleMembers.filter(p => p.display_name?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : circleMembers;
 
   const showMemberList = isSearchFocused && filteredMembers.length > 0;
 
@@ -455,7 +466,7 @@ const Messages = () => {
                     <div className="space-y-2">
                       <Label>Select Members</Label>
                       <div className="max-h-48 overflow-y-auto space-y-2 border border-border rounded-md p-2">
-                        {allCircleMembers.map(member => (
+                        {circleMembers.map(member => (
                           <label key={member.user_id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary cursor-pointer">
                             <Checkbox
                               checked={selectedMemberIds.has(member.user_id)}
