@@ -237,7 +237,7 @@ export function CircleHeader({
               )}
             </>
           )}
-          {showNav && notifBell}
+          {showNav && !overrideLabel && notifBell}
         </div>
         {showNav && (
           <>
