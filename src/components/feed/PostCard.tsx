@@ -93,13 +93,13 @@ const VideoPlayer = ({ url }: { url: string }) => {
       )}
       <video
         controls
+        src={url}
+        crossOrigin="anonymous"
         className={`w-full rounded-lg max-h-[400px] transition-opacity duration-300 ${isReady ? 'opacity-100' : 'opacity-0 absolute inset-0'}`}
         preload="metadata"
         playsInline
         poster={poster || undefined}
-      >
-        <source src={url} />
-      </video>
+      />
     </div>
   );
 };
