@@ -16,7 +16,7 @@ import {
   SheetTrigger,
   SheetClose,
 } from "@/components/ui/sheet";
-import { LogOut, Users, Calendar, Settings, Pin, MessageSquare, Image, Menu, Home } from "lucide-react";
+import { LogOut, Users, Calendar, Settings, Pin, MessageSquare, Image, Menu, Home, User } from "lucide-react";
 import icon from "@/assets/icon.png";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -41,7 +41,7 @@ const navItems = [
   { to: "/events", icon: Calendar, label: "Events" },
   { to: "/albums", icon: Image, label: "Albums" },
   { to: "/messages", icon: MessageSquare, label: "Messages" },
-  { to: "/settings", icon: Settings, label: "Settings" },
+  { to: "/profile", icon: User, label: "Profile" },
 ];
 
 export function CircleHeader({
