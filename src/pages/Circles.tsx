@@ -41,7 +41,7 @@ interface CircleMembership {
 
 const Circles = () => {
   const { user } = useAuth();
-  const { circles, isLoading: contextLoading, refetchCircles, profile } = useCircleContext();
+  const { circles, isLoading: contextLoading, refetchCircles, profile, setSelectedCircle: setContextCircle } = useCircleContext();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [pendingCount, setPendingCount] = useState(0);
@@ -503,7 +503,7 @@ const Circles = () => {
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12"><AvatarFallback className="bg-secondary text-foreground font-serif text-lg">{circle.name.charAt(0)}</AvatarFallback></Avatar>
                     <div>
-                      <CardTitle className="font-serif text-lg flex items-center gap-2">{circle.name}{isOwner(circle) && <Crown className="w-4 h-4 text-muted-foreground" />}</CardTitle>
+                      <CardTitle className="font-serif text-lg flex items-center gap-2"><button type="button" className="hover:underline cursor-pointer text-left" onClick={() => { setContextCircle(circle.id); navigate("/feed"); }}>{circle.name}</button>{isOwner(circle) && <Crown className="w-4 h-4 text-muted-foreground" />}</CardTitle>
                       <CardDescription>Created {new Date(circle.created_at).toLocaleDateString()}</CardDescription>
                     </div>
                   </div>

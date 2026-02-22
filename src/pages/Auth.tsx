@@ -26,7 +26,7 @@ const Auth = () => {
 
   useEffect(() => {
     if (!loading && user) {
-      navigate("/feed");
+      navigate("/circles");
     }
   }, [user, loading, navigate]);
 

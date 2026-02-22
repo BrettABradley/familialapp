@@ -52,7 +52,9 @@ function AppLayoutContent() {
           overrideLabel={isProfileRoute ? "All Circles" : undefined}
         />
       )}
-      <Outlet />
+      <main key={location.pathname} className="animate-page-fade-in">
+        <Outlet />
+      </main>
       <MobileNavigation />
     </div>
   );
