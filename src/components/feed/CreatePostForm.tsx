@@ -30,6 +30,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isPosting, setIsPosting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   // Persist draft text to sessionStorage
   useEffect(() => {
@@ -76,7 +77,9 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const uploadFiles = async (): Promise<string[]> => {
     if (!user || selectedFiles.length === 0) return [];
     const uploadedUrls: string[] = [];
-    for (const file of selectedFiles) {
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      setUploadProgress(Math.round(((i) / selectedFiles.length) * 100));
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
       const { error } = await supabase.storage.from("post-media").upload(fileName, file);
@@ -84,6 +87,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
       const { data } = supabase.storage.from("post-media").getPublicUrl(fileName);
       uploadedUrls.push(data.publicUrl);
     }
+    setUploadProgress(100);
     return uploadedUrls;
   };
 
@@ -112,6 +116,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
       toast({ title: "Posted!", description: "Your post has been shared with your circle." });
     }
     setIsPosting(false);
+    setUploadProgress(null);
   };
 
   const renderPreview = (url: string, index: number) => {
@@ -176,16 +181,30 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
             {previewUrls.map((url, index) => renderPreview(url, index))}
           </div>
         )}
+        {uploadProgress !== null && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+              <span>Uploading media...</span>
+              <span>{uploadProgress}%</span>
+            </div>
+            <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
+              <div
+                className="bg-primary h-2 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*" multiple onChange={handleFileSelect} className="hidden" />
-            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>
+            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isPosting}>
               <Paperclip className="w-4 h-4 mr-2" />Add Media
             </Button>
             <VoiceRecorder onRecordingComplete={handleVoiceRecording} />
           </div>
           <Button onClick={handleCreatePost} disabled={(!newPostContent.trim() && selectedFiles.length === 0) || isPosting}>
-            <Send className="w-4 h-4 mr-2" />{isPosting ? "Posting..." : "Share"}
+            <Send className="w-4 h-4 mr-2" />{isPosting ? "Uploading..." : "Share"}
           </Button>
         </div>
       </CardContent>

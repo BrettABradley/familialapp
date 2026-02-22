@@ -34,8 +34,19 @@ const MediaItem = ({ url, index, onDownload, onImageClick }: { url: string; inde
 
   if (mediaType === 'video') {
     return (
-      <div className="relative group rounded-lg overflow-hidden">
-        <video controls className="w-full rounded-lg max-h-[400px]" preload="metadata">
+      <div className="relative group rounded-lg overflow-hidden bg-secondary">
+        <video
+          controls
+          className="w-full rounded-lg max-h-[400px]"
+          preload="metadata"
+          playsInline
+          poster={`${url}#t=0.5`}
+          onLoadedData={(e) => {
+            const vid = e.currentTarget;
+            vid.style.opacity = '1';
+          }}
+          style={{ opacity: 0, transition: 'opacity 0.3s ease-in' }}
+        >
           <source src={url} />
         </video>
       </div>
