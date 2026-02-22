@@ -113,54 +113,76 @@ export function CircleHeader({
     setUnreadCount(0);
   };
 
-  const notifBell = (
-    <Popover open={bellOpen} onOpenChange={setBellOpen} modal={true}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="relative">
-          <Bell className="w-4 h-4" />
+  const notifContent = (
+    <>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <span className="font-serif font-semibold text-sm">Notifications</span>
+        <div className="flex gap-1">
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleMarkAllRead}>
+              <Check className="w-3 h-3 mr-1" />Mark read
+            </Button>
           )}
-        </Button>
+          {notifications.length > 0 && (
+            <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={handleClearAll}>
+              <Trash2 className="w-3 h-3 mr-1" />Clear all
+            </Button>
+          )}
+        </div>
+      </div>
+      <div className="max-h-72 overflow-y-auto">
+        {notifications.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">No notifications</p>
+        ) : (
+          notifications.map(n => (
+            <div key={n.id} className={`px-4 py-3 border-b border-border last:border-0 ${!n.is_read ? "bg-secondary/30" : ""}`}>
+              <p className={`text-sm ${!n.is_read ? "font-medium" : ""} text-foreground`}>{n.title}</p>
+              {n.message && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>}
+              <p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString()}</p>
+            </div>
+          ))
+        )}
+      </div>
+      {notifications.length > 0 && (
+        <div className="border-t border-border px-4 py-2">
+          <Link to="/notifications" onClick={() => setBellOpen(false)}>
+            <Button variant="ghost" size="sm" className="w-full text-xs">View all notifications</Button>
+          </Link>
+        </div>
+      )}
+    </>
+  );
+
+  const bellButton = (
+    <Button variant="ghost" size="sm" className="relative" onClick={() => setBellOpen(!bellOpen)}>
+      <Bell className="w-4 h-4" />
+      {unreadCount > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+          {unreadCount > 9 ? "9+" : unreadCount}
+        </span>
+      )}
+    </Button>
+  );
+
+  const notifBell = isMobile ? (
+    <Sheet open={bellOpen} onOpenChange={setBellOpen}>
+      <SheetTrigger asChild>
+        {bellButton}
+      </SheetTrigger>
+      <SheetContent side="top" className="p-0 rounded-b-lg">
+        <SheetHeader className="sr-only">
+          <SheetTitle>Notifications</SheetTitle>
+        </SheetHeader>
+        {notifContent}
+      </SheetContent>
+    </Sheet>
+  ) : (
+    <Popover open={bellOpen} onOpenChange={setBellOpen}>
+      <PopoverTrigger asChild>
+        {bellButton}
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <span className="font-serif font-semibold text-sm">Notifications</span>
-          <div className="flex gap-1">
-            {unreadCount > 0 && (
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleMarkAllRead}>
-                <Check className="w-3 h-3 mr-1" />Mark read
-              </Button>
-            )}
-            {notifications.length > 0 && (
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={handleClearAll}>
-                <Trash2 className="w-3 h-3 mr-1" />Clear all
-              </Button>
-            )}
-          </div>
-        </div>
-        <div className="max-h-72 overflow-y-auto">
-          {notifications.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">No notifications</p>
-          ) : (
-            notifications.map(n => (
-              <div key={n.id} className={`px-4 py-3 border-b border-border last:border-0 ${!n.is_read ? "bg-secondary/30" : ""}`}>
-                <p className={`text-sm ${!n.is_read ? "font-medium" : ""} text-foreground`}>{n.title}</p>
-                {n.message && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>}
-                <p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString()}</p>
-              </div>
-            ))
-          )}
-        </div>
-        {notifications.length > 0 && (
-          <div className="border-t border-border px-4 py-2">
-            <Link to="/notifications" onClick={() => setBellOpen(false)}>
-              <Button variant="ghost" size="sm" className="w-full text-xs">View all notifications</Button>
-            </Link>
-          </div>
-        )}
+        {notifContent}
       </PopoverContent>
     </Popover>
   );
