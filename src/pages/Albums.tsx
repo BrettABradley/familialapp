@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users, Camera, Pencil, Check } from "lucide-react";
+import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users, Camera, Pencil, Check, Download, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Circle {
   id: string;
@@ -455,22 +455,74 @@ const Albums = () => {
             </div>
           )}
 
-          {/* Enlarged photo dialog */}
+          {/* Enlarged photo dialog with navigation */}
           <Dialog open={!!enlargedPhoto} onOpenChange={(open) => !open && setEnlargedPhoto(null)}>
             <DialogContent className="max-w-3xl p-2 sm:p-4">
               <DialogTitle className="sr-only">{enlargedPhoto?.caption || "Photo"}</DialogTitle>
-              {enlargedPhoto && (
-                <div className="flex flex-col items-center">
-                  <img
-                    src={enlargedPhoto.photo_url}
-                    alt={enlargedPhoto.caption || "Photo"}
-                    className="max-h-[80vh] w-auto rounded-md object-contain"
-                  />
-                  {enlargedPhoto.caption && (
-                    <p className="mt-3 text-sm text-muted-foreground">{enlargedPhoto.caption}</p>
-                  )}
-                </div>
-              )}
+              {enlargedPhoto && (() => {
+                const currentIndex = photos.findIndex(p => p.id === enlargedPhoto.id);
+                return (
+                  <div className="flex flex-col items-center">
+                    <div className="relative group w-full flex items-center justify-center">
+                      {photos.length > 1 && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="absolute left-2 z-10 bg-background/80 hover:bg-background"
+                          disabled={currentIndex === 0}
+                          onClick={() => setEnlargedPhoto(photos[currentIndex - 1])}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <img
+                        src={enlargedPhoto.photo_url}
+                        alt={enlargedPhoto.caption || "Photo"}
+                        className="max-h-[80vh] w-auto rounded-md object-contain"
+                      />
+                      {photos.length > 1 && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="absolute right-2 z-10 bg-background/80 hover:bg-background"
+                          disabled={currentIndex === photos.length - 1}
+                          onClick={() => setEnlargedPhoto(photos[currentIndex + 1])}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-3">
+                      {photos.length > 1 && (
+                        <span className="text-sm text-muted-foreground">{currentIndex + 1} / {photos.length}</span>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const link = document.createElement("a");
+                          fetch(enlargedPhoto.photo_url)
+                            .then(r => r.blob())
+                            .then(blob => {
+                              link.href = URL.createObjectURL(blob);
+                              link.download = enlargedPhoto.photo_url.split("/").pop() || "photo.jpg";
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                              URL.revokeObjectURL(link.href);
+                            });
+                        }}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </Button>
+                    </div>
+                    {enlargedPhoto.caption && (
+                      <p className="mt-2 text-sm text-muted-foreground">{enlargedPhoto.caption}</p>
+                    )}
+                  </div>
+                );
+              })()}
             </DialogContent>
           </Dialog>
         </>

@@ -23,7 +23,7 @@ interface PostCardProps {
   onReaction: (postId: string) => void;
   onToggleComments: (postId: string) => void;
   onCommentInputChange: (postId: string, value: string) => void;
-  onSubmitComment: (postId: string) => void;
+  onSubmitComment: (postId: string, parentCommentId?: string) => void;
   onDownloadImage: (url: string) => void;
   onDelete?: (postId: string) => void;
   onEdit?: (postId: string, newContent: string) => Promise<void>;
@@ -106,6 +106,7 @@ export const PostCard = ({
   const [editContent, setEditContent] = useState(post.content || "");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
   const handleSaveEdit = async () => {
     if (!onEdit) return;
@@ -291,48 +292,95 @@ export const PostCard = ({
           </Button>
         </div>
 
-        {isExpanded && (
-          <div className="mt-4 pt-4 border-t border-border space-y-3">
-            {post.comments?.map((comment) => (
-              <div key={comment.id} className="flex gap-3">
-                <Link to={`/profile/${comment.author_id}`}>
-                  <Avatar className="h-8 w-8 cursor-pointer hover:opacity-80 transition-opacity">
-                    <AvatarImage src={comment.profiles?.avatar_url || undefined} />
-                    <AvatarFallback className="text-xs">{comment.profiles?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
-                  </Avatar>
+        {isExpanded && (() => {
+          const topLevelComments = post.comments?.filter(c => !(c as any).parent_comment_id) || [];
+          const replies = post.comments?.filter(c => (c as any).parent_comment_id) || [];
+          const getReplies = (commentId: string) => replies.filter(r => (r as any).parent_comment_id === commentId);
+
+          const renderComment = (comment: typeof topLevelComments[0], isReply = false) => (
+            <div key={comment.id} className={`flex gap-3 ${isReply ? "ml-10" : ""}`}>
+              <Link to={`/profile/${comment.author_id}`}>
+                <Avatar className={`${isReply ? "h-6 w-6" : "h-8 w-8"} cursor-pointer hover:opacity-80 transition-opacity`}>
+                  <AvatarImage src={comment.profiles?.avatar_url || undefined} />
+                  <AvatarFallback className="text-xs">{comment.profiles?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                </Avatar>
+              </Link>
+              <div className="flex-1 bg-secondary rounded-lg px-3 py-2">
+                <Link to={`/profile/${comment.author_id}`} className="text-sm font-medium text-foreground hover:underline">
+                  {comment.profiles?.display_name || "Unknown"}
                 </Link>
-                <div className="flex-1 bg-secondary rounded-lg px-3 py-2">
-                  <Link to={`/profile/${comment.author_id}`} className="text-sm font-medium text-foreground hover:underline">
-                    {comment.profiles?.display_name || "Unknown"}
-                  </Link>
-                  <p className="text-sm text-foreground">{comment.content}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{new Date(comment.created_at).toLocaleDateString()}</p>
+                <p className="text-sm text-foreground">{comment.content}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xs text-muted-foreground">{new Date(comment.created_at).toLocaleDateString()}</p>
+                  {!isReply && (
+                    <button
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                    >
+                      Reply
+                    </button>
+                  )}
                 </div>
               </div>
-            ))}
-            <div className="flex gap-2">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={profile?.avatar_url || undefined} />
-                <AvatarFallback className="text-xs">{profile?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Write a comment..."
-                  value={commentInput}
-                  onChange={(e) => onCommentInputChange(post.id, e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmitComment(post.id); }
-                  }}
-                  className="flex-1 bg-secondary rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-                <Button size="sm" onClick={() => onSubmitComment(post.id)} disabled={!commentInput?.trim() || isSubmittingComment} aria-label="Send comment">
-                  <Send className="w-4 h-4" />
-                </Button>
+            </div>
+          );
+
+          return (
+            <div className="mt-4 pt-4 border-t border-border space-y-3">
+              {topLevelComments.map((comment) => (
+                <div key={comment.id} className="space-y-2">
+                  {renderComment(comment)}
+                  {getReplies(comment.id).map(reply => renderComment(reply, true))}
+                  {replyingTo === comment.id && (
+                    <div className="flex gap-2 ml-10">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={profile?.avatar_url || undefined} />
+                        <AvatarFallback className="text-xs">{profile?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 flex gap-2">
+                        <input
+                          type="text"
+                          placeholder={`Reply to ${comment.profiles?.display_name || "Unknown"}...`}
+                          value={commentInput}
+                          onChange={(e) => onCommentInputChange(post.id, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmitComment(post.id, comment.id); setReplyingTo(null); }
+                          }}
+                          className="flex-1 bg-secondary rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                          autoFocus
+                        />
+                        <Button size="sm" onClick={() => { onSubmitComment(post.id, comment.id); setReplyingTo(null); }} disabled={!commentInput?.trim() || isSubmittingComment} aria-label="Send reply">
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarFallback className="text-xs">{profile?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Write a comment..."
+                    value={replyingTo ? "" : commentInput}
+                    onChange={(e) => { if (!replyingTo) onCommentInputChange(post.id, e.target.value); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey && !replyingTo) { e.preventDefault(); onSubmitComment(post.id); }
+                    }}
+                    className="flex-1 bg-secondary rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <Button size="sm" onClick={() => onSubmitComment(post.id)} disabled={!commentInput?.trim() || isSubmittingComment || !!replyingTo} aria-label="Send comment">
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </CardContent>
     </Card>
   );
