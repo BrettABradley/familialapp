@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +22,7 @@ interface Notification {
 
 const Notifications = () => {
   const { user } = useAuth();
-  const { isLoading: contextLoading } = useCircleContext();
+  const { isLoading: contextLoading, selectedCircle } = useCircleContext();
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
@@ -30,10 +31,10 @@ const Notifications = () => {
   const PAGE_SIZE = 50;
 
   useEffect(() => {
-    if (user) {
+    if (user && selectedCircle) {
       fetchNotifications();
     }
-  }, [user]);
+  }, [user, selectedCircle]);
 
   const fetchNotifications = async (reset = true) => {
     if (!user) return;
@@ -45,6 +46,7 @@ const Notifications = () => {
       .from("notifications")
       .select("*")
       .eq("user_id", user.id)
+      .eq("related_circle_id", selectedCircle)
       .order("created_at", { ascending: false })
       .limit(PAGE_SIZE);
 
@@ -224,9 +226,17 @@ const Notifications = () => {
                     {getNotificationIcon(notification.type)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-foreground ${!notification.is_read ? 'font-medium' : ''}`}>
-                      {notification.title}
-                    </p>
+                    {notification.link ? (
+                      <Link to={notification.link} className="hover:underline">
+                        <p className={`text-foreground ${!notification.is_read ? 'font-medium' : ''}`}>
+                          {notification.title}
+                        </p>
+                      </Link>
+                    ) : (
+                      <p className={`text-foreground ${!notification.is_read ? 'font-medium' : ''}`}>
+                        {notification.title}
+                      </p>
+                    )}
                     {notification.message && (
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                         {notification.message}

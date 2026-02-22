@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -61,18 +61,19 @@ export function CircleHeader({
   overrideLabel,
 }: CircleHeaderProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const currentCircle = circles.find((c) => c.id === selectedCircle);
   const isMobile = useIsMobile();
   const [sheetOpen, setSheetOpen] = useState(false);
 
   // Notification bell state
-  interface NotifItem { id: string; title: string; message: string | null; is_read: boolean; created_at: string; type: string; }
+  interface NotifItem { id: string; title: string; message: string | null; is_read: boolean; created_at: string; type: string; link: string | null; related_post_id: string | null; }
   const [notifications, setNotifications] = useState<NotifItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [bellOpen, setBellOpen] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !selectedCircle) return;
     fetchNotifications();
 
     const channel = supabase
@@ -83,14 +84,15 @@ export function CircleHeader({
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [user]);
+  }, [user, selectedCircle]);
 
   const fetchNotifications = async () => {
     if (!user) return;
     const { data } = await supabase
       .from("notifications")
-      .select("id, title, message, is_read, created_at, type")
+      .select("id, title, message, is_read, created_at, type, link, related_post_id")
       .eq("user_id", user.id)
+      .eq("related_circle_id", selectedCircle)
       .order("created_at", { ascending: false })
       .limit(20);
     if (data) {
@@ -101,9 +103,10 @@ export function CircleHeader({
 
   const handleClearAll = async () => {
     if (!user) return;
-    await supabase.from("notifications").delete().eq("user_id", user.id);
+    await supabase.from("notifications").delete().eq("user_id", user.id).eq("related_circle_id", selectedCircle);
     setNotifications([]);
     setUnreadCount(0);
+    setBellOpen(false);
   };
 
   const handleMarkAllRead = async () => {
@@ -134,13 +137,22 @@ export function CircleHeader({
         {notifications.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">No notifications</p>
         ) : (
-          notifications.map(n => (
-            <div key={n.id} className={`px-4 py-3 border-b border-border last:border-0 ${!n.is_read ? "bg-secondary/30" : ""}`}>
-              <p className={`text-sm ${!n.is_read ? "font-medium" : ""} text-foreground`}>{n.title}</p>
-              {n.message && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>}
-              <p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString()}</p>
-            </div>
-          ))
+          notifications.map(n => {
+            const inner = (
+              <div key={n.id} className={`px-4 py-3 border-b border-border last:border-0 cursor-pointer hover:bg-secondary/50 transition-colors ${!n.is_read ? "bg-secondary/30" : ""}`}>
+                <p className={`text-sm ${!n.is_read ? "font-medium" : ""} text-foreground`}>{n.title}</p>
+                {n.message && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>}
+                <p className="text-xs text-muted-foreground mt-1">{new Date(n.created_at).toLocaleDateString()}</p>
+              </div>
+            );
+            return n.link ? (
+              <Link key={n.id} to={n.link} onClick={() => setBellOpen(false)}>
+                {inner}
+              </Link>
+            ) : (
+              <div key={n.id}>{inner}</div>
+            );
+          })
         )}
       </div>
       {notifications.length > 0 && (

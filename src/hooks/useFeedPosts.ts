@@ -201,6 +201,8 @@ export const useFeedPosts = () => {
             message: `${displayName} replied: "${content.slice(0, 100)}"`,
             related_post_id: postId,
             related_user_id: user.id,
+            related_circle_id: post?.circle_id || null,
+            link: `/feed?post=${postId}`,
           }).then();
         }
       }
@@ -214,6 +216,8 @@ export const useFeedPosts = () => {
           message: `${displayName}: "${content.slice(0, 100)}"`,
           related_post_id: postId,
           related_user_id: user.id,
+          related_circle_id: post.circle_id,
+          link: `/feed?post=${postId}`,
         }).then();
       }
     }
