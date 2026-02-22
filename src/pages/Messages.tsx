@@ -12,7 +12,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Send, MessageSquare, Search, Users, Plus, UsersRound, Pencil, Camera } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, Search, Users, Plus, UsersRound, Pencil, Camera, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Profile {
   id: string;
@@ -85,6 +95,7 @@ const Messages = () => {
   const [isEditGroupOpen, setIsEditGroupOpen] = useState(false);
   const [editGroupName, setEditGroupName] = useState("");
   const [isUploadingGroupAvatar, setIsUploadingGroupAvatar] = useState(false);
+  const [isDeleteGroupOpen, setIsDeleteGroupOpen] = useState(false);
 
   useEffect(() => {
     if (user && selectedCircle) {
@@ -341,6 +352,22 @@ const Messages = () => {
     setIsUploadingGroupAvatar(false);
   };
 
+  const handleDeleteGroup = async () => {
+    if (!selectedGroup) return;
+    // Delete members, messages, then the group chat
+    await supabase.from("group_chat_messages").delete().eq("group_chat_id", selectedGroup.id);
+    await supabase.from("group_chat_members").delete().eq("group_chat_id", selectedGroup.id);
+    const { error } = await supabase.from("group_chats").delete().eq("id", selectedGroup.id);
+    if (error) {
+      toast({ title: "Error", description: "Failed to delete group chat.", variant: "destructive" });
+    } else {
+      setSelectedGroup(null);
+      setChatView("list");
+      setGroupChats(prev => prev.filter(g => g.id !== selectedGroup.id));
+      setIsDeleteGroupOpen(false);
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !user) return;
     setIsSending(true);
@@ -461,9 +488,26 @@ const Messages = () => {
             </div>
             <h2 className="font-serif text-xl font-bold text-foreground flex-1">{selectedGroup.name}</h2>
             {selectedGroup.created_by === user?.id && (
-              <Button variant="ghost" size="icon" onClick={handleEditGroup}><Pencil className="w-4 h-4" /></Button>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" onClick={handleEditGroup}><Pencil className="w-4 h-4" /></Button>
+                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setIsDeleteGroupOpen(true)}><Trash2 className="w-4 h-4" /></Button>
+              </div>
             )}
           </div>
+
+          {/* Delete Group Confirmation */}
+          <AlertDialog open={isDeleteGroupOpen} onOpenChange={setIsDeleteGroupOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Group Chat</AlertDialogTitle>
+                <AlertDialogDescription>This will permanently delete "{selectedGroup.name}" and all its messages. This cannot be undone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteGroup} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Edit Group Name Dialog */}
           <Dialog open={isEditGroupOpen} onOpenChange={setIsEditGroupOpen}>
