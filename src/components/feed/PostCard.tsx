@@ -34,6 +34,46 @@ interface PostCardProps {
 const VideoPlayer = ({ url }: { url: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [showPlaceholder, setShowPlaceholder] = useState(true);
+  const [thumbnail, setThumbnail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+
+    const handleSeeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 360;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          setThumbnail(canvas.toDataURL("image/jpeg", 0.7));
+        }
+      } catch {
+        // CORS or other error – fall back to no poster
+      }
+      video.removeEventListener("seeked", handleSeeked);
+      video.src = "";
+      video.load();
+    };
+
+    video.addEventListener("loadeddata", () => {
+      video.currentTime = 0.1;
+    });
+    video.addEventListener("seeked", handleSeeked);
+    video.addEventListener("error", () => {});
+    video.load();
+
+    return () => {
+      video.removeEventListener("seeked", handleSeeked);
+      video.src = "";
+    };
+  }, [url]);
 
   return (
     <div className="relative group rounded-lg overflow-hidden bg-secondary">
@@ -46,7 +86,7 @@ const VideoPlayer = ({ url }: { url: string }) => {
         className="w-full rounded-lg max-h-[400px]"
         preload="metadata"
         playsInline
-        poster={`${url}#t=0.5`}
+        {...(thumbnail ? { poster: thumbnail } : {})}
         onLoadedMetadata={() => setShowPlaceholder(false)}
       >
         <source src={url} type="video/mp4" />
