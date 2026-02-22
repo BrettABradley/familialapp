@@ -35,7 +35,18 @@ const CircleContext = createContext<CircleContextType | undefined>(undefined);
 export const CircleProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [circles, setCircles] = useState<Circle[]>([]);
-  const [selectedCircle, setSelectedCircle] = useState<string>("");
+  const [selectedCircle, setSelectedCircleState] = useState<string>(() => {
+    return localStorage.getItem("selectedCircle") || "";
+  });
+
+  const setSelectedCircle = (circleId: string) => {
+    setSelectedCircleState(circleId);
+    if (circleId) {
+      localStorage.setItem("selectedCircle", circleId);
+    } else {
+      localStorage.removeItem("selectedCircle");
+    }
+  };
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
