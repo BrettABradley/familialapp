@@ -280,11 +280,15 @@ const Messages = () => {
 
     await supabase.from("group_chat_members").insert(members);
 
-    toast({ title: "Group created!", description: `${newGroupName} is ready.` });
+    const newGroupName_ = newGroupName;
     setNewGroupName("");
     setSelectedMemberIds(new Set());
     setIsCreateGroupOpen(false);
-    fetchGroupChats();
+    await fetchGroupChats();
+
+    // Auto-open the newly created group chat
+    setSelectedGroup(group as GroupChat);
+    setChatView("group");
   };
 
   const handleSendMessage = async () => {
