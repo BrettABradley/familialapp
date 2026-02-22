@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { CircleProvider, useCircleContext } from "@/contexts/CircleContext";
 import { CircleHeader } from "@/components/layout/CircleHeader";
@@ -10,6 +10,9 @@ function AppLayoutContent() {
   const { user, loading: authLoading, signOut } = useAuth();
   const { circles, selectedCircle, setSelectedCircle, isLoading: circlesLoading } = useCircleContext();
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  const isProfileRoute = location.pathname.startsWith("/profile") || location.pathname === "/settings";
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -46,6 +49,7 @@ function AppLayoutContent() {
           selectedCircle={selectedCircle}
           onCircleChange={setSelectedCircle}
           onSignOut={handleSignOut}
+          overrideLabel={isProfileRoute ? "All Circles" : undefined}
         />
       )}
       <Outlet />

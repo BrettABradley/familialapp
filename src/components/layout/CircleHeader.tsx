@@ -32,6 +32,7 @@ interface CircleHeaderProps {
   onCircleChange: (circleId: string) => void;
   onSignOut: () => void;
   showNav?: boolean;
+  overrideLabel?: string;
 }
 
 const navItems = [
@@ -50,6 +51,7 @@ export function CircleHeader({
   onCircleChange,
   onSignOut,
   showNav = true,
+  overrideLabel,
 }: CircleHeaderProps) {
   const currentCircle = circles.find((c) => c.id === selectedCircle);
   const isMobile = useIsMobile();
@@ -63,7 +65,12 @@ export function CircleHeader({
             <img src={icon} alt="Familial" className="h-8 w-auto" />
             <span className="font-serif text-lg font-bold text-foreground">Familial</span>
           </Link>
-          {circles.length > 0 && (
+          {overrideLabel ? (
+            <>
+              <span className="text-muted-foreground text-lg">/</span>
+              <span className="font-medium text-foreground">{overrideLabel}</span>
+            </>
+          ) : circles.length > 0 && (
             <>
               <span className="text-muted-foreground text-lg">/</span>
               {circles.length === 1 ? (
