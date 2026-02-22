@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, MapPin, ImagePlus, Trash2 } from "lucide-react";
+import { Settings, MapPin, ImagePlus, Trash2, Play } from "lucide-react";
+import { getMediaType } from "@/lib/mediaUtils";
 
 interface ProfileData {
   user_id: string;
@@ -182,9 +183,9 @@ const ProfileView = () => {
               <>
                 <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                   <ImagePlus className="h-4 w-4 mr-2" />
-                  {isUploading ? "Uploading..." : "Add Photo"}
+                  {isUploading ? "Uploading..." : "Add Media"}
                 </Button>
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleUploadImage} className="hidden" />
+                <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleUploadImage} className="hidden" />
               </>
             )}
           </div>
@@ -192,19 +193,31 @@ const ProfileView = () => {
         <CardContent>
           {images.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">
-              {isOwnProfile ? "No photos yet. Add some to your profile!" : "No photos yet."}
+              {isOwnProfile ? "No photos or videos yet. Add some to your profile!" : "No photos or videos yet."}
             </p>
           ) : (
             <div className="grid grid-cols-3 gap-2">
-              {images.map((img) => (
-                <div
-                  key={img.id}
-                  className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => setEnlargedImage(img)}
-                >
-                  <img src={img.image_url} alt={img.caption || "Profile photo"} className="w-full h-full object-cover" />
-                </div>
-              ))}
+              {images.map((img) => {
+                const mediaType = getMediaType(img.image_url);
+                return (
+                  <div
+                    key={img.id}
+                    className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity relative"
+                    onClick={() => setEnlargedImage(img)}
+                  >
+                    {mediaType === 'video' ? (
+                      <>
+                        <video src={img.image_url} className="w-full h-full object-cover" muted preload="metadata" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <Play className="h-8 w-8 text-white fill-white" />
+                        </div>
+                      </>
+                    ) : (
+                      <img src={img.image_url} alt={img.caption || "Profile photo"} className="w-full h-full object-cover" />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -215,11 +228,20 @@ const ProfileView = () => {
         <DialogContent className="max-w-3xl p-2 bg-background/95">
           {enlargedImage && (
             <div className="flex flex-col items-center">
-              <img
-                src={enlargedImage.image_url}
-                alt={enlargedImage.caption || "Profile photo"}
-                className="max-h-[80vh] w-auto object-contain rounded-lg"
-              />
+              {getMediaType(enlargedImage.image_url) === 'video' ? (
+                <video
+                  src={enlargedImage.image_url}
+                  controls
+                  autoPlay
+                  className="max-h-[80vh] w-auto rounded-lg"
+                />
+              ) : (
+                <img
+                  src={enlargedImage.image_url}
+                  alt={enlargedImage.caption || "Profile photo"}
+                  className="max-h-[80vh] w-auto object-contain rounded-lg"
+                />
+              )}
               {enlargedImage.caption && (
                 <p className="mt-3 text-sm text-muted-foreground">{enlargedImage.caption}</p>
               )}
