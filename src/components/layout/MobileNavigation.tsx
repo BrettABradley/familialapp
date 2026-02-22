@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Pin, Calendar, MoreHorizontal, Settings, Users, Image, MessageSquare } from "lucide-react";
+import { Home, Pin, Calendar, MoreHorizontal, Settings, Users, Image, MessageSquare, User } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Sheet,
@@ -20,7 +20,7 @@ const navItems = [
 const moreItems = [
   { to: "/albums", icon: Image, label: "Albums" },
   { to: "/messages", icon: MessageSquare, label: "Messages" },
-  { to: "/settings", icon: Settings, label: "Settings" },
+  { to: "/profile", icon: User, label: "Profile" },
 ];
 
 export function MobileNavigation() {
