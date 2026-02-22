@@ -42,9 +42,10 @@ const VideoPlayer = ({ url }: { url: string }) => {
         ref={videoRef}
         controls
         className="w-full rounded-lg max-h-[400px]"
-        preload="auto"
+        preload="metadata"
         playsInline
-        onLoadedData={() => setShowPlaceholder(false)}
+        poster={`${url}#t=0.5`}
+        onLoadedMetadata={() => setShowPlaceholder(false)}
       >
         <source src={url} type="video/mp4" />
         <source src={url} type="video/quicktime" />
