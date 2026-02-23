@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, TreeDeciduous, Trash2, Users } from "lucide-react";
+import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 
 interface Circle {
   id: string;
@@ -38,7 +39,8 @@ interface FamilyMember {
 
 const FamilyTree = () => {
   const { user } = useAuth();
-  const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading } = useCircleContext();
+  const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
+  const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const circleIdParam = searchParams.get("circle");
@@ -237,6 +239,7 @@ const FamilyTree = () => {
 
   return (
     <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <ReadOnlyBanner circleId={selectedCircle} />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-serif text-3xl font-bold text-foreground flex items-center gap-3">
@@ -247,7 +250,7 @@ const FamilyTree = () => {
             Map out your family connections
           </p>
         </div>
-        {isAdmin && (
+        {isAdmin && !readOnly && (
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
               <Button>

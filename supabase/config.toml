@@ -26,3 +26,9 @@ verify_jwt = false
 
 [functions.downgrade-subscription]
 verify_jwt = false
+
+[functions.reactivate-subscription]
+verify_jwt = false
+
+[functions.cleanup-rescue-offers]
+verify_jwt = false
