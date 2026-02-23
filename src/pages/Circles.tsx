@@ -597,24 +597,27 @@ const Circles = () => {
                 {/* Member counter */}
                 {memberInfo[circle.id] && (
                   <div className="flex items-center justify-between mb-3">
-                    <Badge variant={getMemberBadgeVariant(circle.id)} className="text-xs">
-                      <Users className="w-3 h-3 mr-1" />
-                      {memberInfo[circle.id].count}/{memberInfo[circle.id].limit} members
-                    </Badge>
-                    {isOwner(circle) && memberInfo[circle.id].count >= memberInfo[circle.id].limit * 0.8 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => {
-                          const info = memberInfo[circle.id];
-                          setUpgradeInfo({ plan: info.plan, currentCount: info.count, limit: info.limit, circleId: circle.id });
-                          setUpgradeDialogOpen(true);
-                        }}
-                      >
-                        <ArrowUp className="w-3 h-3 mr-1" />Upgrade
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <Badge variant={getMemberBadgeVariant(circle.id)} className="text-xs">
+                        <Users className="w-3 h-3 mr-1" />
+                        {memberInfo[circle.id].count}/{memberInfo[circle.id].limit} members
+                      </Badge>
+                      {isOwner(circle) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          title="Upgrade or add members"
+                          onClick={() => {
+                            const info = memberInfo[circle.id];
+                            setUpgradeInfo({ plan: info.plan, currentCount: info.count, limit: info.limit, circleId: circle.id });
+                            setUpgradeDialogOpen(true);
+                          }}
+                        >
+                          <ArrowUp className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                        </Button>
+                      )}
+                    </div>
                     {!isOwner(circle) && memberInfo[circle.id].count >= memberInfo[circle.id].limit * 0.8 && (
                       <Button
                         variant="outline"
