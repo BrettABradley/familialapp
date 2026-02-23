@@ -156,6 +156,7 @@ serve(async (req) => {
       .from("user_plans")
       .update({
         cancel_at_period_end: true,
+        pending_plan: null,
         current_period_end: periodEnd,
         updated_at: new Date().toISOString(),
       })

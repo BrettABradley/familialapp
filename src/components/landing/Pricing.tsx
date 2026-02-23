@@ -311,6 +311,7 @@ const Pricing = () => {
         if (error) throw error;
         if (data?.success) {
           setCancelAtPeriodEnd(true);
+          setPendingPlan(null);
           setCurrentPeriodEnd(data.current_period_end);
           toast({
             title: "Subscription canceled",
