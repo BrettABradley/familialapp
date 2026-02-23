@@ -167,6 +167,47 @@ export type Database = {
           },
         ]
       }
+      circle_transfer_requests: {
+        Row: {
+          circle_id: string
+          created_at: string
+          from_user_id: string
+          id: string
+          leave_after_transfer: boolean
+          resolved_at: string | null
+          status: string
+          to_user_id: string
+        }
+        Insert: {
+          circle_id: string
+          created_at?: string
+          from_user_id: string
+          id?: string
+          leave_after_transfer?: boolean
+          resolved_at?: string | null
+          status?: string
+          to_user_id: string
+        }
+        Update: {
+          circle_id?: string
+          created_at?: string
+          from_user_id?: string
+          id?: string
+          leave_after_transfer?: boolean
+          resolved_at?: string | null
+          status?: string
+          to_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "circle_transfer_requests_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       circles: {
         Row: {
           avatar_url: string | null
@@ -177,6 +218,7 @@ export type Database = {
           invite_code: string
           name: string
           owner_id: string
+          transfer_block: boolean
           updated_at: string
         }
         Insert: {
@@ -188,6 +230,7 @@ export type Database = {
           invite_code?: string
           name: string
           owner_id: string
+          transfer_block?: boolean
           updated_at?: string
         }
         Update: {
@@ -199,6 +242,7 @@ export type Database = {
           invite_code?: string
           name?: string
           owner_id?: string
+          transfer_block?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -1048,6 +1092,10 @@ export type Database = {
     }
     Functions: {
       can_create_circle: { Args: { _user_id: string }; Returns: boolean }
+      claim_circle_ownership: {
+        Args: { _circle_id: string }
+        Returns: undefined
+      }
       get_circle_count: { Args: never; Returns: number }
       get_circle_limit: { Args: never; Returns: number }
       has_circle_role: {

@@ -5,6 +5,7 @@ import { CircleProvider, useCircleContext } from "@/contexts/CircleContext";
 import { CircleHeader } from "@/components/layout/CircleHeader";
 import { CircleHeaderSkeleton } from "@/components/layout/CircleHeaderSkeleton";
 import { MobileNavigation } from "@/components/layout/MobileNavigation";
+import TransferBlockBanner from "@/components/circles/TransferBlockBanner";
 
 function AppLayoutContent() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -53,6 +54,9 @@ function AppLayoutContent() {
         />
       )}
       <main key={location.pathname} className="animate-page-fade-in">
+        <div className="container mx-auto px-4 mt-4">
+          <TransferBlockBanner />
+        </div>
         <Outlet />
       </main>
       <MobileNavigation />
