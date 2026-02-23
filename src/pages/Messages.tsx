@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Send, MessageSquare, Search, Users, Plus, UsersRound, Pencil, Camera, Trash2 } from "lucide-react";
+import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,7 +68,8 @@ type ChatView = "list" | "dm" | "group";
 
 const Messages = () => {
   const { user } = useAuth();
-  const { circles, selectedCircle, isLoading: contextLoading } = useCircleContext();
+  const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
+  const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -471,10 +473,14 @@ const Messages = () => {
             )}
             <div ref={messagesEndRef} />
           </div>
-          <div className="flex gap-2">
-            <Input placeholder="Type a message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} maxLength={5000} />
-            <Button onClick={handleSendMessage} disabled={!newMessage.trim() || isSending}><Send className="w-4 h-4" /></Button>
-          </div>
+          {readOnly ? (
+            <p className="text-sm text-muted-foreground text-center py-2">This circle is read-only. Messaging is disabled.</p>
+          ) : (
+            <div className="flex gap-2">
+              <Input placeholder="Type a message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} maxLength={5000} />
+              <Button onClick={handleSendMessage} disabled={!newMessage.trim() || isSending}><Send className="w-4 h-4" /></Button>
+            </div>
+          )}
         </div>
       </main>
     );
@@ -556,10 +562,14 @@ const Messages = () => {
             )}
             <div ref={messagesEndRef} />
           </div>
-          <div className="flex gap-2">
-            <Input placeholder="Type a message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} maxLength={5000} />
-            <Button onClick={handleSendMessage} disabled={!newMessage.trim() || isSending}><Send className="w-4 h-4" /></Button>
-          </div>
+          {readOnly ? (
+            <p className="text-sm text-muted-foreground text-center py-2">This circle is read-only. Messaging is disabled.</p>
+          ) : (
+            <div className="flex gap-2">
+              <Input placeholder="Type a message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} maxLength={5000} />
+              <Button onClick={handleSendMessage} disabled={!newMessage.trim() || isSending}><Send className="w-4 h-4" /></Button>
+            </div>
+          )}
         </div>
       </main>
     );
@@ -568,6 +578,7 @@ const Messages = () => {
   // Conversations List
   return (
     <main className="container mx-auto px-4 py-8 max-w-2xl">
+      <ReadOnlyBanner circleId={selectedCircle} />
       <div className="mb-8">
         <h1 className="font-serif text-3xl font-bold text-foreground flex items-center gap-3">
           <MessageSquare className="w-8 h-8" />
@@ -590,7 +601,7 @@ const Messages = () => {
               />
               <Dialog open={isCreateGroupOpen} onOpenChange={setIsCreateGroupOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" title="Create group chat"><UsersRound className="w-4 h-4" /></Button>
+                  <Button variant="outline" title="Create group chat" disabled={readOnly}><UsersRound className="w-4 h-4" /></Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { CreditCard, ExternalLink, Loader2 } from "lucide-react";
+import { CreditCard, ExternalLink, Loader2, RotateCcw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,11 +38,13 @@ const PLAN_LIMITS: Record<string, number> = { free: 1, family: 2, extended: 3 };
 const SubscriptionCard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [planData, setPlanData] = useState<UserPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [portalLoading, setPortalLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [downgradeLoading, setDowngradeLoading] = useState(false);
+  const [reactivateLoading, setReactivateLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; action: "cancel" | "downgrade" } | null>(null);
   const [affectedCircles, setAffectedCircles] = useState<OwnedCircle[]>([]);
 
@@ -188,6 +191,22 @@ const SubscriptionCard = () => {
     }
   };
 
+  const handleReactivate = async () => {
+    setReactivateLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("reactivate-subscription");
+      if (error) throw error;
+      if (data?.success) {
+        setPlanData((prev) => prev ? { ...prev, cancel_at_period_end: false, pending_plan: null, current_period_end: data.current_period_end } : prev);
+        toast({ title: "Subscription reactivated!", description: "Your plan will continue as normal." });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to reactivate.", variant: "destructive" });
+    } finally {
+      setReactivateLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -256,9 +275,22 @@ const SubscriptionCard = () => {
               </Button>
             )}
 
+            {isPaid && planData.cancel_at_period_end && (
+              <Button variant="default" onClick={handleReactivate} disabled={reactivateLoading} className="w-full">
+                {reactivateLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RotateCcw className="w-4 h-4 mr-2" />}
+                Reactivate Subscription
+              </Button>
+            )}
+
             {isPaid && !planData.cancel_at_period_end && (
               <Button variant="outline" onClick={() => openConfirmDialog("cancel")} disabled={cancelLoading} className="w-full text-destructive hover:text-destructive">
                 Cancel Membership
+              </Button>
+            )}
+
+            {!isPaid && !isAdmin && (
+              <Button onClick={() => navigate("/#pricing")} className="w-full">
+                Upgrade Plan
               </Button>
             )}
           </div>
