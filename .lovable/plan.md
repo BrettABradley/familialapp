@@ -1,27 +1,36 @@
 
 
-## Show Fridge Pin Description on the Board
+## Make Event Addresses Clickable with Maps Links
 
-### Problem
-When users add a description/content to a fridge pin, it gets saved to the database but is never displayed on the board. The `FridgeBoardPin` interface doesn't even include the `content` field.
+### What Changes
 
-### Solution
-Display the content below the title on each polaroid card, making the card slightly taller when content is present. Also enforce a 150-character limit on the content input.
+When an event has a location/address, it will become a tappable link. Tapping it opens a small menu letting the user choose between **Apple Maps** or **Google Maps**, which then opens the selected maps app/website with the address pre-filled.
+
+### How It Works
+
+- The location text in each event card becomes a clickable button styled as a link
+- Clicking it opens a small popover with two options:
+  - **Apple Maps** -- opens `https://maps.apple.com/?q={address}`
+  - **Google Maps** -- opens `https://www.google.com/maps/search/?api=1&query={address}`
+- Both open in a new tab; on mobile devices, they'll automatically open the respective maps app if installed
+- No user preference is stored -- the user simply picks each time they tap (keeps it simple and avoids needing database changes)
 
 ### Changes
 
-**1. `src/components/fridge/FridgeBoard.tsx`**
-- Add `content: string | null` to the `FridgeBoardPin` interface
-- On each polaroid card: when `pin.content` exists, remove the fixed `aspect-square` on the image/note area and add the description text below the title in the caption area
-- Make the bottom padding (`pb-6`) dynamic -- use `pb-10` or similar when content exists so there's room for both title and description
-- In the enlarged pin dialog: also show `enlargedPin.content` below the title
+**`src/pages/Events.tsx`**
 
-**2. `src/pages/Fridge.tsx`**
-- Change the content `Textarea` maxLength from 1000 to 150
-- Update the label to indicate the limit: "Description (optional, max 150 chars)"
+In the `renderEventCard` function (lines 501-505), replace the plain location text with a `Popover` component:
+- The trigger is the location text styled as a clickable link (underline, pointer cursor)
+- The popover content shows two buttons: "Open in Apple Maps" and "Open in Google Maps"
+- Each button opens the appropriate URL with the address URI-encoded
 
-### Visual Behavior
-- Pins without content: unchanged (square image, title only at bottom)
-- Pins with content: polaroid frame is slightly taller, description appears in a second line below the title in a smaller font, truncated with ellipsis if needed
-- Enlarged view: full content shown below the title
+The same treatment applies to the edit dialog preview -- but since the edit dialog doesn't show a rendered card, no changes needed there.
+
+### Technical Details
+
+The URL formats:
+- Apple Maps: `https://maps.apple.com/?q=${encodeURIComponent(location)}`
+- Google Maps: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`
+
+Uses the existing `Popover`, `PopoverTrigger`, `PopoverContent` components already imported in the file. No new dependencies needed.
 
