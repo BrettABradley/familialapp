@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Paperclip, X } from "lucide-react";
+import { Send, Paperclip, X, Trash2 } from "lucide-react";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import { validateFileSize, getFileMediaType } from "@/lib/mediaUtils";
 
@@ -22,20 +22,14 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const DRAFT_KEY = "familial_post_draft";
+  
 
-  const [newPostContent, setNewPostContent] = useState(() => {
-    try { return sessionStorage.getItem(DRAFT_KEY) || ""; } catch { return ""; }
-  });
+  const [newPostContent, setNewPostContent] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isPosting, setIsPosting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
-  // Persist draft text to sessionStorage
-  useEffect(() => {
-    try { sessionStorage.setItem(DRAFT_KEY, newPostContent); } catch { /* ignore */ }
-  }, [newPostContent]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -108,7 +102,6 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
       toast({ title: "Error", description: "Failed to create post.", variant: "destructive" });
     } else {
       setNewPostContent("");
-      try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
       setSelectedFiles([]);
       previewUrls.forEach(url => URL.revokeObjectURL(url));
       setPreviewUrls([]);
@@ -236,6 +229,22 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
               <Paperclip className="w-4 h-4 mr-2" />Add Media
             </Button>
             <VoiceRecorder onRecordingComplete={handleVoiceRecording} />
+            {(newPostContent.trim() || selectedFiles.length > 0) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => {
+                  setNewPostContent("");
+                  previewUrls.forEach(url => URL.revokeObjectURL(url));
+                  setSelectedFiles([]);
+                  setPreviewUrls([]);
+                }}
+                disabled={isPosting}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />Discard
+              </Button>
+            )}
           </div>
           <Button onClick={handleCreatePost} disabled={(!newPostContent.trim() && selectedFiles.length === 0) || isPosting}>
             <Send className="w-4 h-4 mr-2" />{isPosting ? "Uploading..." : "Share"}
