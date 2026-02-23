@@ -17,6 +17,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound, ArrowRightLeft, LogOut, ArrowUp } from "lucide-react";
+// Note: ArrowRightLeft kept for delete dialog transfer block suggestion
 import { Badge } from "@/components/ui/badge";
 import PendingInvites from "@/components/circles/PendingInvites";
 import UpgradePlanDialog from "@/components/circles/UpgradePlanDialog";
@@ -73,9 +74,7 @@ const Circles = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
   const [upgradeInfo, setUpgradeInfo] = useState<{ plan: string; currentCount: number; limit: number; circleId: string }>({ plan: "free", currentCount: 0, limit: 8, circleId: "" });
-  const [isTransferOpen, setIsTransferOpen] = useState(false);
-  const [isTransferring, setIsTransferring] = useState(false);
-  const [isLeaveTransferOpen, setIsLeaveTransferOpen] = useState(false);
+  // Transfer ownership states removed — only transfer block is used now
   const [circleCount, setCircleCount] = useState(0);
   const [circleLimit, setCircleLimit] = useState(3);
   const [memberInfo, setMemberInfo] = useState<Record<string, { count: number; limit: number; plan: string }>>({});
@@ -85,7 +84,7 @@ const Circles = () => {
   const [deleteConfirmStep, setDeleteConfirmStep] = useState<1 | 2>(1);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteMemberCount, setDeleteMemberCount] = useState<number | null>(null);
-  const [memberPlans, setMemberPlans] = useState<Record<string, { plan: string; owned: number; max: number }>>({});
+  // memberPlans state removed — was only used for transfer ownership dialogs
 
   // Handle ?rescue= query param
   useEffect(() => {
@@ -229,25 +228,6 @@ const Circles = () => {
 
     if (data) {
       setMemberships(data as unknown as CircleMembership[]);
-      // Fetch plan capacity for each member (excluding current user)
-      const otherMembers = (data as unknown as CircleMembership[]).filter(m => m.user_id !== user?.id);
-      if (otherMembers.length > 0) {
-        const plans: Record<string, { plan: string; owned: number; max: number }> = {};
-        await Promise.all(
-          otherMembers.map(async (m) => {
-            const [planRes, ownedRes] = await Promise.all([
-              supabase.from("user_plans").select("plan, max_circles").eq("user_id", m.user_id).maybeSingle(),
-              supabase.from("circles").select("id", { count: "exact", head: true }).eq("owner_id", m.user_id),
-            ]);
-            plans[m.user_id] = {
-              plan: planRes.data?.plan ?? "free",
-              max: planRes.data?.max_circles ?? 1,
-              owned: ownedRes.count ?? 0,
-            };
-          })
-        );
-        setMemberPlans(plans);
-      }
     }
   };
 
@@ -508,10 +488,8 @@ const Circles = () => {
         return;
       }
 
-      // Owner needs to transfer ownership first
-      setSelectedCircle(circle);
-      await fetchMemberships(circle.id);
-      setIsLeaveTransferOpen(true);
+      // Owner needs to put circle on transfer block first
+      handleTransferBlock(circle);
       return;
     }
 
@@ -531,78 +509,9 @@ const Circles = () => {
     }
   };
 
-  const handleTransferAndLeave = async (newOwnerId: string) => {
-    if (!selectedCircle || !user) return;
-    setIsTransferring(true);
-
-    const memberName = memberships.find(m => m.user_id === newOwnerId)?.profiles?.display_name || "a member";
-
-    // Create transfer request instead of instant transfer
-    const { error: reqError } = await supabase.from("circle_transfer_requests").insert({
-      circle_id: selectedCircle.id,
-      from_user_id: user.id,
-      to_user_id: newOwnerId,
-      leave_after_transfer: true,
-    });
-
-    if (reqError) {
-      toast({ title: "Error", description: reqError.message || "Failed to send transfer request.", variant: "destructive" });
-      setIsTransferring(false);
-      return;
-    }
-
-    // Notify the recipient
-    await supabase.from("notifications").insert({
-      user_id: newOwnerId,
-      type: "transfer_request",
-      title: "Ownership Transfer Request",
-      message: `${profile?.display_name || "Someone"} wants to transfer ownership of "${selectedCircle.name}" to you.`,
-      related_circle_id: selectedCircle.id,
-      related_user_id: user.id,
-    });
-
-    toast({ title: "Transfer request sent!", description: `${memberName} will be notified. They need to accept the transfer.` });
-    setIsLeaveTransferOpen(false);
-    setIsTransferring(false);
-  };
-
   const isOwner = (circle: Circle) => circle.owner_id === user?.id;
 
-  const handleTransferOwnership = async (newOwnerId: string) => {
-    if (!selectedCircle || !user) return;
-    setIsTransferring(true);
-
-    const memberName = memberships.find(m => m.user_id === newOwnerId)?.profiles?.display_name || "a member";
-
-    // Create transfer request instead of instant transfer
-    const { error: reqError } = await supabase.from("circle_transfer_requests").insert({
-      circle_id: selectedCircle.id,
-      from_user_id: user.id,
-      to_user_id: newOwnerId,
-      leave_after_transfer: false,
-    });
-
-    if (reqError) {
-      toast({ title: "Error", description: reqError.message || "Failed to send transfer request.", variant: "destructive" });
-      setIsTransferring(false);
-      return;
-    }
-
-    // Notify the recipient
-    await supabase.from("notifications").insert({
-      user_id: newOwnerId,
-      type: "transfer_request",
-      title: "Ownership Transfer Request",
-      message: `${profile?.display_name || "Someone"} wants to transfer ownership of "${selectedCircle.name}" to you.`,
-      related_circle_id: selectedCircle.id,
-      related_user_id: user.id,
-    });
-
-    toast({ title: "Transfer request sent!", description: `${memberName} will be notified. They need to accept the transfer.` });
-    setIsTransferOpen(false);
-    setIsMembersOpen(false);
-    setIsTransferring(false);
-  };
+  // handleTransferAndLeave and handleTransferOwnership removed — only transfer block is used now
 
   const handleTransferBlock = async (circle: Circle) => {
     if (!user || !circle) return;
@@ -884,112 +793,18 @@ const Circles = () => {
               ))
             )}
           </div>
-          {selectedCircle && isOwner(selectedCircle) && memberships.length > 0 && (
+          {selectedCircle && isOwner(selectedCircle) && memberships.filter(m => m.user_id !== user?.id).length > 0 && (
             <div className="mt-4 pt-4 border-t border-border">
-              <Button variant="outline" className="w-full" onClick={() => setIsTransferOpen(true)}>
-                <ArrowRightLeft className="w-4 h-4 mr-2" />Transfer Ownership
+              <Button variant="outline" className="w-full" onClick={() => { setIsMembersOpen(false); handleTransferBlock(selectedCircle); }}>
+                <ArrowRightLeft className="w-4 h-4 mr-2" />Put on Transfer Block
               </Button>
+              <p className="text-xs text-muted-foreground mt-2 text-center">Let any member claim ownership of this circle.</p>
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Transfer Ownership Dialog */}
-      <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-serif">Transfer Ownership of {selectedCircle?.name}</DialogTitle>
-            <DialogDescription>Select a member to request ownership transfer. They will need to accept.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 mt-4 max-h-96 overflow-y-auto">
-            {memberships.filter(m => m.user_id !== user?.id).map((member) => {
-              const mp = memberPlans[member.user_id];
-              const available = mp ? mp.max - mp.owned : null;
-              return (
-              <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border border-border">
-                <Avatar className="h-10 w-10"><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
-                <div className="flex-1">
-                  <p className="font-medium text-foreground">{member.profiles?.display_name || "Unknown"}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
-                  {mp ? (
-                    <p className={`text-xs mt-0.5 ${available !== null && available > 0 ? "text-muted-foreground" : "text-destructive"}`}>
-                      {mp.plan.charAt(0).toUpperCase() + mp.plan.slice(1)} plan — {available !== null && available > 0 ? `${available} of ${mp.max} circles available` : `0 of ${mp.max} circles available`}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground mt-0.5">No plan info</p>
-                  )}
-                </div>
-                <Button size="sm" variant="outline" onClick={() => handleTransferOwnership(member.user_id)} disabled={isTransferring}>
-                  <Crown className="w-4 h-4 mr-1" />Request
-                </Button>
-              </div>
-              );
-            })}
-            {memberships.filter(m => m.user_id !== user?.id).length === 0 && (
-              <p className="text-muted-foreground text-center py-4">No other members to transfer to</p>
-            )}
-          </div>
-          {selectedCircle && memberships.filter(m => m.user_id !== user?.id).length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <Button variant="secondary" className="w-full" onClick={() => { setIsTransferOpen(false); handleTransferBlock(selectedCircle); }}>
-                Put on Transfer Block
-              </Button>
-              <p className="text-xs text-muted-foreground mt-2 text-center">Let any member claim ownership instead of picking one.</p>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Transfer & Leave Dialog (for owners leaving) */}
-      <Dialog open={isLeaveTransferOpen} onOpenChange={setIsLeaveTransferOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-serif">Transfer Ownership to Leave</DialogTitle>
-            <DialogDescription>
-              As the owner of "{selectedCircle?.name}", you must transfer ownership to another member before leaving. They will need to accept the transfer.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 mt-4 max-h-96 overflow-y-auto">
-            {memberships.filter(m => m.user_id !== user?.id).map((member) => {
-              const mp = memberPlans[member.user_id];
-              const available = mp ? mp.max - mp.owned : null;
-              return (
-              <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border border-border">
-                <Avatar className="h-10 w-10"><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
-                <div className="flex-1">
-                  <p className="font-medium text-foreground">{member.profiles?.display_name || "Unknown"}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
-                  {mp ? (
-                    <p className={`text-xs mt-0.5 ${available !== null && available > 0 ? "text-muted-foreground" : "text-destructive"}`}>
-                      {mp.plan.charAt(0).toUpperCase() + mp.plan.slice(1)} plan — {available !== null && available > 0 ? `${available} of ${mp.max} circles available` : `0 of ${mp.max} circles available`}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground mt-0.5">No plan info</p>
-                  )}
-                </div>
-                <Button size="sm" variant="outline" onClick={() => handleTransferAndLeave(member.user_id)} disabled={isTransferring}>
-                  <Crown className="w-4 h-4 mr-1" />Request & Leave
-                </Button>
-              </div>
-              );
-            })}
-            {memberships.filter(m => m.user_id !== user?.id).length === 0 && (
-              <div className="text-center py-4">
-                <p className="text-muted-foreground mb-2">No other members to transfer ownership to.</p>
-                <p className="text-sm text-muted-foreground">You can delete the circle instead, or invite someone first.</p>
-              </div>
-            )}
-          </div>
-          {selectedCircle && memberships.filter(m => m.user_id !== user?.id).length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <Button variant="secondary" className="w-full" onClick={() => { setIsLeaveTransferOpen(false); handleTransferBlock(selectedCircle); }}>
-                Put on Transfer Block
-              </Button>
-              <p className="text-xs text-muted-foreground mt-2 text-center">Let any member claim ownership instead.</p>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Transfer Ownership and Transfer & Leave dialogs removed — only transfer block is used now */}
 
       {/* Delete Circle Confirmation Dialog */}
       <AlertDialog open={isDeleteOpen} onOpenChange={(open) => { if (!open) { setIsDeleteOpen(false); setDeleteTarget(null); setDeleteConfirmStep(1); setDeleteMemberCount(null); } }}>

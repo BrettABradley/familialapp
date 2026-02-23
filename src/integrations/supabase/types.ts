@@ -1122,10 +1122,6 @@ export type Database = {
         Args: { _other_user_id: string; _user_id: string }
         Returns: boolean
       }
-      transfer_circle_ownership: {
-        Args: { _circle_id: string; _new_owner_id: string }
-        Returns: undefined
-      }
     }
     Enums: {
       app_role: "admin" | "member"

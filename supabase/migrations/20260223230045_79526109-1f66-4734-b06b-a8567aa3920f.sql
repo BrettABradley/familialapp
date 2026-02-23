@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS transfer_circle_ownership(uuid, uuid);
