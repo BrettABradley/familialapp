@@ -134,6 +134,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           description: string | null
+          extra_members: number
           id: string
           invite_code: string
           name: string
@@ -144,6 +145,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           description?: string | null
+          extra_members?: number
           id?: string
           invite_code?: string
           name: string
@@ -154,6 +156,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           description?: string | null
+          extra_members?: number
           id?: string
           invite_code?: string
           name?: string

@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,11 @@ import logo from "@/assets/logo.png";
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
 
+const PLAN_PRICES: Record<string, { priceId: string; mode: "subscription" }> = {
+  family: { priceId: "price_1T3N5bCiWDzualH5Cf7G7VsM", mode: "subscription" },
+  extended: { priceId: "price_1T3N5nCiWDzualH5SBHxbHqo", mode: "subscription" },
+};
+
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -21,16 +26,37 @@ const Auth = () => {
   const [displayName, setDisplayName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  
+  const checkoutTriggered = useRef(false);
+
   const { signIn, signUp, user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const planParam = searchParams.get("plan");
 
+  // After login, if there's a plan param, trigger checkout
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && planParam && PLAN_PRICES[planParam] && !checkoutTriggered.current) {
+      checkoutTriggered.current = true;
+      const { priceId, mode } = PLAN_PRICES[planParam];
+      
+      supabase.functions.invoke("create-checkout", {
+        body: { priceId, mode },
+      }).then(({ data, error }) => {
+        if (error || !data?.url) {
+          toast({ title: "Checkout error", description: "Could not start checkout. Please try again from your circles page.", variant: "destructive" });
+          navigate("/circles");
+        } else {
+          window.location.href = data.url;
+        }
+      });
+      return; // Don't navigate to /circles yet
+    }
+
+    if (!loading && user && !planParam) {
       navigate("/circles");
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, planParam, toast]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -160,6 +186,11 @@ const Auth = () => {
               ? "Sign in to connect with your family"
               : "Create an account to start your family circle"}
           </CardDescription>
+          {planParam && PLAN_PRICES[planParam] && (
+            <p className="text-sm text-primary mt-2">
+              {isLogin ? "Sign in" : "Sign up"} to continue with the {planParam.charAt(0).toUpperCase() + planParam.slice(1)} plan purchase
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           {isForgotPassword ? (

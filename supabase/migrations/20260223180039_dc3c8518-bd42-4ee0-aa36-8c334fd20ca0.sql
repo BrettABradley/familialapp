@@ -1,0 +1,1 @@
+ALTER TABLE public.circles ADD COLUMN extra_members integer NOT NULL DEFAULT 0;

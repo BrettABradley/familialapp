@@ -1,7 +1,16 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Phone, ArrowRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Check, Phone, ArrowRight, Loader2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
+const PRICES = {
+  family: "price_1T3N5bCiWDzualH5Cf7G7VsM",
+  extended: "price_1T3N5nCiWDzualH5SBHxbHqo",
+};
 
 const tiers = [
   {
@@ -16,9 +25,11 @@ const tiers = [
       "Basic circle management",
       "Mobile & web access",
       "No ads, ever",
+      "Need more? Add 7 members for $5",
     ],
     cta: "Get Started Free",
     popular: false,
+    plan: "free",
   },
   {
     name: "Family",
@@ -32,9 +43,11 @@ const tiers = [
       "Photo albums",
       "Priority support",
       "Advanced privacy controls",
+      "Need more? Add 7 members for $5",
     ],
     cta: "Buy Now",
     popular: true,
+    plan: "family",
   },
   {
     name: "Extended",
@@ -52,10 +65,48 @@ const tiers = [
     ],
     cta: "Buy Now",
     popular: false,
+    plan: "extended",
   },
 ];
 
 const Pricing = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
+  const handleBuyNow = async (plan: string) => {
+    if (plan === "free") {
+      navigate("/auth");
+      return;
+    }
+
+    if (!user) {
+      // Not logged in — redirect to auth with plan param
+      navigate(`/auth?plan=${plan}`);
+      return;
+    }
+
+    // Logged in — directly trigger checkout
+    const priceId = PRICES[plan as keyof typeof PRICES];
+    if (!priceId) return;
+
+    setLoadingPlan(plan);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: { priceId, mode: "subscription" },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
   return (
     <section id="pricing" className="py-20 md:py-32 bg-background">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -99,16 +150,21 @@ const Pricing = () => {
                     </li>
                   ))}
                 </ul>
-                <Link to="/auth" className="block pt-4">
-                  <Button 
-                    variant={tier.popular ? "default" : "outline"} 
+                <div className="pt-4">
+                  <Button
+                    variant={tier.popular ? "default" : "outline"}
                     className="w-full"
                     size="lg"
+                    onClick={() => handleBuyNow(tier.plan)}
+                    disabled={loadingPlan !== null}
                   >
+                    {loadingPlan === tier.plan ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : null}
                     {tier.cta}
-                    <ArrowRight className="w-4 h-4" />
+                    {loadingPlan !== tier.plan && <ArrowRight className="w-4 h-4 ml-2" />}
                   </Button>
-                </Link>
+                </div>
               </CardContent>
             </Card>
           ))}

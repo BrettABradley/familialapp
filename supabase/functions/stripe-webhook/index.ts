@@ -30,7 +30,6 @@ serve(async (req) => {
     const body = await req.text();
     const sig = req.headers.get("stripe-signature");
 
-    // If we have a webhook secret, verify; otherwise parse directly
     const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
     let event: Stripe.Event;
 
@@ -50,10 +49,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({ received: true }), { headers: corsHeaders });
       }
 
-      const customerEmail = session.customer_email || session.customer_details?.email;
-
       if (session.mode === "subscription") {
-        // Retrieve subscription to get the product
         const subscriptionId = session.subscription as string;
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
         const productId = subscription.items.data[0]?.price?.product as string;
@@ -87,32 +83,53 @@ serve(async (req) => {
         if (error) console.error("[STRIPE-WEBHOOK] Error updating plan:", error);
 
       } else if (session.mode === "payment") {
-        // One-time payment — check if it's an extra members pack
         const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
         const item = lineItems.data[0];
         const productId = item?.price?.product as string;
 
         if (productId === EXTRA_MEMBERS_PRODUCT_ID) {
-          console.log(`[STRIPE-WEBHOOK] Adding 7 extra members for user ${userId}`);
+          const circleId = session.metadata?.circle_id;
 
-          // First get current extra_members
-          const { data: currentPlan } = await supabase
-            .from("user_plans")
-            .select("extra_members")
-            .eq("user_id", userId)
-            .maybeSingle();
+          if (circleId) {
+            // Per-circle extra members
+            console.log(`[STRIPE-WEBHOOK] Adding 7 extra members to circle ${circleId}`);
 
-          const currentExtra = currentPlan?.extra_members ?? 0;
+            const { data: circleData } = await supabase
+              .from("circles")
+              .select("extra_members")
+              .eq("id", circleId)
+              .maybeSingle();
 
-          const { error } = await supabase
-            .from("user_plans")
-            .upsert({
-              user_id: userId,
-              extra_members: currentExtra + 7,
-              updated_at: new Date().toISOString(),
-            }, { onConflict: "user_id" });
+            const currentExtra = circleData?.extra_members ?? 0;
 
-          if (error) console.error("[STRIPE-WEBHOOK] Error adding extra members:", error);
+            const { error } = await supabase
+              .from("circles")
+              .update({ extra_members: currentExtra + 7 })
+              .eq("id", circleId);
+
+            if (error) console.error("[STRIPE-WEBHOOK] Error adding circle extra members:", error);
+          } else {
+            // Fallback: global extra members (backward compat)
+            console.log(`[STRIPE-WEBHOOK] Adding 7 global extra members for user ${userId}`);
+
+            const { data: currentPlan } = await supabase
+              .from("user_plans")
+              .select("extra_members")
+              .eq("user_id", userId)
+              .maybeSingle();
+
+            const currentExtra = currentPlan?.extra_members ?? 0;
+
+            const { error } = await supabase
+              .from("user_plans")
+              .upsert({
+                user_id: userId,
+                extra_members: currentExtra + 7,
+                updated_at: new Date().toISOString(),
+              }, { onConflict: "user_id" });
+
+            if (error) console.error("[STRIPE-WEBHOOK] Error adding extra members:", error);
+          }
         }
       }
     }
