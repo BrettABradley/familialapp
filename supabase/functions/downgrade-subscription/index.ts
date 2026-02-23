@@ -74,7 +74,11 @@ serve(async (req) => {
       proration_behavior: "none",
     });
 
-    const periodEnd = new Date(updated.current_period_end * 1000).toISOString();
+    const rawEnd = updated.current_period_end;
+    logStep("Raw current_period_end value", { rawEnd, type: typeof rawEnd });
+    const periodEnd = rawEnd
+      ? new Date(typeof rawEnd === "number" ? rawEnd * 1000 : rawEnd).toISOString()
+      : new Date().toISOString();
     logStep("Subscription updated to Family price", { periodEnd });
 
     // Set pending_plan in user_plans so UI shows "Switching to Family on [date]"
