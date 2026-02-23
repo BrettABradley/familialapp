@@ -8,21 +8,33 @@ export async function getCircleMemberCount(circleId: string): Promise<number> {
   return (count ?? 0) + 1; // +1 for owner
 }
 
-export async function getCircleMemberLimit(circleOwnerId: string): Promise<{ limit: number; plan: string; extraMembers: number; maxMembers: number }> {
-  const { data } = await supabase
+export async function getCircleMemberLimit(circleOwnerId: string, circleId?: string): Promise<{ limit: number; plan: string; extraMembers: number; maxMembers: number }> {
+  // Fetch owner plan
+  const planPromise = supabase
     .from("user_plans")
     .select("max_members_per_circle, extra_members, plan")
     .eq("user_id", circleOwnerId)
     .maybeSingle();
-  
-  const maxMembers = data?.max_members_per_circle ?? 8;
-  const extraMembers = data?.extra_members ?? 0;
-  const plan = data?.plan ?? "free";
-  
+
+  // Fetch per-circle extra members if circleId provided
+  const circlePromise = circleId
+    ? supabase.from("circles").select("extra_members").eq("id", circleId).maybeSingle()
+    : Promise.resolve({ data: null });
+
+  const [{ data: planData }, { data: circleData }] = await Promise.all([planPromise, circlePromise]);
+
+  const maxMembers = planData?.max_members_per_circle ?? 8;
+  const globalExtra = planData?.extra_members ?? 0;
+  const circleExtra = (circleData as any)?.extra_members ?? 0;
+  const plan = planData?.plan ?? "free";
+
+  // Per-circle extra members take priority; also add global for backward compat
+  const totalExtra = circleExtra + globalExtra;
+
   return {
-    limit: maxMembers + extraMembers,
+    limit: maxMembers + totalExtra,
     plan,
-    extraMembers,
+    extraMembers: totalExtra,
     maxMembers,
   };
 }
@@ -30,7 +42,7 @@ export async function getCircleMemberLimit(circleOwnerId: string): Promise<{ lim
 export async function checkCircleCapacity(circleId: string, circleOwnerId: string) {
   const [count, limitInfo] = await Promise.all([
     getCircleMemberCount(circleId),
-    getCircleMemberLimit(circleOwnerId),
+    getCircleMemberLimit(circleOwnerId, circleId),
   ]);
   
   return {

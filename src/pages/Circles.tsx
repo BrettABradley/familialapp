@@ -85,23 +85,39 @@ const Circles = () => {
   const circlesList = circles as unknown as Circle[];
 
   // Fetch member counts and limits for all circles
-  useEffect(() => {
+  const fetchMemberInfo = useCallback(async () => {
     if (circlesList.length === 0) return;
-    const fetchAll = async () => {
-      const results: Record<string, { count: number; limit: number; plan: string }> = {};
-      await Promise.all(
-        circlesList.map(async (circle) => {
-          const [count, limitInfo] = await Promise.all([
-            getCircleMemberCount(circle.id),
-            getCircleMemberLimit(circle.owner_id),
-          ]);
-          results[circle.id] = { count, limit: limitInfo.limit, plan: limitInfo.plan };
-        })
-      );
-      setMemberInfo(results);
-    };
-    fetchAll();
+    const results: Record<string, { count: number; limit: number; plan: string }> = {};
+    await Promise.all(
+      circlesList.map(async (circle) => {
+        const [count, limitInfo] = await Promise.all([
+          getCircleMemberCount(circle.id),
+          getCircleMemberLimit(circle.owner_id, circle.id),
+        ]);
+        results[circle.id] = { count, limit: limitInfo.limit, plan: limitInfo.plan };
+      })
+    );
+    setMemberInfo(results);
   }, [circlesList.length, circlesList.map(c => c.id).join(",")]);
+
+  useEffect(() => {
+    fetchMemberInfo();
+  }, [fetchMemberInfo]);
+
+  // Re-fetch after checkout success
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "success") {
+      toast({ title: "Payment successful!", description: "Your plan has been updated." });
+      // Clean up URL
+      window.history.replaceState({}, "", "/circles");
+      // Re-fetch data after a short delay to allow webhook processing
+      setTimeout(() => {
+        refetchCircles();
+        fetchMemberInfo();
+      }, 2000);
+    }
+  }, []);
 
   const handleRequestUpgrade = async (circle: Circle) => {
     if (!user || !profile) return;
