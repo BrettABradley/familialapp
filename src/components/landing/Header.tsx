@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, Phone } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import icon from "@/assets/icon.png";
+import { useAuth } from "@/hooks/useAuth";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
@@ -39,12 +42,18 @@ const Header = () => {
               <Phone className="w-4 h-4" />
               <span className="text-sm">520-759-5200</span>
             </a>
-            <Link to="/auth">
-              <Button variant="ghost">Sign In</Button>
-            </Link>
-            <Link to="/auth">
-              <Button>Get Started</Button>
-            </Link>
+            {user ? (
+              <Button onClick={() => navigate("/feed")}>Go to Dashboard</Button>
+            ) : (
+              <>
+                <Link to="/auth">
+                  <Button variant="ghost">Sign In</Button>
+                </Link>
+                <Link to="/auth">
+                  <Button>Get Started</Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -98,12 +107,20 @@ const Header = () => {
                 <span>Call Support: 520-759-5200</span>
               </a>
               <div className="flex flex-col gap-2 pt-4 border-t border-border/50">
-                <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
-                  <Button variant="outline" className="w-full">Sign In</Button>
-                </Link>
-                <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
-                  <Button className="w-full">Get Started</Button>
-                </Link>
+                {user ? (
+                  <Link to="/feed" onClick={() => setIsMenuOpen(false)}>
+                    <Button className="w-full">Go to Dashboard</Button>
+                  </Link>
+                ) : (
+                  <>
+                    <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
+                      <Button variant="outline" className="w-full">Sign In</Button>
+                    </Link>
+                    <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
+                      <Button className="w-full">Get Started</Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </nav>
           </div>
