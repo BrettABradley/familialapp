@@ -126,7 +126,7 @@ const Pricing = () => {
 
         {/* Choose your circle size */}
         <p className="text-center text-muted-foreground mb-8 text-sm font-medium uppercase tracking-wider">
-          Choose your circle size
+          Choose your plan
         </p>
 
         {/* Pricing Cards */}
@@ -159,6 +159,14 @@ const Pricing = () => {
                       <span className="text-foreground">{feature}</span>
                     </li>
                   ))}
+                  <li className="flex items-center gap-3 border-t border-border pt-3 mt-1">
+                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Check className="w-3 h-3 text-primary" />
+                    </div>
+                    <a href="#all-features" className="text-sm text-muted-foreground hover:text-foreground hover:underline transition-colors">
+                      All features included
+                    </a>
+                  </li>
                 </ul>
                 <div className="pt-4">
                   {currentPlan === tier.plan ? (
@@ -205,7 +213,7 @@ const Pricing = () => {
         </div>
 
         {/* All Plans Include */}
-        <div className="max-w-5xl mx-auto mt-16 bg-secondary/30 rounded-2xl p-8 sm:p-12">
+        <div id="all-features" className="max-w-5xl mx-auto mt-16 bg-secondary/30 rounded-2xl p-8 sm:p-12 scroll-mt-8">
           <h3 className="font-serif text-2xl sm:text-3xl font-bold text-foreground text-center mb-8">
             Every plan includes
           </h3>
