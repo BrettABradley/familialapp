@@ -1,34 +1,24 @@
 
-## Fix: Allow cancellation to Free even when a downgrade is pending
+## Fix: Cancellation should override a pending downgrade
 
 ### Problem
-When a user has a pending downgrade (e.g., Extended to Family), the Free tier button incorrectly shows "Cancel Pending" (disabled). The user should still be able to cancel their membership entirely, even while a tier-to-tier downgrade is pending.
+When a user cancels their membership to Free while a downgrade (Extended to Family) is pending:
+1. The `cancel-subscription` backend function does NOT clear `pending_plan` in the database
+2. The frontend does NOT clear `pendingPlan` in local state
+3. On page refresh, the UI reads `pending_plan: "family"` from the database and shows "Current Tier" / "Downgrade Pending" instead of showing a cancellation is scheduled
 
 ### Root Cause
-The condition at line 441 checks `cancelAtPeriodEnd && tierPlan === "free"` without considering whether the cancellation is a standalone action or part of a tier downgrade. When `pendingPlan` is set (meaning a tier-to-tier downgrade, not a full cancellation), Free should remain actionable.
+The `cancel-subscription` edge function only updates `cancel_at_period_end` and `current_period_end` but leaves `pending_plan` untouched. Since the UI checks `pendingPlan` first, it never reaches the cancellation display logic.
 
-### Fix (single file change)
+### Fix (2 files)
 
-**File: `src/components/landing/Pricing.tsx`**
+**1. Backend: `supabase/functions/cancel-subscription/index.ts`**
+- Add `pending_plan: null` to the database update so any pending tier-to-tier downgrade is cleared when the user chooses a full cancellation instead
 
-Update the Free tier logic (lines 440-447) so that "Cancel Pending" only appears when there's a standalone cancellation (i.e., `cancelAtPeriodEnd` is true but `pendingPlan` is NOT set). When a tier-to-tier downgrade is pending, Free remains clickable with "Cancel Membership":
+**2. Frontend: `src/components/landing/Pricing.tsx`**
+- In `handleCancelConfirm` (the "cancel to free" branch around line 312), add `setPendingPlan(null)` after a successful cancellation so the UI immediately reflects the correct state without needing a page refresh
 
-```text
-Before:
-  - pendingPlan = "family" + cancelAtPeriodEnd = true --> Free shows "Cancel Pending" (WRONG)
-
-After:
-  - pendingPlan = "family" (tier downgrade) --> Free shows "Cancel Membership" (clickable)
-  - cancelAtPeriodEnd = true, no pendingPlan (full cancel) --> Free shows "Cancel Pending" (disabled)
-```
-
-The condition changes from:
-```typescript
-if (cancelAtPeriodEnd && tierPlan === "free")
-```
-to:
-```typescript
-if (cancelAtPeriodEnd && !pendingPlan && tierPlan === "free")
-```
-
-This single condition change ensures users can always navigate to a lower tier, even when another change is already pending. The existing `handleConfirmDowngrade` function already handles the Stripe and database updates correctly for cancellations.
+### Result
+- Canceling to Free clears any pending downgrade in both Stripe-side state and the database
+- The UI immediately shows "Cancel Pending" on the Free tier and "Cancel Downgrade" on the current tier
+- On page refresh, the database correctly has `pending_plan: null` and `cancel_at_period_end: true`, so the cancellation state displays properly
