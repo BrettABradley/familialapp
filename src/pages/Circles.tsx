@@ -104,14 +104,42 @@ const Circles = () => {
     fetchMemberInfo();
   }, [fetchMemberInfo]);
 
-  // Re-fetch after checkout success
+  // Re-fetch after checkout success — verify with Stripe directly
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("checkout") === "success") {
-      toast({ title: "Payment successful!", description: "Your plan has been updated." });
-      // Clean up URL
+    const sessionId = params.get("session_id");
+    if (params.get("checkout") === "success" && sessionId) {
+      // Clean up URL immediately
       window.history.replaceState({}, "", "/circles");
-      // Re-fetch data after a short delay to allow webhook processing
+
+      const verify = async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke("verify-checkout", {
+            body: { sessionId },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+
+          if (data?.type === "subscription") {
+            toast({ title: "Plan upgraded!", description: `You're now on the ${data.plan} plan.` });
+          } else if (data?.type === "extra_members") {
+            toast({ title: "Members added!", description: "7 extra member slots have been added to your circle." });
+          } else {
+            toast({ title: "Payment successful!", description: "Your purchase has been applied." });
+          }
+        } catch (err: any) {
+          console.error("Verify checkout error:", err);
+          toast({ title: "Payment received", description: "Your payment was successful. Changes may take a moment to reflect.", variant: "default" });
+        }
+        // Always refresh data
+        await refetchCircles();
+        await fetchMemberInfo();
+      };
+      verify();
+    } else if (params.get("checkout") === "success") {
+      // Fallback if no session_id (old links)
+      toast({ title: "Payment successful!", description: "Your plan has been updated." });
+      window.history.replaceState({}, "", "/circles");
       setTimeout(() => {
         refetchCircles();
         fetchMemberInfo();

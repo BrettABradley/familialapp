@@ -44,7 +44,7 @@ serve(async (req) => {
       customer_email: customerId ? undefined : user.email,
       line_items: [{ price: priceId, quantity: 1 }],
       mode: mode || "subscription",
-      success_url: `${origin}/circles?checkout=success`,
+      success_url: `${origin}/circles?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/circles?checkout=canceled`,
       metadata: {
         user_id: user.id,
