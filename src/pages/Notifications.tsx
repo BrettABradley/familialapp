@@ -141,6 +141,7 @@ const Notifications = () => {
       case "event":
         return <Calendar className="w-4 h-4" />;
       case "circle":
+      case "upgrade_request":
         return <Users className="w-4 h-4" />;
       default:
         return <Bell className="w-4 h-4" />;

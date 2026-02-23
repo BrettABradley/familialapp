@@ -13,11 +13,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound, ArrowRightLeft, LogOut } from "lucide-react";
+import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound, ArrowRightLeft, LogOut, ArrowUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import PendingInvites from "@/components/circles/PendingInvites";
 import UpgradePlanDialog from "@/components/circles/UpgradePlanDialog";
-import { checkCircleCapacity } from "@/lib/circleLimits";
+import { checkCircleCapacity, getCircleMemberCount, getCircleMemberLimit } from "@/lib/circleLimits";
 
 interface Circle {
   id: string;
@@ -71,6 +71,8 @@ const Circles = () => {
   const [isLeaveTransferOpen, setIsLeaveTransferOpen] = useState(false);
   const [circleCount, setCircleCount] = useState(0);
   const [circleLimit, setCircleLimit] = useState(3);
+  const [memberInfo, setMemberInfo] = useState<Record<string, { count: number; limit: number; plan: string }>>({});
+  const [requestingUpgrade, setRequestingUpgrade] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -81,6 +83,76 @@ const Circles = () => {
 
   // Type guard for circles with full properties
   const circlesList = circles as unknown as Circle[];
+
+  // Fetch member counts and limits for all circles
+  useEffect(() => {
+    if (circlesList.length === 0) return;
+    const fetchAll = async () => {
+      const results: Record<string, { count: number; limit: number; plan: string }> = {};
+      await Promise.all(
+        circlesList.map(async (circle) => {
+          const [count, limitInfo] = await Promise.all([
+            getCircleMemberCount(circle.id),
+            getCircleMemberLimit(circle.owner_id),
+          ]);
+          results[circle.id] = { count, limit: limitInfo.limit, plan: limitInfo.plan };
+        })
+      );
+      setMemberInfo(results);
+    };
+    fetchAll();
+  }, [circlesList.length, circlesList.map(c => c.id).join(",")]);
+
+  const handleRequestUpgrade = async (circle: Circle) => {
+    if (!user || !profile) return;
+    setRequestingUpgrade(circle.id);
+
+    try {
+      // Rate limit: check if already requested in last 24h
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: existing } = await supabase
+        .from("notifications")
+        .select("id")
+        .eq("user_id", circle.owner_id)
+        .eq("type", "upgrade_request")
+        .eq("related_circle_id", circle.id)
+        .eq("related_user_id", user.id)
+        .gte("created_at", oneDayAgo)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        toast({ title: "Already requested", description: "You've already sent an upgrade request for this circle recently." });
+        setRequestingUpgrade(null);
+        return;
+      }
+
+      const info = memberInfo[circle.id];
+      const { error } = await supabase.from("notifications").insert({
+        user_id: circle.owner_id,
+        type: "upgrade_request",
+        title: "Upgrade Request",
+        message: `${profile.display_name || "A member"} is requesting you upgrade ${circle.name} (${info?.count ?? "?"}/${info?.limit ?? "?"} members)`,
+        related_circle_id: circle.id,
+        related_user_id: user.id,
+        link: "/circles",
+      });
+
+      if (error) throw error;
+      toast({ title: "Request sent!", description: "The circle owner has been notified." });
+    } catch {
+      toast({ title: "Error", description: "Failed to send upgrade request.", variant: "destructive" });
+    }
+    setRequestingUpgrade(null);
+  };
+
+  const getMemberBadgeVariant = (circleId: string): "default" | "secondary" | "destructive" => {
+    const info = memberInfo[circleId];
+    if (!info) return "secondary";
+    const ratio = info.count / info.limit;
+    if (ratio >= 1) return "destructive";
+    if (ratio >= 0.8) return "default";
+    return "secondary";
+  };
 
   const fetchMemberships = async (circleId: string) => {
     const { data } = await supabase
@@ -505,6 +577,42 @@ const Circles = () => {
               </CardHeader>
               <CardContent>
                 {circle.description && <p className="text-muted-foreground text-sm mb-3">{circle.description}</p>}
+
+                {/* Member counter */}
+                {memberInfo[circle.id] && (
+                  <div className="flex items-center justify-between mb-3">
+                    <Badge variant={getMemberBadgeVariant(circle.id)} className="text-xs">
+                      <Users className="w-3 h-3 mr-1" />
+                      {memberInfo[circle.id].count}/{memberInfo[circle.id].limit} members
+                    </Badge>
+                    {isOwner(circle) && memberInfo[circle.id].count >= memberInfo[circle.id].limit * 0.8 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          const info = memberInfo[circle.id];
+                          setUpgradeInfo({ plan: info.plan, currentCount: info.count, limit: info.limit, circleId: circle.id });
+                          setUpgradeDialogOpen(true);
+                        }}
+                      >
+                        <ArrowUp className="w-3 h-3 mr-1" />Upgrade
+                      </Button>
+                    )}
+                    {!isOwner(circle) && memberInfo[circle.id].count >= memberInfo[circle.id].limit * 0.8 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => handleRequestUpgrade(circle)}
+                        disabled={requestingUpgrade === circle.id}
+                      >
+                        <ArrowUp className="w-3 h-3 mr-1" />{requestingUpgrade === circle.id ? "Sending..." : "Request Upgrade"}
+                      </Button>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 mb-3 p-2 rounded-md bg-secondary/50 border border-border">
                   <span className="text-xs text-muted-foreground">Invite Code:</span>
                   <code className="text-sm font-mono font-semibold text-foreground">{circle.invite_code}</code>
