@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users, Camera, Pencil, Check, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 
 interface Circle {
   id: string;
@@ -41,7 +42,8 @@ interface AlbumPhoto {
 
 const Albums = () => {
   const { user } = useAuth();
-  const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading } = useCircleContext();
+  const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
+  const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const circleIdParam = searchParams.get("circle");
@@ -335,6 +337,7 @@ const Albums = () => {
 
   return (
     <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <ReadOnlyBanner circleId={selectedCircle} />
       {selectedAlbum ? (
         // Album Detail View
         <>
@@ -405,7 +408,7 @@ const Albums = () => {
                 onChange={handleFileUpload}
                 className="hidden"
               />
-              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading || readOnly}>
                 <Upload className="w-4 h-4 mr-2" />
                 {isUploading ? "Uploading..." : "Add Photos"}
               </Button>

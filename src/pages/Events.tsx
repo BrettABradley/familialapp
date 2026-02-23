@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, CalendarDays, MapPin, Clock, Trash2, Loader2, Image, Pencil, Check, X, UserCheck, HelpCircle, XCircle, Users } from "lucide-react";
+import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { format, parse } from "date-fns";
 
 /** Parse "YYYY-MM-DD" as local date (avoids UTC-midnight timezone shift). */
@@ -90,7 +91,8 @@ interface Event {
 
 const Events = () => {
   const { user } = useAuth();
-  const { circles, selectedCircle, setSelectedCircle, profile, isLoading: contextLoading } = useCircleContext();
+  const { circles, selectedCircle, setSelectedCircle, profile, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
+  const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
 
   const [events, setEvents] = useState<Event[]>([]);
@@ -553,6 +555,7 @@ const Events = () => {
 
   return (
     <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <ReadOnlyBanner circleId={selectedCircle} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-serif text-3xl font-bold text-foreground">Family Calendar</h1>
@@ -560,7 +563,7 @@ const Events = () => {
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-2" />Add Event</Button>
+            <Button disabled={readOnly}><Plus className="w-4 h-4 mr-2" />Add Event</Button>
           </DialogTrigger>
           <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>

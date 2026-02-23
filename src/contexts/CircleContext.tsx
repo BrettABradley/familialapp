@@ -20,14 +20,25 @@ interface Profile {
   location: string | null;
 }
 
+interface UserPlan {
+  plan: string;
+  max_circles: number;
+  max_members_per_circle: number;
+  cancel_at_period_end: boolean;
+  current_period_end: string | null;
+  pending_plan: string | null;
+}
+
 interface CircleContextType {
   circles: Circle[];
   selectedCircle: string;
   setSelectedCircle: (circleId: string) => void;
   profile: Profile | null;
+  userPlan: UserPlan | null;
   isLoading: boolean;
   refetchCircles: () => Promise<void>;
   refetchProfile: () => Promise<void>;
+  isCircleReadOnly: (circleId: string) => boolean;
 }
 
 const CircleContext = createContext<CircleContextType | undefined>(undefined);
@@ -48,6 +59,7 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchCircles = async () => {
@@ -111,6 +123,47 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchUserPlan = async () => {
+    if (!user) {
+      setUserPlan(null);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_plans")
+      .select("plan, max_circles, max_members_per_circle, cancel_at_period_end, current_period_end, pending_plan")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!error && data) {
+      setUserPlan(data as UserPlan);
+    }
+  };
+
+  // Determines if a circle is read-only due to plan overflow.
+  // Owned circles sorted by created_at; oldest N (up to max_circles) are active, rest are overflow.
+  const isCircleReadOnly = (circleId: string): boolean => {
+    if (!userPlan || !user) return false;
+
+    // Get circles owned by this user, sorted by creation date (oldest first)
+    const ownedCircles = circles
+      .filter(c => c.owner_id === user.id)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+    if (ownedCircles.length <= userPlan.max_circles) return false;
+
+    // The circle must be owned by the user to be "overflow read-only"
+    const circle = ownedCircles.find(c => c.id === circleId);
+    if (!circle) {
+      // Not owned by user — check if the circle's owner has overflow
+      // We need the owner's plan for that; for now, not read-only from this user's perspective
+      return false;
+    }
+
+    const activeIds = new Set(ownedCircles.slice(0, userPlan.max_circles).map(c => c.id));
+    return !activeIds.has(circleId);
+  };
+
   useEffect(() => {
     const loadData = async () => {
       if (!user) {
@@ -119,7 +172,7 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
       }
 
       setIsLoading(true);
-      await Promise.all([fetchCircles(), fetchProfile()]);
+      await Promise.all([fetchCircles(), fetchProfile(), fetchUserPlan()]);
       setIsLoading(false);
     };
 
@@ -133,9 +186,11 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
         selectedCircle,
         setSelectedCircle,
         profile,
+        userPlan,
         isLoading,
         refetchCircles: fetchCircles,
         refetchProfile: fetchProfile,
+        isCircleReadOnly,
       }}
     >
       {children}

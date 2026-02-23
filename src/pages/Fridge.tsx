@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FridgeBoard, type FridgeBoardPin } from "@/components/fridge/FridgeBoard";
 import { Plus, Pin, Image, FileText, Calendar, Users, Mic } from "lucide-react";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
+import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 
 interface Circle {
   id: string;
@@ -36,7 +37,8 @@ interface FridgePin {
 
 const Fridge = () => {
   const { user } = useAuth();
-  const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading } = useCircleContext();
+  const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
+  const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -258,6 +260,7 @@ const Fridge = () => {
 
   return (
     <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <ReadOnlyBanner circleId={selectedCircle} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="font-serif text-3xl font-bold text-foreground flex items-center gap-2">
@@ -268,7 +271,7 @@ const Fridge = () => {
             Important notes, photos, and reminders for your family
           </p>
         </div>
-        {isAdmin && (
+        {isAdmin && !readOnly && (
           <Dialog open={isCreateOpen} onOpenChange={(open) => {
             setIsCreateOpen(open);
             if (!open) resetForm();
