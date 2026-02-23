@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Phone, ArrowRight, Loader2 } from "lucide-react";
@@ -25,7 +25,6 @@ const tiers = [
       "Unlimited posts & photos",
       "Basic circle management",
       "Mobile & web access",
-      "Mobile & web access",
     ],
     cta: "Get Started Free",
     popular: false,
@@ -42,7 +41,6 @@ const tiers = [
       "Event planning & calendars",
       "Photo albums",
       "Priority support",
-      "Advanced privacy controls",
       "Advanced privacy controls",
     ],
     cta: "Buy Now",
@@ -61,7 +59,6 @@ const tiers = [
       "Private messaging",
       "Video sharing",
       "Admin tools & analytics",
-      "Admin tools & analytics",
     ],
     cta: "Buy Now",
     popular: false,
@@ -74,6 +71,13 @@ const Pricing = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [currentPlan, setCurrentPlan] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) { setCurrentPlan(null); return; }
+    supabase.from("user_plans").select("plan").eq("user_id", user.id).single()
+      .then(({ data }) => setCurrentPlan(data?.plan ?? "free"));
+  }, [user]);
 
   const handleBuyNow = async (plan: string) => {
     if (plan === "free") {
@@ -152,19 +156,30 @@ const Pricing = () => {
                   ))}
                 </ul>
                 <div className="pt-4">
-                  <Button
-                    variant={tier.popular ? "default" : "outline"}
-                    className="w-full"
-                    size="lg"
-                    onClick={() => handleBuyNow(tier.plan)}
-                    disabled={loadingPlan !== null}
-                  >
-                    {loadingPlan === tier.plan ? (
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    ) : null}
-                    {tier.cta}
-                    {loadingPlan !== tier.plan && <ArrowRight className="w-4 h-4 ml-2" />}
-                  </Button>
+                  {currentPlan === tier.plan ? (
+                    <Button
+                      variant="secondary"
+                      className="w-full"
+                      size="lg"
+                      disabled
+                    >
+                      Current Tier
+                    </Button>
+                  ) : (
+                    <Button
+                      variant={tier.popular ? "default" : "outline"}
+                      className="w-full"
+                      size="lg"
+                      onClick={() => handleBuyNow(tier.plan)}
+                      disabled={loadingPlan !== null}
+                    >
+                      {loadingPlan === tier.plan ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : null}
+                      {tier.cta}
+                      {loadingPlan !== tier.plan && <ArrowRight className="w-4 h-4 ml-2" />}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
