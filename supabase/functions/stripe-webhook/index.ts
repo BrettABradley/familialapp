@@ -225,6 +225,65 @@ serve(async (req) => {
         }
       }
 
+      // Handle circle rescue if rescue_circle_id is present
+      const rescueCircleId = session.metadata?.rescue_circle_id;
+      if (rescueCircleId && userId) {
+        console.log(`[STRIPE-WEBHOOK] Processing rescue for circle ${rescueCircleId} by user ${userId}`);
+
+        // Transfer ownership using service role (bypasses RLS/auth.uid check)
+        // We need to do this directly since transfer_circle_ownership checks auth.uid()
+        const { data: circleData } = await supabase
+          .from("circles")
+          .select("owner_id, name")
+          .eq("id", rescueCircleId)
+          .maybeSingle();
+
+        if (circleData) {
+          const previousOwner = circleData.owner_id;
+
+          // Update circle owner
+          await supabase
+            .from("circles")
+            .update({ owner_id: userId })
+            .eq("id", rescueCircleId);
+
+          // Remove new owner from memberships (owners are implicit members)
+          await supabase
+            .from("circle_memberships")
+            .delete()
+            .eq("circle_id", rescueCircleId)
+            .eq("user_id", userId);
+
+          // Add previous owner as admin member
+          await supabase
+            .from("circle_memberships")
+            .insert({ circle_id: rescueCircleId, user_id: previousOwner, role: "admin" })
+            .select()
+            .maybeSingle();
+
+          // Mark rescue offer as claimed
+          await supabase
+            .from("circle_rescue_offers")
+            .update({ claimed_by: userId, status: "claimed" })
+            .eq("circle_id", rescueCircleId)
+            .eq("status", "open");
+
+          // Notify previous owner
+          await supabase
+            .from("notifications")
+            .insert({
+              user_id: previousOwner,
+              type: "circle_rescue_claimed",
+              title: "Circle Rescued!",
+              message: `Someone has taken over ownership of "${circleData.name}". Your circle is safe!`,
+              related_circle_id: rescueCircleId,
+              link: "/circles",
+            });
+
+          console.log(`[STRIPE-WEBHOOK] Circle ${rescueCircleId} ownership transferred from ${previousOwner} to ${userId}`);
+        }
+      }
+
       // Send receipt email (best-effort)
       if (customerEmail && receiptPriceId) {
         sendReceiptEmail(customerEmail, receiptPriceId).catch((err) =>

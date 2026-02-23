@@ -8,9 +8,11 @@ import { Users, Plus, Loader2 } from "lucide-react";
 import { useFeedPosts } from "@/hooks/useFeedPosts";
 import { CreatePostForm } from "@/components/feed/CreatePostForm";
 import { PostCard } from "@/components/feed/PostCard";
+import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 
 const Feed = () => {
-  const { circles, isLoading: contextLoading } = useCircleContext();
+  const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
+  const readOnly = isCircleReadOnly(selectedCircle);
   const [searchParams] = useSearchParams();
   const highlightPostId = searchParams.get("post");
   const scrolledRef = useRef(false);
@@ -92,7 +94,8 @@ const Feed = () => {
 
   return (
     <main className="container mx-auto px-4 py-8 max-w-2xl">
-      {circles.length > 0 ? (
+      <ReadOnlyBanner circleId={selectedCircle} />
+      {circles.length > 0 && !readOnly ? (
         <CreatePostForm onPostCreated={() => fetchPosts(true)} />
       ) : (
         <Card className="mb-8">

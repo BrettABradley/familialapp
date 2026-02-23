@@ -98,17 +98,13 @@ const CircleRescueDialog = ({ circleId, open, onOpenChange }: CircleRescueDialog
           priceId: plan.priceId,
           mode: "subscription",
           circleId: offer.circle_id,
+          rescue_circle_id: offer.circle_id,
         },
       });
 
       if (error) throw error;
       if (data?.url) {
-        // Mark the offer as claimed before redirecting
-        await supabase
-          .from("circle_rescue_offers")
-          .update({ claimed_by: user.id, status: "claimed" } as any)
-          .eq("id", offer.id);
-
+        // Let the webhook handle marking as claimed after payment confirmation
         window.location.href = data.url;
       }
     } catch (err: any) {
