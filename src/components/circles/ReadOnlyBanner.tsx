@@ -36,7 +36,7 @@ const ReadOnlyBanner = ({ circleId }: ReadOnlyBannerProps) => {
             to restore full access.
           </>
         ) : (
-          "This circle is read-only. The owner needs to upgrade, transfer ownership, or delete this circle to restore full access."
+          "This circle is read-only. The owner needs to upgrade or delete this circle to restore full access."
         )}
       </AlertDescription>
     </Alert>
