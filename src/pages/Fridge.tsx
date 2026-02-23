@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { FridgeBoard, type FridgeBoardPin } from "@/components/fridge/FridgeBoard";
 import { Plus, Pin, Image, FileText, Calendar, Users, Mic } from "lucide-react";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
@@ -252,7 +253,8 @@ const Fridge = () => {
                   Add a note, photo, or reminder for your family.
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 mt-4">
+              <ScrollArea className="max-h-[70vh]">
+              <div className="space-y-4 mt-4 pr-4">
                 <div className="space-y-2">
                   <Label>Circle</Label>
                   <Select value={selectedCircle} onValueChange={setSelectedCircle}>
@@ -393,6 +395,7 @@ const Fridge = () => {
                   {isCreating ? "Pinning..." : "Pin to Fridge"}
                 </Button>
               </div>
+              </ScrollArea>
             </DialogContent>
           </Dialog>
         )}
