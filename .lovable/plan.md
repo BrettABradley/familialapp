@@ -1,47 +1,39 @@
 
 
-# Fix: Only Save Invite After Email Sends Successfully
+# Fix: Auth Session Missing in Circle Invite Function
 
 ## Problem
-Currently, the invite flow works like this:
-1. Save invite record to the database
-2. Try to send the email
-3. If email fails, the invite record stays -- blocking future attempts because duplicate detection rejects it
+The edge function logs show this error:
+```
+AuthSessionMissingError: Auth session missing!
+```
 
-This means a failed email permanently blocks re-inviting that person.
+The function creates a Supabase client and calls `supabase.auth.getUser()` without passing the token. In Lovable Cloud's edge runtime, the client cannot resolve the session from headers alone -- you must pass the token explicitly to `getUser(token)`.
 
 ## Solution
-Move the database insert into the backend function so it only happens **after** the email sends successfully. The client will no longer insert the invite record directly.
+One-line fix in `supabase/functions/send-circle-invite/index.ts`: extract the token from the Authorization header and pass it to `getUser(token)`.
 
 ## Changes
 
-### 1. `src/pages/Circles.tsx` -- Remove client-side DB insert
-- Remove the `supabase.from("circle_invites").insert(...)` call
-- Instead, just call the backend function directly
-- The backend function will handle both sending the email AND saving the invite
-- On success, show "Invite sent!"; on failure, show the error without leaving a stale record
-
-### 2. `supabase/functions/send-circle-invite/index.ts` -- Add DB insert after email success
-- After the Resend API confirms the email was sent, insert the invite record into `circle_invites` using the admin client
-- Include all required fields: `circle_id`, `invited_by` (from the authenticated user), `email`, `status: 'pending'`
-- If email fails, return an error without touching the database
-- The existing validation checks (duplicate invite, already a member, etc.) stay in place within the function
+### `supabase/functions/send-circle-invite/index.ts`
+- Extract the bearer token: `const token = authHeader.replace("Bearer ", "")`
+- Change `supabase.auth.getUser()` to `supabase.auth.getUser(token)`
+- This explicitly validates the JWT and retrieves the user, bypassing the session requirement
 
 ## Technical Details
 
 ```text
 BEFORE:
-  Client: insert invite -> call edge function -> send email
-  Problem: invite saved even if email fails
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  // Fails because edge runtime has no session store
 
 AFTER:
-  Client: call edge function
-  Edge function: validate -> send email -> insert invite (only on success)
-  Result: no stale records on failure, user can retry
+  const token = authHeader.replace("Bearer ", "");
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  // Works because token is validated directly
 ```
 
-- The `validate_circle_invite` database trigger will still run on insert, providing server-side duplicate protection
-- The `handle_invite_notification` trigger will still fire to create in-app notifications for existing users
-- The `handle_invite_on_signup` trigger continues to work for new user auto-join
-- Files modified: `src/pages/Circles.tsx`, `supabase/functions/send-circle-invite/index.ts`
+- Only one file modified: `supabase/functions/send-circle-invite/index.ts`
+- The function will be automatically redeployed
+- No client-side changes needed -- `supabase.functions.invoke()` already sends the Authorization header
 
