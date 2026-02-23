@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.sync-stripe-purchases]
 verify_jwt = false
+
+[functions.fetch-link-preview]
+verify_jwt = false

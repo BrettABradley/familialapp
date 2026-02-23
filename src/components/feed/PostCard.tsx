@@ -10,6 +10,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp, Trash2, Pencil, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { LinkifiedText } from "@/components/shared/LinkifiedText";
+import { LinkPreviewCard } from "@/components/feed/LinkPreviewCard";
 import { getMediaType } from "@/lib/mediaUtils";
 import type { Post } from "@/hooks/useFeedPosts";
 
@@ -169,6 +170,9 @@ export const PostCard = ({
   const imageUrls = post.media_urls?.filter(u => getMediaType(u) === 'image') || [];
   const otherMedia = post.media_urls?.filter(u => getMediaType(u) !== 'image') || [];
 
+  // Extract first URL from post content for link preview
+  const firstUrl = post.content?.match(/(https?:\/\/[^\s]+)/)?.[0] || null;
+
   return (
     <Card>
       <CardHeader className="pb-4">
@@ -240,6 +244,9 @@ export const PostCard = ({
             <LinkifiedText text={post.content} />
           </p>
         ) : null}
+
+        {/* Link Preview */}
+        {firstUrl && <LinkPreviewCard url={firstUrl} />}
 
         {/* Image grid */}
         {imageUrls.length > 0 && (

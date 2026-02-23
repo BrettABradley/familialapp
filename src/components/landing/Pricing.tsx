@@ -124,6 +124,26 @@ const Pricing = () => {
           </p>
         </div>
 
+        {/* All Plans Include */}
+        <div className="max-w-4xl mx-auto mb-16 bg-secondary/30 rounded-2xl p-8 sm:p-10">
+          <h3 className="font-serif text-xl sm:text-2xl font-semibold text-foreground text-center mb-6">
+            Every plan includes
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-3">
+            {sharedFeatures.map((feature) => (
+              <div key={feature} className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                <span className="text-sm text-foreground">{feature}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Choose your size */}
+        <p className="text-center text-muted-foreground mb-8 text-sm font-medium uppercase tracking-wider">
+          Choose your circle size
+        </p>
+
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-16">
           {tiers.map((tier) => (
@@ -157,12 +177,7 @@ const Pricing = () => {
                 </ul>
                 <div className="pt-4">
                   {currentPlan === tier.plan ? (
-                    <Button
-                      variant="secondary"
-                      className="w-full"
-                      size="lg"
-                      disabled
-                    >
+                    <Button variant="secondary" className="w-full" size="lg" disabled>
                       Current Tier
                     </Button>
                   ) : (
@@ -173,9 +188,7 @@ const Pricing = () => {
                       onClick={() => handleBuyNow(tier.plan)}
                       disabled={loadingPlan !== null}
                     >
-                      {loadingPlan === tier.plan ? (
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      ) : null}
+                      {loadingPlan === tier.plan ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                       {tier.cta}
                       {loadingPlan !== tier.plan && <ArrowRight className="w-4 h-4 ml-2" />}
                     </Button>
@@ -184,23 +197,6 @@ const Pricing = () => {
               </CardContent>
             </Card>
           ))}
-        </div>
-
-        {/* All Plans Include */}
-        <div className="max-w-4xl mx-auto mb-16">
-          <h3 className="font-serif text-2xl sm:text-3xl font-bold text-foreground text-center mb-8">
-            All plans include
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4">
-            {sharedFeatures.map((feature) => (
-              <div key={feature} className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
-                  <Check className="w-3 h-3 text-foreground" />
-                </div>
-                <span className="text-sm text-muted-foreground">{feature}</span>
-              </div>
-            ))}
-          </div>
         </div>
 
         {/* Custom Plans */}
