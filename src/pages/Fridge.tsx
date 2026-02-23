@@ -298,13 +298,13 @@ const Fridge = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="content">Content (optional)</Label>
+                  <Label htmlFor="content">Description (optional, max 150 chars)</Label>
                   <Textarea
                     id="content"
                     placeholder="Add details..."
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
-                    maxLength={1000}
+                    maxLength={150}
                   />
                 </div>
 
