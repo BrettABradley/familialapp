@@ -124,22 +124,7 @@ const Pricing = () => {
           </p>
         </div>
 
-        {/* All Plans Include */}
-        <div className="max-w-4xl mx-auto mb-16 bg-secondary/30 rounded-2xl p-8 sm:p-10">
-          <h3 className="font-serif text-xl sm:text-2xl font-semibold text-foreground text-center mb-6">
-            Every plan includes
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-3">
-            {sharedFeatures.map((feature) => (
-              <div key={feature} className="flex items-center gap-2">
-                <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                <span className="text-sm text-foreground">{feature}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Choose your size */}
+        {/* Choose your circle size */}
         <p className="text-center text-muted-foreground mb-8 text-sm font-medium uppercase tracking-wider">
           Choose your circle size
         </p>
@@ -217,6 +202,23 @@ const Pricing = () => {
               </a>
             </CardContent>
           </Card>
+        </div>
+
+        {/* All Plans Include */}
+        <div className="max-w-5xl mx-auto mt-16 bg-secondary/30 rounded-2xl p-8 sm:p-12">
+          <h3 className="font-serif text-2xl sm:text-3xl font-bold text-foreground text-center mb-8">
+            Every plan includes
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-10 gap-y-5">
+            {sharedFeatures.map((feature) => (
+              <div key={feature} className="flex items-center gap-3">
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-4 h-4 text-primary" />
+                </div>
+                <span className="text-base text-foreground">{feature}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
