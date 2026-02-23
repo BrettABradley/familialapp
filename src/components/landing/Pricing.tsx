@@ -18,13 +18,10 @@ const tiers = [
     name: "Free",
     price: "$0",
     period: "/forever",
-    description: "Perfect for small families getting started",
+    description: "For small families getting started",
     features: [
-      "Creation of up to 1 circle",
+      "1 circle",
       "Up to 8 members per circle",
-      "Unlimited posts & photos",
-      "Basic circle management",
-      "Mobile & web access",
     ],
     cta: "Get Started Free",
     popular: false,
@@ -34,14 +31,10 @@ const tiers = [
     name: "Family",
     price: "$7",
     period: "/month",
-    description: "For growing families who want more",
+    description: "For growing families who need more space",
     features: [
-      "Creation of up to 2 circles",
+      "Up to 2 circles",
       "Up to 20 members per circle",
-      "Event planning & calendars",
-      "Photo albums",
-      "Priority support",
-      "Advanced privacy controls",
     ],
     cta: "Buy Now",
     popular: true,
@@ -53,17 +46,24 @@ const tiers = [
     period: "/month",
     description: "For large families and reunions",
     features: [
-      "Creation of up to 3 circles",
+      "Up to 3 circles",
       "Up to 35 members per circle",
-      "Family tree features",
-      "Private messaging",
-      "Video sharing",
-      "Admin tools & analytics",
     ],
     cta: "Buy Now",
     popular: false,
     plan: "extended",
   },
+];
+
+const sharedFeatures = [
+  "Unlimited posts & photos",
+  "Event planning & calendars",
+  "Photo albums",
+  "Family tree features",
+  "Private messaging",
+  "Video sharing",
+  "Mobile & web access",
+  "Circle management tools",
 ];
 
 const Pricing = () => {
@@ -184,6 +184,23 @@ const Pricing = () => {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* All Plans Include */}
+        <div className="max-w-4xl mx-auto mb-16">
+          <h3 className="font-serif text-2xl sm:text-3xl font-bold text-foreground text-center mb-8">
+            All plans include
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-4">
+            {sharedFeatures.map((feature) => (
+              <div key={feature} className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-secondary flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3 text-foreground" />
+                </div>
+                <span className="text-sm text-muted-foreground">{feature}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Custom Plans */}
