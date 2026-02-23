@@ -65,7 +65,7 @@ const sharedFeatures = [
   { icon: Smartphone, title: "Mobile & Web Access", description: "Stay connected from any device, anywhere." },
   { icon: Users, title: "Circle Management", description: "Invite members, assign roles, and manage your circles with ease." },
   { icon: Bell, title: "Notifications", description: "Stay up to date with activity in your circles." },
-  { icon: Shield, title: "Content Moderation", description: "Built-in tools to keep your family space safe and positive." },
+  { icon: Shield, title: "No Sale of Data", description: "Your family's data is never sold or shared with third parties." },
   { icon: Globe, title: "Shareable Invite Links", description: "Easily invite family members with a simple link." },
   { icon: Settings, title: "Profile Customization", description: "Personalize your profile with photos, bios, and more." },
 ];
@@ -197,7 +197,7 @@ const Pricing = () => {
         </div>
 
         {/* Custom Plans */}
-        <div className="max-w-xl mx-auto">
+        <div className="max-w-xl mx-auto mb-8">
           <Card className="bg-secondary/50 border-border">
             <CardContent className="flex flex-col items-center gap-4 py-8">
               <h3 className="font-serif text-xl font-semibold text-foreground">
