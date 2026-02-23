@@ -91,6 +91,16 @@ const Pricing = () => {
   const [currentPeriodEnd, setCurrentPeriodEnd] = useState<string | null>(null);
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; targetPlan: string } | null>(null);
+  const [upgradePreview, setUpgradePreview] = useState<{
+    open: boolean;
+    loading: boolean;
+    planName: string;
+    priceId: string;
+    proratedAmount: number;
+    newMonthlyPrice: number;
+    nextBillingDate: string;
+  } | null>(null);
+  const [upgrading, setUpgrading] = useState(false);
   const [affectedCircles, setAffectedCircles] = useState<OwnedCircle[]>([]);
 
   useEffect(() => {
@@ -139,13 +149,64 @@ const Pricing = () => {
     return withCounts;
   };
 
+  const handleUpgradePreview = async (plan: string, priceId: string) => {
+    setLoadingPlan(plan);
+    try {
+      const { data, error } = await supabase.functions.invoke("preview-upgrade", {
+        body: { priceId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setUpgradePreview({
+        open: true,
+        loading: false,
+        planName: data.plan_name,
+        priceId,
+        proratedAmount: data.prorated_amount,
+        newMonthlyPrice: data.new_monthly_price,
+        nextBillingDate: data.next_billing_date,
+      });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to preview upgrade.", variant: "destructive" });
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
+  const handleConfirmUpgrade = async () => {
+    if (!upgradePreview) return;
+    setUpgrading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("upgrade-subscription", {
+        body: { priceId: upgradePreview.priceId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (data?.success) {
+        setCurrentPlan(data.plan);
+        setCancelAtPeriodEnd(false);
+        setCurrentPeriodEnd(data.current_period_end);
+        setPendingPlan(null);
+        toast({
+          title: "Plan upgraded!",
+          description: `You're now on the ${data.plan.charAt(0).toUpperCase() + data.plan.slice(1)} plan. A receipt has been sent to your email.`,
+        });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to process upgrade.", variant: "destructive" });
+    } finally {
+      setUpgrading(false);
+      setUpgradePreview(null);
+    }
+  };
+
   const handleBuyNow = async (plan: string) => {
     if (plan === "free") {
       if (!user) {
         navigate("/auth");
         return;
       }
-      // User wants to cancel to free — show confirmation
       const circles = await fetchAffectedCircles("free");
       setAffectedCircles(circles);
       setConfirmDialog({ open: true, targetPlan: "free" });
@@ -160,31 +221,16 @@ const Pricing = () => {
     const priceId = PRICES[plan as keyof typeof PRICES];
     if (!priceId) return;
 
-    setLoadingPlan(plan);
-    try {
-      const currentRank = PLAN_RANK[currentPlan || "free"] ?? 0;
-      const targetRank = PLAN_RANK[plan] ?? 0;
+    const currentRank = PLAN_RANK[currentPlan || "free"] ?? 0;
+    const targetRank = PLAN_RANK[plan] ?? 0;
 
-      // If user has an active paid subscription and is upgrading, use upgrade-subscription
-      // This modifies the existing subscription with proration instead of creating a new one
-      if (currentPlan && currentPlan !== "free" && targetRank > currentRank) {
-        const { data, error } = await supabase.functions.invoke("upgrade-subscription", {
-          body: { priceId },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        if (data?.success) {
-          setCurrentPlan(data.plan);
-          setCancelAtPeriodEnd(false);
-          setCurrentPeriodEnd(data.current_period_end);
-          setPendingPlan(null);
-          toast({
-            title: "Plan upgraded!",
-            description: `You're now on the ${data.plan.charAt(0).toUpperCase() + data.plan.slice(1)} plan. You were only charged the prorated difference.`,
-          });
-        }
-      } else {
-        // New subscription (from free) — use checkout
+    if (currentPlan && currentPlan !== "free" && targetRank > currentRank) {
+      // Show preview before upgrading
+      await handleUpgradePreview(plan, priceId);
+    } else {
+      // New subscription from free — use checkout
+      setLoadingPlan(plan);
+      try {
         const { data, error } = await supabase.functions.invoke("create-checkout", {
           body: { priceId, mode: "subscription" },
         });
@@ -192,11 +238,11 @@ const Pricing = () => {
         if (data?.url) {
           window.location.href = data.url;
         }
+      } catch (err: any) {
+        toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });
+      } finally {
+        setLoadingPlan(null);
       }
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message || "Failed to process upgrade.", variant: "destructive" });
-    } finally {
-      setLoadingPlan(null);
     }
   };
 
@@ -521,6 +567,50 @@ const Pricing = () => {
             <AlertDialogAction onClick={handleCancelConfirm} disabled={cancelingPlan}>
               {cancelingPlan ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Upgrade Preview Confirmation Dialog */}
+      <AlertDialog
+        open={upgradePreview?.open ?? false}
+        onOpenChange={(open) => !open && setUpgradePreview(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Upgrade to {upgradePreview?.planName}?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="rounded-md border p-3 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-foreground font-medium">Due now (prorated)</span>
+                    <span className="text-foreground font-semibold">
+                      ${((upgradePreview?.proratedAmount ?? 0) / 100).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Starting {upgradePreview?.nextBillingDate ? formatPeriodEnd(upgradePreview.nextBillingDate) : "next billing date"}
+                    </span>
+                    <span className="text-muted-foreground">
+                      ${((upgradePreview?.newMonthlyPrice ?? 0) / 100).toFixed(2)}/month
+                    </span>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  You'll be charged the prorated difference for the remainder of your current billing period. After that, your monthly rate adjusts to the new plan price.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmUpgrade} disabled={upgrading}>
+              {upgrading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Confirm & Pay
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
