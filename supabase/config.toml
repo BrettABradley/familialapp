@@ -38,3 +38,9 @@ verify_jwt = false
 
 [functions.upgrade-subscription]
 verify_jwt = false
+
+[functions.cancel-downgrade]
+verify_jwt = false
+
+[functions.send-past-receipts]
+verify_jwt = false
