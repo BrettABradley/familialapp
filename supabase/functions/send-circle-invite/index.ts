@@ -201,6 +201,25 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Email sent successfully:", result);
 
+    // Only insert invite record after email sends successfully
+    const { error: insertError } = await supabaseAdmin
+      .from("circle_invites")
+      .insert({
+        circle_id: circleId,
+        invited_by: user.id,
+        email: email,
+        status: "pending",
+      });
+
+    if (insertError) {
+      console.error("Failed to save invite record:", insertError);
+      // Email was sent but DB insert failed — still return success since the email went out
+      return new Response(JSON.stringify({ success: true, warning: "Email sent but invite record failed to save" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
     return new Response(JSON.stringify({ success: true, id: result.id }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
