@@ -191,7 +191,7 @@ const Circles = () => {
     }
 
     try {
-      const { error: emailError } = await supabase.functions.invoke("send-circle-invite", {
+      const { data, error: emailError } = await supabase.functions.invoke("send-circle-invite", {
         body: {
           email: inviteEmail,
           circleName: selectedCircle.name,
@@ -200,14 +200,20 @@ const Circles = () => {
         },
       });
 
+      console.log("send-circle-invite response data:", data);
+      console.log("send-circle-invite response error:", emailError);
+
       if (emailError) {
         console.error("Circle invite email error:", emailError);
         toast({ title: "Invite created", description: `Invitation saved, but email failed to send.`, variant: "default" });
+      } else if (data?.error) {
+        console.error("Circle invite email error from response:", data.error);
+        toast({ title: "Invite created", description: data.error || "Email failed to send.", variant: "default" });
       } else {
         toast({ title: "Invite sent!", description: `Invitation email sent to ${inviteEmail}.` });
       }
     } catch (err) {
-      // Email send failed
+      console.error("Circle invite email exception:", err);
       toast({ title: "Invite created", description: `Invitation saved, but email failed to send.` });
     }
 
