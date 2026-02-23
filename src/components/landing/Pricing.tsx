@@ -162,15 +162,39 @@ const Pricing = () => {
 
     setLoadingPlan(plan);
     try {
-      const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { priceId, mode: "subscription" },
-      });
-      if (error) throw error;
-      if (data?.url) {
-        window.location.href = data.url;
+      const currentRank = PLAN_RANK[currentPlan || "free"] ?? 0;
+      const targetRank = PLAN_RANK[plan] ?? 0;
+
+      // If user has an active paid subscription and is upgrading, use upgrade-subscription
+      // This modifies the existing subscription with proration instead of creating a new one
+      if (currentPlan && currentPlan !== "free" && targetRank > currentRank) {
+        const { data, error } = await supabase.functions.invoke("upgrade-subscription", {
+          body: { priceId },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        if (data?.success) {
+          setCurrentPlan(data.plan);
+          setCancelAtPeriodEnd(false);
+          setCurrentPeriodEnd(data.current_period_end);
+          setPendingPlan(null);
+          toast({
+            title: "Plan upgraded!",
+            description: `You're now on the ${data.plan.charAt(0).toUpperCase() + data.plan.slice(1)} plan. You were only charged the prorated difference.`,
+          });
+        }
+      } else {
+        // New subscription (from free) — use checkout
+        const { data, error } = await supabase.functions.invoke("create-checkout", {
+          body: { priceId, mode: "subscription" },
+        });
+        if (error) throw error;
+        if (data?.url) {
+          window.location.href = data.url;
+        }
       }
     } catch (err: any) {
-      toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });
+      toast({ title: "Error", description: err.message || "Failed to process upgrade.", variant: "destructive" });
     } finally {
       setLoadingPlan(null);
     }
