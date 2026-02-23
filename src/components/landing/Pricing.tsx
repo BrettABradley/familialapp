@@ -117,7 +117,7 @@ const Pricing = () => {
   };
 
   return (
-    <section id="pricing" className="py-20 md:py-32 bg-background">
+    <section id="pricing" className="pt-20 md:pt-32 bg-background">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center mb-16">
           <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-6">
@@ -218,7 +218,7 @@ const Pricing = () => {
 
         {/* All Plans Include */}
       </div>
-      <div id="all-features" className="w-full mt-20 bg-secondary/30 py-16 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-8 scroll-mt-8">
+      <div id="all-features" className="w-full bg-secondary py-16 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-8 scroll-mt-8">
         <h3 className="font-serif text-2xl sm:text-3xl font-bold text-foreground text-center mb-3">
           Every plan includes
         </h3>
