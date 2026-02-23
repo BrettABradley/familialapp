@@ -91,6 +91,24 @@ async function sendReceiptEmail(toEmail: string, priceId: string): Promise<void>
   }
 }
 
+function getPlanFromProduct(productId: string): { plan: string; maxCircles: number; maxMembers: number } {
+  if (productId === FAMILY_PRODUCT_ID) {
+    return { plan: "family", maxCircles: 2, maxMembers: 20 };
+  } else if (productId === EXTENDED_PRODUCT_ID) {
+    return { plan: "extended", maxCircles: 3, maxMembers: 35 };
+  }
+  return { plan: "free", maxCircles: 1, maxMembers: 8 };
+}
+
+async function findUserIdByEmail(supabase: any, email: string): Promise<string | null> {
+  const { data } = await supabase.auth.admin.listUsers({ perPage: 1, page: 1 });
+  // Search through users - for large user bases this could be optimized
+  // but Stripe webhook gives us customer email which we match
+  const { data: users } = await supabase.auth.admin.listUsers();
+  const user = users?.users?.find((u: any) => u.email === email);
+  return user?.id ?? null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -138,19 +156,8 @@ serve(async (req) => {
         const productId = subscription.items.data[0]?.price?.product as string;
         receiptPriceId = subscription.items.data[0]?.price?.id;
 
-        let plan = "free";
-        let maxCircles = 1;
-        let maxMembers = 8;
-
-        if (productId === FAMILY_PRODUCT_ID) {
-          plan = "family";
-          maxCircles = 2;
-          maxMembers = 20;
-        } else if (productId === EXTENDED_PRODUCT_ID) {
-          plan = "extended";
-          maxCircles = 3;
-          maxMembers = 35;
-        }
+        const { plan, maxCircles, maxMembers } = getPlanFromProduct(productId);
+        const periodEnd = new Date(subscription.current_period_end * 1000).toISOString();
 
         console.log(`[STRIPE-WEBHOOK] Updating user ${userId} to plan: ${plan}`);
 
@@ -161,6 +168,8 @@ serve(async (req) => {
             plan,
             max_circles: maxCircles,
             max_members_per_circle: maxMembers,
+            cancel_at_period_end: false,
+            current_period_end: periodEnd,
             updated_at: new Date().toISOString(),
           }, { onConflict: "user_id" });
 
@@ -216,12 +225,98 @@ serve(async (req) => {
         }
       }
 
-      // Send receipt email (best-effort, backup to verify-checkout)
+      // Send receipt email (best-effort)
       if (customerEmail && receiptPriceId) {
         sendReceiptEmail(customerEmail, receiptPriceId).catch((err) =>
           console.error("[STRIPE-WEBHOOK] Receipt background error:", err.message)
         );
       }
+
+    } else if (event.type === "customer.subscription.updated") {
+      const subscription = event.data.object as Stripe.Subscription;
+      const customerEmail = typeof subscription.customer === "string"
+        ? (await stripe.customers.retrieve(subscription.customer) as Stripe.Customer).email
+        : null;
+
+      if (!customerEmail) {
+        console.log("[STRIPE-WEBHOOK] No customer email for subscription.updated, skipping");
+        return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const userId = await findUserIdByEmail(supabase, customerEmail);
+      if (!userId) {
+        console.log(`[STRIPE-WEBHOOK] No user found for email ${customerEmail}`);
+        return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const periodEnd = new Date(subscription.current_period_end * 1000).toISOString();
+      const cancelAtPeriodEnd = subscription.cancel_at_period_end;
+
+      if (cancelAtPeriodEnd) {
+        // Subscription is set to cancel at period end
+        console.log(`[STRIPE-WEBHOOK] Subscription canceling at period end for user ${userId}`);
+        const { error } = await supabase
+          .from("user_plans")
+          .update({
+            cancel_at_period_end: true,
+            current_period_end: periodEnd,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId);
+
+        if (error) console.error("[STRIPE-WEBHOOK] Error updating cancel state:", error);
+      } else {
+        // Subscription was reactivated or plan changed
+        const productId = subscription.items.data[0]?.price?.product as string;
+        const { plan, maxCircles, maxMembers } = getPlanFromProduct(productId);
+
+        console.log(`[STRIPE-WEBHOOK] Subscription updated for user ${userId}, plan: ${plan}`);
+        const { error } = await supabase
+          .from("user_plans")
+          .update({
+            plan,
+            max_circles: maxCircles,
+            max_members_per_circle: maxMembers,
+            cancel_at_period_end: false,
+            current_period_end: periodEnd,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId);
+
+        if (error) console.error("[STRIPE-WEBHOOK] Error updating plan:", error);
+      }
+
+    } else if (event.type === "customer.subscription.deleted") {
+      const subscription = event.data.object as Stripe.Subscription;
+      const customerEmail = typeof subscription.customer === "string"
+        ? (await stripe.customers.retrieve(subscription.customer) as Stripe.Customer).email
+        : null;
+
+      if (!customerEmail) {
+        console.log("[STRIPE-WEBHOOK] No customer email for subscription.deleted, skipping");
+        return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const userId = await findUserIdByEmail(supabase, customerEmail);
+      if (!userId) {
+        console.log(`[STRIPE-WEBHOOK] No user found for email ${customerEmail}`);
+        return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      console.log(`[STRIPE-WEBHOOK] Subscription deleted, downgrading user ${userId} to free`);
+      const { error } = await supabase
+        .from("user_plans")
+        .update({
+          plan: "free",
+          max_circles: 1,
+          max_members_per_circle: 8,
+          cancel_at_period_end: false,
+          current_period_end: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId);
+
+      if (error) console.error("[STRIPE-WEBHOOK] Error downgrading to free:", error);
     }
 
     return new Response(JSON.stringify({ received: true }), {

@@ -2,16 +2,27 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Phone, ArrowRight, Loader2, Camera, Calendar, MessageCircle, Smartphone, Users, Bell, Shield, Image, Video, Settings, Globe, StickyNote } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const PRICES = {
   family: "price_1T3N5bCiWDzualH5Cf7G7VsM",
   extended: "price_1T3N5nCiWDzualH5SBHxbHqo",
-  
 };
+
+const PLAN_RANK: Record<string, number> = { free: 0, family: 1, extended: 2 };
 
 const tiers = [
   {
@@ -19,10 +30,7 @@ const tiers = [
     price: "$0",
     period: "/forever",
     description: "For small families getting started",
-    features: [
-      "1 circle",
-      "Up to 8 members per circle",
-    ],
+    features: ["1 circle", "Up to 8 members per circle"],
     cta: "Get Started Free",
     popular: false,
     plan: "free",
@@ -32,10 +40,7 @@ const tiers = [
     price: "$7",
     period: "/month",
     description: "For growing families who need more space",
-    features: [
-      "Up to 2 circles",
-      "Up to 20 members per circle",
-    ],
+    features: ["Up to 2 circles", "Up to 20 members per circle"],
     cta: "Buy Now",
     popular: true,
     plan: "family",
@@ -45,10 +50,7 @@ const tiers = [
     price: "$15",
     period: "/month",
     description: "For large families and reunions",
-    features: [
-      "Up to 3 circles",
-      "Up to 35 members per circle",
-    ],
+    features: ["Up to 3 circles", "Up to 35 members per circle"],
     cta: "Buy Now",
     popular: false,
     plan: "extended",
@@ -75,28 +77,47 @@ const Pricing = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [cancelingPlan, setCancelingPlan] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
+  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
+  const [currentPeriodEnd, setCurrentPeriodEnd] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; targetPlan: string } | null>(null);
 
   useEffect(() => {
-    if (!user) { setCurrentPlan(null); return; }
-    supabase.from("user_plans").select("plan").eq("user_id", user.id).single()
-      .then(({ data }) => setCurrentPlan(data?.plan ?? "free"));
+    if (!user) {
+      setCurrentPlan(null);
+      setCancelAtPeriodEnd(false);
+      setCurrentPeriodEnd(null);
+      return;
+    }
+    supabase
+      .from("user_plans")
+      .select("plan, cancel_at_period_end, current_period_end")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data }) => {
+        setCurrentPlan(data?.plan ?? "free");
+        setCancelAtPeriodEnd(data?.cancel_at_period_end ?? false);
+        setCurrentPeriodEnd(data?.current_period_end ?? null);
+      });
   }, [user]);
 
   const handleBuyNow = async (plan: string) => {
     if (plan === "free") {
-      navigate("/auth");
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
+      // User wants to cancel to free — show confirmation
+      setConfirmDialog({ open: true, targetPlan: "free" });
       return;
     }
 
-
     if (!user) {
-      // Not logged in — redirect to auth with plan param
       navigate(`/auth?plan=${plan}`);
       return;
     }
 
-    // Logged in — directly trigger checkout
     const priceId = PRICES[plan as keyof typeof PRICES];
     if (!priceId) return;
 
@@ -116,6 +137,114 @@ const Pricing = () => {
     }
   };
 
+  const handleCancelConfirm = async () => {
+    setCancelingPlan(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("cancel-subscription");
+      if (error) throw error;
+      if (data?.success) {
+        setCancelAtPeriodEnd(true);
+        setCurrentPeriodEnd(data.current_period_end);
+        toast({
+          title: "Subscription canceled",
+          description: `You'll keep access until ${formatPeriodEnd(data.current_period_end)}.`,
+        });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to cancel subscription.", variant: "destructive" });
+    } finally {
+      setCancelingPlan(false);
+      setConfirmDialog(null);
+    }
+  };
+
+  const formatPeriodEnd = (dateStr: string | null) => {
+    if (!dateStr) return "the end of your billing period";
+    return new Date(dateStr).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  };
+
+  const getButtonForTier = (tierPlan: string, tierPopular: boolean, tierCta: string) => {
+    if (!user || !currentPlan) {
+      // Not logged in
+      return (
+        <Button
+          variant={tierPopular ? "default" : "outline"}
+          className="w-full"
+          size="lg"
+          onClick={() => handleBuyNow(tierPlan)}
+          disabled={loadingPlan !== null}
+        >
+          {loadingPlan === tierPlan ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+          {tierCta}
+          {loadingPlan !== tierPlan && <ArrowRight className="w-4 h-4 ml-2" />}
+        </Button>
+      );
+    }
+
+    const currentRank = PLAN_RANK[currentPlan] ?? 0;
+    const tierRank = PLAN_RANK[tierPlan] ?? 0;
+
+    // Current plan
+    if (tierPlan === currentPlan) {
+      if (cancelAtPeriodEnd) {
+        return (
+          <Button variant="secondary" className="w-full" size="lg" disabled>
+            Canceling {formatPeriodEnd(currentPeriodEnd)}
+          </Button>
+        );
+      }
+      return (
+        <Button variant="secondary" className="w-full" size="lg" disabled>
+          Current Tier
+        </Button>
+      );
+    }
+
+    // Higher tier — upgrade
+    if (tierRank > currentRank) {
+      return (
+        <Button
+          variant={tierPopular ? "default" : "outline"}
+          className="w-full"
+          size="lg"
+          onClick={() => handleBuyNow(tierPlan)}
+          disabled={loadingPlan !== null || cancelingPlan}
+        >
+          {loadingPlan === tierPlan ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+          Upgrade
+          {loadingPlan !== tierPlan && <ArrowRight className="w-4 h-4 ml-2" />}
+        </Button>
+      );
+    }
+
+    // Lower tier — downgrade / cancel
+    if (cancelAtPeriodEnd) {
+      // Already canceling, lower tiers should just show disabled
+      return (
+        <Button variant="outline" className="w-full" size="lg" disabled>
+          {tierPlan === "free" ? "Cancel Pending" : "Downgrade Pending"}
+        </Button>
+      );
+    }
+
+    const label = tierPlan === "free" ? "Cancel Membership" : "Downgrade";
+    return (
+      <Button
+        variant="outline"
+        className="w-full"
+        size="lg"
+        onClick={() => setConfirmDialog({ open: true, targetPlan: tierPlan })}
+        disabled={cancelingPlan}
+      >
+        {label}
+      </Button>
+    );
+  };
+
+  const dialogTargetName = confirmDialog
+    ? tiers.find((t) => t.plan === confirmDialog.targetPlan)?.name ?? "Free"
+    : "";
+
   return (
     <section id="pricing" className="pt-20 md:pt-32 bg-background">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -128,17 +257,15 @@ const Pricing = () => {
           </p>
         </div>
 
-        {/* Choose your circle size */}
         <p className="text-center text-muted-foreground mb-8 text-sm font-medium uppercase tracking-wider">
           Choose your plan
         </p>
 
-        {/* Pricing Cards */}
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-16">
           {tiers.map((tier) => (
-            <Card 
-              key={tier.name} 
-              className={`relative ${tier.popular ? 'border-2 border-foreground shadow-xl' : 'border border-border'}`}
+            <Card
+              key={tier.name}
+              className={`relative ${tier.popular ? "border-2 border-foreground shadow-xl" : "border border-border"}`}
             >
               {tier.popular && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-foreground text-background px-4 py-1 rounded-full text-sm font-medium">
@@ -173,23 +300,7 @@ const Pricing = () => {
                   </li>
                 </ul>
                 <div className="pt-4">
-                  {currentPlan === tier.plan ? (
-                    <Button variant="secondary" className="w-full" size="lg" disabled>
-                      Current Tier
-                    </Button>
-                  ) : (
-                    <Button
-                      variant={tier.popular ? "default" : "outline"}
-                      className="w-full"
-                      size="lg"
-                      onClick={() => handleBuyNow(tier.plan)}
-                      disabled={loadingPlan !== null}
-                    >
-                      {loadingPlan === tier.plan ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                      {tier.cta}
-                      {loadingPlan !== tier.plan && <ArrowRight className="w-4 h-4 ml-2" />}
-                    </Button>
-                  )}
+                  {getButtonForTier(tier.plan, tier.popular, tier.cta)}
                 </div>
               </CardContent>
             </Card>
@@ -215,9 +326,9 @@ const Pricing = () => {
             </CardContent>
           </Card>
         </div>
-
-        {/* All Plans Include */}
       </div>
+
+      {/* All Plans Include */}
       <div id="all-features" className="w-full bg-secondary py-16 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-8 scroll-mt-8">
         <h3 className="font-serif text-2xl sm:text-3xl font-bold text-foreground text-center mb-3">
           Every plan includes
@@ -240,6 +351,34 @@ const Pricing = () => {
           })}
         </div>
       </div>
+
+      {/* Cancel/Downgrade Confirmation Dialog */}
+      <AlertDialog
+        open={confirmDialog?.open ?? false}
+        onOpenChange={(open) => !open && setConfirmDialog(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmDialog?.targetPlan === "free"
+                ? "Cancel your subscription?"
+                : `Downgrade to ${dialogTargetName}?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You'll keep full access to your current plan until{" "}
+              {formatPeriodEnd(currentPeriodEnd)}. After that, your plan will switch to{" "}
+              {dialogTargetName}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Current Plan</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelConfirm} disabled={cancelingPlan}>
+              {cancelingPlan ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 };
