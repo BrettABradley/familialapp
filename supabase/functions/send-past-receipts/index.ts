@@ -130,11 +130,91 @@ serve(async (req) => {
       }
     }
 
+    // ── Pass 2: Backfill upgrade receipts from subscription_update invoices ──
+    const upgradeProcessed: string[] = [];
+    const upgradeSkipped: string[] = [];
+    let invoiceHasMore = true;
+    let invoiceStartingAfter: string | undefined;
+
+    while (invoiceHasMore) {
+      const invoiceParams: any = { status: "paid", limit: 100 };
+      if (invoiceStartingAfter) invoiceParams.starting_after = invoiceStartingAfter;
+
+      const invoices = await stripe.invoices.list(invoiceParams);
+
+      for (const invoice of invoices.data) {
+        if (invoice.billing_reason !== "subscription_update") {
+          upgradeSkipped.push(invoice.id);
+          continue;
+        }
+
+        if (!invoice.amount_paid || invoice.amount_paid <= 0) {
+          upgradeSkipped.push(invoice.id);
+          continue;
+        }
+
+        // Get customer email
+        let email: string | null = null;
+        if (invoice.customer_email) {
+          email = invoice.customer_email;
+        } else if (typeof invoice.customer === "string") {
+          try {
+            const cust = await stripe.customers.retrieve(invoice.customer);
+            if ("email" in cust && cust.email) email = cust.email;
+          } catch { /* skip */ }
+        }
+
+        if (!email) {
+          upgradeSkipped.push(invoice.id);
+          continue;
+        }
+
+        const amountStr = `$${(invoice.amount_paid / 100).toFixed(2)}`;
+        const purchaseDate = formatDate(new Date(invoice.created * 1000));
+        const subject = `Your Familial Receipt - ${purchaseDate}`;
+        const html = buildReceiptHtml("Plan Upgrade (prorated)", amountStr, purchaseDate);
+
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: "Familial <support@support.familialmedia.com>",
+            to: [email],
+            subject,
+            html,
+          }),
+        });
+
+        const result = await res.json();
+        if (res.ok) {
+          console.log(`[SEND-PAST-RECEIPTS] Upgrade receipt sent to ${email} for invoice ${invoice.id}`);
+          upgradeProcessed.push(invoice.id);
+        } else {
+          console.error(`[SEND-PAST-RECEIPTS] Upgrade receipt failed for ${invoice.id}:`, result);
+          upgradeSkipped.push(invoice.id);
+        }
+
+        await delay(100);
+      }
+
+      invoiceHasMore = invoices.has_more;
+      if (invoices.data.length > 0) {
+        invoiceStartingAfter = invoices.data[invoices.data.length - 1].id;
+      } else {
+        invoiceHasMore = false;
+      }
+    }
+
     const summary = {
-      emailsSent: processed.length,
-      skipped: skipped.length,
+      checkoutEmailsSent: processed.length,
+      checkoutSkipped: skipped.length,
+      upgradeEmailsSent: upgradeProcessed.length,
+      upgradeSkipped: upgradeSkipped.length,
       processedSessionIds: processed,
-      skippedSessionIds: skipped,
+      processedInvoiceIds: upgradeProcessed,
     };
 
     console.log("[SEND-PAST-RECEIPTS] Complete:", JSON.stringify(summary));

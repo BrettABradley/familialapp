@@ -86,11 +86,13 @@ const Pricing = () => {
   const { toast } = useToast();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [cancelingPlan, setCancelingPlan] = useState(false);
+  const [cancelDowngradeLoading, setCancelDowngradeLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const [currentPeriodEnd, setCurrentPeriodEnd] = useState<string | null>(null);
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; targetPlan: string } | null>(null);
+  const [cancelDowngradeDialog, setCancelDowngradeDialog] = useState(false);
   const [upgradePreview, setUpgradePreview] = useState<{
     open: boolean;
     loading: boolean;
@@ -324,6 +326,28 @@ const Pricing = () => {
     }
   };
 
+  const handleCancelDowngrade = async () => {
+    setCancelDowngradeLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("cancel-downgrade");
+      if (error) throw error;
+      if (data?.success) {
+        setCurrentPlan("extended");
+        setPendingPlan(null);
+        setCurrentPeriodEnd(data.current_period_end);
+        toast({
+          title: "Downgrade canceled",
+          description: "You're back on the Extended plan. No additional charges.",
+        });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to cancel downgrade.", variant: "destructive" });
+    } finally {
+      setCancelDowngradeLoading(false);
+      setCancelDowngradeDialog(false);
+    }
+  };
+
   const formatPeriodEnd = (dateStr: string | null) => {
     if (!dateStr) return "the end of your billing period";
     return new Date(dateStr).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
@@ -350,8 +374,23 @@ const Pricing = () => {
     const currentRank = PLAN_RANK[currentPlan] ?? 0;
     const tierRank = PLAN_RANK[tierPlan] ?? 0;
 
-    // Current plan
+    // Current plan — but if there's a pending downgrade, show Cancel Downgrade on the original plan
     if (tierPlan === currentPlan) {
+      if (pendingPlan && !cancelAtPeriodEnd) {
+        // User has a pending downgrade from this tier — show Cancel Downgrade
+        return (
+          <Button
+            variant="default"
+            className="w-full"
+            size="lg"
+            onClick={() => setCancelDowngradeDialog(true)}
+            disabled={cancelDowngradeLoading}
+          >
+            {cancelDowngradeLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Cancel Downgrade
+          </Button>
+        );
+      }
       if (cancelAtPeriodEnd) {
         return (
           <Button variant="secondary" className="w-full" size="lg" disabled>
@@ -388,7 +427,7 @@ const Pricing = () => {
       // Already canceling or downgrading, lower tiers should just show disabled
       return (
         <Button variant="outline" className="w-full" size="lg" disabled>
-          {tierPlan === "free" ? "Cancel Pending" : "Downgrade Pending"}
+          {tierPlan === pendingPlan ? "Downgrade Pending" : tierPlan === "free" ? "Cancel Pending" : "Downgrade Pending"}
         </Button>
       );
     }
@@ -611,6 +650,35 @@ const Pricing = () => {
             <AlertDialogAction onClick={handleConfirmUpgrade} disabled={upgrading}>
               {upgrading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Confirm & Pay
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Downgrade Confirmation Dialog */}
+      <AlertDialog
+        open={cancelDowngradeDialog}
+        onOpenChange={(open) => !open && setCancelDowngradeDialog(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel your downgrade?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Are you sure? You'll continue on the <strong>Extended</strong> plan at <strong>$15/month</strong>, charged on your original billing schedule.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  No additional charges will be made right now.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Downgrade</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelDowngrade} disabled={cancelDowngradeLoading}>
+              {cancelDowngradeLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Stay on Extended
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

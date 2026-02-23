@@ -45,7 +45,9 @@ const SubscriptionCard = () => {
   const [cancelLoading, setCancelLoading] = useState(false);
   const [downgradeLoading, setDowngradeLoading] = useState(false);
   const [reactivateLoading, setReactivateLoading] = useState(false);
+  const [cancelDowngradeLoading, setCancelDowngradeLoading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; action: "cancel" | "downgrade" } | null>(null);
+  const [cancelDowngradeDialog, setCancelDowngradeDialog] = useState(false);
   const [affectedCircles, setAffectedCircles] = useState<OwnedCircle[]>([]);
 
   useEffect(() => {
@@ -207,6 +209,23 @@ const SubscriptionCard = () => {
     }
   };
 
+  const handleCancelDowngrade = async () => {
+    setCancelDowngradeLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("cancel-downgrade");
+      if (error) throw error;
+      if (data?.success) {
+        setPlanData((prev) => prev ? { ...prev, plan: "extended", pending_plan: null, current_period_end: data.current_period_end, max_circles: 3 } : prev);
+        toast({ title: "Downgrade canceled", description: "You're back on the Extended plan. No additional charges." });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to cancel downgrade.", variant: "destructive" });
+    } finally {
+      setCancelDowngradeLoading(false);
+      setCancelDowngradeDialog(false);
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -272,6 +291,13 @@ const SubscriptionCard = () => {
             {isExtended && !planData.cancel_at_period_end && !planData.pending_plan && (
               <Button variant="outline" onClick={() => openConfirmDialog("downgrade")} disabled={downgradeLoading} className="w-full">
                 Downgrade to Family
+              </Button>
+            )}
+
+            {planData.pending_plan && !planData.cancel_at_period_end && (
+              <Button variant="default" onClick={() => setCancelDowngradeDialog(true)} disabled={cancelDowngradeLoading} className="w-full">
+                {cancelDowngradeLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RotateCcw className="w-4 h-4 mr-2" />}
+                Cancel Downgrade
               </Button>
             )}
 
@@ -342,6 +368,34 @@ const SubscriptionCard = () => {
             >
               {(cancelLoading || downgradeLoading) && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={cancelDowngradeDialog}
+        onOpenChange={(open) => !open && setCancelDowngradeDialog(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel your downgrade?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Are you sure? You'll continue on the <strong>Extended</strong> plan at <strong>$15/month</strong>, charged on your original billing schedule.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  No additional charges will be made right now.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Downgrade</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelDowngrade} disabled={cancelDowngradeLoading}>
+              {cancelDowngradeLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Stay on Extended
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
