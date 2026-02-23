@@ -1,36 +1,34 @@
 
+## Fix: Allow cancellation to Free even when a downgrade is pending
 
-## Make Event Addresses Clickable with Maps Links
+### Problem
+When a user has a pending downgrade (e.g., Extended to Family), the Free tier button incorrectly shows "Cancel Pending" (disabled). The user should still be able to cancel their membership entirely, even while a tier-to-tier downgrade is pending.
 
-### What Changes
+### Root Cause
+The condition at line 441 checks `cancelAtPeriodEnd && tierPlan === "free"` without considering whether the cancellation is a standalone action or part of a tier downgrade. When `pendingPlan` is set (meaning a tier-to-tier downgrade, not a full cancellation), Free should remain actionable.
 
-When an event has a location/address, it will become a tappable link. Tapping it opens a small menu letting the user choose between **Apple Maps** or **Google Maps**, which then opens the selected maps app/website with the address pre-filled.
+### Fix (single file change)
 
-### How It Works
+**File: `src/components/landing/Pricing.tsx`**
 
-- The location text in each event card becomes a clickable button styled as a link
-- Clicking it opens a small popover with two options:
-  - **Apple Maps** -- opens `https://maps.apple.com/?q={address}`
-  - **Google Maps** -- opens `https://www.google.com/maps/search/?api=1&query={address}`
-- Both open in a new tab; on mobile devices, they'll automatically open the respective maps app if installed
-- No user preference is stored -- the user simply picks each time they tap (keeps it simple and avoids needing database changes)
+Update the Free tier logic (lines 440-447) so that "Cancel Pending" only appears when there's a standalone cancellation (i.e., `cancelAtPeriodEnd` is true but `pendingPlan` is NOT set). When a tier-to-tier downgrade is pending, Free remains clickable with "Cancel Membership":
 
-### Changes
+```text
+Before:
+  - pendingPlan = "family" + cancelAtPeriodEnd = true --> Free shows "Cancel Pending" (WRONG)
 
-**`src/pages/Events.tsx`**
+After:
+  - pendingPlan = "family" (tier downgrade) --> Free shows "Cancel Membership" (clickable)
+  - cancelAtPeriodEnd = true, no pendingPlan (full cancel) --> Free shows "Cancel Pending" (disabled)
+```
 
-In the `renderEventCard` function (lines 501-505), replace the plain location text with a `Popover` component:
-- The trigger is the location text styled as a clickable link (underline, pointer cursor)
-- The popover content shows two buttons: "Open in Apple Maps" and "Open in Google Maps"
-- Each button opens the appropriate URL with the address URI-encoded
+The condition changes from:
+```typescript
+if (cancelAtPeriodEnd && tierPlan === "free")
+```
+to:
+```typescript
+if (cancelAtPeriodEnd && !pendingPlan && tierPlan === "free")
+```
 
-The same treatment applies to the edit dialog preview -- but since the edit dialog doesn't show a rendered card, no changes needed there.
-
-### Technical Details
-
-The URL formats:
-- Apple Maps: `https://maps.apple.com/?q=${encodeURIComponent(location)}`
-- Google Maps: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`
-
-Uses the existing `Popover`, `PopoverTrigger`, `PopoverContent` components already imported in the file. No new dependencies needed.
-
+This single condition change ensures users can always navigate to a lower tier, even when another change is already pending. The existing `handleConfirmDowngrade` function already handles the Stripe and database updates correctly for cancellations.
