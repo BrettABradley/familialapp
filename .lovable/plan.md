@@ -1,20 +1,49 @@
 
 
-# Fix: Circle Member Count Shows 2 Instead of 1
+# Stay Signed In on Homepage + Pricing Layout Fix
 
-## The Bug
-When you create a new circle, it shows "2 members" even though only you (the owner) are in the circle.
+## Overview
+Two changes: (1) The landing page header should reflect your signed-in state so you can interact with pricing buttons without re-authenticating, and (2) the "Need More Members" and "Need a Custom Plan" cards should sit side by side on desktop.
 
-## Root Cause
-When a circle is created, the owner is added to the `circle_memberships` table as an "admin" (line 223 in Circles.tsx). However, the `getCircleMemberCount` function in `circleLimits.ts` counts all entries in `circle_memberships` AND then adds +1 "for the owner" -- effectively double-counting the owner.
+## What Changes
 
-## The Fix
-Remove the `+1` from `getCircleMemberCount` in `src/lib/circleLimits.ts`, since the owner is already tracked in the `circle_memberships` table.
+### 1. Header Shows Signed-In State
+The landing page header currently always shows "Sign In" and "Get Started" buttons, even if you're already logged in. This means when you click a pricing button, it may unnecessarily redirect you to `/auth`.
 
-### File Changed
+**Fix:** Update `Header.tsx` to use the `useAuth` hook. If signed in:
+- Replace "Sign In" / "Get Started" with a "Go to Dashboard" button (links to `/feed`)
+- Same change in the mobile menu
+
+### 2. Pricing Bottom Cards Side by Side on Desktop
+Currently "Need More Members?" and "Need a Custom Plan?" are stacked vertically in separate `max-w-2xl` containers.
+
+**Fix:** Wrap both cards in a single `max-w-6xl` grid container with `md:grid-cols-2` so they sit side by side on desktop and stack on mobile.
+
+---
+
+## Technical Details
+
+### Files Modified
 
 | File | Change |
 |------|--------|
-| `src/lib/circleLimits.ts` | Change `return (count ?? 0) + 1` to `return count ?? 0` on line 8 |
+| `src/components/landing/Header.tsx` | Import `useAuth`; conditionally render "Go to Dashboard" button when user is signed in, or "Sign In" / "Get Started" when not |
+| `src/components/landing/Pricing.tsx` | Combine the "Extra Members" and "Custom Plans" cards into a single `grid md:grid-cols-2` container with `max-w-6xl` |
 
-This is a one-line fix.
+### Header Logic
+```text
+if (user) --> Show "Go to Dashboard" button linking to /feed
+else      --> Show "Sign In" + "Get Started" buttons linking to /auth
+```
+
+### Pricing Layout
+```text
+Before:
+  [Need More Members?]    (max-w-2xl, centered)
+  [Need a Custom Plan?]   (max-w-2xl, centered)
+
+After:
+  [Need More Members?]  [Need a Custom Plan?]   (max-w-6xl, grid md:grid-cols-2)
+  (stacked on mobile)
+```
+
