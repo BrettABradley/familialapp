@@ -10,6 +10,7 @@ export interface FridgeBoardPin {
   title: string;
   image_url: string | null;
   circle_id: string;
+  pinned_by: string;
   created_at: string;
   circles?: { id: string; name: string };
 }
@@ -44,13 +45,13 @@ const MAGNET_COLORS = [
 
 export function FridgeBoard({
   pins,
-  canDeleteCircleId,
+  canDelete,
   onDelete,
   className,
   circleName,
 }: {
   pins: FridgeBoardPin[];
-  canDeleteCircleId: (circleId: string) => boolean;
+  canDelete: (pin: FridgeBoardPin) => boolean;
   onDelete: (pin: FridgeBoardPin) => void;
   className?: string;
   circleName?: string;
@@ -136,7 +137,7 @@ export function FridgeBoard({
           <div className="relative aspect-[3/4] sm:aspect-[2/3] w-full p-4 pt-12">
             {pins.slice(0, 8).map((pin, idx) => {
               const layout = PIN_LAYOUT[idx];
-              const canDelete = canDeleteCircleId(pin.circle_id);
+              const canDeletePin = canDelete(pin);
               const magnetColor = MAGNET_COLORS[idx % MAGNET_COLORS.length];
 
               return (
@@ -213,7 +214,7 @@ export function FridgeBoard({
                     </div>
 
                     {/* Delete button */}
-                    {canDelete && (
+                    {canDeletePin && (
                       <Button
                         type="button"
                         variant="destructive"
