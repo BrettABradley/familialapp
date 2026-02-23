@@ -1,49 +1,35 @@
 
 
-# Send Receipt Emails for All Past Purchases
+# Fix Stripe Product Description and Add "Current Tier" Logic
 
-## Overview
-Create a one-time edge function that fetches all completed payments from Stripe and sends receipt emails retroactively using the same branded template already in place.
+## Problem 1: Stripe Product Description Mismatch
+The Stripe product "Family Plan" (`prod_U1PvvkbplSC8Pm`) currently says:
+> "Family plan - up to 20 members per circle, **3 circles**"
 
-## Approach
-A new edge function `send-past-receipts` will:
-1. Query Stripe for all past completed checkout sessions
-2. For each session, determine the purchased item (subscription or extra members) from the line items
-3. Send the same branded receipt email via Resend to the customer's email
-4. Log results and skip any sessions without a valid email or recognizable price ID
+But the correct description per the pricing page is **2 circles**. Unfortunately, there is no automated tool to update Stripe product descriptions -- you will need to manually update this in your Stripe dashboard. The product URL is accessible from your Stripe account under Products > Family Plan. Change the description to:
+> "Family plan - up to 20 members per circle, 2 circles"
 
-This function will be invoked manually (once) to backfill receipts for all historical purchases.
+## Problem 2: Prevent Duplicate Purchases (Show "Current Tier")
 
-## Changes
+### Changes to `src/components/landing/Pricing.tsx`:
 
-### 1. New file: `supabase/functions/send-past-receipts/index.ts`
-- Authenticates the caller (must be logged in -- acts as a safety gate)
-- Uses Stripe API to list all checkout sessions with `status: "complete"` and `payment_status: "paid"`
-- Paginates through all results using Stripe's `auto_paging` or manual `starting_after` cursor
-- For each session:
-  - Retrieves line items to get the price ID
-  - Maps price ID to item description and amount (same mapping as verify-checkout/stripe-webhook)
-  - Gets the customer email from `session.customer_email` or `session.customer_details.email`
-  - Sends the receipt email using the same HTML template and subject format (`Your Familial Receipt - [date]`)
-  - Uses the session's `created` timestamp for the date (not today's date) so receipts reflect the actual purchase date
-- Returns a summary: total sessions found, emails sent, skipped (no email or unknown price)
+1. **Fetch the user's current plan** from the `user_plans` table when logged in using a `useEffect` + query
+2. **Replace the "Buy Now" button** with a disabled "Current Tier" button when the user's plan matches the tier
+3. **Also disable "Get Started Free"** if the user is already on the free plan (logged in)
+4. **Fix duplicate features** in all three tier lists (each has a duplicated last entry)
 
-### 2. Update `supabase/config.toml`
-- Add `[functions.send-past-receipts]` with `verify_jwt = false`
+### How it works:
+- When logged in, query `user_plans` for the current user's `plan` field (values: `free`, `family`, `extended`)
+- For each pricing card, compare `tier.plan` against the user's current plan
+- If they match: show a disabled button with text "Current Tier" (no arrow icon, no click handler)
+- If they don't match: show the normal "Buy Now" / "Get Started Free" button as before
 
-## Technical Details
+### UI behavior:
+- **Not logged in**: All buttons work normally (redirect to `/auth?plan=...`)
+- **Logged in, Free tier**: Free card shows "Current Tier" (disabled), Family and Extended show "Buy Now"
+- **Logged in, Family tier**: Family card shows "Current Tier" (disabled), others show their normal CTAs
+- **Logged in, Extended tier**: Extended card shows "Current Tier" (disabled), others show their normal CTAs
 
-**Date handling**: Unlike the real-time receipts which use `new Date()`, this function will use the Stripe session's `created` timestamp to format the date, so each receipt shows the actual purchase date.
-
-**Rate limiting**: Resend allows up to 100 emails/second on most plans. A small delay (100ms) between sends will be added to avoid hitting limits.
-
-**Idempotency**: If run multiple times, customers may receive duplicate receipts. A log of processed session IDs will be returned so you can verify before re-running.
-
-**Files created/modified**:
-| File | Change |
-|------|--------|
-| `supabase/functions/send-past-receipts/index.ts` | New one-time edge function to backfill receipts |
-| `supabase/config.toml` | Add function config entry |
-
-No new secrets needed -- uses existing `STRIPE_SECRET_KEY` and `RESEND_API_KEY`.
+### Manual step required:
+Update the Family Plan product description in Stripe from "3 circles" to "2 circles".
 
