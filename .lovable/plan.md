@@ -1,35 +1,47 @@
 
 
-# Fix Stripe Product Description and Add "Current Tier" Logic
+# Restructure Pricing Page for Honesty and Clarity
 
-## Problem 1: Stripe Product Description Mismatch
-The Stripe product "Family Plan" (`prod_U1PvvkbplSC8Pm`) currently says:
-> "Family plan - up to 20 members per circle, **3 circles**"
+## Problem
+Right now each tier lists different features (e.g., "Event planning & calendars" only on Family, "Family tree features" only on Extended), which implies those features are exclusive to paid tiers. In reality, the **only** differences between tiers are circle count and member limits. All features are available to everyone, including free users.
 
-But the correct description per the pricing page is **2 circles**. Unfortunately, there is no automated tool to update Stripe product descriptions -- you will need to manually update this in your Stripe dashboard. The product URL is accessible from your Stripe account under Products > Family Plan. Change the description to:
-> "Family plan - up to 20 members per circle, 2 circles"
+## Approach
+Restructure the pricing cards so each tier only highlights its **circle count** and **member limit** as the differentiators. Then add a shared "All plans include" section below the pricing cards that lists every feature available across all tiers.
 
-## Problem 2: Prevent Duplicate Purchases (Show "Current Tier")
+## Changes to `src/components/landing/Pricing.tsx`
 
-### Changes to `src/components/landing/Pricing.tsx`:
+### 1. Simplify the tier feature lists
+Each tier card will only show two bullet points -- the things that actually differ:
+- **Free**: 1 circle, 8 members per circle
+- **Family**: 2 circles, 20 members per circle
+- **Extended**: 3 circles, 35 members per circle
 
-1. **Fetch the user's current plan** from the `user_plans` table when logged in using a `useEffect` + query
-2. **Replace the "Buy Now" button** with a disabled "Current Tier" button when the user's plan matches the tier
-3. **Also disable "Get Started Free"** if the user is already on the free plan (logged in)
-4. **Fix duplicate features** in all three tier lists (each has a duplicated last entry)
+### 2. Add a shared features section
+Below the three pricing cards (and above the "Custom Plan" card), add a centered section titled **"All plans include"** with a grid of features that apply to every tier:
+- Unlimited posts and photos
+- Event planning and calendars
+- Photo albums
+- Family tree features
+- Private messaging
+- Video sharing
+- Mobile and web access
+- Circle management tools
 
-### How it works:
-- When logged in, query `user_plans` for the current user's `plan` field (values: `free`, `family`, `extended`)
-- For each pricing card, compare `tier.plan` against the user's current plan
-- If they match: show a disabled button with text "Current Tier" (no arrow icon, no click handler)
-- If they don't match: show the normal "Buy Now" / "Get Started Free" button as before
+### 3. Update tier descriptions
+Make the descriptions reinforce that the difference is just scale:
+- Free: "For small families getting started"
+- Family: "For growing families who need more space"
+- Extended: "For large families and reunions"
 
-### UI behavior:
-- **Not logged in**: All buttons work normally (redirect to `/auth?plan=...`)
-- **Logged in, Free tier**: Free card shows "Current Tier" (disabled), Family and Extended show "Buy Now"
-- **Logged in, Family tier**: Family card shows "Current Tier" (disabled), others show their normal CTAs
-- **Logged in, Extended tier**: Extended card shows "Current Tier" (disabled), others show their normal CTAs
+### Visual Layout
 
-### Manual step required:
-Update the Family Plan product description in Stripe from "3 circles" to "2 circles".
+The pricing cards will be cleaner and shorter, making the value proposition obvious at a glance. The shared features grid below will reassure users that they get the full experience regardless of tier.
+
+### Technical Details
+
+Only one file changes: `src/components/landing/Pricing.tsx`.
+
+- Replace the `features` arrays in each tier object with just the 2 differentiating items
+- Add a `const sharedFeatures` array with all the common features
+- Render a new section between the pricing grid and the "Custom Plan" card using a responsive grid (e.g., `grid-cols-2 md:grid-cols-4`) with check icons
 
