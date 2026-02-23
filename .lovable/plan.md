@@ -1,64 +1,33 @@
 
 
-# Two Changes: Pricing Layout Polish + Link Preview Cards in Feed
+# Polish Pricing Section
 
-## 1. Pricing Page - Move "All Plans Include" Above Tiers
+## What feels off and how to fix it
 
-Restructure the pricing section so the shared features appear **above** the pricing cards, reinforcing that every feature is available on every plan before users even look at prices.
+The pricing cards are too sparse with only 2 bullet points, making them feel incomplete. Users may not scroll down to see the shared features list, leaving them uncertain about what each plan includes.
 
-### Layout order (top to bottom):
-1. Title: "Simple, Transparent Pricing"
-2. Subtitle
-3. **"All plans include"** section with the feature grid (moved up)
-4. A subtle label like "Choose your circle size" to transition into tiers
-5. The three pricing cards
-6. Custom plan card
+## Changes to `src/components/landing/Pricing.tsx`
 
-### Styling improvements:
-- Wrap the shared features in a subtle card/background (e.g., `bg-secondary/30 rounded-2xl p-8`) to visually group them
-- Add a small transition heading between the features and the pricing cards
+### 1. Change "Choose your circle size" to "Choose your plan"
+Simple text update on line 129.
 
-### File changed: `src/components/landing/Pricing.tsx`
+### 2. Add "All features included" note to each pricing card
+Below the 2 feature bullet points (circle count + member limit), add a subtle line that says **"All features included"** styled as a muted, smaller text with a checkmark icon. This anchors to `#all-features` so users can click to see the full list.
 
----
+This fills out the card visually and reassures users at the point of decision.
 
-## 2. Link Preview Cards in Feed (Open Graph Previews)
+### 3. Add an `id` anchor to the shared features section
+Add `id="all-features"` to the "Every plan includes" container div so the in-card link can scroll to it smoothly.
 
-When a user posts a URL, show a rich link preview card below the post text -- similar to how X/Twitter displays them (image, title, description, domain).
+### 4. Slight card padding adjustment
+Add a bit more vertical space in the card content area so the "All features included" line doesn't feel cramped.
 
-### Approach:
-- **New Edge Function** (`fetch-link-preview`): Takes a URL, fetches the page HTML server-side, parses Open Graph meta tags (`og:title`, `og:description`, `og:image`, `og:url`), and returns the metadata as JSON. This avoids CORS issues from client-side fetching.
-- **New Component** (`LinkPreviewCard`): A card that displays the OG image, title, description, and domain in a clean, X-style layout (image on top, text below, rounded corners, clickable).
-- **Integration into PostCard**: After rendering the post content text, extract the first URL from the post content. If found, render `LinkPreviewCard` which calls the edge function to get preview data, caches the result, and displays it.
+## Result
+- Cards feel more complete and trustworthy
+- Users immediately see that all plans share the same features
+- A clickable link lets curious users jump to the full feature list
+- "Choose your plan" is clearer and more direct
 
-### Edge Function: `supabase/functions/fetch-link-preview/index.ts`
-- Accepts `{ url: string }` in the request body
-- Fetches the URL with a timeout (5 seconds)
-- Parses `<meta property="og:...">` and `<meta name="twitter:...">` tags from the HTML
-- Returns `{ title, description, image, url, domain }`
-- Handles errors gracefully (returns empty object if fetch fails)
-
-### New Component: `src/components/feed/LinkPreviewCard.tsx`
-- Takes a `url` prop
-- On mount, calls the `fetch-link-preview` edge function
-- Displays a card with:
-  - OG image (if available) at the top, aspect-ratio constrained
-  - Title (bold, truncated to 2 lines)
-  - Description (muted, truncated to 2 lines)
-  - Domain name at the bottom
-- Entire card is clickable, opens URL in new tab
-- Shows a subtle skeleton while loading
-- Renders nothing if no OG data is found
-
-### PostCard Integration: `src/components/feed/PostCard.tsx`
-- Extract the first URL from `post.content` using the same URL regex pattern
-- Render `<LinkPreviewCard url={firstUrl} />` below the text content and above the media grid
-
-### Files changed/created:
-| File | Change |
-|------|--------|
-| `src/components/landing/Pricing.tsx` | Move shared features above pricing cards, add polish |
-| `supabase/functions/fetch-link-preview/index.ts` | New edge function to fetch OG metadata |
-| `src/components/feed/LinkPreviewCard.tsx` | New component for rich link preview display |
-| `src/components/feed/PostCard.tsx` | Add link preview rendering below post text |
+## Technical details
+Only one file changes: `src/components/landing/Pricing.tsx`. The changes are purely cosmetic/text -- no logic changes.
 
