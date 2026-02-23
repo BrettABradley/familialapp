@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Phone, ArrowRight, Loader2 } from "lucide-react";
+import { Check, Phone, ArrowRight, Loader2, Camera, Calendar, MessageCircle, TreeDeciduous, Smartphone, Users, Bell, Shield, Image, Video, Settings, Globe } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,14 +56,18 @@ const tiers = [
 ];
 
 const sharedFeatures = [
-  "Unlimited posts & photos",
-  "Event planning & calendars",
-  "Photo albums",
-  "Family tree features",
-  "Private messaging",
-  "Video sharing",
-  "Mobile & web access",
-  "Circle management tools",
+  { icon: Camera, title: "Unlimited Posts & Photos", description: "Share as many moments as you want with no storage limits." },
+  { icon: Video, title: "Video Sharing", description: "Upload and share family videos directly in your circle." },
+  { icon: Calendar, title: "Event Planning & Calendars", description: "Organize gatherings, birthdays, and reunions with shared calendars." },
+  { icon: Image, title: "Photo Albums", description: "Create and collaborate on beautiful photo albums together." },
+  { icon: MessageCircle, title: "Private Messaging", description: "Chat one-on-one or in groups within your family circle." },
+  { icon: TreeDeciduous, title: "Family Tree", description: "Build and explore your family tree with linked profiles." },
+  { icon: Smartphone, title: "Mobile & Web Access", description: "Stay connected from any device, anywhere." },
+  { icon: Users, title: "Circle Management", description: "Invite members, assign roles, and manage your circles with ease." },
+  { icon: Bell, title: "Notifications", description: "Stay up to date with activity in your circles." },
+  { icon: Shield, title: "Content Moderation", description: "Built-in tools to keep your family space safe and positive." },
+  { icon: Globe, title: "Shareable Invite Links", description: "Easily invite family members with a simple link." },
+  { icon: Settings, title: "Profile Customization", description: "Personalize your profile with photos, bios, and more." },
 ];
 
 const Pricing = () => {
@@ -213,19 +217,26 @@ const Pricing = () => {
         </div>
 
         {/* All Plans Include */}
-        <div id="all-features" className="max-w-5xl mx-auto mt-16 bg-secondary/30 rounded-2xl p-8 sm:p-12 scroll-mt-8">
-          <h3 className="font-serif text-2xl sm:text-3xl font-bold text-foreground text-center mb-8">
+        <div id="all-features" className="max-w-6xl mx-auto mt-20 bg-secondary/30 rounded-2xl p-8 sm:p-12 lg:p-16 scroll-mt-8">
+          <h3 className="font-serif text-2xl sm:text-3xl font-bold text-foreground text-center mb-3">
             Every plan includes
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-10 gap-y-5">
-            {sharedFeatures.map((feature) => (
-              <div key={feature} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Check className="w-4 h-4 text-primary" />
+          <p className="text-muted-foreground text-center mb-10 max-w-2xl mx-auto">
+            No matter which plan you choose, you get the full Familial experience.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 lg:gap-8">
+            {sharedFeatures.map((feature) => {
+              const Icon = feature.icon;
+              return (
+                <div key={feature.title} className="flex flex-col items-center text-center gap-2">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-1">
+                    <Icon className="w-5 h-5 text-primary" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-foreground">{feature.title}</h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{feature.description}</p>
                 </div>
-                <span className="text-base text-foreground">{feature}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
