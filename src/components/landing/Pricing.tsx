@@ -217,27 +217,27 @@ const Pricing = () => {
         </div>
 
         {/* All Plans Include */}
-        <div id="all-features" className="w-full mt-20 bg-secondary/30 rounded-2xl p-8 sm:p-12 lg:p-16 scroll-mt-8">
-          <h3 className="font-serif text-2xl sm:text-3xl font-bold text-foreground text-center mb-3">
-            Every plan includes
-          </h3>
-          <p className="text-muted-foreground text-center mb-10 max-w-2xl mx-auto">
-            No matter which plan you choose, you get the full Familial experience.
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 lg:gap-8">
-            {sharedFeatures.map((feature) => {
-              const Icon = feature.icon;
-              return (
-                <div key={feature.title} className="flex flex-col items-center text-center gap-2">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-1">
-                    <Icon className="w-5 h-5 text-primary" />
-                  </div>
-                  <h4 className="text-sm font-semibold text-foreground">{feature.title}</h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{feature.description}</p>
+      </div>
+      <div id="all-features" className="w-full mt-20 bg-secondary/30 py-16 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-8 scroll-mt-8">
+        <h3 className="font-serif text-2xl sm:text-3xl font-bold text-foreground text-center mb-3">
+          Every plan includes
+        </h3>
+        <p className="text-muted-foreground text-center mb-10 max-w-2xl mx-auto">
+          No matter which plan you choose, you get the full Familial experience.
+        </p>
+        <div className="max-w-6xl mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6 lg:gap-8">
+          {sharedFeatures.map((feature) => {
+            const Icon = feature.icon;
+            return (
+              <div key={feature.title} className="flex flex-col items-center text-center gap-2">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-1">
+                  <Icon className="w-5 h-5 text-primary" />
                 </div>
-              );
-            })}
-          </div>
+                <h4 className="text-sm font-semibold text-foreground">{feature.title}</h4>
+                <p className="text-xs text-muted-foreground leading-relaxed">{feature.description}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>

@@ -50,7 +50,7 @@ const HowItWorks = () => {
                 
                 <div className="relative bg-background rounded-2xl p-8 border border-border hover:shadow-lg transition-shadow">
                   {/* Step Number */}
-                  <div className="absolute -top-4 left-8">
+                  <div className="mb-4 mt-1">
                     <span className="font-serif text-4xl font-bold text-foreground/20">{step.number}</span>
                   </div>
                   
