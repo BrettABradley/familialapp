@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Phone, ArrowRight, Loader2, Camera, Calendar, MessageCircle, TreeDeciduous, Smartphone, Users, Bell, Shield, Image, Video, Settings, Globe } from "lucide-react";
+import { Check, Phone, ArrowRight, Loader2, Camera, Calendar, MessageCircle, Smartphone, Users, Bell, Shield, Image, Video, Settings, Globe, StickyNote } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,7 +61,7 @@ const sharedFeatures = [
   { icon: Calendar, title: "Event Planning & Calendars", description: "Organize gatherings, birthdays, and reunions with shared calendars." },
   { icon: Image, title: "Photo Albums", description: "Create and collaborate on beautiful photo albums together." },
   { icon: MessageCircle, title: "Private Messaging", description: "Chat one-on-one or in groups within your family circle." },
-  { icon: TreeDeciduous, title: "Family Tree", description: "Build and explore your family tree with linked profiles." },
+  { icon: StickyNote, title: "Family Fridge", description: "Pin save the dates or leave a note for your family." },
   { icon: Smartphone, title: "Mobile & Web Access", description: "Stay connected from any device, anywhere." },
   { icon: Users, title: "Circle Management", description: "Invite members, assign roles, and manage your circles with ease." },
   { icon: Bell, title: "Notifications", description: "Stay up to date with activity in your circles." },
@@ -217,7 +217,7 @@ const Pricing = () => {
         </div>
 
         {/* All Plans Include */}
-        <div id="all-features" className="max-w-6xl mx-auto mt-20 bg-secondary/30 rounded-2xl p-8 sm:p-12 lg:p-16 scroll-mt-8">
+        <div id="all-features" className="w-full mt-20 bg-secondary/30 rounded-2xl p-8 sm:p-12 lg:p-16 scroll-mt-8">
           <h3 className="font-serif text-2xl sm:text-3xl font-bold text-foreground text-center mb-3">
             Every plan includes
           </h3>
