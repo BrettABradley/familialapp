@@ -202,7 +202,8 @@ const SubscriptionCard = () => {
 
   if (!planData) return null;
 
-  const isPaid = planData.plan !== "free";
+  const isAdmin = planData.plan === "admin";
+  const isPaid = planData.plan !== "free" && !isAdmin;
   const isExtended = planData.plan === "extended";
   const dialogAction = confirmDialog?.action;
   const targetPlanName = dialogAction === "cancel" ? "Free" : "Family";
