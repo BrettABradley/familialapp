@@ -12,7 +12,7 @@ export async function getCircleMemberLimit(circleOwnerId: string, circleId?: str
   // Fetch owner plan
   const planPromise = supabase
     .from("user_plans")
-    .select("max_members_per_circle, extra_members, plan")
+    .select("max_members_per_circle, plan")
     .eq("user_id", circleOwnerId)
     .maybeSingle();
 
@@ -24,17 +24,13 @@ export async function getCircleMemberLimit(circleOwnerId: string, circleId?: str
   const [{ data: planData }, { data: circleData }] = await Promise.all([planPromise, circlePromise]);
 
   const maxMembers = planData?.max_members_per_circle ?? 8;
-  const globalExtra = planData?.extra_members ?? 0;
   const circleExtra = (circleData as any)?.extra_members ?? 0;
   const plan = planData?.plan ?? "free";
 
-  // Per-circle extra members take priority; also add global for backward compat
-  const totalExtra = circleExtra + globalExtra;
-
   return {
-    limit: maxMembers + totalExtra,
+    limit: maxMembers + circleExtra,
     plan,
-    extraMembers: totalExtra,
+    extraMembers: circleExtra,
     maxMembers,
   };
 }
