@@ -8,6 +8,7 @@ import { getMediaType } from "@/lib/mediaUtils";
 export interface FridgeBoardPin {
   id: string;
   title: string;
+  content: string | null;
   image_url: string | null;
   circle_id: string;
   pinned_by: string;
@@ -158,7 +159,8 @@ export function FridgeBoard({
                   {/* Polaroid frame - pixel style */}
                   <div
                     className={cn(
-                      "relative bg-white p-1 pb-6",
+                      "relative bg-white p-1",
+                      pin.content ? "pb-10" : "pb-6",
                       "border-4 border-zinc-300",
                       "shadow-[4px_4px_0_0_rgba(0,0,0,0.25)]",
                       "transition-shadow duration-150",
@@ -208,6 +210,11 @@ export function FridgeBoard({
                       <p className="truncate text-[9px] font-bold text-zinc-800 font-mono">
                         {pin.title}
                       </p>
+                      {pin.content && (
+                        <p className="truncate text-[8px] text-zinc-600 font-mono">
+                          {pin.content}
+                        </p>
+                      )}
                       <p className="truncate text-[8px] text-zinc-500 font-mono">
                         {pin.circles?.name || ""}
                       </p>
@@ -280,7 +287,8 @@ export function FridgeBoard({
           {enlargedPin?.image_url && (
             <div
               className={cn(
-                "relative bg-white p-3 pb-12",
+                "relative bg-white p-3",
+                enlargedPin?.content ? "pb-16" : "pb-12",
                 "border-[6px] border-zinc-300",
                 "shadow-[8px_8px_0_0_rgba(0,0,0,0.25)]",
                 "mx-auto max-w-sm"
@@ -314,6 +322,11 @@ export function FridgeBoard({
                 <p className="truncate text-sm font-bold text-zinc-800 font-mono">
                   {enlargedPin.title}
                 </p>
+                {enlargedPin.content && (
+                  <p className="text-xs text-zinc-600 font-mono mt-0.5">
+                    {enlargedPin.content}
+                  </p>
+                )}
                 <p className="truncate text-xs text-zinc-500 font-mono">
                   {enlargedPin.circles?.name || ""}
                 </p>
