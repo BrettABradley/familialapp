@@ -1,49 +1,77 @@
 
 
-# Stay Signed In on Homepage + Pricing Layout Fix
+# Fix: Stripe Purchases Not Reflecting in App
 
-## Overview
-Two changes: (1) The landing page header should reflect your signed-in state so you can interact with pricing buttons without re-authenticating, and (2) the "Need More Members" and "Need a Custom Plan" cards should sit side by side on desktop.
+## Problem
+When you purchase extra members or upgrade your plan, nothing changes in the app. The webhook endpoint has never received a single event (zero logs), meaning your Stripe Dashboard likely doesn't have the webhook URL registered, and the `STRIPE_WEBHOOK_SECRET` isn't configured.
 
-## What Changes
+## Solution
+Instead of depending solely on the webhook (which requires manual Stripe Dashboard configuration), we'll create a **verify-checkout** edge function. After a successful Stripe checkout, the app will call this function with the checkout session ID. The function will look up the session in Stripe, determine what was purchased, and update the database directly.
 
-### 1. Header Shows Signed-In State
-The landing page header currently always shows "Sign In" and "Get Started" buttons, even if you're already logged in. This means when you click a pricing button, it may unnecessarily redirect you to `/auth`.
+The webhook will remain as a backup for reliability, but the primary flow will no longer depend on it.
 
-**Fix:** Update `Header.tsx` to use the `useAuth` hook. If signed in:
-- Replace "Sign In" / "Get Started" with a "Go to Dashboard" button (links to `/feed`)
-- Same change in the mobile menu
+## How It Works
 
-### 2. Pricing Bottom Cards Side by Side on Desktop
-Currently "Need More Members?" and "Need a Custom Plan?" are stacked vertically in separate `max-w-2xl` containers.
+```text
+User completes Stripe Checkout
+        |
+        v
+Redirected to /circles?checkout=success&session_id=cs_xxx
+        |
+        v
+App calls verify-checkout edge function with session_id
+        |
+        v
+Edge function retrieves session from Stripe API
+        |
+        v
+Determines purchase type (subscription upgrade or extra members)
+        |
+        v
+Updates user_plans or circles.extra_members in database
+        |
+        v
+Returns result to app, which refreshes data
+```
 
-**Fix:** Wrap both cards in a single `max-w-6xl` grid container with `md:grid-cols-2` so they sit side by side on desktop and stack on mobile.
+## Changes
 
----
+### 1. New Edge Function: `verify-checkout`
+**File:** `supabase/functions/verify-checkout/index.ts`
+
+- Accepts a `sessionId` parameter from the authenticated user
+- Retrieves the checkout session from Stripe
+- Verifies the `user_id` in metadata matches the caller
+- For subscriptions: determines product (Family/Extended), upserts `user_plans` with correct plan, max_circles, max_members_per_circle
+- For one-time payments (extra members): reads `circle_id` from metadata, increments `circles.extra_members` by 7
+- Uses the service role key to write to the database (since users can't write to `user_plans`)
+- Returns the updated plan info so the frontend can display it immediately
+
+### 2. Update `create-checkout` Edge Function
+**File:** `supabase/functions/create-checkout/index.ts`
+
+- Add `session.id` to the success URL as a query parameter: `success_url: ${origin}/circles?checkout=success&session_id={CHECKOUT_SESSION_ID}`
+- Stripe automatically replaces `{CHECKOUT_SESSION_ID}` with the real session ID
+
+### 3. Update Circles Page
+**File:** `src/pages/Circles.tsx`
+
+- On checkout success, read `session_id` from URL params
+- Call `supabase.functions.invoke("verify-checkout", { body: { sessionId } })`
+- On success, refresh circles and member info data
+- Show appropriate toast message based on what was purchased
+- Remove the arbitrary 2-second delay (no longer needed since we're verifying directly)
+
+### 4. Update `supabase/config.toml`
+- Add `verify_jwt = false` entry for the new `verify-checkout` function
 
 ## Technical Details
 
-### Files Modified
-
 | File | Change |
 |------|--------|
-| `src/components/landing/Header.tsx` | Import `useAuth`; conditionally render "Go to Dashboard" button when user is signed in, or "Sign In" / "Get Started" when not |
-| `src/components/landing/Pricing.tsx` | Combine the "Extra Members" and "Custom Plans" cards into a single `grid md:grid-cols-2` container with `max-w-6xl` |
+| `supabase/functions/verify-checkout/index.ts` | New edge function that verifies Stripe checkout and updates database |
+| `supabase/functions/create-checkout/index.ts` | Append `session_id={CHECKOUT_SESSION_ID}` to success URL |
+| `src/pages/Circles.tsx` | Call verify-checkout on return, remove 2s delay |
+| `supabase/config.toml` | Add verify-checkout function config |
 
-### Header Logic
-```text
-if (user) --> Show "Go to Dashboard" button linking to /feed
-else      --> Show "Sign In" + "Get Started" buttons linking to /auth
-```
-
-### Pricing Layout
-```text
-Before:
-  [Need More Members?]    (max-w-2xl, centered)
-  [Need a Custom Plan?]   (max-w-2xl, centered)
-
-After:
-  [Need More Members?]  [Need a Custom Plan?]   (max-w-6xl, grid md:grid-cols-2)
-  (stacked on mobile)
-```
-
+The webhook remains in place as a safety net -- if someone configures it in Stripe Dashboard later, it will still work. But the app no longer depends on it for the primary flow.
