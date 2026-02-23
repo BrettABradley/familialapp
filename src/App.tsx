@@ -19,6 +19,7 @@ import Notifications from "./pages/Notifications";
 
 import Albums from "./pages/Albums";
 import Messages from "./pages/Messages";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             {/* Public routes */}
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/store" element={<Store />} />
             
             {/* Authenticated routes with persistent layout */}
