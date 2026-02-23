@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.send-past-receipts]
 verify_jwt = false
+
+[functions.receipt-history]
+verify_jwt = false
