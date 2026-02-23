@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Camera, Save, ArrowLeft } from "lucide-react";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import SubscriptionCard from "@/components/settings/SubscriptionCard";
+import ReceiptHistory from "@/components/settings/ReceiptHistory";
 
 const Settings = () => {
   const { user } = useAuth();
@@ -197,6 +198,7 @@ const Settings = () => {
       </Card>
 
       <SubscriptionCard />
+      <ReceiptHistory />
     </main>
   );
 };
