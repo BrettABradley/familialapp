@@ -17,6 +17,75 @@ const PLAN_CONFIG: Record<string, { priceId: string; plan: string; maxCircles: n
   "price_1T3N5nCiWDzualH5SBHxbHqo": { priceId: "price_1T3N5nCiWDzualH5SBHxbHqo", plan: "extended", maxCircles: 3, maxMembers: 35 },
 };
 
+function formatDate(date: Date): string {
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function buildReceiptHtml(itemDescription: string, itemAmount: string, purchaseDate: string): string {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5;">
+<div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+<div style="background-color: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+  <h1 style="color: #1a1a1a; font-size: 24px; margin: 0 0 8px 0;">Familial</h1>
+  <h2 style="color: #555; font-size: 18px; font-weight: normal; margin: 0 0 24px 0;">Purchase Receipt</h2>
+  <table style="width: 100%; border-collapse: collapse; font-size: 15px; color: #333; margin-bottom: 24px;">
+    <tr style="border-bottom: 1px solid #eee;">
+      <td style="padding: 12px 0; font-weight: 600;">Item</td>
+      <td style="padding: 12px 0; text-align: right;">${itemDescription}</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #eee;">
+      <td style="padding: 12px 0; font-weight: 600;">Amount</td>
+      <td style="padding: 12px 0; text-align: right;">${itemAmount}</td>
+    </tr>
+    <tr>
+      <td style="padding: 12px 0; font-weight: 600;">Date</td>
+      <td style="padding: 12px 0; text-align: right;">${purchaseDate}</td>
+    </tr>
+  </table>
+  <p style="color: #333; font-size: 15px; line-height: 1.6; margin: 0 0 16px 0;">Thank you so much for your business. We hope our products bring you closer to your family and close friends.</p>
+  <p style="color: #888; font-size: 13px; line-height: 1.5; margin: 0 0 16px 0; padding-top: 16px; border-top: 1px solid #eee;"><strong>Refund Policy:</strong> All purchases are non-refundable.</p>
+  <p style="color: #888; font-size: 13px; margin: 0;">Questions? Contact us at <a href="mailto:support@support.familialmedia.com" style="color: #888;">support@support.familialmedia.com</a></p>
+</div></div></body></html>`;
+}
+
+async function sendReceiptEmail(toEmail: string, planName: string, amountCents: number): Promise<void> {
+  const now = new Date();
+  const purchaseDate = formatDate(now);
+  const subject = `Your Familial Receipt - ${purchaseDate}`;
+  const amountStr = `$${(amountCents / 100).toFixed(2)}`;
+  const description = `Upgrade to ${planName} Plan (prorated)`;
+  const html = buildReceiptHtml(description, amountStr, purchaseDate);
+
+  const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+  if (!RESEND_API_KEY) {
+    logStep("RESEND_API_KEY not set, skipping receipt email");
+    return;
+  }
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "Familial <support@support.familialmedia.com>",
+        to: [toEmail],
+        subject,
+        html,
+      }),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      console.error("[UPGRADE-SUBSCRIPTION] Receipt email failed:", result);
+    } else {
+      logStep("Receipt email sent", { to: toEmail });
+    }
+  } catch (err: any) {
+    console.error("[UPGRADE-SUBSCRIPTION] Receipt email error:", err.message);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -90,8 +159,8 @@ serve(async (req) => {
         id: subscriptionItemId,
         price: priceId,
       }],
-      proration_behavior: "always_invoice", // Immediately charge the prorated difference
-      cancel_at_period_end: false, // Clear any pending cancellation
+      proration_behavior: "always_invoice",
+      cancel_at_period_end: false,
     });
 
     const periodEnd = updated.current_period_end 
@@ -103,6 +172,21 @@ serve(async (req) => {
       periodEnd,
       prorationBehavior: "always_invoice"
     });
+
+    // Retrieve the latest invoice to get the actual charged amount
+    let chargedAmountCents = 0;
+    try {
+      const invoices = await stripe.invoices.list({
+        subscription: subscription.id,
+        limit: 1,
+      });
+      if (invoices.data.length > 0) {
+        chargedAmountCents = invoices.data[0].amount_paid;
+        logStep("Invoice amount", { chargedAmountCents });
+      }
+    } catch (invoiceErr: any) {
+      logStep("Could not retrieve invoice", { error: invoiceErr.message });
+    }
 
     // Update user_plans in the database
     const { error: dbError } = await supabase
@@ -123,6 +207,13 @@ serve(async (req) => {
     }
 
     logStep("Database updated successfully");
+
+    // Send receipt email (best-effort, don't block response)
+    if (user.email && chargedAmountCents > 0) {
+      sendReceiptEmail(user.email, newPlanConfig.plan.charAt(0).toUpperCase() + newPlanConfig.plan.slice(1), chargedAmountCents).catch((err) =>
+        console.error("[UPGRADE-SUBSCRIPTION] Receipt background error:", err.message)
+      );
+    }
 
     return new Response(
       JSON.stringify({
