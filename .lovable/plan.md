@@ -1,53 +1,75 @@
 
 
-# Member Counter + Upgrade Requests for Circles
+# Streamlined Payments, Per-Circle Extra Members, and Account Upgrades
 
-## What You'll See
+## Overview
+This plan addresses several interconnected issues: the "Buy Now" buttons on the landing page just redirect to login without completing a purchase, accounts don't seamlessly upgrade after payment, and the $5 extra member pack needs to work for ALL tiers and be assigned to a specific circle.
 
-1. **Member counter on each circle card** -- e.g. "3/8 members" (Free), "5/20 members" (Family), "12/35 members" (Extended) -- with color indicators when nearing capacity
-2. **"Request Upgrade" button** for non-owner members when a circle is near-full or full, allowing them to send a request to the circle owner
-3. **Owner receives upgrade requests** as a notification in the bell icon, with a message like: `"Jane requested you upgrade the Smith Family circle (3/8 members)"`
+## What Changes
 
-## How It Works
+### 1. Landing Page "Buy Now" Buttons -- Smart Checkout Flow
+Currently, all pricing buttons link to `/auth`. Instead:
+- **Logged-in users**: Clicking "Buy Now" immediately opens Stripe checkout for that plan
+- **Not logged-in users**: Redirected to `/auth?plan=family` (or `extended`), and after login/signup, checkout is automatically triggered
 
-- The member counter pulls from `circle_memberships` count + `user_plans` for the owner's limit
-- Any circle member (not just the owner) can tap "Request Upgrade" which creates a notification for the circle owner
-- The owner sees the request in their notification bell and can act on it (open the upgrade dialog from the Circles page)
-- Only the **owner** sees the "Upgrade" button directly; non-owners see "Request Upgrade" instead
+### 2. Auth Page -- Post-Login Checkout Trigger
+- Read `?plan=family` or `?plan=extended` from the URL after successful login
+- Automatically call `create-checkout` with the correct price ID and redirect to Stripe
+
+### 3. Extra Members Available on ALL Tiers
+- The "$5 for 7 extra members" option will appear in the upgrade dialog for free, family, AND extended plans (not just extended)
+- Update the pricing landing page to show this option on all tiers
+
+### 4. Per-Circle Extra Members (Database Change)
+- Add an `extra_members` column to the `circles` table (default 0)
+- When someone buys extra members, those 7 slots are assigned to the specific circle they selected
+- Update the webhook to increment `circles.extra_members` for that circle instead of the global `user_plans.extra_members`
+- Update `circleLimits.ts` to factor in per-circle extra members
+
+### 5. Account Actually Upgrades After Purchase
+- The webhook already handles plan upgrades -- verify and fix the token-based auth pattern
+- After checkout success, the Circles page will re-fetch plan data so changes appear immediately
+
+---
 
 ## Technical Details
 
-### 1. `src/pages/Circles.tsx` -- Add member counter and upgrade request
-
-- Add a `useEffect` that fetches member count and plan limit for each circle (using existing `getCircleMemberCount` and `getCircleMemberLimit` from `src/lib/circleLimits.ts`)
-- Store in state: `Record<string, { count: number; limit: number; plan: string }>`
-- Render a badge on each circle card showing `count/limit members`
-  - Green/default when under 80%
-  - Amber when at 80%+
-  - Red when full
-- For **owners**: show an "Upgrade" button that opens the existing `UpgradePlanDialog`
-- For **non-owners**: show a "Request Upgrade" button that inserts a notification to the circle owner
-
-### 2. Upgrade request notification (no schema changes needed)
-
-When a non-owner clicks "Request Upgrade":
-- Insert into the existing `notifications` table:
-  - `user_id`: the circle owner's ID
-  - `type`: `"upgrade_request"`
-  - `title`: `"Upgrade Request"`
-  - `message`: `"[requester name] is requesting you upgrade [circle name] (X/Y members)"`
-  - `related_circle_id`: the circle ID
-  - `link`: `/circles` (so the owner can navigate to manage their circles)
-- Show a toast confirming the request was sent
-- Add a simple rate limit check (client-side) to prevent spamming -- check if an upgrade_request notification already exists from this user for this circle in the last 24 hours before inserting
-
-### 3. No database migrations needed
-
-The existing `notifications` table already supports all required fields (`user_id`, `type`, `title`, `message`, `related_circle_id`, `link`), and the RLS policy allows any authenticated user to insert notifications.
+### Database Migration
+```sql
+ALTER TABLE public.circles ADD COLUMN extra_members integer NOT NULL DEFAULT 0;
+```
+- RLS: Owners can already update their circles, no new policies needed
+- The webhook uses the service role key, so it bypasses RLS
 
 ### Files Modified
 
 | File | Change |
 |------|--------|
-| `src/pages/Circles.tsx` | Add member counter display, "Upgrade" button for owners, "Request Upgrade" button for non-owners with notification insertion |
+| `src/components/landing/Pricing.tsx` | Add `useAuth` hook; logged-in users get direct checkout, others go to `/auth?plan=X`. Show extra members option on all tiers. |
+| `src/pages/Auth.tsx` | Read `plan` query param; after successful login, auto-trigger checkout via `create-checkout` edge function |
+| `src/components/circles/UpgradePlanDialog.tsx` | Show "Add 7 Extra Members" option for ALL plans (free, family, extended), not just extended |
+| `src/lib/circleLimits.ts` | Update `getCircleMemberLimit` to also query `circles.extra_members` for the specific circle and add it to the limit |
+| `supabase/functions/stripe-webhook/index.ts` | For extra members payment, update `circles.extra_members` on the specific circle (from `session.metadata.circle_id`) instead of global `user_plans.extra_members` |
+| `src/pages/Circles.tsx` | After `?checkout=success` query param, re-fetch member info to reflect new limits |
+
+### Payment Flow Diagram
+
+```text
+Landing Page "Buy Now"
+  |
+  +-- Logged in? --> Call create-checkout --> Stripe Checkout --> Webhook upgrades account --> /circles?checkout=success
+  |
+  +-- Not logged in? --> /auth?plan=family --> Login/Signup --> Auto-call create-checkout --> Stripe Checkout --> same flow
+```
+
+### Webhook Changes for Per-Circle Extra Members
+- Read `circle_id` from `session.metadata.circle_id`
+- Instead of incrementing `user_plans.extra_members`, increment `circles.extra_members` for that specific circle
+- Keep the global `user_plans.extra_members` for backward compatibility but per-circle is the primary mechanism going forward
+
+### Circle Limit Calculation Update
+```text
+limit = owner_plan.max_members_per_circle + circle.extra_members
+```
+This replaces the current formula that uses global `user_plans.extra_members`.
 
