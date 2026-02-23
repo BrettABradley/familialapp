@@ -1,77 +1,53 @@
 
 
-# Fix: Stripe Purchases Not Reflecting in App
+# Receipt Emails for All Purchases
 
-## Problem
-When you purchase extra members or upgrade your plan, nothing changes in the app. The webhook endpoint has never received a single event (zero logs), meaning your Stripe Dashboard likely doesn't have the webhook URL registered, and the `STRIPE_WEBHOOK_SECRET` isn't configured.
-
-## Solution
-Instead of depending solely on the webhook (which requires manual Stripe Dashboard configuration), we'll create a **verify-checkout** edge function. After a successful Stripe checkout, the app will call this function with the checkout session ID. The function will look up the session in Stripe, determine what was purchased, and update the database directly.
-
-The webhook will remain as a backup for reliability, but the primary flow will no longer depend on it.
-
-## How It Works
-
-```text
-User completes Stripe Checkout
-        |
-        v
-Redirected to /circles?checkout=success&session_id=cs_xxx
-        |
-        v
-App calls verify-checkout edge function with session_id
-        |
-        v
-Edge function retrieves session from Stripe API
-        |
-        v
-Determines purchase type (subscription upgrade or extra members)
-        |
-        v
-Updates user_plans or circles.extra_members in database
-        |
-        v
-Returns result to app, which refreshes data
-```
+## Overview
+Add branded receipt emails sent via Resend from `support@support.familialmedia.com` after every successful purchase. Emails include the purchase date in the subject line and a warm thank-you message.
 
 ## Changes
 
-### 1. New Edge Function: `verify-checkout`
-**File:** `supabase/functions/verify-checkout/index.ts`
+### 1. `supabase/functions/verify-checkout/index.ts`
+After successfully updating the database (plan upgrade or extra members), send a receipt email:
 
-- Accepts a `sessionId` parameter from the authenticated user
-- Retrieves the checkout session from Stripe
-- Verifies the `user_id` in metadata matches the caller
-- For subscriptions: determines product (Family/Extended), upserts `user_plans` with correct plan, max_circles, max_members_per_circle
-- For one-time payments (extra members): reads `circle_id` from metadata, increments `circles.extra_members` by 7
-- Uses the service role key to write to the database (since users can't write to `user_plans`)
-- Returns the updated plan info so the frontend can display it immediately
+- **From**: `Familial <support@support.familialmedia.com>`
+- **To**: The authenticated user's email (`user.email`)
+- **Subject**: `Your Familial Receipt - Feb 23, 2026` (formatted date of purchase)
+- **Body** (branded HTML email):
+  - Receipt header with Familial branding
+  - Item purchased (mapped from price ID):
+    - Family Plan (Monthly) -- $7.00
+    - Extended Plan (Monthly) -- $15.00
+    - Extra Member Pack (+7 members) -- $5.00
+  - Date of purchase
+  - Thank-you message: "Thank you so much for your business. We hope our products bring you closer to your family and close friends."
+  - Non-refundable policy reminder
+  - Support contact footer
+- Email sending is best-effort (logged but does not block the purchase response)
 
-### 2. Update `create-checkout` Edge Function
-**File:** `supabase/functions/create-checkout/index.ts`
+### 2. `supabase/functions/stripe-webhook/index.ts`
+Same receipt email logic added after processing `checkout.session.completed` events:
 
-- Add `session.id` to the success URL as a query parameter: `success_url: ${origin}/circles?checkout=success&session_id={CHECKOUT_SESSION_ID}`
-- Stripe automatically replaces `{CHECKOUT_SESSION_ID}` with the real session ID
+- Uses `session.customer_email` or `session.customer_details?.email` for the recipient
+- Same subject format with date, same HTML template, same thank-you message
+- Acts as a backup in case the user doesn't return to the app after checkout
 
-### 3. Update Circles Page
-**File:** `src/pages/Circles.tsx`
+### Technical Details
 
-- On checkout success, read `session_id` from URL params
-- Call `supabase.functions.invoke("verify-checkout", { body: { sessionId } })`
-- On success, refresh circles and member info data
-- Show appropriate toast message based on what was purchased
-- Remove the arbitrary 2-second delay (no longer needed since we're verifying directly)
+**Price-to-description mapping** (shared in both files):
+```text
+price_1T3N5bCiWDzualH5Cf7G7VsM  ->  "Family Plan (Monthly)"       / $7.00
+price_1T3N5nCiWDzualH5SBHxbHqo  ->  "Extended Plan (Monthly)"     / $15.00
+price_1T3N5zCiWDzualH52rsDSBlu  ->  "Extra Member Pack (+7 members)" / $5.00
+```
 
-### 4. Update `supabase/config.toml`
-- Add `verify_jwt = false` entry for the new `verify-checkout` function
+**Subject line format**: `Your Familial Receipt - Mon DD, YYYY`
 
-## Technical Details
-
+**Files modified**:
 | File | Change |
 |------|--------|
-| `supabase/functions/verify-checkout/index.ts` | New edge function that verifies Stripe checkout and updates database |
-| `supabase/functions/create-checkout/index.ts` | Append `session_id={CHECKOUT_SESSION_ID}` to success URL |
-| `src/pages/Circles.tsx` | Call verify-checkout on return, remove 2s delay |
-| `supabase/config.toml` | Add verify-checkout function config |
+| `supabase/functions/verify-checkout/index.ts` | Add receipt email after successful purchase processing |
+| `supabase/functions/stripe-webhook/index.ts` | Add receipt email after `checkout.session.completed` |
 
-The webhook remains in place as a safety net -- if someone configures it in Stripe Dashboard later, it will still work. But the app no longer depends on it for the primary flow.
+No new secrets needed -- `RESEND_API_KEY` is already configured and used by other edge functions.
+
