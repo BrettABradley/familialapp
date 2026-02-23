@@ -1,18 +1,38 @@
 
 
-# Update "Every Plan Includes" Section
+# Add FAQ Section Below Pricing
 
-## Changes to `src/components/landing/Pricing.tsx`
+## Overview
+Add a new FAQ component below the "Every plan includes" section, using the existing Radix accordion component for expandable Q&A items. The section will address common questions about privacy, plans, data, and family circles.
 
-### 1. Replace "Content Moderation" with "No Sale of Data"
-Swap the Content Moderation feature entry with a privacy-focused one:
-- Icon: `Shield` (keep the same icon -- it fits privacy/security)
-- Title: "No Sale of Data"
-- Description: "Your family's data is never sold or shared with third parties."
+## New File: `src/components/landing/FAQ.tsx`
 
-### 2. Add a small gap between the Custom Plan card and the "Every plan includes" section
-Add a bottom margin (`mb-8`) to the Custom Plan card's wrapper div to create a tiny visual gap before the full-width features section begins.
+Create a new component with an accordion-based FAQ section containing 6-8 questions covering:
 
-## Technical details
-Only `src/components/landing/Pricing.tsx` is modified. Two small changes: one text swap in the `sharedFeatures` array and one spacing class addition.
+- **Privacy**: "Is my family's data sold or shared?" / "Who can see my posts?"
+- **Plans**: "What's the difference between plans?" / "Can I upgrade or downgrade?"
+- **Features**: "What happens when I hit my member limit?" / "Can I create multiple circles?"
+- **General**: "Is Familial available on mobile?" / "How do I invite family members?"
 
+### Design
+- Full-width section with `bg-background` to contrast with the `bg-secondary` sections above and below
+- Centered content with `max-w-3xl` for readable line lengths
+- Section heading: "Frequently Asked Questions"
+- Subtitle: "Everything you need to know about Familial."
+- Uses the existing `Accordion`, `AccordionItem`, `AccordionTrigger`, `AccordionContent` components from `src/components/ui/accordion.tsx`
+
+## Changes to `src/pages/Index.tsx`
+
+Import and render the new `FAQ` component between `Pricing` and `CTA`:
+
+```
+<Pricing />
+<FAQ />
+<CTA />
+```
+
+## Technical Details
+- Uses existing `@radix-ui/react-accordion` (already installed)
+- Uses existing shadcn accordion UI components (already in project)
+- No new dependencies needed
+- FAQ data is a simple static array of `{ question, answer }` objects inside the component
