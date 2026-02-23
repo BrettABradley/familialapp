@@ -1,53 +1,62 @@
 
 
-## Fix: Incorrect Member Count and Inflated Member Limit After Transfer Block Claim
+## Remove Transfer Ownership, Keep Only Transfer Block
 
-### Problem
+### What Changes
 
-Two bugs occur when ownership is claimed via the transfer block flow:
+The current code has two ways to hand off a circle:
+1. **Transfer Ownership** -- owner picks a specific member, sends a request, they accept/deny (uses `circle_transfer_requests` table and `transfer_circle_ownership` database function)
+2. **Transfer Block** -- owner puts the circle on transfer block, any member can claim it (uses `claim_circle_ownership` database function)
 
-1. **Member count drops to 1** -- The `claim_circle_ownership` database function removes the new owner from `circle_memberships`. But the app's member counting (`getCircleMemberCount`) only queries `circle_memberships`. Since the new owner is no longer in that table, they aren't counted. So with 2 people in a circle, only 1 shows.
+We're removing option 1 entirely and keeping only Transfer Block. This simplifies the flow: if an owner wants to leave or hand off, they put the circle on transfer block.
 
-2. **Member limit inflates to 42** -- The `getCircleMemberLimit` function adds together two sources of "extra members": a per-circle value (`circles.extra_members`, set when purchasing extra member packs) AND a global value (`user_plans.extra_members`, a legacy field). When ownership transfers, the new owner's plan limits apply. If they have an Extended plan (35 base) and any legacy `extra_members` value (e.g., 7), the total becomes 42. These should not be added together.
+### Changes by File
 
-### Root Cause
+**1. `src/pages/Circles.tsx`**
+- Remove the `isTransferOpen` state and the Transfer Ownership dialog (lines 897-941)
+- Remove the `isLeaveTransferOpen` state and the "Transfer & Leave" dialog (lines 943-992)
+- Remove the `handleTransferOwnership` function
+- Remove the `handleTransferAndLeave` function
+- Remove the `memberPlans` state and the logic that fetches member plan info (only used for showing plan capacity in transfer dialogs)
+- Remove the "Transfer Ownership" button from the members dialog
+- Remove `ArrowRightLeft` from the icon imports
+- Update the owner leave flow: instead of opening a "Transfer & Leave" dialog, directly call `handleTransferBlock` so the owner puts the circle on transfer block, then can leave
 
-The `claim_circle_ownership` (and `transfer_circle_ownership`) database functions follow a pattern where the owner is NOT in `circle_memberships` (implicit owner). But the app's circle creation flow DOES add the owner to `circle_memberships`. This inconsistency causes the count mismatch.
+**2. `src/pages/Notifications.tsx`**
+- Remove `handleAcceptTransfer` and `handleDenyTransfer` functions
+- Remove the Accept/Deny buttons for `transfer_request` notifications in the notification list
+- Remove the `transfer_request` case from the notification icon switch (or keep it harmlessly -- old notifications may still exist)
+- Remove the `respondingTo` state
 
-### Solution
+**3. `src/components/circles/ReadOnlyBanner.tsx`**
+- Update the non-owner text from "The owner needs to upgrade, transfer ownership, or delete this circle..." to "The owner needs to upgrade or delete this circle to restore full access."
 
-**1. Fix `claim_circle_ownership` database function**
-- Stop removing the new owner from `circle_memberships` -- they should stay as a member row (matching the creation pattern)
-- When adding the old owner, use `ON CONFLICT DO NOTHING` (already there, but the old owner might already be in memberships)
+**4. Database migration**
+- Drop the `transfer_circle_ownership` function (no longer needed; `claim_circle_ownership` stays)
+- The `circle_transfer_requests` table can remain in the database (old data) but will no longer be used by the app. No migration needed to drop it -- it's harmless.
 
-**2. Fix `transfer_circle_ownership` database function**
-- Same fix: stop removing the new owner from `circle_memberships`
+### Owner Leave Flow (After Changes)
 
-**3. Fix `getCircleMemberLimit` in `src/lib/circleLimits.ts`**
-- Only use `circles.extra_members` (per-circle), NOT `user_plans.extra_members` (global/legacy)
-- This prevents the inflated limit of 42
+When an owner tries to leave a circle with other members:
+- If transfer block is already active: leave directly (existing behavior, unchanged)
+- If transfer block is NOT active: prompt them to put the circle on transfer block first, then they can leave
 
-**4. Fix `enforce_circle_member_limit` database trigger function**
-- Currently only reads `user_plans.extra_members` (global). Update it to also read `circles.extra_members` and use only the per-circle value for consistency
+This is simpler and more consistent than the current two-path approach.
 
 ### Technical Details
 
-**Database migration (2 function updates):**
+**`src/pages/Circles.tsx` state cleanup:**
+- Remove: `isTransferOpen`, `isTransferring`, `isLeaveTransferOpen`, `memberPlans`
+- Keep: `isTransferring` can be removed since it's only used by the removed transfer functions
 
-Update `claim_circle_ownership`:
-- Remove the `DELETE FROM circle_memberships WHERE ... user_id = auth.uid()` line
-- Keep the old owner insert with `ON CONFLICT DO NOTHING`
+**`src/pages/Circles.tsx` leave flow update (lines 510-515):**
+Replace opening the leave-transfer dialog with directly calling `handleTransferBlock(circle)` so the owner activates transfer block. After that, they can leave via the existing transfer-block leave path.
 
-Update `transfer_circle_ownership`:
-- Remove the `DELETE FROM circle_memberships WHERE ... user_id = _new_owner_id` line
+**`src/pages/Notifications.tsx` cleanup:**
+Remove ~100 lines of transfer request handling code. Old `transfer_request` notifications will still render (title/message) but without Accept/Deny buttons.
 
-Update `enforce_circle_member_limit`:
-- Read `circles.extra_members` for the specific circle
-- Use that instead of `user_plans.extra_members`
-
-**Frontend change: `src/lib/circleLimits.ts`**
-- In `getCircleMemberLimit`, remove the `user_plans.extra_members` from the calculation
-- Only use `circles.extra_members` as the extra member source
-
-These are small, targeted changes that fix both bugs without changing the overall architecture.
+**Database migration:**
+```sql
+DROP FUNCTION IF EXISTS transfer_circle_ownership(uuid, uuid);
+```
 
