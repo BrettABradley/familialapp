@@ -1,197 +1,77 @@
 
 
-# Subscription Management in Settings + Downgrade Offboarding + Circle Rescue Flow
+# Complete Circle Rescue Flow + Read-Only Overflow UI
 
 ## Overview
 
-Add a "Subscription" card to the Settings page, support Extended-to-Family downgrades, handle circle overflow with a "soft lock" policy, and introduce a **Circle Rescue** flow where other circle members can opt in to take over payment for a circle the owner is about to lose due to downgrading.
+Several pieces are already built (SubscriptionCard, cancel/downgrade edge functions, CircleRescueDialog, webhook handlers). This plan addresses the remaining gaps: read-only UI enforcement for overflow circles, rescue checkout handling in the webhook, and end-to-end testing readiness.
 
 ---
 
-## 1. Settings Page -- New "Subscription" Card
+## 1. Add User Plan Data to CircleContext
 
-Add a second card below the profile card in `src/pages/Settings.tsx`:
+Modify `src/contexts/CircleContext.tsx` to fetch and expose the current user's plan data (`plan`, `max_circles`, `cancel_at_period_end`, `current_period_end`) alongside existing circle/profile data. Add a helper function `isCircleReadOnly(circleId)` that returns `true` if the user owns more circles than `max_circles` and the given circle falls outside the allowed set (oldest N circles are active, newer ones are overflow).
 
-- **Current plan name** with a colored badge (Free / Family / Extended)
-- **Billing period end date** (if on a paid plan)
-- **Cancellation status** ("Canceling on [date]" if pending)
-- **Action buttons**:
-  - "Manage Billing" -- opens Stripe Customer Portal (invoices, payment method)
-  - "Downgrade to Family" (if on Extended)
-  - "Cancel Membership" (to Free)
-- Plan data fetched from `user_plans` table
+This gives all downstream components access to read-only status without redundant queries.
 
-## 2. Customer Portal Return URL
+## 2. Read-Only Banner Component
 
-Update `supabase/functions/customer-portal/index.ts` to return users to `/settings` instead of `/#pricing`.
+Create `src/components/circles/ReadOnlyBanner.tsx` -- a simple alert banner displayed at the top of circle-scoped pages (Feed, Events, Albums, Fridge, Messages) when the selected circle is read-only:
 
-## 3. Extended-to-Family Downgrade
+- Amber/warning styling using the existing `Alert` component
+- Message: "This circle is read-only. The owner needs to upgrade, transfer ownership, or delete this circle to restore full access."
+- If the current user IS the owner, show an "Upgrade" link to `/#pricing`
 
-Create `supabase/functions/downgrade-subscription/index.ts`:
+## 3. Enforce Read-Only in UI Components
 
-- Authenticates the user
-- Finds their active Stripe subscription
-- Updates the subscription price from Extended to Family using `stripe.subscriptions.update()` with `proration_behavior: 'none'` so the price change applies at the next billing cycle
-- Sets `pending_plan = 'family'` in `user_plans` so the UI can show "Switching to Family on [date]"
-- The webhook's existing `customer.subscription.updated` handler already processes actual plan changes
+Conditionally disable write actions when the selected circle is read-only:
 
-### Database Change
+- **Feed page** (`src/pages/Feed.tsx`): Hide or disable `CreatePostForm` when circle is read-only
+- **Events page** (`src/pages/Events.tsx`): Disable "Create Event" button
+- **Albums page** (`src/pages/Albums.tsx`): Disable "Create Album" and upload buttons
+- **Fridge page** (`src/pages/Fridge.tsx`): Disable pin creation
+- **Messages page** (`src/pages/Messages.tsx`): Disable sending in group chats for that circle
+- **Circles page** (`src/pages/Circles.tsx`): Disable "Invite Member" for read-only circles
 
-Add a `pending_plan` column (text, nullable, default null) to `user_plans`.
+Each page will import `useCircleContext` and check `isCircleReadOnly(selectedCircle)`, then render the `ReadOnlyBanner` and disable the relevant controls.
 
-## 4. Circle Offboarding -- Soft Lock Policy
+## 4. Handle Rescue Checkout in Webhook
 
-When a downgrade takes effect and the user owns more circles than their new plan allows:
+Update `supabase/functions/stripe-webhook/index.ts` in the `checkout.session.completed` handler to check if the checkout metadata contains a `rescue_circle_id`. If present:
 
-- **No automatic deletion** -- family data is never destroyed
-- **Read-only overflow**: excess circles (determined by creation date, oldest kept active) become locked:
-  - Members can still **view** all content
-  - **Cannot** create new posts, events, albums, or invite members
-  - A banner appears: "This circle is read-only. The owner needs to upgrade, transfer ownership, or delete this circle."
-- The user must **transfer ownership**, **delete**, or **upgrade** to restore full access
+1. Transfer circle ownership to the new subscriber using the existing `transfer_circle_ownership` database function (called via `supabase.rpc`)
+2. Mark the corresponding `circle_rescue_offers` row as `claimed` with `claimed_by` set to the new owner
+3. Send a notification to the original owner confirming the transfer
 
-Frontend enforcement: compare `circles` owned count against `user_plans.max_circles`. Circles beyond the limit get a read-only UI treatment.
+This ensures that when a member completes a rescue checkout, ownership transfers automatically without relying on the client-side claim (which currently happens before redirect and could fail).
 
-## 5. Circle Rescue Flow (New Concept)
+## 5. Update CircleRescueDialog Checkout Metadata
 
-When a user begins the downgrade/cancel process and has circles that would become read-only, other members of those circles can **opt in to pick up the payment** and take over ownership.
+Modify `src/components/circles/CircleRescueDialog.tsx` to pass `rescue_circle_id` (in addition to the existing `circleId`) in the checkout body so the webhook can identify rescue transactions. Also remove the premature client-side `claimed` update -- let the webhook handle it after payment confirmation.
 
-### How It Works
+## 6. Update create-checkout to Pass Rescue Metadata
 
-**Step 1 -- Downgrade Confirmation with Circle Impact**
-
-When the user confirms a downgrade/cancel, the confirmation dialog lists the specific circles that will be affected:
-
-> "You own 3 circles. The Free plan allows 1. These circles will become read-only:
-> - **Smith Family Reunion** (12 members)
-> - **Book Club** (5 members)
->
-> Members of these circles will be notified and given the option to take over ownership and billing."
-
-**Step 2 -- Circle Rescue Notifications**
-
-After the user confirms the downgrade, a notification is sent to all members of the affected circles:
-
-> "[Owner Name] is downgrading their plan. **[Circle Name]** will become read-only on [date] unless someone takes over. Tap here to keep it active."
-
-This uses the existing `notifications` table with a new type: `circle_rescue`.
-
-**Step 3 -- Rescue Page / Dialog**
-
-When a member taps the notification, they see a dialog explaining:
-
-- The circle will become read-only on [date]
-- They can take over ownership by subscribing to a plan that supports this circle
-- What "taking over" means: they become the circle owner and start a subscription
-
-**Step 4 -- Rescue Checkout**
-
-If the member agrees, the flow:
-1. Calls `create-checkout` with the required plan (Family or Extended) and the circle ID in metadata
-2. Upon successful payment (handled by webhook), the system:
-   - Transfers circle ownership to the rescuer (using existing `transfer_circle_ownership` function)
-   - The original owner's circle count decreases, potentially resolving their overflow
-
-**Step 5 -- Rescue Deadline**
-
-The rescue window lasts until the original owner's billing period ends (`current_period_end`). If no one rescues the circle by then, it enters read-only mode as described in the soft lock policy.
-
-### Database Changes for Circle Rescue
-
-New table: `circle_rescue_offers`
-
-```text
-id              uuid PRIMARY KEY DEFAULT gen_random_uuid()
-circle_id       uuid NOT NULL (references circles.id)
-current_owner   uuid NOT NULL (user who is downgrading)
-deadline        timestamptz NOT NULL (matches current_period_end)
-status          text NOT NULL DEFAULT 'open' (open / claimed / expired)
-claimed_by      uuid (the member who took over, nullable)
-created_at      timestamptz DEFAULT now()
-```
-
-RLS policies:
-- SELECT: circle members can view rescue offers for their circles
-- UPDATE: authenticated users can claim (set claimed_by, status='claimed') if they are a member of the circle
-
-### Notification Content
-
-Type: `circle_rescue`
-Title: "Circle needs a new owner"
-Message: "[Owner] is downgrading. [Circle Name] will become read-only on [date] unless someone takes over."
-Link: `/circles?rescue=[circle_id]`
-
-## 6. Downgrade Confirmation Dialog Updates
-
-Update the confirmation dialog in Pricing.tsx and Settings.tsx to:
-
-1. Fetch the user's owned circles and compare count vs target plan limit
-2. If overflow exists, list the affected circles by name with member counts
-3. Explain that members will be notified and can opt to take over
-4. On confirm: create `circle_rescue_offers` for each affected circle, send notifications to members, then proceed with the cancellation
-
-## 7. Update Stripe Webhook
-
-In the `customer.subscription.deleted` handler, after downgrading to free:
-- Mark any open `circle_rescue_offers` for that user as `expired` if unclaimed
-- The soft lock kicks in naturally via frontend enforcement
-
----
-
-## Technical Flow
-
-```text
-User clicks "Cancel" or "Downgrade"
-       |
-       v
-Confirmation dialog shows affected circles
-       |
-       v
-User confirms
-       |
-       v
-Creates circle_rescue_offers for overflow circles
-Sends notifications to all members of affected circles
-Calls cancel-subscription (or downgrade-subscription)
-       |
-       v
-Rescue window is open (until billing period ends)
-       |
-       v
-Member taps notification --> sees rescue dialog
-       |
-       v
-Member clicks "Take Over" --> Stripe checkout
-       |
-       v
-On successful payment:
-  - transfer_circle_ownership() to rescuer
-  - Mark rescue offer as "claimed"
-  - Original owner's circle count drops
-       |
-       v
-If no one rescues by deadline:
-  - Subscription expires (webhook fires)
-  - circle_rescue_offers marked "expired"
-  - Overflow circles enter read-only mode
-```
+Modify `supabase/functions/create-checkout/index.ts` to read `rescue_circle_id` from the request body and include it in the Stripe session metadata so the webhook can access it.
 
 ---
 
 ## Files to Create
 
-- `supabase/functions/downgrade-subscription/index.ts` -- handles Extended-to-Family plan change
-- A new component `src/components/circles/CircleRescueDialog.tsx` -- shown when a member taps a rescue notification
+- `src/components/circles/ReadOnlyBanner.tsx`
 
 ## Files to Modify
 
-- `src/pages/Settings.tsx` -- add Subscription management card
-- `src/components/landing/Pricing.tsx` -- update cancel dialog to show affected circles and trigger rescue flow
-- `supabase/functions/customer-portal/index.ts` -- change return URL to `/settings`
-- `supabase/functions/stripe-webhook/index.ts` -- on subscription.deleted, expire unclaimed rescue offers; on checkout.session.completed, handle rescue claim (transfer ownership)
-- `src/pages/Circles.tsx` -- handle `?rescue=` query param to open rescue dialog
+- `src/contexts/CircleContext.tsx` -- add plan data and `isCircleReadOnly` helper
+- `src/pages/Feed.tsx` -- show banner, disable post creation when read-only
+- `src/pages/Events.tsx` -- disable event creation when read-only
+- `src/pages/Albums.tsx` -- disable album creation when read-only
+- `src/pages/Fridge.tsx` -- disable pin creation when read-only
+- `src/pages/Circles.tsx` -- disable invite when read-only
+- `src/components/circles/CircleRescueDialog.tsx` -- pass rescue metadata, remove premature claim
+- `supabase/functions/create-checkout/index.ts` -- forward `rescue_circle_id` in metadata
+- `supabase/functions/stripe-webhook/index.ts` -- handle rescue ownership transfer on checkout completion
 
-## Database Changes
+## No Database Changes Required
 
-1. Add `pending_plan` column to `user_plans` (text, nullable, default null)
-2. Create `circle_rescue_offers` table with RLS policies
+All needed tables and columns already exist.
+
