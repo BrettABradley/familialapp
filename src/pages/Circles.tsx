@@ -765,7 +765,6 @@ const Circles = () => {
                         <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="moderator">Mod</SelectItem>
                           <SelectItem value="member">Member</SelectItem>
                         </SelectContent>
                       </Select>

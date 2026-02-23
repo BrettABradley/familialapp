@@ -44,7 +44,6 @@ const Fridge = () => {
   
   
   const [pins, setPins] = useState<FridgePin[]>([]);
-  const [adminCircles, setAdminCircles] = useState<Circle[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -55,48 +54,12 @@ const Fridge = () => {
   const [isLoadingPins, setIsLoadingPins] = useState(true);
 
   useEffect(() => {
-    if (user && circles.length > 0) {
-      fetchAdminCircles();
-    }
-  }, [user, circles]);
-
-  useEffect(() => {
     if (circles.length > 0) {
       fetchPins();
     } else if (!contextLoading) {
       setIsLoadingPins(false);
     }
   }, [circles, selectedCircle, contextLoading]);
-
-  const fetchAdminCircles = async () => {
-    if (!user) return;
-
-    const adminList: Circle[] = [];
-
-    // Owned circles are always admin
-    circles.forEach(c => {
-      if (c.owner_id === user.id) {
-        adminList.push(c);
-      }
-    });
-
-    // Check memberships for admin role
-    const { data: memberCircles } = await supabase
-      .from("circle_memberships")
-      .select("circle_id, role, circles!circle_memberships_circle_id_fkey(*)")
-      .eq("user_id", user.id)
-      .eq("role", "admin");
-
-    if (memberCircles) {
-      memberCircles.forEach((m: any) => {
-        if (m.circles && !adminList.find((c) => c.id === (m.circles as Circle).id)) {
-          adminList.push(m.circles as Circle);
-        }
-      });
-    }
-
-    setAdminCircles(adminList);
-  };
 
   const fetchPins = async () => {
     if (circles.length === 0) return;
@@ -166,7 +129,7 @@ const Fridge = () => {
     if (error) {
       toast({
         title: "Error",
-        description: "Failed to create pin. Make sure you're an admin of this circle.",
+        description: "Failed to create pin.",
         variant: "destructive",
       });
     } else {
@@ -256,7 +219,7 @@ const Fridge = () => {
     );
   }
 
-  const isAdmin = adminCircles.length > 0;
+  
 
   return (
     <main className="container mx-auto px-4 py-8 max-w-4xl">
@@ -271,7 +234,7 @@ const Fridge = () => {
             Important notes, photos, and reminders for your family
           </p>
         </div>
-        {isAdmin && !readOnly && (
+        {!readOnly && (
           <Dialog open={isCreateOpen} onOpenChange={(open) => {
             setIsCreateOpen(open);
             if (!open) resetForm();
@@ -297,7 +260,7 @@ const Fridge = () => {
                       <SelectValue placeholder="Select circle" />
                     </SelectTrigger>
                     <SelectContent>
-                      {adminCircles.map((circle) => (
+                      {circles.map((circle) => (
                         <SelectItem key={circle.id} value={circle.id}>
                           {circle.name}
                         </SelectItem>
@@ -443,16 +406,14 @@ const Fridge = () => {
               Nothing on the fridge yet
             </h2>
             <p className="text-muted-foreground">
-              {isAdmin 
-                ? "Pin important notes, photos, and reminders for your family."
-                : "Circle admins can pin items here."}
+              Pin important notes, photos, and reminders for your family.
             </p>
           </CardContent>
         </Card>
       ) : (
         <FridgeBoard
           pins={pins as unknown as FridgeBoardPin[]}
-          canDeleteCircleId={(circleId) => adminCircles.some((c) => c.id === circleId)}
+          canDelete={(pin) => pin.pinned_by === user?.id || circles.some(c => c.id === pin.circle_id && c.owner_id === user?.id)}
           onDelete={(pin) => handleDeletePin(pin as unknown as FridgePin)}
           circleName={selectedCircle ? circles.find(c => c.id === selectedCircle)?.name : undefined}
         />
