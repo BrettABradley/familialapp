@@ -178,20 +178,8 @@ const Circles = () => {
       return;
     }
 
-    const { error } = await supabase.from("circle_invites").insert({
-      circle_id: selectedCircle.id,
-      invited_by: user.id,
-      email: inviteEmail,
-    });
-
-    if (error) {
-      toast({ title: "Error", description: "Failed to create invite.", variant: "destructive" });
-      setIsSendingInvite(false);
-      return;
-    }
-
     try {
-      const { data, error: emailError } = await supabase.functions.invoke("send-circle-invite", {
+      const { data, error: fnError } = await supabase.functions.invoke("send-circle-invite", {
         body: {
           email: inviteEmail,
           circleName: selectedCircle.name,
@@ -200,21 +188,18 @@ const Circles = () => {
         },
       });
 
-      console.log("send-circle-invite response data:", data);
-      console.log("send-circle-invite response error:", emailError);
-
-      if (emailError) {
-        console.error("Circle invite email error:", emailError);
-        toast({ title: "Invite created", description: `Invitation saved, but email failed to send.`, variant: "default" });
+      if (fnError) {
+        console.error("Circle invite error:", fnError);
+        toast({ title: "Error", description: "Failed to send invite. Please try again.", variant: "destructive" });
       } else if (data?.error) {
-        console.error("Circle invite email error from response:", data.error);
-        toast({ title: "Invite created", description: data.error || "Email failed to send.", variant: "default" });
+        console.error("Circle invite error from response:", data.error);
+        toast({ title: "Error", description: data.error, variant: "destructive" });
       } else {
         toast({ title: "Invite sent!", description: `Invitation email sent to ${inviteEmail}.` });
       }
     } catch (err) {
-      console.error("Circle invite email exception:", err);
-      toast({ title: "Invite created", description: `Invitation saved, but email failed to send.` });
+      console.error("Circle invite exception:", err);
+      toast({ title: "Error", description: "Failed to send invite. Please try again.", variant: "destructive" });
     }
 
     setInviteEmail("");
