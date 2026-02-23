@@ -78,7 +78,7 @@ const handler = async (req: Request): Promise<Response> => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization" }), {
-        status: 401,
+        status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
@@ -91,8 +91,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
+      console.error("Auth error:", authError);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
+        status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
@@ -103,7 +104,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (!validation.valid || !validation.data) {
       console.error("Validation failed:", validation.error);
       return new Response(JSON.stringify({ error: validation.error }), {
-        status: 400,
+        status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
@@ -131,7 +132,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       if (membership) {
         return new Response(JSON.stringify({ error: "This person is already a member of this circle" }), {
-          status: 400,
+          status: 200,
           headers: { "Content-Type": "application/json", ...corsHeaders },
         });
       }
@@ -146,7 +147,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       if (ownedCircle) {
         return new Response(JSON.stringify({ error: "This person is the owner of this circle" }), {
-          status: 400,
+          status: 200,
           headers: { "Content-Type": "application/json", ...corsHeaders },
         });
       }
@@ -164,7 +165,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (existingInvite) {
       return new Response(JSON.stringify({ error: "A pending invite already exists for this email" }), {
-        status: 400,
+        status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
@@ -172,6 +173,14 @@ const handler = async (req: Request): Promise<Response> => {
     const safeCircleName = escapeHtml(circleName);
     const safeInviterName = escapeHtml(inviterName || "A family member");
     const safeEmail = escapeHtml(email);
+
+    if (!RESEND_API_KEY) {
+      console.error("RESEND_API_KEY is not configured");
+      return new Response(JSON.stringify({ error: "Email service is not configured. Please contact support." }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
 
     console.log(`Sending invite to ${email} for circle ${circleName}`);
 
@@ -192,9 +201,9 @@ const handler = async (req: Request): Promise<Response> => {
     const result = await emailResponse.json();
 
     if (!emailResponse.ok) {
-      console.error("Resend error:", result);
-      return new Response(JSON.stringify({ error: result.message || "Failed to send email" }), {
-        status: 500,
+      console.error("Resend API error:", result);
+      return new Response(JSON.stringify({ error: result.message || "Failed to send email via Resend" }), {
+        status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
@@ -228,7 +237,7 @@ const handler = async (req: Request): Promise<Response> => {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error("Error sending invite email:", error);
     return new Response(JSON.stringify({ error: errorMessage }), {
-      status: 500,
+      status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
