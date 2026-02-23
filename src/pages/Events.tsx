@@ -499,10 +499,34 @@ const Events = () => {
                 </span>
               )}
               {event.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4" />
-                  {event.location}
-                </span>
+                <Popover>
+                  <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <button className="flex items-center gap-1 text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer">
+                      <MapPin className="w-4 h-4 shrink-0" />
+                      {event.location}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 p-2" align="start" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-col gap-1">
+                      <a
+                        href={`https://maps.apple.com/?q=${encodeURIComponent(event.location)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
+                      >
+                        Open in Apple Maps
+                      </a>
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
+                      >
+                        Open in Google Maps
+                      </a>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
             {event.description && (
