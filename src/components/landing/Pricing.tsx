@@ -329,7 +329,22 @@ const Pricing = () => {
   const handleCancelAllPending = async () => {
     setCancelDowngradeLoading(true);
     try {
-      if (cancelAtPeriodEnd) {
+      if (pendingPlan) {
+        // Tier-to-tier downgrade pending — revert to original plan in Stripe
+        const { data, error } = await supabase.functions.invoke("cancel-downgrade");
+        if (error) throw error;
+        if (data?.success) {
+          setCurrentPlan("extended");
+          setPendingPlan(null);
+          setCancelAtPeriodEnd(false);
+          setCurrentPeriodEnd(data.current_period_end);
+          toast({
+            title: "Downgrade canceled",
+            description: "You're back on the Extended plan. No additional charges.",
+          });
+        }
+      } else if (cancelAtPeriodEnd) {
+        // Standalone cancellation — reactivate subscription
         const { data, error } = await supabase.functions.invoke("reactivate-subscription");
         if (error) throw error;
         if (data?.success) {
@@ -339,18 +354,6 @@ const Pricing = () => {
           toast({
             title: "Subscription reactivated!",
             description: "Your plan will continue as normal.",
-          });
-        }
-      } else if (pendingPlan) {
-        const { data, error } = await supabase.functions.invoke("cancel-downgrade");
-        if (error) throw error;
-        if (data?.success) {
-          setCurrentPlan("extended");
-          setPendingPlan(null);
-          setCurrentPeriodEnd(data.current_period_end);
-          toast({
-            title: "Downgrade canceled",
-            description: "You're back on the Extended plan. No additional charges.",
           });
         }
       }
