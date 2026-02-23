@@ -83,6 +83,7 @@ const Circles = () => {
   const [deleteTarget, setDeleteTarget] = useState<Circle | null>(null);
   const [deleteConfirmStep, setDeleteConfirmStep] = useState<1 | 2>(1);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [memberPlans, setMemberPlans] = useState<Record<string, { plan: string; owned: number; max: number }>>({});
 
   // Handle ?rescue= query param
   useEffect(() => {
@@ -226,6 +227,25 @@ const Circles = () => {
 
     if (data) {
       setMemberships(data as unknown as CircleMembership[]);
+      // Fetch plan capacity for each member (excluding current user)
+      const otherMembers = (data as unknown as CircleMembership[]).filter(m => m.user_id !== user?.id);
+      if (otherMembers.length > 0) {
+        const plans: Record<string, { plan: string; owned: number; max: number }> = {};
+        await Promise.all(
+          otherMembers.map(async (m) => {
+            const [planRes, ownedRes] = await Promise.all([
+              supabase.from("user_plans").select("plan, max_circles").eq("user_id", m.user_id).maybeSingle(),
+              supabase.from("circles").select("id", { count: "exact", head: true }).eq("owner_id", m.user_id),
+            ]);
+            plans[m.user_id] = {
+              plan: planRes.data?.plan ?? "free",
+              max: planRes.data?.max_circles ?? 1,
+              owned: ownedRes.count ?? 0,
+            };
+          })
+        );
+        setMemberPlans(plans);
+      }
     }
   };
 
@@ -797,18 +817,29 @@ const Circles = () => {
             <DialogDescription>Select a member to become the new owner. You will become an admin.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-4 max-h-96 overflow-y-auto">
-            {memberships.filter(m => m.user_id !== user?.id).map((member) => (
+            {memberships.filter(m => m.user_id !== user?.id).map((member) => {
+              const mp = memberPlans[member.user_id];
+              const available = mp ? mp.max - mp.owned : null;
+              return (
               <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border border-border">
                 <Avatar className="h-10 w-10"><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
                 <div className="flex-1">
                   <p className="font-medium text-foreground">{member.profiles?.display_name || "Unknown"}</p>
                   <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
+                  {mp ? (
+                    <p className={`text-xs mt-0.5 ${available !== null && available > 0 ? "text-muted-foreground" : "text-destructive"}`}>
+                      {mp.plan.charAt(0).toUpperCase() + mp.plan.slice(1)} plan — {available !== null && available > 0 ? `${available} of ${mp.max} circles available` : `0 of ${mp.max} circles available`}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-0.5">No plan info</p>
+                  )}
                 </div>
                 <Button size="sm" variant="outline" onClick={() => handleTransferOwnership(member.user_id)} disabled={isTransferring}>
                   <Crown className="w-4 h-4 mr-1" />Transfer
                 </Button>
               </div>
-            ))}
+              );
+            })}
             {memberships.filter(m => m.user_id !== user?.id).length === 0 && (
               <p className="text-muted-foreground text-center py-4">No other members to transfer to</p>
             )}
@@ -826,18 +857,29 @@ const Circles = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 mt-4 max-h-96 overflow-y-auto">
-            {memberships.filter(m => m.user_id !== user?.id).map((member) => (
+            {memberships.filter(m => m.user_id !== user?.id).map((member) => {
+              const mp = memberPlans[member.user_id];
+              const available = mp ? mp.max - mp.owned : null;
+              return (
               <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border border-border">
                 <Avatar className="h-10 w-10"><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
                 <div className="flex-1">
                   <p className="font-medium text-foreground">{member.profiles?.display_name || "Unknown"}</p>
                   <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
+                  {mp ? (
+                    <p className={`text-xs mt-0.5 ${available !== null && available > 0 ? "text-muted-foreground" : "text-destructive"}`}>
+                      {mp.plan.charAt(0).toUpperCase() + mp.plan.slice(1)} plan — {available !== null && available > 0 ? `${available} of ${mp.max} circles available` : `0 of ${mp.max} circles available`}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-0.5">No plan info</p>
+                  )}
                 </div>
                 <Button size="sm" variant="outline" onClick={() => handleTransferAndLeave(member.user_id)} disabled={isTransferring}>
                   <Crown className="w-4 h-4 mr-1" />Transfer & Leave
                 </Button>
               </div>
-            ))}
+              );
+            })}
             {memberships.filter(m => m.user_id !== user?.id).length === 0 && (
               <div className="text-center py-4">
                 <p className="text-muted-foreground mb-2">No other members to transfer ownership to.</p>
