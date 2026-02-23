@@ -5,7 +5,7 @@ export async function getCircleMemberCount(circleId: string): Promise<number> {
     .from("circle_memberships")
     .select("id", { count: "exact", head: true })
     .eq("circle_id", circleId);
-  return (count ?? 0) + 1; // +1 for owner
+  return count ?? 0;
 }
 
 export async function getCircleMemberLimit(circleOwnerId: string, circleId?: string): Promise<{ limit: number; plan: string; extraMembers: number; maxMembers: number }> {
