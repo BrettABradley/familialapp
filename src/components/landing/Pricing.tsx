@@ -428,7 +428,23 @@ const Pricing = () => {
       );
     }
 
-    // Lower tier — always show actionable buttons
+    // Lower tier — check if this is the pending downgrade destination
+    if (pendingPlan && tierPlan === pendingPlan) {
+      return (
+        <Button variant="secondary" className="w-full" size="lg" disabled>
+          Downgrade Pending
+        </Button>
+      );
+    }
+
+    // If cancellation is pending and this is the free tier
+    if (cancelAtPeriodEnd && tierPlan === "free") {
+      return (
+        <Button variant="secondary" className="w-full" size="lg" disabled>
+          Cancel Pending
+        </Button>
+      );
+    }
 
     const label = tierPlan === "free" ? "Cancel Membership" : "Downgrade";
     return (
