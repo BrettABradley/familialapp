@@ -160,7 +160,7 @@ export function FridgeBoard({
                   <div
                     className={cn(
                       "relative bg-white p-1",
-                      pin.content ? "pb-10" : "pb-6",
+                      pin.content ? "pb-12" : "pb-8",
                       "border-4 border-zinc-300",
                       "shadow-[4px_4px_0_0_rgba(0,0,0,0.25)]",
                       "transition-shadow duration-150",
