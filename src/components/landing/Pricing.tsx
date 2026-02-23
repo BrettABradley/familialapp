@@ -438,7 +438,7 @@ const Pricing = () => {
     }
 
     // If cancellation is pending and this is the free tier
-    if (cancelAtPeriodEnd && tierPlan === "free") {
+    if (cancelAtPeriodEnd && !pendingPlan && tierPlan === "free") {
       return (
         <Button variant="secondary" className="w-full" size="lg" disabled>
           Cancel Pending
