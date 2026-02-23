@@ -196,13 +196,31 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <Textarea
-          placeholder="What's happening with the family?"
-          value={newPostContent}
-          onChange={(e) => setNewPostContent(e.target.value)}
-          className="min-h-[100px] resize-none mb-4"
-          maxLength={5000}
-        />
+        <div className="relative mb-4">
+          <Textarea
+            placeholder="What's happening with the family?"
+            value={newPostContent}
+            onChange={(e) => setNewPostContent(e.target.value)}
+            className="min-h-[100px] resize-none pb-10"
+            maxLength={5000}
+          />
+          {(newPostContent.trim() || selectedFiles.length > 0) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute bottom-2 right-2 text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2 text-xs"
+              onClick={() => {
+                setNewPostContent("");
+                previewUrls.forEach(url => URL.revokeObjectURL(url));
+                setSelectedFiles([]);
+                setPreviewUrls([]);
+              }}
+              disabled={isPosting}
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1" />Discard
+            </Button>
+          )}
+        </div>
         {previewUrls.length > 0 && (
           <div className="grid grid-cols-2 gap-2 mb-4">
             {previewUrls.map((url, index) => renderPreview(url, index))}
@@ -229,22 +247,6 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
               <Paperclip className="w-4 h-4 mr-2" />Add Media
             </Button>
             <VoiceRecorder onRecordingComplete={handleVoiceRecording} />
-            {(newPostContent.trim() || selectedFiles.length > 0) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                onClick={() => {
-                  setNewPostContent("");
-                  previewUrls.forEach(url => URL.revokeObjectURL(url));
-                  setSelectedFiles([]);
-                  setPreviewUrls([]);
-                }}
-                disabled={isPosting}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />Discard
-              </Button>
-            )}
           </div>
           <Button onClick={handleCreatePost} disabled={(!newPostContent.trim() && selectedFiles.length === 0) || isPosting}>
             <Send className="w-4 h-4 mr-2" />{isPosting ? "Uploading..." : "Share"}
