@@ -67,7 +67,8 @@ serve(async (req) => {
       cancel_at_period_end: true,
     });
 
-    const periodEnd = new Date(updated.current_period_end * 1000).toISOString();
+    const periodEndTimestamp = updated.current_period_end;
+    const periodEnd = periodEndTimestamp ? new Date(periodEndTimestamp * 1000).toISOString() : null;
     logStep("Subscription set to cancel at period end", { periodEnd });
 
     // Update user_plans to reflect pending cancellation
