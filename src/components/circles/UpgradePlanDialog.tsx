@@ -91,10 +91,10 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
         <DialogHeader>
           <DialogTitle className="font-serif flex items-center gap-2">
             <Users className="w-5 h-5" />
-            Circle Member Limit Reached
+            Upgrade Your Circle
           </DialogTitle>
           <DialogDescription>
-            This circle has {currentCount} of {limit} members. Upgrade to add more members.
+            Hit your member limit or just want more room to grow? We've got you covered.
           </DialogDescription>
         </DialogHeader>
 
