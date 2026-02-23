@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Bell, Check, Trash2, Heart, MessageCircle, Calendar, UserPlus, Users, Loader2 } from "lucide-react";
+import { Bell, Check, Trash2, Heart, MessageCircle, Calendar, UserPlus, Users, Loader2, Crown, X } from "lucide-react";
 import PendingInvites from "@/components/circles/PendingInvites";
 
 interface Notification {
@@ -128,6 +128,112 @@ const Notifications = () => {
     }
   };
 
+  const [respondingTo, setRespondingTo] = useState<string | null>(null);
+
+  const handleAcceptTransfer = async (notification: Notification) => {
+    if (!user) return;
+    setRespondingTo(notification.id);
+
+    // Find the pending transfer request for this user
+    const { data: req } = await supabase
+      .from("circle_transfer_requests")
+      .select("*")
+      .eq("to_user_id", user.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    const transferReq = req?.[0];
+
+    if (!transferReq) {
+      toast({ title: "Error", description: "Transfer request not found or already resolved.", variant: "destructive" });
+      setRespondingTo(null);
+      return;
+    }
+
+    // Execute the transfer
+    const { error: transferErr } = await supabase.rpc("transfer_circle_ownership", {
+      _circle_id: transferReq.circle_id,
+      _new_owner_id: user.id,
+    });
+
+    if (transferErr) {
+      toast({ title: "Error", description: transferErr.message || "Failed to accept transfer.", variant: "destructive" });
+      setRespondingTo(null);
+      return;
+    }
+
+    // Update request status
+    await supabase.from("circle_transfer_requests")
+      .update({ status: "accepted", resolved_at: new Date().toISOString() } as any)
+      .eq("id", transferReq.id);
+
+    // If leave_after_transfer, remove old owner from memberships
+    if (transferReq.leave_after_transfer) {
+      await supabase.from("circle_memberships")
+        .delete()
+        .eq("circle_id", transferReq.circle_id)
+        .eq("user_id", transferReq.from_user_id);
+    }
+
+    // Notify the original owner
+    await supabase.from("notifications").insert({
+      user_id: transferReq.from_user_id,
+      type: "transfer_request",
+      title: "Transfer Accepted",
+      message: `Your ownership transfer request has been accepted.`,
+      related_circle_id: transferReq.circle_id,
+      related_user_id: user.id,
+    });
+
+    // Mark this notification as read
+    await markAsRead(notification.id);
+
+    toast({ title: "Ownership accepted!", description: "You are now the circle owner." });
+    setRespondingTo(null);
+    fetchNotifications();
+  };
+
+  const handleDenyTransfer = async (notification: Notification) => {
+    if (!user) return;
+    setRespondingTo(notification.id);
+
+    const { data: req } = await supabase
+      .from("circle_transfer_requests")
+      .select("*")
+      .eq("to_user_id", user.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    const transferReq = req?.[0];
+
+    if (!transferReq) {
+      toast({ title: "Error", description: "Transfer request not found or already resolved.", variant: "destructive" });
+      setRespondingTo(null);
+      return;
+    }
+
+    await supabase.from("circle_transfer_requests")
+      .update({ status: "declined", resolved_at: new Date().toISOString() } as any)
+      .eq("id", transferReq.id);
+
+    // Notify original owner
+    await supabase.from("notifications").insert({
+      user_id: transferReq.from_user_id,
+      type: "transfer_request",
+      title: "Transfer Declined",
+      message: `Your ownership transfer request has been declined.`,
+      related_circle_id: transferReq.circle_id,
+      related_user_id: user.id,
+    });
+
+    await markAsRead(notification.id);
+    toast({ title: "Transfer declined" });
+    setRespondingTo(null);
+    fetchNotifications();
+  };
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "reaction":
@@ -140,6 +246,10 @@ const Notifications = () => {
         return <UserPlus className="w-4 h-4" />;
       case "event":
         return <Calendar className="w-4 h-4" />;
+      case "transfer_request":
+        return <Crown className="w-4 h-4" />;
+      case "transfer_block":
+        return <Crown className="w-4 h-4" />;
       case "circle":
       case "upgrade_request":
         return <Users className="w-4 h-4" />;
@@ -242,6 +352,26 @@ const Notifications = () => {
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                         {notification.message}
                       </p>
+                    )}
+                    {/* Accept/Deny buttons for transfer requests */}
+                    {notification.type === "transfer_request" && !notification.is_read && notification.title === "Ownership Transfer Request" && (
+                      <div className="flex gap-2 mt-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleAcceptTransfer(notification)}
+                          disabled={respondingTo === notification.id}
+                        >
+                          <Check className="w-4 h-4 mr-1" />Accept
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDenyTransfer(notification)}
+                          disabled={respondingTo === notification.id}
+                        >
+                          <X className="w-4 h-4 mr-1" />Deny
+                        </Button>
+                      </div>
                     )}
                     <p className="text-xs text-muted-foreground mt-2">
                       {new Date(notification.created_at).toLocaleDateString()} at{' '}
