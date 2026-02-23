@@ -129,6 +129,44 @@ export type Database = {
           },
         ]
       }
+      circle_rescue_offers: {
+        Row: {
+          circle_id: string
+          claimed_by: string | null
+          created_at: string | null
+          current_owner: string
+          deadline: string
+          id: string
+          status: string
+        }
+        Insert: {
+          circle_id: string
+          claimed_by?: string | null
+          created_at?: string | null
+          current_owner: string
+          deadline: string
+          id?: string
+          status?: string
+        }
+        Update: {
+          circle_id?: string
+          claimed_by?: string | null
+          created_at?: string | null
+          current_owner?: string
+          deadline?: string
+          id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "circle_rescue_offers_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       circles: {
         Row: {
           avatar_url: string | null
@@ -906,6 +944,7 @@ export type Database = {
           extra_members: number
           max_circles: number
           max_members_per_circle: number
+          pending_plan: string | null
           plan: string
           updated_at: string
           user_id: string
@@ -917,6 +956,7 @@ export type Database = {
           extra_members?: number
           max_circles?: number
           max_members_per_circle?: number
+          pending_plan?: string | null
           plan?: string
           updated_at?: string
           user_id: string
@@ -928,6 +968,7 @@ export type Database = {
           extra_members?: number
           max_circles?: number
           max_members_per_circle?: number
+          pending_plan?: string | null
           plan?: string
           updated_at?: string
           user_id?: string

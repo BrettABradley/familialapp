@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Camera, Save, ArrowLeft } from "lucide-react";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
+import SubscriptionCard from "@/components/settings/SubscriptionCard";
 
 const Settings = () => {
   const { user } = useAuth();
@@ -194,6 +195,8 @@ const Settings = () => {
           </Button>
         </CardContent>
       </Card>
+
+      <SubscriptionCard />
     </main>
   );
 };

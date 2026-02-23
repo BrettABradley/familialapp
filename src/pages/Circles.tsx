@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +20,7 @@ import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, Key
 import { Badge } from "@/components/ui/badge";
 import PendingInvites from "@/components/circles/PendingInvites";
 import UpgradePlanDialog from "@/components/circles/UpgradePlanDialog";
+import CircleRescueDialog from "@/components/circles/CircleRescueDialog";
 import { checkCircleCapacity, getCircleMemberCount, getCircleMemberLimit } from "@/lib/circleLimits";
 
 interface Circle {
@@ -46,8 +47,10 @@ const Circles = () => {
   const { user } = useAuth();
   const { circles, isLoading: contextLoading, refetchCircles, profile, setSelectedCircle: setContextCircle } = useCircleContext();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const [pendingCount, setPendingCount] = useState(0);
+  const [rescueCircleId, setRescueCircleId] = useState<string | null>(null);
 
   const [memberships, setMemberships] = useState<CircleMembership[]>([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -80,6 +83,16 @@ const Circles = () => {
   const [deleteTarget, setDeleteTarget] = useState<Circle | null>(null);
   const [deleteConfirmStep, setDeleteConfirmStep] = useState<1 | 2>(1);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Handle ?rescue= query param
+  useEffect(() => {
+    const rescueId = searchParams.get("rescue");
+    if (rescueId) {
+      setRescueCircleId(rescueId);
+      searchParams.delete("rescue");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (user) {
@@ -907,6 +920,13 @@ const Circles = () => {
         currentCount={upgradeInfo.currentCount}
         limit={upgradeInfo.limit}
         circleId={upgradeInfo.circleId}
+      />
+
+      {/* Circle Rescue Dialog */}
+      <CircleRescueDialog
+        circleId={rescueCircleId}
+        open={!!rescueCircleId}
+        onOpenChange={(open) => !open && setRescueCircleId(null)}
       />
     </main>
   );

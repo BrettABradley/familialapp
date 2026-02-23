@@ -266,7 +266,7 @@ serve(async (req) => {
 
         if (error) console.error("[STRIPE-WEBHOOK] Error updating cancel state:", error);
       } else {
-        // Subscription was reactivated or plan changed
+      // Subscription was reactivated or plan changed
         const productId = subscription.items.data[0]?.price?.product as string;
         const { plan, maxCircles, maxMembers } = getPlanFromProduct(productId);
 
@@ -279,6 +279,7 @@ serve(async (req) => {
             max_members_per_circle: maxMembers,
             cancel_at_period_end: false,
             current_period_end: periodEnd,
+            pending_plan: null,
             updated_at: new Date().toISOString(),
           })
           .eq("user_id", userId);
@@ -312,11 +313,21 @@ serve(async (req) => {
           max_members_per_circle: 8,
           cancel_at_period_end: false,
           current_period_end: null,
+          pending_plan: null,
           updated_at: new Date().toISOString(),
         })
         .eq("user_id", userId);
 
       if (error) console.error("[STRIPE-WEBHOOK] Error downgrading to free:", error);
+
+      // Expire any open circle rescue offers for this user
+      const { error: rescueError } = await supabase
+        .from("circle_rescue_offers")
+        .update({ status: "expired" })
+        .eq("current_owner", userId)
+        .eq("status", "open");
+
+      if (rescueError) console.error("[STRIPE-WEBHOOK] Error expiring rescue offers:", rescueError);
     }
 
     return new Response(JSON.stringify({ received: true }), {

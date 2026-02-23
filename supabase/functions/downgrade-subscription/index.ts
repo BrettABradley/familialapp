@@ -7,9 +7,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const FAMILY_PRICE_ID = "price_1T3N5bCiWDzualH5Cf7G7VsM";
+
 const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : "";
-  console.log(`[CUSTOMER-PORTAL] ${step}${detailsStr}`);
+  console.log(`[DOWNGRADE-SUBSCRIPTION] ${step}${detailsStr}`);
 };
 
 serve(async (req) => {
@@ -40,6 +42,7 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
+    // Find the Stripe customer
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     if (customers.data.length === 0) {
       throw new Error("No Stripe customer found for this user");
@@ -47,17 +50,58 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
-    const origin = req.headers.get("origin") || "https://familialapp.lovable.app";
-    const portalSession = await stripe.billingPortal.sessions.create({
+    // Find active subscription
+    const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
-      return_url: `${origin}/settings`,
+      status: "active",
+      limit: 1,
     });
-    logStep("Portal session created", { url: portalSession.url });
 
-    return new Response(JSON.stringify({ url: portalSession.url }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
+    if (subscriptions.data.length === 0) {
+      throw new Error("No active subscription found");
+    }
+
+    const subscription = subscriptions.data[0];
+    const subscriptionItemId = subscription.items.data[0].id;
+    logStep("Found active subscription", { subscriptionId: subscription.id, itemId: subscriptionItemId });
+
+    // Update subscription to Family price, effective at next billing cycle
+    const updated = await stripe.subscriptions.update(subscription.id, {
+      items: [{
+        id: subscriptionItemId,
+        price: FAMILY_PRICE_ID,
+      }],
+      proration_behavior: "none",
     });
+
+    const periodEnd = new Date(updated.current_period_end * 1000).toISOString();
+    logStep("Subscription updated to Family price", { periodEnd });
+
+    // Set pending_plan in user_plans so UI shows "Switching to Family on [date]"
+    const { error: dbError } = await supabase
+      .from("user_plans")
+      .update({
+        pending_plan: "family",
+        current_period_end: periodEnd,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", user.id);
+
+    if (dbError) {
+      console.error("[DOWNGRADE-SUBSCRIPTION] DB update error:", dbError);
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        pending_plan: "family",
+        current_period_end: periodEnd,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      }
+    );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });

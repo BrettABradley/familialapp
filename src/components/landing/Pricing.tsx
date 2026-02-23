@@ -72,6 +72,14 @@ const sharedFeatures = [
   { icon: Settings, title: "Profile Customization", description: "Personalize your profile with photos, bios, and more." },
 ];
 
+const PLAN_LIMITS: Record<string, number> = { free: 1, family: 2, extended: 3 };
+
+interface OwnedCircle {
+  id: string;
+  name: string;
+  memberCount: number;
+}
+
 const Pricing = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -81,26 +89,55 @@ const Pricing = () => {
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const [currentPeriodEnd, setCurrentPeriodEnd] = useState<string | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; targetPlan: string } | null>(null);
+  const [affectedCircles, setAffectedCircles] = useState<OwnedCircle[]>([]);
 
   useEffect(() => {
     if (!user) {
       setCurrentPlan(null);
       setCancelAtPeriodEnd(false);
       setCurrentPeriodEnd(null);
+      setPendingPlan(null);
       return;
     }
     supabase
       .from("user_plans")
-      .select("plan, cancel_at_period_end, current_period_end")
+      .select("plan, cancel_at_period_end, current_period_end, pending_plan")
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => {
         setCurrentPlan(data?.plan ?? "free");
         setCancelAtPeriodEnd(data?.cancel_at_period_end ?? false);
         setCurrentPeriodEnd(data?.current_period_end ?? null);
+        setPendingPlan((data as any)?.pending_plan ?? null);
       });
   }, [user]);
+
+  const fetchAffectedCircles = async (targetPlan: string): Promise<OwnedCircle[]> => {
+    if (!user) return [];
+    const targetLimit = PLAN_LIMITS[targetPlan] ?? 1;
+
+    const { data: circles } = await supabase
+      .from("circles")
+      .select("id, name, created_at")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: true });
+
+    if (!circles || circles.length <= targetLimit) return [];
+
+    const overflow = circles.slice(targetLimit);
+    const withCounts = await Promise.all(
+      overflow.map(async (c) => {
+        const { count } = await supabase
+          .from("circle_memberships")
+          .select("id", { count: "exact", head: true })
+          .eq("circle_id", c.id);
+        return { id: c.id, name: c.name, memberCount: (count ?? 0) + 1 };
+      })
+    );
+    return withCounts;
+  };
 
   const handleBuyNow = async (plan: string) => {
     if (plan === "free") {
@@ -109,6 +146,8 @@ const Pricing = () => {
         return;
       }
       // User wants to cancel to free — show confirmation
+      const circles = await fetchAffectedCircles("free");
+      setAffectedCircles(circles);
       setConfirmDialog({ open: true, targetPlan: "free" });
       return;
     }
@@ -137,21 +176,78 @@ const Pricing = () => {
     }
   };
 
+  const createRescueOffers = async () => {
+    if (!user || !currentPeriodEnd || affectedCircles.length === 0) return;
+
+    const { data: profileData } = await supabase.from("profiles").select("display_name").eq("user_id", user.id).single();
+    const displayName = profileData?.display_name || "The owner";
+
+    for (const circle of affectedCircles) {
+      await supabase.from("circle_rescue_offers").insert({
+        circle_id: circle.id,
+        current_owner: user.id,
+        deadline: currentPeriodEnd,
+        status: "open",
+      } as any);
+
+      const { data: members } = await supabase
+        .from("circle_memberships")
+        .select("user_id")
+        .eq("circle_id", circle.id);
+
+      if (members) {
+        const notifications = members
+          .filter((m) => m.user_id !== user.id)
+          .map((m) => ({
+            user_id: m.user_id,
+            type: "circle_rescue",
+            title: "Circle needs a new owner",
+            message: `${displayName} is downgrading their plan. "${circle.name}" will become read-only on ${formatPeriodEnd(currentPeriodEnd)} unless someone takes over.`,
+            related_circle_id: circle.id,
+            link: `/circles?rescue=${circle.id}`,
+          }));
+
+        if (notifications.length > 0) {
+          await supabase.from("notifications").insert(notifications);
+        }
+      }
+    }
+  };
+
   const handleCancelConfirm = async () => {
     setCancelingPlan(true);
     try {
-      const { data, error } = await supabase.functions.invoke("cancel-subscription");
-      if (error) throw error;
-      if (data?.success) {
-        setCancelAtPeriodEnd(true);
-        setCurrentPeriodEnd(data.current_period_end);
-        toast({
-          title: "Subscription canceled",
-          description: `You'll keep access until ${formatPeriodEnd(data.current_period_end)}.`,
-        });
+      await createRescueOffers();
+
+      const targetPlan = confirmDialog?.targetPlan;
+
+      if (targetPlan === "family" && currentPlan === "extended") {
+        // Downgrade Extended -> Family
+        const { data, error } = await supabase.functions.invoke("downgrade-subscription");
+        if (error) throw error;
+        if (data?.success) {
+          setPendingPlan("family");
+          setCurrentPeriodEnd(data.current_period_end);
+          toast({
+            title: "Downgrade scheduled",
+            description: `Your plan will switch to Family on ${formatPeriodEnd(data.current_period_end)}.`,
+          });
+        }
+      } else {
+        // Cancel to free
+        const { data, error } = await supabase.functions.invoke("cancel-subscription");
+        if (error) throw error;
+        if (data?.success) {
+          setCancelAtPeriodEnd(true);
+          setCurrentPeriodEnd(data.current_period_end);
+          toast({
+            title: "Subscription canceled",
+            description: `You'll keep access until ${formatPeriodEnd(data.current_period_end)}.`,
+          });
+        }
       }
     } catch (err: any) {
-      toast({ title: "Error", description: err.message || "Failed to cancel subscription.", variant: "destructive" });
+      toast({ title: "Error", description: err.message || "Failed to process request.", variant: "destructive" });
     } finally {
       setCancelingPlan(false);
       setConfirmDialog(null);
@@ -218,8 +314,8 @@ const Pricing = () => {
     }
 
     // Lower tier — downgrade / cancel
-    if (cancelAtPeriodEnd) {
-      // Already canceling, lower tiers should just show disabled
+    if (cancelAtPeriodEnd || pendingPlan) {
+      // Already canceling or downgrading, lower tiers should just show disabled
       return (
         <Button variant="outline" className="w-full" size="lg" disabled>
           {tierPlan === "free" ? "Cancel Pending" : "Downgrade Pending"}
@@ -233,7 +329,11 @@ const Pricing = () => {
         variant="outline"
         className="w-full"
         size="lg"
-        onClick={() => setConfirmDialog({ open: true, targetPlan: tierPlan })}
+        onClick={async () => {
+          const circles = await fetchAffectedCircles(tierPlan);
+          setAffectedCircles(circles);
+          setConfirmDialog({ open: true, targetPlan: tierPlan });
+        }}
         disabled={cancelingPlan}
       >
         {label}
@@ -364,10 +464,32 @@ const Pricing = () => {
                 ? "Cancel your subscription?"
                 : `Downgrade to ${dialogTargetName}?`}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              You'll keep full access to your current plan until{" "}
-              {formatPeriodEnd(currentPeriodEnd)}. After that, your plan will switch to{" "}
-              {dialogTargetName}.
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  You'll keep full access to your current plan until{" "}
+                  {formatPeriodEnd(currentPeriodEnd)}. After that, your plan will switch to{" "}
+                  {dialogTargetName}.
+                </p>
+                {affectedCircles.length > 0 && (
+                  <div className="rounded-md border p-3 space-y-2">
+                    <p className="font-medium text-foreground text-sm">
+                      These circles will become read-only:
+                    </p>
+                    <ul className="space-y-1">
+                      {affectedCircles.map((c) => (
+                        <li key={c.id} className="text-sm flex justify-between">
+                          <span className="font-medium text-foreground">{c.name}</span>
+                          <span className="text-muted-foreground">{c.memberCount} members</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-muted-foreground pt-1">
+                      Members will be notified and given the option to take over ownership and billing.
+                    </p>
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
