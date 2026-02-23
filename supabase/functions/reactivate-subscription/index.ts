@@ -135,7 +135,10 @@ serve(async (req) => {
       cancel_at_period_end: false,
     });
 
-    const periodEnd = new Date(updated.current_period_end * 1000).toISOString();
+    const rawEnd = updated.current_period_end;
+    const periodEnd = rawEnd
+      ? new Date(typeof rawEnd === "number" ? rawEnd * 1000 : rawEnd).toISOString()
+      : new Date().toISOString();
 
     // Determine the plan from the current price
     const currentPriceId = updated.items.data[0].price.id;
