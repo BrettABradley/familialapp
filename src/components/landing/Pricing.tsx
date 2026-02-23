@@ -193,18 +193,17 @@ const Pricing = () => {
           ))}
         </div>
 
-        {/* Extra Members Add-On */}
-        <div className="max-w-2xl mx-auto mb-16">
+        {/* Extra Members + Custom Plans */}
+        <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+          {/* Extra Members Add-On */}
           <Card className="border-border">
-            <CardContent className="flex flex-col md:flex-row items-center justify-between gap-6 py-8">
-              <div className="text-center md:text-left">
-                <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
-                  Need More Members?
-                </h3>
-                <p className="text-muted-foreground">
-                  Add <span className="font-semibold text-foreground">7 extra member slots</span> to any circle for a one-time payment of <span className="font-semibold text-foreground">$5</span>.
-                </p>
-              </div>
+            <CardContent className="flex flex-col items-center md:items-start gap-4 py-8">
+              <h3 className="font-serif text-xl font-semibold text-foreground">
+                Need More Members?
+              </h3>
+              <p className="text-muted-foreground text-center md:text-left">
+                Add <span className="font-semibold text-foreground">7 extra member slots</span> to any circle for a one-time payment of <span className="font-semibold text-foreground">$5</span>.
+              </p>
               <Button
                 variant="default"
                 size="lg"
@@ -221,20 +220,16 @@ const Pricing = () => {
               </Button>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Custom Plans */}
-        <div className="max-w-2xl mx-auto">
+          {/* Custom Plans */}
           <Card className="bg-secondary/50 border-border">
-            <CardContent className="flex flex-col md:flex-row items-center justify-between gap-6 py-8">
-              <div className="text-center md:text-left">
-                <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
-                  Need a Custom Plan?
-                </h3>
-                <p className="text-muted-foreground">
-                  For organizations, communities, or larger groups — we've got you covered.
-                </p>
-              </div>
+            <CardContent className="flex flex-col items-center md:items-start gap-4 py-8">
+              <h3 className="font-serif text-xl font-semibold text-foreground">
+                Need a Custom Plan?
+              </h3>
+              <p className="text-muted-foreground text-center md:text-left">
+                For organizations, communities, or larger groups — we've got you covered.
+              </p>
               <a href="tel:520-759-5200">
                 <Button variant="outline" size="lg" className="whitespace-nowrap">
                   <Phone className="w-4 h-4 mr-2" />
