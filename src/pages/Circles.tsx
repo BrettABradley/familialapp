@@ -10,6 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -73,6 +76,10 @@ const Circles = () => {
   const [circleLimit, setCircleLimit] = useState(3);
   const [memberInfo, setMemberInfo] = useState<Record<string, { count: number; limit: number; plan: string }>>({});
   const [requestingUpgrade, setRequestingUpgrade] = useState<string | null>(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Circle | null>(null);
+  const [deleteConfirmStep, setDeleteConfirmStep] = useState<1 | 2>(1);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -350,17 +357,25 @@ const Circles = () => {
     }
   };
 
-  const handleDeleteCircle = async (circle: Circle) => {
-    if (!confirm(`Delete "${circle.name}"? This cannot be undone.`)) return;
-    
-    const { error } = await supabase.from("circles").delete().eq("id", circle.id);
+  const openDeleteDialog = (circle: Circle) => {
+    setDeleteTarget(circle);
+    setDeleteConfirmStep(1);
+    setIsDeleteOpen(true);
+  };
 
+  const handleDeleteCircle = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    const { error } = await supabase.from("circles").delete().eq("id", deleteTarget.id);
     if (error) {
       toast({ title: "Error", description: "Failed to delete circle.", variant: "destructive" });
     } else {
       refetchCircles();
-      toast({ title: "Circle deleted" });
+      toast({ title: "Circle deleted", description: `"${deleteTarget.name}" has been permanently deleted.` });
     }
+    setIsDeleting(false);
+    setIsDeleteOpen(false);
+    setDeleteTarget(null);
   };
 
   const handleJoinByCode = async () => {
@@ -615,7 +630,7 @@ const Circles = () => {
                     </div>
                   </div>
                   {isOwner(circle) && (
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100" onClick={() => handleDeleteCircle(circle)} aria-label={`Delete circle ${circle.name}`}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100" onClick={() => openDeleteDialog(circle)} aria-label={`Delete circle ${circle.name}`}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                   )}
                 </div>
               </CardHeader>
@@ -816,6 +831,73 @@ const Circles = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Circle Confirmation Dialog */}
+      <AlertDialog open={isDeleteOpen} onOpenChange={(open) => { if (!open) { setIsDeleteOpen(false); setDeleteTarget(null); setDeleteConfirmStep(1); } }}>
+        <AlertDialogContent>
+          {deleteConfirmStep === 1 ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="font-serif flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                  Delete "{deleteTarget?.name}"?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="space-y-3">
+                  <Alert variant="destructive" className="mt-3">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>This action is permanent and cannot be undone.</strong> All posts, photos, events, and data within this circle will be permanently deleted.
+                    </AlertDescription>
+                  </Alert>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    <strong>No refunds:</strong> Any purchases made for this circle (extra member slots, plan upgrades) will <strong>not</strong> be refunded.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Members will lose access:</strong> All members will immediately lose access to this circle and its content.
+                  </p>
+                  <div className="rounded-md border border-border bg-secondary/50 p-3 mt-3">
+                    <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                      <ArrowRightLeft className="w-4 h-4" />
+                      Consider transferring ownership instead
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      If you just want to leave this circle, you can transfer ownership to another member from the Members panel without losing any data.
+                    </p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <Button variant="destructive" onClick={() => setDeleteConfirmStep(2)}>
+                  I understand, continue
+                </Button>
+              </AlertDialogFooter>
+            </>
+          ) : (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="font-serif text-destructive">
+                  Are you 100% sure?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  <p className="text-sm text-muted-foreground">
+                    You are about to <strong>permanently delete "{deleteTarget?.name}"</strong> and all its content. This includes all posts, photos, albums, events, messages, and member data. No purchases will be refunded.
+                  </p>
+                  <p className="text-sm font-medium text-destructive mt-3">
+                    This cannot be reversed.
+                  </p>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setDeleteConfirmStep(1)}>Go back</AlertDialogCancel>
+                <Button variant="destructive" onClick={handleDeleteCircle} disabled={isDeleting}>
+                  {isDeleting ? "Deleting..." : "Yes, permanently delete"}
+                </Button>
+              </AlertDialogFooter>
+            </>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Upgrade Plan Dialog */}
       <UpgradePlanDialog
