@@ -423,11 +423,19 @@ const Pricing = () => {
     }
 
     // Lower tier — downgrade / cancel
-    if (cancelAtPeriodEnd || pendingPlan) {
-      // Already canceling or downgrading, lower tiers should just show disabled
+    if (cancelAtPeriodEnd && tierPlan === "free") {
+      // Subscription is being canceled to free
       return (
         <Button variant="outline" className="w-full" size="lg" disabled>
-          {tierPlan === pendingPlan ? "Downgrade Pending" : tierPlan === "free" ? "Cancel Pending" : "Downgrade Pending"}
+          Cancel Pending
+        </Button>
+      );
+    }
+    if (pendingPlan && tierPlan === pendingPlan) {
+      // This specific tier is the pending downgrade target
+      return (
+        <Button variant="outline" className="w-full" size="lg" disabled>
+          Downgrade Pending
         </Button>
       );
     }
