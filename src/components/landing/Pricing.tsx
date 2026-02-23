@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Phone, ArrowRight, Loader2, Users } from "lucide-react";
+import { Check, Phone, ArrowRight, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 const PRICES = {
   family: "price_1T3N5bCiWDzualH5Cf7G7VsM",
   extended: "price_1T3N5nCiWDzualH5SBHxbHqo",
-  extra: "price_1T3N5zCiWDzualH52rsDSBlu",
+  
 };
 
 const tiers = [
@@ -25,7 +25,7 @@ const tiers = [
       "Unlimited posts & photos",
       "Basic circle management",
       "Mobile & web access",
-      "Need more? Add 7 members for $5 — or upgrade tier",
+      "Mobile & web access",
     ],
     cta: "Get Started Free",
     popular: false,
@@ -43,7 +43,7 @@ const tiers = [
       "Photo albums",
       "Priority support",
       "Advanced privacy controls",
-      "Need more? Add 7 members for $5 — or upgrade tier",
+      "Advanced privacy controls",
     ],
     cta: "Buy Now",
     popular: true,
@@ -61,7 +61,7 @@ const tiers = [
       "Private messaging",
       "Video sharing",
       "Admin tools & analytics",
-      "Need more? Add 7 members for $5",
+      "Admin tools & analytics",
     ],
     cta: "Buy Now",
     popular: false,
@@ -81,28 +81,6 @@ const Pricing = () => {
       return;
     }
 
-    if (plan === "extra") {
-      if (!user) {
-        navigate("/auth?plan=extra");
-        return;
-      }
-      const priceId = PRICES.extra;
-      setLoadingPlan("extra");
-      try {
-        const { data, error } = await supabase.functions.invoke("create-checkout", {
-          body: { priceId, mode: "payment" },
-        });
-        if (error) throw error;
-        if (data?.url) {
-          window.location.href = data.url;
-        }
-      } catch (err: any) {
-        toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });
-      } finally {
-        setLoadingPlan(null);
-      }
-      return;
-    }
 
     if (!user) {
       // Not logged in — redirect to auth with plan param
@@ -193,41 +171,14 @@ const Pricing = () => {
           ))}
         </div>
 
-        {/* Extra Members + Custom Plans */}
-        <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-          {/* Extra Members Add-On */}
-          <Card className="border-border">
-            <CardContent className="flex flex-col items-center md:items-start gap-4 py-8">
-              <h3 className="font-serif text-xl font-semibold text-foreground">
-                Need More Members?
-              </h3>
-              <p className="text-muted-foreground text-center md:text-left">
-                Add <span className="font-semibold text-foreground">7 extra member slots</span> to any circle for a one-time payment of <span className="font-semibold text-foreground">$5</span>.
-              </p>
-              <Button
-                variant="default"
-                size="lg"
-                className="whitespace-nowrap"
-                onClick={() => handleBuyNow("extra")}
-                disabled={loadingPlan !== null}
-              >
-                {loadingPlan === "extra" ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <Users className="w-4 h-4 mr-2" />
-                )}
-                Add 7 Members — $5
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Custom Plans */}
+        {/* Custom Plans */}
+        <div className="max-w-xl mx-auto">
           <Card className="bg-secondary/50 border-border">
-            <CardContent className="flex flex-col items-center md:items-start gap-4 py-8">
+            <CardContent className="flex flex-col items-center gap-4 py-8">
               <h3 className="font-serif text-xl font-semibold text-foreground">
                 Need a Custom Plan?
               </h3>
-              <p className="text-muted-foreground text-center md:text-left">
+              <p className="text-muted-foreground text-center">
                 For organizations, communities, or larger groups — we've got you covered.
               </p>
               <a href="tel:520-759-5200">
