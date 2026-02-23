@@ -24,7 +24,7 @@ const faqs = [
   {
     question: "Can I upgrade or downgrade my plan?",
     answer:
-      "Yes! You can upgrade or downgrade at any time. Changes take effect immediately, and billing is prorated so you only pay for what you use.",
+      "Yes! You can upgrade at any time and changes take effect immediately. If you downgrade or cancel, you'll keep full access to your current plan until the end of your billing period. After that, your plan will automatically adjust.",
   },
   {
     question: "What happens when I hit my member limit?",
