@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Phone, ArrowRight, Loader2 } from "lucide-react";
+import { Check, Phone, ArrowRight, Loader2, Users } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 const PRICES = {
   family: "price_1T3N5bCiWDzualH5Cf7G7VsM",
   extended: "price_1T3N5nCiWDzualH5SBHxbHqo",
+  extra: "price_1T3N5zCiWDzualH52rsDSBlu",
 };
 
 const tiers = [
@@ -77,6 +78,29 @@ const Pricing = () => {
   const handleBuyNow = async (plan: string) => {
     if (plan === "free") {
       navigate("/auth");
+      return;
+    }
+
+    if (plan === "extra") {
+      if (!user) {
+        navigate("/auth?plan=extra");
+        return;
+      }
+      const priceId = PRICES.extra;
+      setLoadingPlan("extra");
+      try {
+        const { data, error } = await supabase.functions.invoke("create-checkout", {
+          body: { priceId, mode: "payment" },
+        });
+        if (error) throw error;
+        if (data?.url) {
+          window.location.href = data.url;
+        }
+      } catch (err: any) {
+        toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });
+      } finally {
+        setLoadingPlan(null);
+      }
       return;
     }
 
@@ -167,6 +191,36 @@ const Pricing = () => {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* Extra Members Add-On */}
+        <div className="max-w-2xl mx-auto mb-16">
+          <Card className="border-border">
+            <CardContent className="flex flex-col md:flex-row items-center justify-between gap-6 py-8">
+              <div className="text-center md:text-left">
+                <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+                  Need More Members?
+                </h3>
+                <p className="text-muted-foreground">
+                  Add <span className="font-semibold text-foreground">7 extra member slots</span> to any circle for a one-time payment of <span className="font-semibold text-foreground">$5</span>.
+                </p>
+              </div>
+              <Button
+                variant="default"
+                size="lg"
+                className="whitespace-nowrap"
+                onClick={() => handleBuyNow("extra")}
+                disabled={loadingPlan !== null}
+              >
+                {loadingPlan === "extra" ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Users className="w-4 h-4 mr-2" />
+                )}
+                Add 7 Members — $5
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Custom Plans */}
