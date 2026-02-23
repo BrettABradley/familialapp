@@ -1,63 +1,113 @@
 
 
-## Plan: Delete Protection, Transfer Block Read-Only, and Owner Leave
+## Plan: Upgrade Preview, Receipt Emails, and Downgrade Verification
 
-### Overview
-Three interconnected changes to how circle deletion and transfer block work:
+### Problem
+Currently, clicking "Upgrade" on the pricing page immediately charges the user behind the scenes via the `upgrade-subscription` edge function with no preview or confirmation. Users need to:
+1. See exactly what they'll be charged before paying
+2. Receive a receipt email for upgrade purchases
+3. Have the downgrade flow properly preserve their current plan perks until the billing period ends
 
-1. **Delete only when empty** -- The delete button only works if the circle has zero members. If members exist, the dialog redirects the owner to activate transfer block instead.
-2. **Transfer block makes circle read-only** -- While a circle is on transfer block, it becomes fully read-only (no posts, messages, pins, events) until someone claims ownership.
-3. **Owner can leave after activating transfer block** -- Once transfer block is active, the owner can leave the circle since anyone can claim it.
+### Changes
 
-### What Changes
+---
 
-**Delete Dialog Behavior:**
-- When the owner clicks delete, check if there are any members in the circle
-- If **no members**: proceed with the existing two-step delete confirmation
-- If **members exist**: show a different dialog explaining they can't delete while members are present, with a prominent "Put on Transfer Block" button and an explanation that this lets them step away while someone else claims the circle
+### 1. New Edge Function: `preview-upgrade`
+Creates a preview invoice via Stripe's `stripe.invoices.createPreview()` to calculate the exact prorated charge amount before any payment happens.
 
-**Read-Only During Transfer Block:**
-- Update `isCircleReadOnly` in CircleContext to also return `true` when `transfer_block` is `true` on a circle
-- This automatically disables all write actions (posts, messages, pins, events) across the app since existing read-only checks already guard those features
-- The existing `ReadOnlyBanner` will show, but with transfer-block-specific messaging
-- The `TransferBlockBanner` will still show the "Claim Ownership" button
+- Takes `priceId` as input
+- Finds the user's active subscription
+- Returns: prorated amount due now, new monthly price, current period end date, and plan name
 
-**Owner Can Leave After Transfer Block:**
-- In the leave circle flow, if the owner's circle is on transfer block, allow them to leave directly (no need to transfer first since the circle is already up for grabs)
-- After leaving, the owner becomes a regular departed user; the transfer block banner remains for the remaining members
+---
 
-**Financial Responsibility on Claim:**
-- When someone claims ownership, they immediately become the owner and the circle uses their plan's limits going forward
-- The existing capacity indicator (plan name, circles available) already warns potential claimers if they're at capacity before they claim
-- No date-based transition needed -- clean handoff on the spot
+### 2. Update `upgrade-subscription` to Send Receipt Email
+After a successful subscription update, the function will send a branded receipt email via Resend (same format as existing receipts in the webhook). The email will:
+- Show the prorated amount charged (not the full plan price)
+- Thank the user for upgrading
+- Include the new plan name and effective date
+
+To get the actual charge amount, the function will retrieve the latest invoice after the upgrade (Stripe creates one automatically with `always_invoice` proration).
+
+---
+
+### 3. Frontend Confirmation Flow (Pricing.tsx)
+Instead of immediately calling `upgrade-subscription`, the "Upgrade" button will:
+1. Call `preview-upgrade` to get the prorated charge amount
+2. Show a confirmation dialog explaining:
+   - "You'll be charged **$X.XX** now for the remainder of your billing period"
+   - "Starting [next billing date], you'll be charged **$15/month**"
+3. User clicks "Confirm & Pay" to proceed with the actual upgrade
+4. Or "Cancel" to back out
+
+---
+
+### 4. Frontend Confirmation Flow (UpgradePlanDialog.tsx)
+Same flow for the upgrade dialog used within circle settings:
+- When upgrading from Family to Extended, show the preview first
+- Free-to-paid upgrades continue using Stripe Checkout (no change needed)
+
+---
+
+### 5. Downgrade Flow Verification
+The existing downgrade flow (`downgrade-subscription`) already uses `proration_behavior: "none"`, which means:
+- User keeps Extended perks until the current billing period ends
+- At renewal, they're charged $7/month for Family
+- No changes needed here, but will verify the webhook handler (`customer.subscription.updated`) properly applies the plan change at period end
 
 ---
 
 ### Technical Details
 
-**File: `src/contexts/CircleContext.tsx`**
-- Update `isCircleReadOnly` to add a check: if the circle has `transfer_block === true`, return `true` regardless of plan overflow status
+**New file: `supabase/functions/preview-upgrade/index.ts`**
+```text
+- Authenticates user
+- Finds their Stripe customer and active subscription
+- Calls stripe.invoices.createPreview() with the new price
+- Returns { prorated_amount, new_monthly_price, next_billing_date, plan_name }
+```
 
-**File: `src/pages/Circles.tsx`**
-- Modify `openDeleteDialog`: before opening, count members in the circle. Store the count in state.
-- Modify the delete dialog UI:
-  - If member count is 0: show existing two-step delete flow
-  - If member count > 0: show a new panel explaining "This circle has [N] members. You must remove all members or put the circle on transfer block before deleting." with a "Put on Transfer Block" button
-- Modify `handleLeaveCircle`: if the user is the owner AND the circle has `transfer_block === true`, allow them to leave directly (remove them as owner, leave the circle owner-less or handle via the transfer block claim flow)
-- For the owner leaving after transfer block: update the `circles` table to keep `transfer_block = true` but we need to handle the "ownerless" state. The simplest approach: the owner stays as `owner_id` in the database (required field) but is removed from active participation. When someone claims, they replace the owner_id. Alternatively, allow the leave to just work as a normal membership removal since the owner is already implicit.
+**Modified: `supabase/functions/upgrade-subscription/index.ts`**
+- After successful upgrade, retrieve the latest invoice to get actual charged amount
+- Send receipt email via Resend with the prorated amount
+- Receipt subject: "Your Familial Receipt - [Date]"
+- Receipt body: shows "Upgrade to [Plan] (prorated)" and the charged amount
 
-**File: `src/components/circles/ReadOnlyBanner.tsx`**
-- Add transfer-block-specific messaging: "This circle is on transfer block and is read-only until someone claims ownership."
+**Modified: `src/components/landing/Pricing.tsx`**
+- Add state for upgrade preview data and confirmation dialog
+- When user clicks "Upgrade" on a higher tier:
+  1. Call `preview-upgrade` (show loading spinner)
+  2. Open AlertDialog with charge breakdown
+  3. On confirm, call `upgrade-subscription`
+- Free-to-paid continues using `create-checkout` (Stripe hosted page)
 
-**File: `src/components/circles/TransferBlockBanner.tsx`**
-- No major changes needed; it already shows the claim button for non-owners
+**Modified: `src/components/circles/UpgradePlanDialog.tsx`**
+- Same preview + confirm flow for Family-to-Extended upgrades
+- Free-to-paid continues using `create-checkout`
 
-**Database: No schema changes needed**
-- The `transfer_block` column and `claim_circle_ownership` RPC already exist
-- `isCircleReadOnly` is purely frontend logic
+**Config: `supabase/config.toml`**
+- Add `[functions.preview-upgrade]` with `verify_jwt = false`
 
-### Edge Cases
-- If the owner leaves after transfer block and nobody claims: the circle remains in limbo with transfer_block = true, read-only. The owner_id still points to the departed user. Members can still claim ownership.
-- If all members also leave: the circle becomes an empty, ownerless circle. At this point it could be cleaned up by a background job (future enhancement).
-- The owner cannot delete while members exist -- they must either remove all members manually first, or use transfer block.
+### Flow Summary
+
+```text
+User clicks "Upgrade" (Family -> Extended)
+  -> Frontend calls preview-upgrade
+  -> Shows dialog: "You'll be charged $5.33 now. 
+     Starting March 15, you'll pay $15/month."
+  -> User clicks "Confirm & Pay"
+  -> Frontend calls upgrade-subscription
+  -> Stripe charges prorated amount
+  -> Receipt email sent to user
+  -> UI updates to show new plan
+```
+
+```text
+User clicks "Downgrade" (Extended -> Family)
+  -> Confirmation dialog (already exists)
+  -> Calls downgrade-subscription
+  -> Stripe schedules price change at period end
+  -> User keeps Extended perks until renewal
+  -> At renewal: charged $7/month, plan switches to Family
+```
 
