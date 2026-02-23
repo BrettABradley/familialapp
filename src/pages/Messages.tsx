@@ -455,8 +455,12 @@ const Messages = () => {
         <div className="flex flex-col h-[calc(100vh-200px)]">
           <div className="flex items-center gap-3 pb-4 border-b border-border mb-4">
             <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setChatView("list"); }}><ArrowLeft className="w-4 h-4" /></Button>
-            <Avatar><AvatarImage src={selectedUser.avatar_url || undefined} /><AvatarFallback>{selectedUser.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback></Avatar>
-            <h2 className="font-serif text-xl font-bold text-foreground">{selectedUser.display_name || "Unknown"}</h2>
+            <Link to={`/profile/${selectedUser.user_id}`}>
+              <Avatar><AvatarImage src={selectedUser.avatar_url || undefined} /><AvatarFallback>{selectedUser.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback></Avatar>
+            </Link>
+            <Link to={`/profile/${selectedUser.user_id}`} className="hover:underline">
+              <h2 className="font-serif text-xl font-bold text-foreground">{selectedUser.display_name || "Unknown"}</h2>
+            </Link>
           </div>
           <div className="flex-1 overflow-y-auto space-y-4 mb-4">
             {messages.length === 0 ? (
@@ -551,7 +555,7 @@ const Messages = () => {
                   <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[70%] rounded-lg px-4 py-2 ${isMe ? 'bg-foreground text-background' : 'bg-secondary text-foreground'}`}>
                       {!isMe && (
-                        <p className="text-xs font-semibold mb-1 opacity-70">{senderProfile?.display_name || "Unknown"}</p>
+                        <Link to={`/profile/${msg.sender_id}`} className="text-xs font-semibold mb-1 opacity-70 hover:underline block">{senderProfile?.display_name || "Unknown"}</Link>
                       )}
                       <p>{msg.content}</p>
                       <p className={`text-xs mt-1 ${isMe ? 'text-background/70' : 'text-muted-foreground'}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>

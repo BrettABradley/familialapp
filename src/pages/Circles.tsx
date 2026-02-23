@@ -754,9 +754,13 @@ const Circles = () => {
             ) : (
               memberships.map((member) => (
                 <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border border-border">
-                  <Avatar className="h-10 w-10"><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
+                  <Link to={`/profile/${member.user_id}`} onClick={() => setIsMembersOpen(false)}>
+                    <Avatar className="h-10 w-10"><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
+                  </Link>
                   <div className="flex-1">
-                    <p className="font-medium text-foreground">{member.profiles?.display_name || "Unknown"}</p>
+                    <Link to={`/profile/${member.user_id}`} onClick={() => setIsMembersOpen(false)} className="font-medium text-foreground hover:underline">
+                      {member.profiles?.display_name || "Unknown"}
+                    </Link>
                     <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
                   </div>
                    {selectedCircle && isOwner(selectedCircle) && member.user_id !== user?.id && (
