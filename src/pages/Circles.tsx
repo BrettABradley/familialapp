@@ -84,6 +84,7 @@ const Circles = () => {
   const [deleteTarget, setDeleteTarget] = useState<Circle | null>(null);
   const [deleteConfirmStep, setDeleteConfirmStep] = useState<1 | 2>(1);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteMemberCount, setDeleteMemberCount] = useState<number | null>(null);
   const [memberPlans, setMemberPlans] = useState<Record<string, { plan: string; owned: number; max: number }>>({});
 
   // Handle ?rescue= query param
@@ -391,10 +392,20 @@ const Circles = () => {
     }
   };
 
-  const openDeleteDialog = (circle: Circle) => {
+  const openDeleteDialog = async (circle: Circle) => {
     setDeleteTarget(circle);
     setDeleteConfirmStep(1);
+    setDeleteMemberCount(null);
     setIsDeleteOpen(true);
+
+    // Count non-owner members
+    const { count } = await supabase
+      .from("circle_memberships")
+      .select("id", { count: "exact", head: true })
+      .eq("circle_id", circle.id)
+      .neq("user_id", circle.owner_id);
+
+    setDeleteMemberCount(count ?? 0);
   };
 
   const handleDeleteCircle = async () => {
@@ -478,6 +489,25 @@ const Circles = () => {
     if (!user) return;
 
     if (isOwner(circle)) {
+      // If transfer block is active, owner can leave directly
+      if (circle.transfer_block) {
+        if (!confirm(`Leave "${circle.name}"? The circle is on transfer block and any member can claim ownership.`)) return;
+
+        const { error } = await supabase
+          .from("circle_memberships")
+          .delete()
+          .eq("circle_id", circle.id)
+          .eq("user_id", user.id);
+
+        if (error) {
+          toast({ title: "Error", description: "Failed to leave circle.", variant: "destructive" });
+        } else {
+          toast({ title: "Left circle", description: `You've left "${circle.name}". Any member can still claim ownership.` });
+          await refetchCircles();
+        }
+        return;
+      }
+
       // Owner needs to transfer ownership first
       setSelectedCircle(circle);
       await fetchMemberships(circle.id);
@@ -962,9 +992,40 @@ const Circles = () => {
       </Dialog>
 
       {/* Delete Circle Confirmation Dialog */}
-      <AlertDialog open={isDeleteOpen} onOpenChange={(open) => { if (!open) { setIsDeleteOpen(false); setDeleteTarget(null); setDeleteConfirmStep(1); } }}>
+      <AlertDialog open={isDeleteOpen} onOpenChange={(open) => { if (!open) { setIsDeleteOpen(false); setDeleteTarget(null); setDeleteConfirmStep(1); setDeleteMemberCount(null); } }}>
         <AlertDialogContent>
-          {deleteConfirmStep === 1 ? (
+          {deleteMemberCount === null ? (
+            <div className="py-8 text-center text-muted-foreground">Checking members…</div>
+          ) : deleteMemberCount > 0 && deleteConfirmStep === 1 ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="font-serif flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                  Can't Delete "{deleteTarget?.name}"
+                </AlertDialogTitle>
+                <AlertDialogDescription className="space-y-3">
+                  <p className="text-sm text-muted-foreground mt-2">
+                    This circle has <strong>{deleteMemberCount} {deleteMemberCount === 1 ? "member" : "members"}</strong> besides you. You must remove all members or put the circle on transfer block before deleting.
+                  </p>
+                  <div className="rounded-md border border-border bg-secondary/50 p-3 mt-3">
+                    <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                      <ArrowRightLeft className="w-4 h-4" />
+                      Put on Transfer Block
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This makes the circle read-only and lets any member claim ownership. You'll be able to leave the circle after activating it.
+                    </p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <Button onClick={() => { setIsDeleteOpen(false); if (deleteTarget) handleTransferBlock(deleteTarget); }}>
+                  <ArrowRightLeft className="w-4 h-4 mr-2" />Put on Transfer Block
+                </Button>
+              </AlertDialogFooter>
+            </>
+          ) : deleteConfirmStep === 1 ? (
             <>
               <AlertDialogHeader>
                 <AlertDialogTitle className="font-serif flex items-center gap-2">
@@ -981,18 +1042,6 @@ const Circles = () => {
                   <p className="text-sm text-muted-foreground mt-2">
                     <strong>No refunds:</strong> Any purchases made for this circle (extra member slots, plan upgrades) will <strong>not</strong> be refunded.
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    <strong>Members will lose access:</strong> All members will immediately lose access to this circle and its content.
-                  </p>
-                  <div className="rounded-md border border-border bg-secondary/50 p-3 mt-3">
-                    <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                      <ArrowRightLeft className="w-4 h-4" />
-                      Consider transferring ownership instead
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      If you just want to leave this circle, you can transfer ownership to another member from the Members panel without losing any data.
-                    </p>
-                  </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

@@ -144,6 +144,10 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
   // Determines if a circle is read-only due to plan overflow.
   // Owned circles sorted by created_at; oldest N (up to max_circles) are active, rest are overflow.
   const isCircleReadOnly = (circleId: string): boolean => {
+    // Transfer block makes a circle read-only regardless of plan
+    const circle = circles.find(c => c.id === circleId);
+    if (circle && (circle as any).transfer_block) return true;
+
     if (!userPlan || !user) return false;
 
     // Get circles owned by this user, sorted by creation date (oldest first)
@@ -154,12 +158,8 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
     if (ownedCircles.length <= userPlan.max_circles) return false;
 
     // The circle must be owned by the user to be "overflow read-only"
-    const circle = ownedCircles.find(c => c.id === circleId);
-    if (!circle) {
-      // Not owned by user — check if the circle's owner has overflow
-      // We need the owner's plan for that; for now, not read-only from this user's perspective
-      return false;
-    }
+    const ownedCircle = ownedCircles.find(c => c.id === circleId);
+    if (!ownedCircle) return false;
 
     const activeIds = new Set(ownedCircles.slice(0, userPlan.max_circles).map(c => c.id));
     return !activeIds.has(circleId);
