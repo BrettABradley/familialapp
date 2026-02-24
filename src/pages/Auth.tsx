@@ -54,7 +54,14 @@ const Auth = () => {
     }
 
     if (!loading && user && !planParam) {
-      navigate("/circles");
+      // Check for a saved return URL (e.g. from checkout redirect through auth)
+      const savedRedirect = localStorage.getItem("postAuthRedirect");
+      if (savedRedirect) {
+        localStorage.removeItem("postAuthRedirect");
+        navigate(savedRedirect);
+      } else {
+        navigate("/circles");
+      }
     }
   }, [user, loading, navigate, planParam, toast]);
 

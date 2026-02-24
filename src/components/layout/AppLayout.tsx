@@ -17,6 +17,11 @@ function AppLayoutContent() {
 
   useEffect(() => {
     if (!authLoading && !user) {
+      // Preserve return URL so checkout session_id isn't lost during auth redirect
+      const fullPath = window.location.pathname + window.location.search;
+      if (fullPath !== "/" && fullPath !== "/auth") {
+        localStorage.setItem("postAuthRedirect", fullPath);
+      }
       navigate("/auth");
     }
   }, [user, authLoading, navigate]);

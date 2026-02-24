@@ -175,6 +175,17 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       await Promise.all([fetchCircles(), fetchProfile(), fetchUserPlan()]);
       setIsLoading(false);
+
+      // Safety net: sync subscription status with Stripe in the background
+      try {
+        const { data } = await supabase.functions.invoke("check-subscription");
+        if (data?.synced) {
+          // Plan was out of sync — refetch to pick up the corrected values
+          await fetchUserPlan();
+        }
+      } catch {
+        // Best-effort; don't block the UI
+      }
     };
 
     loadData();
