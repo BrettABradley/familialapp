@@ -257,47 +257,7 @@ export function CircleHeader({
               </Button>
             </div>
 
-            {/* Mobile Navigation - Hamburger Menu */}
-            {isMobile && (
-              <div className="flex items-center gap-1 md:hidden">
-                <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                  <SheetTrigger asChild>
-                    <Button variant="ghost" size="sm" className="min-h-[44px] min-w-[44px]">
-                      <Menu className="w-5 h-5" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-[280px]">
-                  <SheetHeader>
-                    <SheetTitle className="text-left">Menu</SheetTitle>
-                  </SheetHeader>
-                  <nav className="flex flex-col gap-2 mt-6">
-                    {navItems.map((item) => (
-                      <SheetClose asChild key={item.to}>
-                        <Link to={item.to}>
-                          <Button variant="ghost" className="w-full justify-start h-12">
-                            <item.icon className="w-5 h-5 mr-3" />
-                            {item.label}
-                          </Button>
-                        </Link>
-                      </SheetClose>
-                    ))}
-                    <div className="border-t border-border my-2" />
-                    <Button 
-                      variant="ghost" 
-                      className="w-full justify-start h-12 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        setSheetOpen(false);
-                        onSignOut();
-                      }}
-                    >
-                      <LogOut className="w-5 h-5 mr-3" />
-                      Sign Out
-                    </Button>
-                  </nav>
-                </SheetContent>
-              </Sheet>
-              </div>
-            )}
+            {/* Mobile: no hamburger menu, bottom nav handles it */}
           </>
         )}
       </div>
