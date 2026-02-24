@@ -9,6 +9,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Paperclip, X, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ToastAction } from "@/components/ui/toast";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import { validateFileSize, getFileMediaType } from "@/lib/mediaUtils";
 
@@ -20,6 +22,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const { user } = useAuth();
   const { circles, selectedCircle, setSelectedCircle, profile } = useCircleContext();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   
@@ -34,7 +37,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length + selectedFiles.length > 4) {
-      toast({ title: "Too many files", description: "You can upload up to 4 files per post. For more images, try creating an Album!", variant: "destructive" });
+      toast({ title: "Too many files", description: "You can upload up to 4 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
       return;
     }
 
@@ -54,7 +57,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
 
   const handleVoiceRecording = (blob: Blob) => {
     if (selectedFiles.length >= 4) {
-      toast({ title: "Too many files", description: "You can upload up to 4 files per post. For more images, try creating an Album!", variant: "destructive" });
+      toast({ title: "Too many files", description: "You can upload up to 4 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
       return;
     }
     const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
