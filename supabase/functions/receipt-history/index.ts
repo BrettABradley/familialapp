@@ -69,6 +69,7 @@ serve(async (req) => {
       description: string;
       amount: string;
       type: string;
+      receipt_url: string | null;
     }> = [];
 
     // Process invoices
@@ -99,6 +100,7 @@ serve(async (req) => {
         description,
         amount: `$${(invoice.amount_paid / 100).toFixed(2)}`,
         type: invoice.billing_reason || "payment",
+        receipt_url: invoice.invoice_pdf || invoice.hosted_invoice_url || null,
       });
     }
 
@@ -133,6 +135,7 @@ serve(async (req) => {
         description,
         amount: `$${(amount / 100).toFixed(2)}`,
         type: "checkout",
+        receipt_url: null,
       });
     }
 
