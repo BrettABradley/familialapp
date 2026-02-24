@@ -34,7 +34,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length + selectedFiles.length > 4) {
-      toast({ title: "Too many files", description: "You can upload up to 4 files per post.", variant: "destructive" });
+      toast({ title: "Too many files", description: "You can upload up to 4 files per post. For more images, try creating an Album!", variant: "destructive" });
       return;
     }
 
@@ -54,7 +54,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
 
   const handleVoiceRecording = (blob: Blob) => {
     if (selectedFiles.length >= 4) {
-      toast({ title: "Too many files", description: "You can upload up to 4 files per post.", variant: "destructive" });
+      toast({ title: "Too many files", description: "You can upload up to 4 files per post. For more images, try creating an Album!", variant: "destructive" });
       return;
     }
     const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });

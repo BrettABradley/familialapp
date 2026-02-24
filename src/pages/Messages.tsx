@@ -274,11 +274,32 @@ const Messages = () => {
     }
   };
 
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+
+  // Group members dialog state
+  const [isViewMembersOpen, setIsViewMembersOpen] = useState(false);
+  const [groupMembersList, setGroupMembersList] = useState<Profile[]>([]);
+
+  const fetchGroupMembers = async (groupId: string) => {
+    const { data: members } = await supabase.from("group_chat_members").select("user_id").eq("group_chat_id", groupId);
+    if (!members || members.length === 0) { setGroupMembersList([]); return; }
+    const userIds = members.map(m => m.user_id);
+    const { data: profiles } = await supabase.from("profiles").select("*").in("user_id", userIds);
+    setGroupMembersList(profiles || []);
+  };
+
+  const handleViewMembers = async () => {
+    if (!selectedGroup) return;
+    await fetchGroupMembers(selectedGroup.id);
+    setIsViewMembersOpen(true);
+  };
+
   const handleCreateGroup = async () => {
-    if (!newGroupName.trim() || !user || selectedMemberIds.size === 0) return;
+    if (!newGroupName.trim() || !user || selectedMemberIds.size === 0 || isCreatingGroup) return;
 
     if (!selectedCircle) return;
     const circleId = selectedCircle;
+    setIsCreatingGroup(true);
 
     const { data: group, error } = await supabase
       .from("group_chats")
@@ -288,6 +309,7 @@ const Messages = () => {
 
     if (error || !group) {
       toast({ title: "Error", description: "Failed to create group chat.", variant: "destructive" });
+      setIsCreatingGroup(false);
       return;
     }
 
@@ -312,10 +334,10 @@ const Messages = () => {
       await supabase.from("notifications").insert(memberNotifications);
     }
 
-    const newGroupName_ = newGroupName;
     setNewGroupName("");
     setSelectedMemberIds(new Set());
     setIsCreateGroupOpen(false);
+    setIsCreatingGroup(false);
     await fetchGroupChats();
 
     // Auto-open the newly created group chat
@@ -509,7 +531,9 @@ const Messages = () => {
                 </label>
               )}
             </div>
-            <h2 className="font-serif text-xl font-bold text-foreground flex-1">{selectedGroup.name}</h2>
+            <button onClick={handleViewMembers} className="text-left hover:underline">
+              <h2 className="font-serif text-xl font-bold text-foreground flex-1">{selectedGroup.name}</h2>
+            </button>
             {selectedGroup.created_by === user?.id && (
               <div className="flex items-center gap-1">
                 <Button variant="ghost" size="icon" onClick={handleEditGroup}><Pencil className="w-4 h-4" /></Button>
@@ -541,6 +565,25 @@ const Messages = () => {
               <div className="space-y-4 mt-2">
                 <Input value={editGroupName} onChange={(e) => setEditGroupName(e.target.value)} maxLength={100} placeholder="Group name" />
                 <Button className="w-full" onClick={handleSaveGroupName} disabled={!editGroupName.trim()}>Save</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* View Members Dialog */}
+          <Dialog open={isViewMembersOpen} onOpenChange={setIsViewMembersOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="font-serif">Group Members</DialogTitle>
+                <DialogDescription>{selectedGroup.name} — {groupMembersList.length} member{groupMembersList.length !== 1 ? 's' : ''}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 mt-2 max-h-64 overflow-y-auto">
+                {groupMembersList.map(member => (
+                  <Link key={member.user_id} to={`/profile/${member.user_id}`} onClick={() => setIsViewMembersOpen(false)} className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary transition-colors">
+                    <Avatar className="h-8 w-8"><AvatarImage src={member.avatar_url || undefined} /><AvatarFallback className="text-xs">{member.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback></Avatar>
+                    <span className="text-sm font-medium text-foreground">{member.display_name || "Unknown"}</span>
+                    {member.user_id === selectedGroup.created_by && <span className="text-xs text-muted-foreground ml-auto">Creator</span>}
+                  </Link>
+                ))}
               </div>
             </DialogContent>
           </Dialog>
@@ -636,7 +679,9 @@ const Messages = () => {
                         ))}
                       </div>
                     </div>
-                    <Button className="w-full" onClick={handleCreateGroup} disabled={!newGroupName.trim() || selectedMemberIds.size === 0}>Create Group</Button>
+                    <Button className="w-full" onClick={handleCreateGroup} disabled={!newGroupName.trim() || selectedMemberIds.size === 0 || isCreatingGroup}>
+                      {isCreatingGroup ? "Creating..." : "Create Group"}
+                    </Button>
                   </div>
                 </DialogContent>
               </Dialog>

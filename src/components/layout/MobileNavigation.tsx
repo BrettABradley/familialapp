@@ -21,7 +21,7 @@ const navItems = [
 const moreItems = [
   { to: "/albums", icon: Image, label: "Albums" },
   { to: "/messages", icon: MessageSquare, label: "Messages" },
-  { to: "/profile", icon: User, label: "Profile" },
+  { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export function MobileNavigation() {
