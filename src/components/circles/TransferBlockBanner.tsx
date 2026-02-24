@@ -6,12 +6,14 @@ import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import UpgradePlanDialog from "@/components/circles/UpgradePlanDialog";
 
 const TransferBlockBanner = () => {
   const { user } = useAuth();
-  const { circles, selectedCircle, refetchCircles, profile } = useCircleContext();
+  const { circles, selectedCircle, refetchCircles, profile, userPlan } = useCircleContext();
   const { toast } = useToast();
   const [isClaiming, setIsClaiming] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const circle = circles.find(c => c.id === selectedCircle);
   if (!circle || !(circle as any).transfer_block) return null;
@@ -29,7 +31,11 @@ const TransferBlockBanner = () => {
     });
 
     if (error) {
-      toast({ title: "Error", description: error.message || "Failed to claim ownership.", variant: "destructive" });
+      if (error.message?.includes("CIRCLE_LIMIT_REACHED")) {
+        setShowUpgrade(true);
+      } else {
+        toast({ title: "Error", description: error.message || "Failed to claim ownership.", variant: "destructive" });
+      }
       setIsClaiming(false);
       return;
     }
@@ -49,23 +55,36 @@ const TransferBlockBanner = () => {
     setIsClaiming(false);
   };
 
+  const ownedCount = circles.filter(c => c.owner_id === user?.id).length;
+
   return (
-    <Alert className="mb-6 border-destructive/50 bg-destructive/10">
-      <Users className="h-4 w-4 text-destructive" />
-      <AlertDescription className="flex items-center justify-between gap-4">
-        <span className="text-sm">
-          {isOwner
-            ? "This circle is on transfer block. Waiting for someone to claim ownership."
-            : `"${circle.name}" needs a new owner. Claim ownership to keep it going.`}
-        </span>
-        {!isOwner && (
-          <Button size="sm" onClick={handleClaim} disabled={isClaiming}>
-            <Crown className="w-4 h-4 mr-1" />
-            {isClaiming ? "Claiming..." : "Claim Ownership"}
-          </Button>
-        )}
-      </AlertDescription>
-    </Alert>
+    <>
+      <Alert className="mb-6 border-destructive/50 bg-destructive/10">
+        <Users className="h-4 w-4 text-destructive" />
+        <AlertDescription className="flex items-center justify-between gap-4">
+          <span className="text-sm">
+            {isOwner
+              ? "This circle is on transfer block. Waiting for someone to claim ownership."
+              : `"${circle.name}" needs a new owner. Claim ownership to keep it going.`}
+          </span>
+          {!isOwner && (
+            <Button size="sm" onClick={handleClaim} disabled={isClaiming}>
+              <Crown className="w-4 h-4 mr-1" />
+              {isClaiming ? "Claiming..." : "Claim Ownership"}
+            </Button>
+          )}
+        </AlertDescription>
+      </Alert>
+
+      <UpgradePlanDialog
+        isOpen={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        currentPlan={userPlan?.plan || "free"}
+        currentCount={ownedCount}
+        limit={userPlan?.max_circles || 1}
+        circleId={circle.id}
+      />
+    </>
   );
 };
 
