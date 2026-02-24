@@ -363,6 +363,20 @@ serve(async (req) => {
         return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      // Check if user is on founder plan — never downgrade founders
+      const { data: planCheck } = await supabase
+        .from("user_plans")
+        .select("plan")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (planCheck?.plan === "founder") {
+        console.log(`[STRIPE-WEBHOOK] Founder plan detected for user ${userId} — skipping downgrade`);
+        return new Response(JSON.stringify({ received: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       console.log(`[STRIPE-WEBHOOK] Subscription deleted, downgrading user ${userId} to free`);
       const { error } = await supabase
         .from("user_plans")
