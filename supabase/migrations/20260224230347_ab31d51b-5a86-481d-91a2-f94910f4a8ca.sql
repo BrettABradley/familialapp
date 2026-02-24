@@ -1,0 +1,1 @@
+UPDATE user_plans SET plan = 'founder' WHERE plan = 'admin';
