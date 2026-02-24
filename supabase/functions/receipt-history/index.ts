@@ -113,10 +113,24 @@ serve(async (req) => {
       // Check if we already have this via an invoice
       if (session.invoice && receipts.some((r) => r.id === session.invoice)) continue;
 
+      // Try to get a descriptive name from line items
+      let description = "One-time Purchase";
+      try {
+        const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 });
+        const priceId = lineItems.data[0]?.price?.id;
+        if (priceId && PRICE_DETAILS[priceId]) {
+          description = PRICE_DETAILS[priceId];
+        } else if (lineItems.data[0]?.description) {
+          description = lineItems.data[0].description;
+        }
+      } catch (_e) {
+        // fallback to generic description
+      }
+
       receipts.push({
         id: session.id,
         date: new Date(session.created * 1000).toISOString(),
-        description: "One-time Purchase",
+        description,
         amount: `$${(amount / 100).toFixed(2)}`,
         type: "checkout",
       });
