@@ -40,6 +40,20 @@ serve(async (req) => {
     const user = userData.user;
     log("Authenticated", { userId: user.id, email: user.email });
 
+    // Founder plan is manually assigned — never overwrite it from Stripe
+    const { data: currentPlanCheck } = await supabaseAdmin
+      .from("user_plans")
+      .select("plan")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (currentPlanCheck?.plan === "founder") {
+      log("Founder plan detected — skipping Stripe sync", { userId: user.id });
+      return new Response(JSON.stringify({ synced: true, plan: "founder" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY not set");
 
