@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Receipt, RefreshCw, Loader2 } from "lucide-react";
+import { Receipt, RefreshCw, Loader2, Download } from "lucide-react";
 
 interface ReceiptItem {
   id: string;
@@ -12,6 +12,7 @@ interface ReceiptItem {
   description: string;
   amount: string;
   type: string;
+  receipt_url: string | null;
 }
 
 const ReceiptHistory = () => {
@@ -83,7 +84,20 @@ const ReceiptHistory = () => {
                   <p className="text-sm font-medium text-foreground truncate">{receipt.description}</p>
                   <p className="text-xs text-muted-foreground">{formatDate(receipt.date)}</p>
                 </div>
-                <span className="text-sm font-semibold text-foreground ml-4 flex-shrink-0">{receipt.amount}</span>
+                <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                  <span className="text-sm font-semibold text-foreground">{receipt.amount}</span>
+                  {receipt.receipt_url && (
+                    <a
+                      href={receipt.receipt_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label="Download receipt"
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
               </div>
             ))}
           </div>
