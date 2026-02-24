@@ -138,17 +138,17 @@ const PendingInvites = ({ compact = false, onCountChange }: PendingInvitesProps)
   };
 
   const handleDecline = async (invite: PendingInvite) => {
+    if (!user?.email) return;
     setProcessingIds((prev) => new Set(prev).add(invite.id));
 
     const { error } = await supabase
       .from("circle_invites")
       .update({ status: "declined" })
-      .eq("circle_id", invite.circle_id)
-      .eq("email", user?.email!)
-      .eq("status", "pending");
+      .eq("id", invite.id);
 
     if (error) {
-      toast({ title: "Error", description: "Failed to decline invite.", variant: "destructive" });
+      console.error("Decline invite error:", error);
+      toast({ title: "Error", description: error.message || "Failed to decline invite.", variant: "destructive" });
     } else {
       const updated = invites.filter((i) => i.circle_id !== invite.circle_id);
       setInvites(updated);
