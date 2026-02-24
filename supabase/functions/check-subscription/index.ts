@@ -48,8 +48,10 @@ serve(async (req) => {
     // Look up Stripe customer by email
     const customers = await stripe.customers.list({ email: user.email!, limit: 1 });
     if (customers.data.length === 0) {
-      log("No Stripe customer found, no sync needed");
-      return new Response(JSON.stringify({ synced: false, reason: "no_customer" }), {
+      log("No Stripe customer found — ensuring free plan");
+      // No Stripe customer at all — make sure DB reflects free
+      await syncToFree(supabaseAdmin, user.id);
+      return new Response(JSON.stringify({ synced: true, plan: "free", reason: "no_customer" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -65,8 +67,34 @@ serve(async (req) => {
     });
 
     if (subscriptions.data.length === 0) {
-      log("No active subscriptions");
-      return new Response(JSON.stringify({ synced: false, reason: "no_active_subscription" }), {
+      log("No active subscriptions — downgrading to free and transfer-blocking overflow");
+
+      // Get current DB plan to check if we need to downgrade
+      const { data: currentPlan } = await supabaseAdmin
+        .from("user_plans")
+        .select("plan")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      await supabaseAdmin.from("user_plans").update({
+        plan: "free",
+        max_circles: 1,
+        max_members_per_circle: 8,
+        cancel_at_period_end: false,
+        current_period_end: null,
+        pending_plan: null,
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", user.id);
+
+      // Transfer-block overflow circles (keep only the oldest 1)
+      await transferBlockOverflow(supabaseAdmin, user.id, 1);
+
+      const wasDowngraded = currentPlan?.plan && currentPlan.plan !== "free";
+      return new Response(JSON.stringify({
+        synced: true,
+        plan: "free",
+        reason: wasDowngraded ? "subscription_expired" : "no_active_subscription",
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -88,42 +116,39 @@ serve(async (req) => {
       }
     }
 
-    log("Best Stripe plan", { bestPlan, bestMaxCircles, bestMaxMembers });
+    // Find the subscription object that corresponds to our best plan
+    const bestSub = subscriptions.data.find(sub =>
+      sub.items.data.some(item => PRICES[item.price.id]?.plan === bestPlan)
+    );
 
-    // Get current DB plan
-    const { data: currentPlan } = await supabaseAdmin
+    const cancelAtPeriodEnd = bestSub?.cancel_at_period_end ?? false;
+    const currentPeriodEnd = bestSub?.current_period_end
+      ? new Date(bestSub.current_period_end * 1000).toISOString()
+      : null;
+
+    log("Best Stripe plan", { bestPlan, bestMaxCircles, bestMaxMembers, cancelAtPeriodEnd, currentPeriodEnd });
+
+    // Always update DB to match Stripe truth
+    const { error: updateError } = await supabaseAdmin
       .from("user_plans")
-      .select("plan, max_circles, max_members_per_circle")
-      .eq("user_id", user.id)
-      .maybeSingle();
+      .update({
+        plan: bestPlan,
+        max_circles: bestMaxCircles,
+        max_members_per_circle: bestMaxMembers,
+        cancel_at_period_end: cancelAtPeriodEnd,
+        current_period_end: currentPeriodEnd,
+        pending_plan: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", user.id);
 
-    const currentRank = PLAN_RANK[currentPlan?.plan ?? "free"] ?? 0;
-    const stripeRank = PLAN_RANK[bestPlan] ?? 0;
-
-    if (stripeRank > currentRank) {
-      log("Upgrading DB plan to match Stripe", { from: currentPlan?.plan, to: bestPlan });
-      const { error: updateError } = await supabaseAdmin
-        .from("user_plans")
-        .update({
-          plan: bestPlan,
-          max_circles: bestMaxCircles,
-          max_members_per_circle: bestMaxMembers,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id);
-
-      if (updateError) {
-        log("Update error", { error: updateError.message });
-        throw new Error("Failed to update plan");
-      }
-
-      return new Response(JSON.stringify({ synced: true, plan: bestPlan }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (updateError) {
+      log("Update error", { error: updateError.message });
+      throw new Error("Failed to update plan");
     }
 
-    log("DB plan is already correct or higher", { dbPlan: currentPlan?.plan, stripePlan: bestPlan });
-    return new Response(JSON.stringify({ synced: false, reason: "already_current", plan: currentPlan?.plan }), {
+    log("DB synced to Stripe", { plan: bestPlan });
+    return new Response(JSON.stringify({ synced: true, plan: bestPlan }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
@@ -134,3 +159,32 @@ serve(async (req) => {
     });
   }
 });
+
+async function syncToFree(supabaseAdmin: any, userId: string) {
+  await supabaseAdmin.from("user_plans").update({
+    plan: "free",
+    max_circles: 1,
+    max_members_per_circle: 8,
+    cancel_at_period_end: false,
+    current_period_end: null,
+    pending_plan: null,
+    updated_at: new Date().toISOString(),
+  }).eq("user_id", userId);
+}
+
+async function transferBlockOverflow(supabaseAdmin: any, userId: string, maxCircles: number) {
+  const { data: ownedCircles } = await supabaseAdmin
+    .from("circles")
+    .select("id")
+    .eq("owner_id", userId)
+    .eq("transfer_block", false)
+    .order("created_at", { ascending: true });
+
+  if (ownedCircles && ownedCircles.length > maxCircles) {
+    const overflowIds = ownedCircles.slice(maxCircles).map((c: any) => c.id);
+    log("Transfer-blocking overflow circles", { overflowIds });
+    await supabaseAdmin.from("circles")
+      .update({ transfer_block: true })
+      .in("id", overflowIds);
+  }
+}
