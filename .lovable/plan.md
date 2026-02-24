@@ -1,66 +1,109 @@
 
 
-# Fix: Family Plan Purchase Not Granting Access
+# Fix: Subscription Sync and Auto-Transfer-Block on Expiration
 
-## What happened
+## Problems
 
-The user `friendsandbrett@gmail.com` has an active Stripe subscription on the Family plan (confirmed in Stripe), but their database record still shows `plan: free` with 1 circle and 8 members. The `verify-checkout` function has zero logs, meaning it was never called.
+1. **`check-subscription` doesn't sync `cancel_at_period_end` or `current_period_end`** -- it only upgrades the plan tier but ignores subscription metadata. This is why `friendsandbrett@gmail.com` shows `cancel_at_period_end: true` with `current_period_end: null` (stale data from a previous manual fix).
 
-## Root cause
+2. **No mechanism to auto-transfer-block overflow circles when a subscription actually expires.** If a user cancels and their period ends, their excess circles should be placed on the transfer block so members can claim them.
 
-There is a critical gap in the checkout return flow:
+## Solution
 
-1. User signs in at `/auth?plan=family`, which triggers Stripe checkout
-2. User completes payment on Stripe
-3. Stripe redirects back to `/circles?checkout=success&session_id=...`
-4. **Problem**: The `AppLayout` component checks authentication first. If the user's session expired during checkout (common with external redirects), they get redirected to `/auth` -- and the `session_id` query parameter is lost forever
-5. The `verify-checkout` function in `Circles.tsx` never runs because the user never reaches that page with the query params intact
-6. No webhook is configured either (no `STRIPE_WEBHOOK_SECRET` exists), so there is no backup path
+### Part 1: Fix `check-subscription` to fully sync subscription state
 
-This means any user whose session expires during checkout will pay but never receive their plan upgrade.
+**File: `supabase/functions/check-subscription/index.ts`**
 
-## Fix (3 parts)
+The function currently only checks if the Stripe plan is higher than the DB plan. It needs to:
 
-### Part 1: Immediate data fix
-Run a database update to set `friendsandbrett@gmail.com` (user_id `59b40736-dbc2-48aa-9c78-4e4b7bfc78cd`) to the Family plan with correct limits. This grants them immediate access.
+- Always sync `cancel_at_period_end` and `current_period_end` from the best active subscription, regardless of whether the plan tier changed
+- If no active subscriptions exist but the DB still shows a paid plan, downgrade to free (subscription expired)
+- When downgrading to free due to expiration, auto-transfer-block any overflow circles
+- Always update the DB to match Stripe truth, not just on upgrades
 
-### Part 2: Persist checkout session_id across auth redirects
-When the user lands on `/circles?checkout=success&session_id=...` but gets redirected to `/auth` due to an expired session, the session_id is lost. Fix this by:
+Key changes:
+- After finding the best subscription, extract `cancel_at_period_end` and `current_period_end` from that subscription
+- Always update the `user_plans` row with the full set of fields: `plan`, `max_circles`, `max_members_per_circle`, `cancel_at_period_end`, `current_period_end`
+- When no active subscriptions exist: set plan to `free`, clear cancellation fields, and transfer-block excess circles
+- Return `synced: true` whenever any field was changed (not just plan tier)
 
-- **In `AppLayout.tsx`**: Before redirecting to `/auth`, check if the current URL has checkout params. If so, save the full return URL (including query params) to `localStorage`
-- **In `Auth.tsx`**: After successful login, check `localStorage` for a saved return URL and redirect there instead of the default `/circles`
-- This ensures the `verify-checkout` flow in `Circles.tsx` always executes after payment
+### Part 2: Auto-transfer-block overflow circles on expiration
 
-### Part 3: Add a login-time subscription sync as a safety net
-Create a lightweight mechanism so that every time a user logs in, their Stripe subscription status is checked against their database plan. This catches any missed verifications.
+When `check-subscription` detects that a user's subscription has expired (no active subs in Stripe, but DB shows paid plan):
 
-- **New edge function `check-subscription`**: Takes the authenticated user's email, looks up their Stripe customer and active subscriptions, and updates `user_plans` if the database is out of sync with Stripe
-- **In `CircleContext.tsx`**: Call `check-subscription` once when the user loads (after auth), ensuring plans are always current regardless of whether `verify-checkout` ran
+1. Set the user to the free plan (`max_circles: 1`, `max_members_per_circle: 8`)
+2. Query circles owned by this user, sorted by `created_at` ascending
+3. For any circles beyond the free limit (1), set `transfer_block = true`
+4. This makes those circles read-only and allows members to claim ownership
 
-## Technical details
+This logic lives inside the `check-subscription` edge function itself, using the service role key.
 
-### Database migration
+### Part 3: Fix `friendsandbrett@gmail.com` immediately
+
+Use the data insert tool to correct the record:
 ```sql
 UPDATE user_plans
-SET plan = 'family', max_circles = 2, max_members_per_circle = 20, updated_at = now()
+SET cancel_at_period_end = false, current_period_end = null, updated_at = now()
 WHERE user_id = '59b40736-dbc2-48aa-9c78-4e4b7bfc78cd';
 ```
 
-### File: `src/components/layout/AppLayout.tsx`
-- In the `useEffect` that redirects to `/auth`, save `window.location.pathname + window.location.search` to `localStorage` key `postAuthRedirect` before navigating
+However, the next login will also auto-correct this via the improved `check-subscription` function, which will read the actual Stripe state (active, not canceling) and sync it.
 
-### File: `src/pages/Auth.tsx`
-- After successful login (when `user` becomes truthy), check `localStorage` for `postAuthRedirect`. If found, navigate there and clear it. Otherwise use the existing default redirect logic
+## Technical Details
 
-### New file: `supabase/functions/check-subscription/index.ts`
-- Authenticate the caller
-- Look up Stripe customer by email
-- Check active subscriptions
-- Compare against `user_plans` row
-- If Stripe shows a higher plan than the database, update the database
-- Return the current plan status
+### `supabase/functions/check-subscription/index.ts` -- rewrite
 
-### File: `src/contexts/CircleContext.tsx`
-- After fetching user plan, invoke `check-subscription` in the background
-- If the returned plan differs, refetch the user plan data
+```typescript
+// After finding best subscription:
+const bestSub = subscriptions.data.find(sub => 
+  sub.items.data.some(item => PRICES[item.price.id]?.plan === bestPlan)
+);
+const cancelAtPeriodEnd = bestSub?.cancel_at_period_end ?? false;
+const currentPeriodEnd = bestSub?.current_period_end 
+  ? new Date(bestSub.current_period_end * 1000).toISOString() 
+  : null;
+
+// Always update to match Stripe (not just on upgrades)
+await supabaseAdmin.from("user_plans").update({
+  plan: bestPlan,
+  max_circles: bestMaxCircles,
+  max_members_per_circle: bestMaxMembers,
+  cancel_at_period_end: cancelAtPeriodEnd,
+  current_period_end: currentPeriodEnd,
+  pending_plan: null,
+  updated_at: new Date().toISOString(),
+}).eq("user_id", user.id);
+```
+
+When no active subscriptions exist:
+```typescript
+// Downgrade to free
+await supabaseAdmin.from("user_plans").update({
+  plan: "free", max_circles: 1, max_members_per_circle: 8,
+  cancel_at_period_end: false, current_period_end: null, pending_plan: null,
+}).eq("user_id", user.id);
+
+// Transfer-block overflow circles
+const { data: ownedCircles } = await supabaseAdmin
+  .from("circles")
+  .select("id")
+  .eq("owner_id", user.id)
+  .eq("transfer_block", false)
+  .order("created_at", { ascending: true });
+
+if (ownedCircles && ownedCircles.length > 1) {
+  const overflowIds = ownedCircles.slice(1).map(c => c.id);
+  await supabaseAdmin.from("circles")
+    .update({ transfer_block: true })
+    .in("id", overflowIds);
+}
+```
+
+### `supabase/config.toml` -- no change needed
+
+`check-subscription` is not listed (defaults to `verify_jwt = true`), which is correct since the function validates the JWT manually.
+
+### Files changed
+- `supabase/functions/check-subscription/index.ts` -- full rewrite to sync all fields and handle expiration
+- Database update for `friendsandbrett@gmail.com` via insert tool
 
