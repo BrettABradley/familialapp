@@ -240,8 +240,8 @@ const SubscriptionCard = () => {
 
   if (!planData) return null;
 
-  const isAdmin = planData.plan === "admin";
-  const isPaid = planData.plan !== "free" && !isAdmin;
+  const isFounder = planData.plan === "founder";
+  const isPaid = planData.plan !== "free" && !isFounder;
   const isExtended = planData.plan === "extended";
   const dialogAction = confirmDialog?.action;
   const targetPlanName = dialogAction === "cancel" ? "Free" : "Family";
@@ -314,7 +314,7 @@ const SubscriptionCard = () => {
               </Button>
             )}
 
-            {!isPaid && !isAdmin && (
+            {!isPaid && !isFounder && (
               <Button onClick={() => navigate("/#pricing")} className="w-full">
                 Upgrade Plan
               </Button>

@@ -41,10 +41,10 @@ serve(async (req) => {
           .select("plan")
           .eq("user_id", userData.user.id)
           .maybeSingle();
-        if (planData?.plan !== "admin") {
-          throw new Error("Only admins can run sync");
+        if (planData?.plan !== "founder") {
+          throw new Error("Only founders can run sync");
         }
-        log("Admin authenticated", { userId: userData.user.id });
+        log("Founder authenticated", { userId: userData.user.id });
       }
     }
 
@@ -109,7 +109,7 @@ serve(async (req) => {
             .eq("user_id", userId)
             .maybeSingle();
 
-          const planRank: Record<string, number> = { free: 0, family: 1, extended: 2, admin: 99 };
+          const planRank: Record<string, number> = { free: 0, family: 1, extended: 2, founder: 99 };
           const currentRank = planRank[currentPlan?.plan ?? "free"] ?? 0;
           const newRank = planRank[plan] ?? 0;
 
