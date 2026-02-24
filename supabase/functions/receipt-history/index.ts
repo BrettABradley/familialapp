@@ -39,29 +39,35 @@ serve(async (req) => {
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
-    // Find customer
+    // Find customer (may not exist for guest checkouts)
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    if (customers.data.length === 0) {
-      return new Response(JSON.stringify({ receipts: [] }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const customerId = customers.data.length > 0 ? customers.data[0].id : null;
+
+    // Get paid invoices (only if customer exists)
+    const invoices = customerId
+      ? await stripe.invoices.list({ customer: customerId, status: "paid", limit: 50 })
+      : { data: [] as any[] };
+
+    // Get completed checkout sessions for the customer
+    const sessions: { data: any[] } = customerId
+      ? await stripe.checkout.sessions.list({ customer: customerId, status: "complete", limit: 50 })
+      : { data: [] };
+
+    // Also search for sessions by email (catches one-time purchases without linked customer)
+    try {
+      const searchResults = await stripe.checkout.sessions.search({
+        query: `customer_details.email:"${user.email}" AND status:"complete"`,
+        limit: 50,
       });
+      const existingIds = new Set(sessions.data.map((s: any) => s.id));
+      for (const s of searchResults.data) {
+        if (!existingIds.has(s.id)) {
+          sessions.data.push(s);
+        }
+      }
+    } catch (_searchErr) {
+      console.log("Checkout session search fallback:", _searchErr);
     }
-
-    const customerId = customers.data[0].id;
-
-    // Get all paid invoices for this customer
-    const invoices = await stripe.invoices.list({
-      customer: customerId,
-      status: "paid",
-      limit: 50,
-    });
-
-    // Also get completed checkout sessions for initial purchases
-    const sessions = await stripe.checkout.sessions.list({
-      customer: customerId,
-      status: "complete",
-      limit: 50,
-    });
 
     const receipts: Array<{
       id: string;
