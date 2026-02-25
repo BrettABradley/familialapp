@@ -1,18 +1,22 @@
 
 
-# Fix: Founder Plan Being Overwritten by Stripe Sync
+## Fix: Founder Plan Applied to Wrong User ID
 
-## Problem
+### What I found
+The database currently has:
+- `59b40736-dbc2-48aa-9c78-4e4b7bfc78cd` → **founder** (this is an old/test account)
+- `ce44fd23-ea57-4719-89c3-341c7b755096` → **free** (this is your active account for brettbradley007@gmail.com)
 
-Your account was set to the "founder" plan, but every time you log in, the `check-subscription` function syncs your plan from Stripe. Since Stripe has no "founder" subscription, it overwrites your plan back to whatever Stripe says (currently "family" with `cancel_at_period_end: true`, which then becomes "free"). The `stripe-webhook` function has the same issue on subscription deletion events.
+The founder plan was applied to the wrong user ID. Your real active account is still on "free", so the founder guard in `check-subscription` never triggers and Stripe sync keeps overwriting it.
 
-## What needs to change
+### Changes needed
 
-### 1. Database: Re-apply the founder plan
+#### 1. Data fix (SQL via insert tool)
 
-Run a migration to set your account back to founder with unlimited limits:
+Update the correct user to founder and revert the old one:
 
 ```sql
+-- Set the CORRECT active account to founder
 UPDATE user_plans 
 SET plan = 'founder', 
     max_circles = 999999, 
@@ -21,35 +25,30 @@ SET plan = 'founder',
     current_period_end = null,
     pending_plan = null,
     updated_at = now() 
+WHERE user_id = 'ce44fd23-ea57-4719-89c3-341c7b755096';
+
+-- Revert the old/wrong account back to free
+UPDATE user_plans 
+SET plan = 'free', 
+    max_circles = 1, 
+    max_members_per_circle = 8 
 WHERE user_id = '59b40736-dbc2-48aa-9c78-4e4b7bfc78cd';
+
+-- Clear any transfer blocks on your circles
+UPDATE circles 
+SET transfer_block = false 
+WHERE owner_id = 'ce44fd23-ea57-4719-89c3-341c7b755096' 
+AND transfer_block = true;
 ```
 
-### 2. Edge Function: `check-subscription/index.ts`
+#### 2. Add founder guard to `customer.subscription.updated` handler
 
-Add an early return after authentication that checks if the user is on the founder plan. If so, skip all Stripe sync logic and return immediately:
+**File**: `supabase/functions/stripe-webhook/index.ts`
 
-```typescript
-// After authenticating the user (line ~41), before Stripe logic:
-const { data: currentPlan } = await supabaseAdmin
-  .from("user_plans")
-  .select("plan")
-  .eq("user_id", user.id)
-  .maybeSingle();
-
-if (currentPlan?.plan === "founder") {
-  log("Founder plan detected — skipping Stripe sync", { userId: user.id });
-  return new Response(JSON.stringify({ synced: true, plan: "founder" }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
-```
-
-### 3. Edge Function: `stripe-webhook/index.ts`
-
-In the `customer.subscription.deleted` handler (~line 366), add a founder check before downgrading:
+After the `userId` lookup (line 309), before the `periodEnd` line (line 311), insert a founder check that short-circuits the handler — identical pattern to the existing guard on `customer.subscription.deleted`:
 
 ```typescript
-// Before the downgrade update:
+// Check if user is on founder plan — never overwrite founders
 const { data: planCheck } = await supabase
   .from("user_plans")
   .select("plan")
@@ -57,28 +56,26 @@ const { data: planCheck } = await supabase
   .maybeSingle();
 
 if (planCheck?.plan === "founder") {
-  console.log("[STRIPE-WEBHOOK] Founder plan — skipping downgrade");
-  return new Response(JSON.stringify({ received: true }), { ... });
+  console.log(`[STRIPE-WEBHOOK] Founder plan detected for user ${userId} — skipping subscription.updated`);
+  return new Response(JSON.stringify({ received: true }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }
 ```
 
-### 4. Also protect `syncToFree` in check-subscription
+This ensures all three Stripe event paths are protected:
+- `checkout.session.completed` — no issue (uses metadata user_id, won't match founder)
+- `customer.subscription.updated` — **adding guard now**
+- `customer.subscription.deleted` — already guarded
 
-The `syncToFree` helper (line 163) is called when no Stripe customer is found. Add a founder guard there too — already covered by the early return in step 2.
+#### 3. No other file changes needed
 
-### 5. Unblock read-only circles
+The `check-subscription` early return is already in place and will work correctly once the correct user ID has the founder plan.
 
-Your circles are likely on `transfer_block = true` from the erroneous downgrade. Fix with migration:
+### Files to modify
+- `supabase/functions/stripe-webhook/index.ts` — add founder guard in `subscription.updated` handler (1 insertion, ~12 lines)
+- Database — 3 UPDATE statements via insert tool
 
-```sql
-UPDATE circles 
-SET transfer_block = false 
-WHERE owner_id = '59b40736-dbc2-48aa-9c78-4e4b7bfc78cd' 
-AND transfer_block = true;
-```
-
-## Files to modify
-- `supabase/functions/check-subscription/index.ts` — add founder early-return
-- `supabase/functions/stripe-webhook/index.ts` — add founder guard on subscription deletion
-- New migration — re-apply founder plan + unblock circles
+### Why only one founder
+The old user ID (`59b40736...`) gets reverted to free. Only `ce44fd23...` (your active brettbradley007@gmail.com account) will hold the founder plan — exactly 1 of 1.
 
