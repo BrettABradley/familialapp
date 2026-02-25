@@ -560,6 +560,7 @@ export type Database = {
           created_at: string
           group_chat_id: string
           id: string
+          media_urls: string[] | null
           sender_id: string
         }
         Insert: {
@@ -567,6 +568,7 @@ export type Database = {
           created_at?: string
           group_chat_id: string
           id?: string
+          media_urls?: string[] | null
           sender_id: string
         }
         Update: {
@@ -574,6 +576,7 @@ export type Database = {
           created_at?: string
           group_chat_id?: string
           id?: string
+          media_urls?: string[] | null
           sender_id?: string
         }
         Relationships: [
@@ -812,6 +815,7 @@ export type Database = {
           created_at: string
           id: string
           is_read: boolean
+          media_urls: string[] | null
           recipient_id: string
           sender_id: string
         }
@@ -820,6 +824,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_read?: boolean
+          media_urls?: string[] | null
           recipient_id: string
           sender_id: string
         }
@@ -828,6 +833,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_read?: boolean
+          media_urls?: string[] | null
           recipient_id?: string
           sender_id?: string
         }

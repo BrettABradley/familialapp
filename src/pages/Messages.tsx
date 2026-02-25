@@ -12,8 +12,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Send, MessageSquare, Search, Users, Plus, UsersRound, Pencil, Camera, Trash2 } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, Search, Users, Plus, UsersRound, Pencil, Camera, Trash2, Paperclip, X } from "lucide-react";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
+import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
+import { validateFileSize, getFileMediaType, getMediaType } from "@/lib/mediaUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +41,7 @@ interface Message {
   content: string;
   is_read: boolean;
   created_at: string;
+  media_urls?: string[];
 }
 
 interface Conversation {
@@ -62,6 +65,7 @@ interface GroupMessage {
   sender_id: string;
   content: string;
   created_at: string;
+  media_urls?: string[];
 }
 
 type ChatView = "list" | "dm" | "group";
@@ -82,6 +86,12 @@ const Messages = () => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [isSending, setIsSending] = useState(false);
+
+  // Media attachment state
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Group chat state
   const [chatView, setChatView] = useState<ChatView>("list");
@@ -405,20 +415,85 @@ const Messages = () => {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length + selectedFiles.length > 4) {
+      toast({ title: "Too many files", description: "You can attach up to 4 files per message.", variant: "destructive" });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    for (const file of files) {
+      const error = validateFileSize(file);
+      if (error) {
+        toast({ title: "File too large", description: error, variant: "destructive" });
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+    }
+    setSelectedFiles(prev => [...prev, ...files]);
+    files.forEach(file => setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleVoiceRecording = (blob: Blob) => {
+    if (selectedFiles.length >= 4) {
+      toast({ title: "Too many files", description: "You can attach up to 4 files per message.", variant: "destructive" });
+      return;
+    }
+    const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
+    setSelectedFiles(prev => [...prev, file]);
+    setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]);
+  };
+
+  const removeFile = (index: number) => {
+    URL.revokeObjectURL(previewUrls[index]);
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadFiles = async (): Promise<string[]> => {
+    if (!user || selectedFiles.length === 0) return [];
+    const uploadedUrls: string[] = [];
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      setUploadProgress(Math.round((i / selectedFiles.length) * 100));
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+      const { error } = await supabase.storage.from("post-media").upload(fileName, file);
+      if (error) continue;
+      const { data } = supabase.storage.from("post-media").getPublicUrl(fileName);
+      uploadedUrls.push(data.publicUrl);
+    }
+    setUploadProgress(100);
+    return uploadedUrls;
+  };
+
+  const clearMediaState = () => {
+    previewUrls.forEach(url => URL.revokeObjectURL(url));
+    setSelectedFiles([]);
+    setPreviewUrls([]);
+    setUploadProgress(null);
+  };
+
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !user) return;
+    if ((!newMessage.trim() && selectedFiles.length === 0) || !user) return;
     setIsSending(true);
+
+    let mediaUrls: string[] = [];
+    if (selectedFiles.length > 0) mediaUrls = await uploadFiles();
 
     if (chatView === "dm" && selectedUser) {
       const { error } = await supabase.from("private_messages").insert({
         sender_id: user.id,
         recipient_id: selectedUser.user_id,
-        content: newMessage.trim(),
-      });
+        content: newMessage.trim() || "",
+        media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
+      } as any);
       if (error) {
         toast({ title: "Error", description: "Failed to send message.", variant: "destructive" });
       } else {
         setNewMessage("");
+        clearMediaState();
         fetchMessages();
         fetchConversations();
       }
@@ -426,18 +501,100 @@ const Messages = () => {
       const { error } = await supabase.from("group_chat_messages").insert({
         group_chat_id: selectedGroup.id,
         sender_id: user.id,
-        content: newMessage.trim(),
-      });
+        content: newMessage.trim() || "",
+        media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
+      } as any);
       if (error) {
         toast({ title: "Error", description: "Failed to send message.", variant: "destructive" });
       } else {
         setNewMessage("");
+        clearMediaState();
         fetchGroupMessages();
       }
     }
 
     setIsSending(false);
   };
+
+  const renderMediaAttachments = (mediaUrls?: string[]) => {
+    if (!mediaUrls || mediaUrls.length === 0) return null;
+    return (
+      <div className="mt-2 space-y-2">
+        {mediaUrls.map((url, i) => {
+          const type = getMediaType(url);
+          if (type === 'video') return <video key={i} src={url} controls playsInline className="rounded-md max-w-full max-h-48" />;
+          if (type === 'audio') return <audio key={i} src={url} controls className="w-full max-w-[240px]" />;
+          return <img key={i} src={url} alt="attachment" className="rounded-md max-w-full max-h-48 cursor-pointer" />;
+        })}
+      </div>
+    );
+  };
+
+  const renderFilePreviewBar = () => {
+    if (previewUrls.length === 0) return null;
+    return (
+      <div className="flex gap-2 p-2 overflow-x-auto">
+        {previewUrls.map((url, index) => {
+          const file = selectedFiles[index];
+          const mediaType = getFileMediaType(file);
+          return (
+            <div key={index} className="relative flex-shrink-0 w-16 h-16 rounded-md overflow-hidden border border-border">
+              {mediaType === 'video' ? (
+                <video src={url} className="w-full h-full object-cover" muted />
+              ) : mediaType === 'audio' ? (
+                <div className="w-full h-full flex items-center justify-center bg-secondary text-xs text-muted-foreground">🎵</div>
+              ) : (
+                <img src={url} alt="" className="w-full h-full object-cover" />
+              )}
+              <button onClick={() => removeFile(index)} className="absolute top-0.5 right-0.5 bg-background/80 rounded-full p-0.5">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderUploadProgress = () => {
+    if (uploadProgress === null) return null;
+    return (
+      <div className="px-2 pb-1">
+        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+          <span>Uploading...</span>
+          <span>{uploadProgress}%</span>
+        </div>
+        <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
+          <div className="bg-primary h-1.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+        </div>
+      </div>
+    );
+  };
+
+  const renderMessageInput = () => (
+    <div className="border-t border-border pt-2 space-y-2">
+      {renderFilePreviewBar()}
+      {renderUploadProgress()}
+      <div className="flex items-center gap-2">
+        <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*" multiple onChange={handleFileSelect} className="hidden" />
+        <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isSending} className="flex-shrink-0">
+          <Paperclip className="w-4 h-4" />
+        </Button>
+        <VoiceRecorder onRecordingComplete={handleVoiceRecording} />
+        <Input
+          placeholder="Type a message..."
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+          maxLength={5000}
+          className="flex-1"
+        />
+        <Button onClick={handleSendMessage} disabled={(!newMessage.trim() && selectedFiles.length === 0) || isSending} className="flex-shrink-0">
+          <Send className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  );
 
   const filteredMembers = searchQuery.trim()
     ? circleMembers.filter(p => p.display_name?.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -476,7 +633,7 @@ const Messages = () => {
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="flex flex-col h-[calc(100vh-200px)]">
           <div className="flex items-center gap-3 pb-4 border-b border-border mb-4">
-            <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setChatView("list"); }}><ArrowLeft className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
             <Link to={`/profile/${selectedUser.user_id}`}>
               <Avatar><AvatarImage src={selectedUser.avatar_url || undefined} /><AvatarFallback>{selectedUser.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback></Avatar>
             </Link>
@@ -491,7 +648,8 @@ const Messages = () => {
               messages.map((msg) => (
                 <div key={msg.id} className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[70%] rounded-lg px-4 py-2 ${msg.sender_id === user?.id ? 'bg-foreground text-background' : 'bg-secondary text-foreground'}`}>
-                    <p>{msg.content}</p>
+                    {msg.content && <p>{msg.content}</p>}
+                    {renderMediaAttachments(msg.media_urls)}
                     <p className={`text-xs mt-1 ${msg.sender_id === user?.id ? 'text-background/70' : 'text-muted-foreground'}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
                 </div>
@@ -502,10 +660,7 @@ const Messages = () => {
           {readOnly ? (
             <p className="text-sm text-muted-foreground text-center py-2">This circle is read-only. Messaging is disabled.</p>
           ) : (
-            <div className="flex gap-2">
-              <Input placeholder="Type a message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} maxLength={5000} />
-              <Button onClick={handleSendMessage} disabled={!newMessage.trim() || isSending}><Send className="w-4 h-4" /></Button>
-            </div>
+            renderMessageInput()
           )}
         </div>
       </main>
@@ -517,7 +672,7 @@ const Messages = () => {
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="flex flex-col h-[calc(100vh-200px)]">
           <div className="flex items-center gap-3 pb-4 border-b border-border mb-4">
-            <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(null); setChatView("list"); }}><ArrowLeft className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
             <div className="relative group cursor-pointer">
               {selectedGroup.avatar_url ? (
                 <Avatar><AvatarImage src={selectedGroup.avatar_url} /><AvatarFallback><UsersRound className="w-5 h-5" /></AvatarFallback></Avatar>
@@ -600,7 +755,8 @@ const Messages = () => {
                       {!isMe && (
                         <Link to={`/profile/${msg.sender_id}`} className="text-xs font-semibold mb-1 opacity-70 hover:underline block">{senderProfile?.display_name || "Unknown"}</Link>
                       )}
-                      <p>{msg.content}</p>
+                      {msg.content && <p>{msg.content}</p>}
+                      {renderMediaAttachments(msg.media_urls)}
                       <p className={`text-xs mt-1 ${isMe ? 'text-background/70' : 'text-muted-foreground'}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                   </div>
@@ -612,10 +768,7 @@ const Messages = () => {
           {readOnly ? (
             <p className="text-sm text-muted-foreground text-center py-2">This circle is read-only. Messaging is disabled.</p>
           ) : (
-            <div className="flex gap-2">
-              <Input placeholder="Type a message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }} maxLength={5000} />
-              <Button onClick={handleSendMessage} disabled={!newMessage.trim() || isSending}><Send className="w-4 h-4" /></Button>
-            </div>
+            renderMessageInput()
           )}
         </div>
       </main>
