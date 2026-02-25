@@ -1,65 +1,76 @@
 
 
-# Plan: Allow Circle Admins to Delete Any Post or Comment
+# Plan: Media Attachments in Private & Group Messages
 
-## What needs to change
+## Overview
 
-Circle admins (owners + users with the `admin` role) should be able to delete any post or comment within their circle, not just their own content. This requires changes at three layers: database policies, backend logic, and UI visibility.
+Add the ability to attach images, videos, and audio files to both DM and group chat messages, reusing the same patterns already established in the feed's `CreatePostForm`.
 
-## Changes
+## Database Changes
 
-### 1. Database: Update RLS policies
+### 1. Add `media_urls` column to both message tables
 
-**Posts table** — Update the DELETE policy from `auth.uid() = author_id` to also allow circle admins:
 ```sql
-DROP POLICY "Authors can delete posts" ON posts;
-CREATE POLICY "Authors and admins can delete posts" ON posts
-  FOR DELETE USING (
-    auth.uid() = author_id 
-    OR is_circle_admin(auth.uid(), circle_id)
-  );
+ALTER TABLE private_messages ADD COLUMN media_urls text[] DEFAULT '{}';
+ALTER TABLE group_chat_messages ADD COLUMN media_urls text[] DEFAULT '{}';
 ```
 
-**Comments table** — Update the DELETE policy similarly. Since comments reference `post_id` (not `circle_id` directly), the policy needs a subquery:
-```sql
-DROP POLICY "Authors can delete comments" ON comments;
-CREATE POLICY "Authors and admins can delete comments" ON comments
-  FOR DELETE USING (
-    auth.uid() = author_id 
-    OR EXISTS (
-      SELECT 1 FROM posts p 
-      WHERE p.id = comments.post_id 
-      AND is_circle_admin(auth.uid(), p.circle_id)
-    )
-  );
-```
+No RLS changes needed — existing policies already cover INSERT/SELECT on these tables.
 
-### 2. CircleContext: Expose admin check
+## Code Changes
 
-Add an `isCircleAdmin` helper to `CircleContext` that checks if the current user is the circle owner or has an admin role in `user_roles`. This avoids querying on every render — the context already has `circles` with `owner_id`, and we can fetch the user's admin roles once.
+### 2. `src/pages/Messages.tsx` — Major updates
 
-- Fetch `user_roles` where `role = 'admin'` for the current user on load
-- Expose `isCircleAdmin(circleId): boolean` — returns true if user is owner or has admin role
+**State additions:**
+- `selectedFiles: File[]`, `previewUrls: string[]`, `uploadProgress: number | null` — same pattern as `CreatePostForm`
 
-### 3. Feed hook (`useFeedPosts.ts`): Allow admin deletion
+**New imports:**
+- `Paperclip`, `X` from lucide-react
+- `validateFileSize`, `getFileMediaType` from `@/lib/mediaUtils`
+- `VoiceRecorder` from `@/components/shared/VoiceRecorder`
 
-- `handleDeletePost`: Remove the `postToDelete.author_id !== user?.id` guard. Instead, allow deletion if the user is the author OR is a circle admin for that post's circle.
-- `handleDeleteComment`: Same — remove the `comment.author_id !== user.id` guard when the user is a circle admin.
+**File handling functions (copy from CreatePostForm pattern):**
+- `handleFileSelect` — validate size, limit to 4 files, generate preview URLs
+- `handleVoiceRecording` — convert blob to File, add to selectedFiles
+- `removeFile` — cleanup preview URL, remove from arrays
+- `uploadFiles` — upload to `post-media` bucket, return public URLs
 
-### 4. Feed page (`Feed.tsx`): Pass admin status
+**Update `handleSendMessage`:**
+- Allow sending when `newMessage.trim() || selectedFiles.length > 0` (not just text)
+- Upload files first, then insert message with `media_urls` array
+- Clear file state after send
 
-- Pass `isCircleAdmin` status so PostCard receives it and can show delete buttons for admins on all posts/comments.
+**Update `Message` and `GroupMessage` interfaces:**
+- Add `media_urls?: string[]` to both
 
-### 5. PostCard UI: Show delete/trash buttons for admins
+**Update message rendering (both DM and group views):**
+- After the text `<p>` tag, render media attachments if `msg.media_urls?.length > 0`
+- Images: thumbnail with click-to-enlarge potential
+- Videos: small `<video>` element with controls
+- Audio: `<audio>` element with controls
+- Use `getMediaType` from `@/lib/mediaUtils` to determine rendering
 
-- **Post delete button**: Currently gated by `isOwnPost`. Add a new prop `isCircleAdmin` and show the delete button when `isOwnPost || isCircleAdmin`.
-- **Comment delete button**: Currently gated by `currentUserId === comment.author_id`. Change to also show when `isCircleAdmin` is true.
-- Edit button remains author-only (admins can remove content but not modify others' words).
+**Update input area (both DM and group views):**
+- Replace the single `<Input>` + `<Button>` row with a slightly richer layout:
+  - Row of file previews above the input (if any files selected)
+  - Hidden `<input type="file">` triggered by a Paperclip button
+  - `VoiceRecorder` component
+  - Text input
+  - Send button — enabled when text OR files present
+- Upload progress bar shown during send
 
-### Files to modify
-- `src/contexts/CircleContext.tsx` — add admin role fetching + `isCircleAdmin` helper
-- `src/hooks/useFeedPosts.ts` — relax author-only guards for delete operations
-- `src/pages/Feed.tsx` — pass admin status to PostCard
-- `src/components/feed/PostCard.tsx` — accept `isCircleAdmin` prop, show delete UI for admins
-- Database migration — update DELETE policies on `posts` and `comments` tables
+### 3. Update send button disabled logic
+
+Currently: `disabled={!newMessage.trim() || isSending}`
+New: `disabled={(!newMessage.trim() && selectedFiles.length === 0) || isSending}`
+
+## Files to modify
+- `src/pages/Messages.tsx` — all UI and logic changes
+- Database migration — add `media_urls` column to `private_messages` and `group_chat_messages`
+
+## What stays the same
+- Storage bucket: reuses existing `post-media` bucket (already public)
+- File validation: reuses `validateFileSize` and `getFileMediaType` from `@/lib/mediaUtils`
+- Voice recording: reuses existing `VoiceRecorder` component
+- Max 4 files per message, same size limits as feed posts
 
