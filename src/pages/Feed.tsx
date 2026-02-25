@@ -11,8 +11,9 @@ import { PostCard } from "@/components/feed/PostCard";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 
 const Feed = () => {
-  const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
+  const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly, isCircleAdmin } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
+  const adminStatus = isCircleAdmin(selectedCircle);
   const [searchParams] = useSearchParams();
   const highlightPostId = searchParams.get("post");
   const scrolledRef = useRef(false);
@@ -128,6 +129,7 @@ const Feed = () => {
               isSubmittingComment={isSubmittingComment === post.id}
               hasUserReacted={hasUserReacted(post) || false}
               isOwnPost={post.author_id === user?.id}
+              isCircleAdmin={adminStatus}
               currentUserId={user?.id}
               onReaction={handleReaction}
               onToggleComments={toggleComments}

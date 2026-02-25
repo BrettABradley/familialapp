@@ -254,7 +254,7 @@ export const useFeedPosts = () => {
 
   const handleDeletePost = async (postId: string) => {
     const postToDelete = posts.find(p => p.id === postId);
-    if (!postToDelete || postToDelete.author_id !== user?.id) return;
+    if (!postToDelete || !user) return;
 
     setPosts(prev => prev.filter(p => p.id !== postId));
 
@@ -288,7 +288,7 @@ export const useFeedPosts = () => {
     if (!user) return;
     const post = posts.find(p => p.id === postId);
     const comment = post?.comments?.find(c => c.id === commentId);
-    if (!comment || comment.author_id !== user.id) return;
+    if (!comment) return;
 
     // Optimistic: remove the comment and its replies
     setPosts(prev => prev.map(p => {

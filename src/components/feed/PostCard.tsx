@@ -21,6 +21,7 @@ interface PostCardProps {
   isSubmittingComment: boolean;
   hasUserReacted: boolean;
   isOwnPost: boolean;
+  isCircleAdmin?: boolean;
   currentUserId?: string;
   onReaction: (postId: string) => void;
   onToggleComments: (postId: string) => void;
@@ -136,6 +137,7 @@ export const PostCard = ({
   isSubmittingComment,
   hasUserReacted,
   isOwnPost,
+  isCircleAdmin: isAdmin = false,
   currentUserId,
   onReaction,
   onToggleComments,
@@ -146,6 +148,7 @@ export const PostCard = ({
   onEdit,
   onDeleteComment,
 }: PostCardProps) => {
+  const canDelete = isOwnPost || isAdmin;
   const { profile } = useCircleContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content || "");
@@ -191,14 +194,14 @@ export const PostCard = ({
               {post.circles?.name} • {new Date(post.created_at).toLocaleDateString()}
             </p>
           </div>
-          {isOwnPost && (
+          {(isOwnPost || canDelete) && (
             <div className="flex items-center gap-1">
-              {onEdit && !isEditing && (
+              {isOwnPost && onEdit && !isEditing && (
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => { setEditContent(post.content || ""); setIsEditing(true); }}>
                   <Pencil className="h-4 w-4" />
                 </Button>
               )}
-              {onDelete && (
+              {canDelete && onDelete && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8">
@@ -208,7 +211,7 @@ export const PostCard = ({
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete post?</AlertDialogTitle>
-                  <AlertDialogDescription>This action cannot be undone. Your post and its comments will be permanently removed.</AlertDialogDescription>
+                  <AlertDialogDescription>This action cannot be undone. This post and its comments will be permanently removed.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -361,7 +364,7 @@ export const PostCard = ({
                   <Link to={`/profile/${comment.author_id}`} className="text-sm font-medium text-foreground hover:underline">
                     {comment.profiles?.display_name || "Unknown"}
                   </Link>
-                  {currentUserId === comment.author_id && onDeleteComment && (
+                  {(currentUserId === comment.author_id || isAdmin) && onDeleteComment && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
