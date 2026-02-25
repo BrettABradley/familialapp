@@ -40,6 +40,7 @@ interface CircleContextType {
   refetchCircles: () => Promise<void>;
   refetchProfile: () => Promise<void>;
   isCircleReadOnly: (circleId: string) => boolean;
+  isCircleAdmin: (circleId: string) => boolean;
 }
 
 const CircleContext = createContext<CircleContextType | undefined>(undefined);
@@ -47,6 +48,7 @@ const CircleContext = createContext<CircleContextType | undefined>(undefined);
 export const CircleProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [circles, setCircles] = useState<Circle[]>([]);
+  const [adminCircleIds, setAdminCircleIds] = useState<Set<string>>(new Set());
   const [selectedCircle, setSelectedCircleState] = useState<string>(() => {
     return localStorage.getItem("selectedCircle") || "";
   });
@@ -141,6 +143,29 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchAdminRoles = async () => {
+    if (!user) {
+      setAdminCircleIds(new Set());
+      return;
+    }
+
+    const { data } = await supabase
+      .from("user_roles")
+      .select("circle_id")
+      .eq("user_id", user.id)
+      .eq("role", "admin");
+
+    const ids = new Set<string>(data?.map(r => r.circle_id) || []);
+    setAdminCircleIds(ids);
+  };
+
+  const isCircleAdmin = (circleId: string): boolean => {
+    if (!user || !circleId) return false;
+    const circle = circles.find(c => c.id === circleId);
+    if (circle && circle.owner_id === user.id) return true;
+    return adminCircleIds.has(circleId);
+  };
+
   // Determines if a circle is read-only due to plan overflow.
   // Owned circles sorted by created_at; oldest N (up to max_circles) are active, rest are overflow.
   const isCircleReadOnly = (circleId: string): boolean => {
@@ -173,7 +198,7 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
       }
 
       setIsLoading(true);
-      await Promise.all([fetchCircles(), fetchProfile(), fetchUserPlan()]);
+      await Promise.all([fetchCircles(), fetchProfile(), fetchUserPlan(), fetchAdminRoles()]);
       setIsLoading(false);
 
       // Safety net: sync subscription status with Stripe in the background
@@ -203,6 +228,7 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
         refetchCircles: fetchCircles,
         refetchProfile: fetchProfile,
         isCircleReadOnly,
+        isCircleAdmin,
       }}
     >
       {children}
