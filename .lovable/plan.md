@@ -1,81 +1,65 @@
 
 
-## Fix: Founder Plan Applied to Wrong User ID
+# Plan: Allow Circle Admins to Delete Any Post or Comment
 
-### What I found
-The database currently has:
-- `59b40736-dbc2-48aa-9c78-4e4b7bfc78cd` → **founder** (this is an old/test account)
-- `ce44fd23-ea57-4719-89c3-341c7b755096` → **free** (this is your active account for brettbradley007@gmail.com)
+## What needs to change
 
-The founder plan was applied to the wrong user ID. Your real active account is still on "free", so the founder guard in `check-subscription` never triggers and Stripe sync keeps overwriting it.
+Circle admins (owners + users with the `admin` role) should be able to delete any post or comment within their circle, not just their own content. This requires changes at three layers: database policies, backend logic, and UI visibility.
 
-### Changes needed
+## Changes
 
-#### 1. Data fix (SQL via insert tool)
+### 1. Database: Update RLS policies
 
-Update the correct user to founder and revert the old one:
-
+**Posts table** — Update the DELETE policy from `auth.uid() = author_id` to also allow circle admins:
 ```sql
--- Set the CORRECT active account to founder
-UPDATE user_plans 
-SET plan = 'founder', 
-    max_circles = 999999, 
-    max_members_per_circle = 999999,
-    cancel_at_period_end = false,
-    current_period_end = null,
-    pending_plan = null,
-    updated_at = now() 
-WHERE user_id = 'ce44fd23-ea57-4719-89c3-341c7b755096';
-
--- Revert the old/wrong account back to free
-UPDATE user_plans 
-SET plan = 'free', 
-    max_circles = 1, 
-    max_members_per_circle = 8 
-WHERE user_id = '59b40736-dbc2-48aa-9c78-4e4b7bfc78cd';
-
--- Clear any transfer blocks on your circles
-UPDATE circles 
-SET transfer_block = false 
-WHERE owner_id = 'ce44fd23-ea57-4719-89c3-341c7b755096' 
-AND transfer_block = true;
+DROP POLICY "Authors can delete posts" ON posts;
+CREATE POLICY "Authors and admins can delete posts" ON posts
+  FOR DELETE USING (
+    auth.uid() = author_id 
+    OR is_circle_admin(auth.uid(), circle_id)
+  );
 ```
 
-#### 2. Add founder guard to `customer.subscription.updated` handler
-
-**File**: `supabase/functions/stripe-webhook/index.ts`
-
-After the `userId` lookup (line 309), before the `periodEnd` line (line 311), insert a founder check that short-circuits the handler — identical pattern to the existing guard on `customer.subscription.deleted`:
-
-```typescript
-// Check if user is on founder plan — never overwrite founders
-const { data: planCheck } = await supabase
-  .from("user_plans")
-  .select("plan")
-  .eq("user_id", userId)
-  .maybeSingle();
-
-if (planCheck?.plan === "founder") {
-  console.log(`[STRIPE-WEBHOOK] Founder plan detected for user ${userId} — skipping subscription.updated`);
-  return new Response(JSON.stringify({ received: true }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}
+**Comments table** — Update the DELETE policy similarly. Since comments reference `post_id` (not `circle_id` directly), the policy needs a subquery:
+```sql
+DROP POLICY "Authors can delete comments" ON comments;
+CREATE POLICY "Authors and admins can delete comments" ON comments
+  FOR DELETE USING (
+    auth.uid() = author_id 
+    OR EXISTS (
+      SELECT 1 FROM posts p 
+      WHERE p.id = comments.post_id 
+      AND is_circle_admin(auth.uid(), p.circle_id)
+    )
+  );
 ```
 
-This ensures all three Stripe event paths are protected:
-- `checkout.session.completed` — no issue (uses metadata user_id, won't match founder)
-- `customer.subscription.updated` — **adding guard now**
-- `customer.subscription.deleted` — already guarded
+### 2. CircleContext: Expose admin check
 
-#### 3. No other file changes needed
+Add an `isCircleAdmin` helper to `CircleContext` that checks if the current user is the circle owner or has an admin role in `user_roles`. This avoids querying on every render — the context already has `circles` with `owner_id`, and we can fetch the user's admin roles once.
 
-The `check-subscription` early return is already in place and will work correctly once the correct user ID has the founder plan.
+- Fetch `user_roles` where `role = 'admin'` for the current user on load
+- Expose `isCircleAdmin(circleId): boolean` — returns true if user is owner or has admin role
+
+### 3. Feed hook (`useFeedPosts.ts`): Allow admin deletion
+
+- `handleDeletePost`: Remove the `postToDelete.author_id !== user?.id` guard. Instead, allow deletion if the user is the author OR is a circle admin for that post's circle.
+- `handleDeleteComment`: Same — remove the `comment.author_id !== user.id` guard when the user is a circle admin.
+
+### 4. Feed page (`Feed.tsx`): Pass admin status
+
+- Pass `isCircleAdmin` status so PostCard receives it and can show delete buttons for admins on all posts/comments.
+
+### 5. PostCard UI: Show delete/trash buttons for admins
+
+- **Post delete button**: Currently gated by `isOwnPost`. Add a new prop `isCircleAdmin` and show the delete button when `isOwnPost || isCircleAdmin`.
+- **Comment delete button**: Currently gated by `currentUserId === comment.author_id`. Change to also show when `isCircleAdmin` is true.
+- Edit button remains author-only (admins can remove content but not modify others' words).
 
 ### Files to modify
-- `supabase/functions/stripe-webhook/index.ts` — add founder guard in `subscription.updated` handler (1 insertion, ~12 lines)
-- Database — 3 UPDATE statements via insert tool
-
-### Why only one founder
-The old user ID (`59b40736...`) gets reverted to free. Only `ce44fd23...` (your active brettbradley007@gmail.com account) will hold the founder plan — exactly 1 of 1.
+- `src/contexts/CircleContext.tsx` — add admin role fetching + `isCircleAdmin` helper
+- `src/hooks/useFeedPosts.ts` — relax author-only guards for delete operations
+- `src/pages/Feed.tsx` — pass admin status to PostCard
+- `src/components/feed/PostCard.tsx` — accept `isCircleAdmin` prop, show delete UI for admins
+- Database migration — update DELETE policies on `posts` and `comments` tables
 
