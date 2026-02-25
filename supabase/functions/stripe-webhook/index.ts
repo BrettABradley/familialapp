@@ -308,6 +308,20 @@ serve(async (req) => {
         return new Response(JSON.stringify({ received: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      // Check if user is on founder plan — never overwrite founders
+      const { data: founderCheck } = await supabase
+        .from("user_plans")
+        .select("plan")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (founderCheck?.plan === "founder") {
+        console.log(`[STRIPE-WEBHOOK] Founder plan detected for user ${userId} — skipping subscription.updated`);
+        return new Response(JSON.stringify({ received: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const periodEnd = new Date(subscription.current_period_end * 1000).toISOString();
       const cancelAtPeriodEnd = subscription.cancel_at_period_end;
 
