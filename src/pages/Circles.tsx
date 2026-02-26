@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
+import { convertHeicToJpeg } from "@/lib/heicConverter";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound, ArrowRightLeft, LogOut, ArrowUp, Camera } from "lucide-react";
@@ -546,9 +547,10 @@ const Circles = () => {
     avatarInputRef.current?.click();
   };
 
-  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    let file = e.target.files?.[0];
     if (!file || !avatarUploadCircleId) return;
+    file = await convertHeicToJpeg(file);
     const reader = new FileReader();
     reader.onload = () => {
       setCropImageSrc(reader.result as string);
@@ -1007,7 +1009,7 @@ const Circles = () => {
       <input
         ref={avatarInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         className="hidden"
         onChange={handleAvatarFileChange}
       />
