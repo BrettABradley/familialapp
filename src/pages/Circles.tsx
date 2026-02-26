@@ -18,7 +18,7 @@ import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound, ArrowRightLeft, LogOut, ArrowUp, Camera } from "lucide-react";
+import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound, ArrowRightLeft, LogOut, ArrowUp, Camera, Eye, EyeOff, RefreshCw } from "lucide-react";
 // Note: ArrowRightLeft kept for delete dialog transfer block suggestion
 import { Badge } from "@/components/ui/badge";
 import PendingInvites from "@/components/circles/PendingInvites";
@@ -93,6 +93,8 @@ const Circles = () => {
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [visibleCodeId, setVisibleCodeId] = useState<string | null>(null);
+  const [refreshingCodeId, setRefreshingCodeId] = useState<string | null>(null);
   // memberPlans state removed — was only used for transfer ownership dialogs
 
   // Handle ?rescue= query param
@@ -802,20 +804,56 @@ const Circles = () => {
 
                 <div className="flex items-center gap-2 mb-3 p-2 rounded-md bg-secondary/50 border border-border">
                   <span className="text-xs text-muted-foreground">Invite Code:</span>
-                  <code className="text-sm font-mono font-semibold text-foreground">{circle.invite_code}</code>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 ml-auto"
-                    onClick={() => {
-                      navigator.clipboard.writeText(circle.invite_code);
-                      setCopiedId(circle.id);
-                      setTimeout(() => setCopiedId(null), 2000);
-                      toast({ title: "Copied!", description: "Invite code copied to clipboard." });
-                    }}
-                  >
-                    {copiedId === circle.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                  </Button>
+                  <code className="text-sm font-mono font-semibold text-foreground select-none">
+                    {visibleCodeId === circle.id ? circle.invite_code : "••••••••"}
+                  </code>
+                  <div className="flex items-center gap-1 ml-auto">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => setVisibleCodeId(visibleCodeId === circle.id ? null : circle.id)}
+                      title={visibleCodeId === circle.id ? "Hide code" : "Reveal code"}
+                    >
+                      {visibleCodeId === circle.id ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(circle.invite_code);
+                        setCopiedId(circle.id);
+                        setTimeout(() => setCopiedId(null), 2000);
+                        toast({ title: "Copied!", description: "Invite code copied to clipboard." });
+                      }}
+                    >
+                      {copiedId === circle.id ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    </Button>
+                    {isOwner(circle) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        disabled={refreshingCodeId === circle.id}
+                        onClick={async () => {
+                          setRefreshingCodeId(circle.id);
+                          const newCode = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+                          const { error } = await supabase.from("circles").update({ invite_code: newCode }).eq("id", circle.id);
+                          if (error) {
+                            toast({ title: "Error", description: "Failed to refresh invite code.", variant: "destructive" });
+                          } else {
+                            await refetchCircles();
+                            toast({ title: "Refreshed", description: "A new invite code has been generated." });
+                          }
+                          setRefreshingCodeId(null);
+                        }}
+                        title="Generate new invite code"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${refreshingCodeId === circle.id ? "animate-spin" : ""}`} />
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" onClick={() => { setSelectedCircle(circle); setIsInviteOpen(true); }}><UserPlus className="w-4 h-4 mr-2" />Invite</Button>
