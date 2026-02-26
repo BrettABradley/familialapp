@@ -197,10 +197,10 @@ const Store = () => {
                 </Button>
               </Link>
             )}
-            <a href="tel:520-759-5200">
+            <a href="tel:480-648-9596">
               <Button variant="outline" size="sm">
                 <Phone className="w-4 h-4 mr-2" />
-                520-759-5200
+                (480) 648-9596
               </Button>
             </a>
           </div>
@@ -298,10 +298,10 @@ const Store = () => {
                 Unlike other platforms, Familial never tracks, profiles, or sells user data. 
                 Offers are matched by region only — no impression tracking, no behavioral monitoring, no data harvesting.
               </p>
-              <a href="tel:520-759-5200">
+              <a href="tel:480-648-9596">
                 <Button size="lg">
                   <Phone className="w-4 h-4 mr-2" />
-                  Call to Discuss: 520-759-5200
+                  Call to Discuss: (480) 648-9596
                 </Button>
               </a>
             </CardContent>
@@ -452,10 +452,10 @@ const Store = () => {
           <p className="text-muted-foreground mb-4">
             Questions about advertising on Familial?
           </p>
-          <a href="tel:520-759-5200">
+          <a href="tel:480-648-9596">
             <Button variant="outline" size="lg">
               <Phone className="w-4 h-4 mr-2" />
-              Call Support: 520-759-5200
+              Call Support: (480) 648-9596
             </Button>
           </a>
         </div>

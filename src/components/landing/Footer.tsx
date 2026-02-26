@@ -17,11 +17,11 @@ const Footer = () => {
               The private social network for families who value connection over content.
             </p>
             <a 
-              href="tel:520-759-5200" 
+              href="tel:480-648-9596" 
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
             >
               <Phone className="w-4 h-4" />
-              <span className="text-sm">520-759-5200</span>
+              <span className="text-sm">(480) 648-9596</span>
             </a>
           </div>
 

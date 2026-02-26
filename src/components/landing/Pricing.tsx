@@ -544,10 +544,10 @@ const Pricing = () => {
               <p className="text-muted-foreground text-center">
                 For organizations, communities, or larger groups — we've got you covered.
               </p>
-              <a href="tel:520-759-5200">
+              <a href="tel:480-648-9596">
                 <Button variant="outline" size="lg" className="whitespace-nowrap">
                   <Phone className="w-4 h-4 mr-2" />
-                  Call 520-759-5200
+                  Call (480) 648-9596
                 </Button>
               </a>
             </CardContent>
