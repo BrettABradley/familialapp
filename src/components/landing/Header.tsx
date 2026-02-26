@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Mail } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import icon from "@/assets/icon.png";
 import { useAuth } from "@/hooks/useAuth";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -35,18 +34,13 @@ const Header = () => {
             <Link to="/store" className="text-muted-foreground hover:text-foreground transition-colors">
               Store
             </Link>
+            <a href="mailto:support@familialmedia.com" className="text-muted-foreground hover:text-foreground transition-colors">
+              Contact Support
+            </a>
           </nav>
 
           {/* Desktop CTA */}
-          <div className="hidden md:flex items-center gap-4">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <a href="mailto:support@familialmedia.com" className="inline-flex items-center justify-center h-10 w-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                  <Mail className="w-5 h-5" />
-                </a>
-              </TooltipTrigger>
-              <TooltipContent>Contact Support</TooltipContent>
-            </Tooltip>
+          <div className="hidden md:flex items-center gap-3">
             {user ? (
               <Button onClick={() => navigate("/feed")}>Go to Dashboard</Button>
             ) : (
@@ -105,11 +99,10 @@ const Header = () => {
               </Link>
               <a 
                 href="mailto:support@familialmedia.com" 
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors py-2"
+                className="text-muted-foreground hover:text-foreground transition-colors py-2"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <Mail className="w-4 h-4" />
-                <span>support@familialmedia.com</span>
+                Contact Support
               </a>
               <div className="flex flex-col gap-2 pt-4 border-t border-border/50">
                 {user ? (
