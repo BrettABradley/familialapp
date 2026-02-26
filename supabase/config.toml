@@ -1,49 +1,37 @@
 project_id = "qxkwxolssapayqyfdwqc"
 
-[functions.send-circle-invite]
-verify_jwt = false
-
-[functions.create-checkout]
-verify_jwt = false
-
-[functions.stripe-webhook]
-verify_jwt = false
-
-[functions.notify-store-offer]
-verify_jwt = false
-
-[functions.moderate-content]
-verify_jwt = false
-
-[functions.verify-checkout]
-verify_jwt = false
-
-[functions.sync-stripe-purchases]
-verify_jwt = false
-
-[functions.fetch-link-preview]
-verify_jwt = false
-
-[functions.downgrade-subscription]
-verify_jwt = false
-
-[functions.reactivate-subscription]
-verify_jwt = false
-
-[functions.cleanup-rescue-offers]
-verify_jwt = false
-
-[functions.preview-upgrade]
-verify_jwt = false
-
-[functions.upgrade-subscription]
-verify_jwt = false
-
-[functions.cancel-downgrade]
-verify_jwt = false
-
-[functions.send-past-receipts]
-verify_jwt = false
-
-[functions.receipt-history]
-verify_jwt = false
+[functions]
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.cancel-downgrade]
+    verify_jwt = false
+  [functions.cleanup-rescue-offers]
+    verify_jwt = false
+  [functions.create-checkout]
+    verify_jwt = false
+  [functions.downgrade-subscription]
+    verify_jwt = false
+  [functions.fetch-link-preview]
+    verify_jwt = false
+  [functions.moderate-content]
+    verify_jwt = false
+  [functions.notify-store-offer]
+    verify_jwt = false
+  [functions.preview-upgrade]
+    verify_jwt = false
+  [functions.reactivate-subscription]
+    verify_jwt = false
+  [functions.receipt-history]
+    verify_jwt = false
+  [functions.send-circle-invite]
+    verify_jwt = false
+  [functions.send-past-receipts]
+    verify_jwt = false
+  [functions.stripe-webhook]
+    verify_jwt = false
+  [functions.sync-stripe-purchases]
+    verify_jwt = false
+  [functions.upgrade-subscription]
+    verify_jwt = false
+  [functions.verify-checkout]
+    verify_jwt = false
