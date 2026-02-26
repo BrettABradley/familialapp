@@ -5,14 +5,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, MapPin, ImagePlus, Trash2, Play, Download } from "lucide-react";
+import { Settings, MapPin, ImagePlus, Trash2, Play, Download, Pencil } from "lucide-react";
 import { getMediaType } from "@/lib/mediaUtils";
 import { Textarea } from "@/components/ui/textarea";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
+import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 
 interface ProfileData {
   user_id: string;
@@ -44,6 +44,16 @@ const ProfileView = () => {
   const [showCaptionInput, setShowCaptionInput] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
+  // Crop state for new uploads
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [croppedBlob, setCroppedBlob] = useState<Blob | null>(null);
+
+  // Edit state for existing images
+  const [editingImage, setEditingImage] = useState<ProfileImage | null>(null);
+  const [editCaption, setEditCaption] = useState("");
+  const [editCropSrc, setEditCropSrc] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
   const isOwnProfile = user?.id === userId;
 
   useEffect(() => {
@@ -69,27 +79,48 @@ const ProfileView = () => {
     if (!file) return;
     event.target.value = "";
     file = await convertHeicToJpeg(file);
-    setPendingFile(file);
+
+    const mediaType = file.type.split("/")[0];
+    if (mediaType === "image") {
+      // Open crop dialog for images
+      const url = URL.createObjectURL(file);
+      setCropSrc(url);
+      setPendingFile(file);
+    } else {
+      // For videos, skip crop
+      setPendingFile(file);
+      setCroppedBlob(null);
+      setUploadCaption("");
+      setShowCaptionInput(true);
+    }
+  };
+
+  const handleCropComplete = (blob: Blob) => {
+    setCropSrc(null);
+    setCroppedBlob(blob);
     setUploadCaption("");
     setShowCaptionInput(true);
   };
 
   const handleConfirmUpload = async () => {
-    if (!pendingFile || !user) return;
+    if (!user) return;
+    const uploadData = croppedBlob || pendingFile;
+    if (!uploadData) return;
 
     setIsUploading(true);
     setShowCaptionInput(false);
-    const ext = pendingFile.name.split(".").pop() || "jpg";
+    const ext = croppedBlob ? "jpg" : (pendingFile?.name.split(".").pop() || "jpg");
     const fileName = `${user.id}/${Date.now()}.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from("profile-images")
-      .upload(fileName, pendingFile, { contentType: pendingFile.type });
+      .upload(fileName, uploadData, { contentType: croppedBlob ? "image/jpeg" : pendingFile?.type });
 
     if (uploadError) {
       toast({ title: "Upload failed", description: uploadError.message, variant: "destructive" });
       setIsUploading(false);
       setPendingFile(null);
+      setCroppedBlob(null);
       return;
     }
 
@@ -107,7 +138,7 @@ const ProfileView = () => {
       setImages((prev) => [newImage, ...prev]);
       toast({ title: "Media uploaded!" });
 
-      // Silent background moderation — fire-and-forget
+      // Silent background moderation
       const imageId = newImage.id;
       const imageUrl = publicUrlData.publicUrl;
       const storagePath = fileName;
@@ -136,6 +167,7 @@ const ProfileView = () => {
 
     setIsUploading(false);
     setPendingFile(null);
+    setCroppedBlob(null);
     setUploadCaption("");
   };
 
@@ -164,6 +196,70 @@ const ProfileView = () => {
       setEnlargedImage(null);
       toast({ title: "Image deleted" });
     }
+  };
+
+  // Edit existing image
+  const handleStartEdit = (image: ProfileImage) => {
+    setEditingImage(image);
+    setEditCaption(image.caption || "");
+    setEnlargedImage(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingImage || !user) return;
+    setIsSavingEdit(true);
+
+    const { error } = await supabase
+      .from("profile_images")
+      .update({ caption: editCaption.trim() || null })
+      .eq("id", editingImage.id);
+
+    if (error) {
+      toast({ title: "Error", description: "Could not update.", variant: "destructive" });
+    } else {
+      setImages((prev) => prev.map((i) => i.id === editingImage.id ? { ...i, caption: editCaption.trim() || null } : i));
+      toast({ title: "Updated!" });
+      setEditingImage(null);
+    }
+    setIsSavingEdit(false);
+  };
+
+  const handleEditRecrop = () => {
+    if (!editingImage) return;
+    setEditCropSrc(editingImage.image_url);
+  };
+
+  const handleEditCropComplete = async (blob: Blob) => {
+    setEditCropSrc(null);
+    if (!editingImage || !user) return;
+    setIsSavingEdit(true);
+
+    const fileName = `${user.id}/${Date.now()}.jpg`;
+    const { error: uploadError } = await supabase.storage
+      .from("profile-images")
+      .upload(fileName, blob, { contentType: "image/jpeg" });
+
+    if (uploadError) {
+      toast({ title: "Error", description: "Failed to upload cropped image.", variant: "destructive" });
+      setIsSavingEdit(false);
+      return;
+    }
+
+    const { data: publicUrlData } = supabase.storage.from("profile-images").getPublicUrl(fileName);
+
+    const { error: updateError } = await supabase
+      .from("profile_images")
+      .update({ image_url: publicUrlData.publicUrl })
+      .eq("id", editingImage.id);
+
+    if (updateError) {
+      toast({ title: "Error", description: "Failed to update image.", variant: "destructive" });
+    } else {
+      setImages((prev) => prev.map((i) => i.id === editingImage.id ? { ...i, image_url: publicUrlData.publicUrl } : i));
+      setEditingImage((prev) => prev ? { ...prev, image_url: publicUrlData.publicUrl } : null);
+      toast({ title: "Image updated!" });
+    }
+    setIsSavingEdit(false);
   };
 
   if (isLoading) {
@@ -319,23 +415,45 @@ const ProfileView = () => {
                 </p>
               )}
               {isOwnProfile && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => handleDeleteImage(enlargedImage)}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleStartEdit(enlargedImage)}
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDeleteImage(enlargedImage)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </div>
               )}
             </div>
           )}
         </DialogContent>
       </Dialog>
 
+      {/* Crop dialog for new uploads */}
+      {cropSrc && (
+        <AvatarCropDialog
+          open={!!cropSrc}
+          imageSrc={cropSrc}
+          onClose={() => { setCropSrc(null); setPendingFile(null); }}
+          onCropComplete={handleCropComplete}
+          aspect={1}
+          cropShape="rect"
+          title="Crop Photo"
+        />
+      )}
+
       {/* Caption Input Dialog */}
-      <Dialog open={showCaptionInput} onOpenChange={(open) => { if (!open) { setShowCaptionInput(false); setPendingFile(null); } }}>
+      <Dialog open={showCaptionInput} onOpenChange={(open) => { if (!open) { setShowCaptionInput(false); setPendingFile(null); setCroppedBlob(null); } }}>
         <DialogContent className="max-w-md">
           <div className="space-y-4">
             <h3 className="font-serif text-lg font-semibold">Add a caption</h3>
@@ -348,7 +466,7 @@ const ProfileView = () => {
               maxLength={500}
             />
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => { setShowCaptionInput(false); setPendingFile(null); }}>
+              <Button variant="outline" onClick={() => { setShowCaptionInput(false); setPendingFile(null); setCroppedBlob(null); }}>
                 Cancel
               </Button>
               <Button onClick={handleConfirmUpload} disabled={isUploading}>
@@ -358,6 +476,55 @@ const ProfileView = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit existing image dialog */}
+      <Dialog open={!!editingImage} onOpenChange={(open) => { if (!open) setEditingImage(null); }}>
+        <DialogContent className="max-w-md">
+          {editingImage && (
+            <div className="space-y-4">
+              <h3 className="font-serif text-lg font-semibold">Edit Photo</h3>
+              <div className="rounded-lg overflow-hidden aspect-square max-h-48 mx-auto">
+                <img src={editingImage.image_url} alt="Preview" className="w-full h-full object-cover" />
+              </div>
+              <Textarea
+                value={editCaption}
+                onChange={(e) => setEditCaption(e.target.value)}
+                placeholder="Edit caption..."
+                className="resize-none"
+                rows={3}
+                maxLength={500}
+              />
+              <div className="flex gap-2 justify-between">
+                {getMediaType(editingImage.image_url) === 'image' && (
+                  <Button variant="outline" size="sm" onClick={handleEditRecrop} disabled={isSavingEdit}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Re-crop
+                  </Button>
+                )}
+                <div className="flex gap-2 ml-auto">
+                  <Button variant="outline" onClick={() => setEditingImage(null)}>Cancel</Button>
+                  <Button onClick={handleSaveEdit} disabled={isSavingEdit}>
+                    {isSavingEdit ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Re-crop dialog for existing images */}
+      {editCropSrc && (
+        <AvatarCropDialog
+          open={!!editCropSrc}
+          imageSrc={editCropSrc}
+          onClose={() => setEditCropSrc(null)}
+          onCropComplete={handleEditCropComplete}
+          aspect={1}
+          cropShape="rect"
+          title="Re-crop Photo"
+        />
+      )}
     </main>
   );
 };

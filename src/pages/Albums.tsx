@@ -11,9 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users, Camera, Pencil, Check, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users, Camera, Pencil, Check, Download, ChevronLeft, ChevronRight, Archive } from "lucide-react";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { convertHeicToJpeg, convertHeicFiles } from "@/lib/heicConverter";
+import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
+import JSZip from "jszip";
 
 interface Circle {
   id: string;
@@ -59,8 +62,14 @@ const Albums = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   
+  // Cover crop state
+  const [coverCropSrc, setCoverCropSrc] = useState<string | null>(null);
+  const [pendingCoverFile, setPendingCoverFile] = useState<File | null>(null);
+
   const [newAlbum, setNewAlbum] = useState({
     name: "",
     description: "",
@@ -168,19 +177,26 @@ const Albums = () => {
     }
   };
 
-  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
-    if (!file || !user || !selectedAlbum) return;
+    if (!file || !selectedAlbum) return;
+    if (coverInputRef.current) coverInputRef.current.value = "";
     file = await convertHeicToJpeg(file);
+    setPendingCoverFile(file);
+    const url = URL.createObjectURL(file);
+    setCoverCropSrc(url);
+  };
+
+  const handleCoverCropComplete = async (croppedBlob: Blob) => {
+    setCoverCropSrc(null);
+    if (!user || !selectedAlbum) return;
 
     setIsUploadingCover(true);
-
-    const fileExt = file.name.split(".").pop();
-    const fileName = `covers/${selectedAlbum.id}/${Date.now()}.${fileExt}`;
+    const fileName = `covers/${selectedAlbum.id}/${Date.now()}.jpg`;
 
     const { error: uploadError } = await supabase.storage
       .from("post-media")
-      .upload(fileName, file, { upsert: true });
+      .upload(fileName, croppedBlob, { upsert: true, contentType: "image/jpeg" });
 
     if (uploadError) {
       toast({ title: "Error", description: "Failed to upload cover photo.", variant: "destructive" });
@@ -188,9 +204,7 @@ const Albums = () => {
       return;
     }
 
-    const { data: publicUrlData } = supabase.storage
-      .from("post-media")
-      .getPublicUrl(fileName);
+    const { data: publicUrlData } = supabase.storage.from("post-media").getPublicUrl(fileName);
 
     const { error: updateError } = await supabase
       .from("photo_albums")
@@ -202,21 +216,30 @@ const Albums = () => {
     } else {
       setSelectedAlbum({ ...selectedAlbum, cover_photo_url: publicUrlData.publicUrl });
       fetchAlbums();
-      toast({ title: "Cover updated!", description: "Album cover photo has been changed." });
+      toast({ title: "Cover updated!" });
     }
 
     setIsUploadingCover(false);
-    if (coverInputRef.current) coverInputRef.current.value = "";
+    setPendingCoverFile(null);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let files = Array.from(e.target.files || []);
     if (!files.length || !user || !selectedAlbum) return;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    if (files.length > 100) {
+      toast({ title: "Too many files", description: "You can upload up to 100 images at once.", variant: "destructive" });
+      return;
+    }
+
     files = await convertHeicFiles(files);
-
     setIsUploading(true);
+    setUploadProgress({ current: 0, total: files.length });
 
-    for (const file of files) {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setUploadProgress({ current: i + 1, total: files.length });
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/${selectedAlbum.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
 
@@ -239,7 +262,43 @@ const Albums = () => {
 
     fetchPhotos();
     setIsUploading(false);
+    setUploadProgress({ current: 0, total: 0 });
     toast({ title: "Photos uploaded!", description: `${files.length} photo(s) added to the album.` });
+  };
+
+  const handleDownloadAll = async () => {
+    if (!selectedAlbum || photos.length === 0) return;
+    setIsDownloadingAll(true);
+    toast({ title: "Preparing download...", description: `Bundling ${photos.length} photos into a zip file.` });
+
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder(selectedAlbum.name) || zip;
+
+      for (let i = 0; i < photos.length; i++) {
+        try {
+          const response = await fetch(photos[i].photo_url);
+          const blob = await response.blob();
+          const ext = photos[i].photo_url.split(".").pop()?.split("?")[0] || "jpg";
+          folder.file(`photo_${i + 1}.${ext}`, blob);
+        } catch {
+          // skip failed downloads
+        }
+      }
+
+      const content = await zip.generateAsync({ type: "blob" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(content);
+      link.download = `${selectedAlbum.name}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      toast({ title: "Download ready!" });
+    } catch {
+      toast({ title: "Download failed", variant: "destructive" });
+    }
+    setIsDownloadingAll(false);
   };
 
   const extractStoragePath = (publicUrl: string): string | null => {
@@ -387,12 +446,18 @@ const Albums = () => {
                 <p className="text-sm text-muted-foreground mt-1">Created by {selectedAlbum.creator_name}</p>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {photos.length > 0 && (
+                <Button variant="outline" onClick={handleDownloadAll} disabled={isDownloadingAll}>
+                  <Archive className="w-4 h-4 mr-2" />
+                  {isDownloadingAll ? "Zipping..." : "Download All"}
+                </Button>
+              )}
               <input
                 ref={coverInputRef}
                 type="file"
                 accept="image/*,.heic,.heif"
-                onChange={handleCoverUpload}
+                onChange={handleCoverFileSelect}
                 className="hidden"
               />
               <Button
@@ -413,7 +478,7 @@ const Albums = () => {
               />
               <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading || readOnly}>
                 <Upload className="w-4 h-4 mr-2" />
-                {isUploading ? "Uploading..." : "Add Photos"}
+                {isUploading ? `Uploading ${uploadProgress.current}/${uploadProgress.total}...` : "Add Photos"}
               </Button>
               {user && selectedAlbum.created_by === user.id && (
                 <Button variant="outline" onClick={() => handleDeleteAlbum(selectedAlbum)} aria-label={`Delete album ${selectedAlbum.name}`}>
@@ -422,6 +487,16 @@ const Albums = () => {
               )}
             </div>
           </div>
+
+          {/* Upload progress bar */}
+          {isUploading && uploadProgress.total > 1 && (
+            <div className="mb-6 space-y-2">
+              <Progress value={(uploadProgress.current / uploadProgress.total) * 100} className="h-2" />
+              <p className="text-sm text-muted-foreground text-center">
+                Uploading {uploadProgress.current} of {uploadProgress.total} photos...
+              </p>
+            </div>
+          )}
 
           {/* Cover Photo Preview */}
           {selectedAlbum.cover_photo_url && (
@@ -531,6 +606,19 @@ const Albums = () => {
               })()}
             </DialogContent>
           </Dialog>
+
+          {/* Cover Crop Dialog */}
+          {coverCropSrc && (
+            <AvatarCropDialog
+              open={!!coverCropSrc}
+              imageSrc={coverCropSrc}
+              onClose={() => { setCoverCropSrc(null); setPendingCoverFile(null); }}
+              onCropComplete={handleCoverCropComplete}
+              aspect={3 / 1}
+              cropShape="rect"
+              title="Crop Album Cover"
+            />
+          )}
         </>
       ) : (
         // Albums List View

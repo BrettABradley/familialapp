@@ -15,6 +15,9 @@ interface AvatarCropDialogProps {
   imageSrc: string;
   onClose: () => void;
   onCropComplete: (croppedBlob: Blob) => void;
+  aspect?: number;
+  cropShape?: "round" | "rect";
+  title?: string;
 }
 
 async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
@@ -50,6 +53,9 @@ const AvatarCropDialog = ({
   imageSrc,
   onClose,
   onCropComplete,
+  aspect = 1,
+  cropShape = "round",
+  title = "Crop Photo",
 }: AvatarCropDialogProps) => {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -72,16 +78,16 @@ const AvatarCropDialog = ({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-serif">Crop Profile Photo</DialogTitle>
+          <DialogTitle className="font-serif">{title}</DialogTitle>
         </DialogHeader>
         <div className="relative w-full h-72">
           <Cropper
             image={imageSrc}
             crop={crop}
             zoom={zoom}
-            aspect={1}
-            cropShape="round"
-            showGrid={false}
+            aspect={aspect}
+            cropShape={cropShape}
+            showGrid={cropShape === "rect"}
             onCropChange={setCrop}
             onZoomChange={setZoom}
             onCropComplete={onCropDone}
