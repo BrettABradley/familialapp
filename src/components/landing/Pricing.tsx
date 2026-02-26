@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Phone, ArrowRight, Loader2, Camera, Calendar, MessageCircle, Smartphone, Users, Bell, Shield, Image, Video, Settings, Globe, StickyNote } from "lucide-react";
+import { Check, Phone, Mail, ArrowRight, Loader2, Camera, Calendar, MessageCircle, Smartphone, Users, Bell, Shield, Image, Video, Settings, Globe, StickyNote } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -544,12 +544,20 @@ const Pricing = () => {
               <p className="text-muted-foreground text-center">
                 For organizations, communities, or larger groups — we've got you covered.
               </p>
-              <a href="tel:480-648-9596">
-                <Button variant="outline" size="lg" className="whitespace-nowrap">
-                  <Phone className="w-4 h-4 mr-2" />
-                  Call (480) 648-9596
-                </Button>
-              </a>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <a href="mailto:support@familialmedia.com">
+                  <Button size="lg" className="whitespace-nowrap">
+                    <Mail className="w-4 h-4 mr-2" />
+                    Email Us
+                  </Button>
+                </a>
+                <a href="tel:480-648-9596">
+                  <Button variant="outline" size="lg" className="whitespace-nowrap">
+                    <Phone className="w-4 h-4 mr-2" />
+                    Call Us
+                  </Button>
+                </a>
+              </div>
             </CardContent>
           </Card>
         </div>
