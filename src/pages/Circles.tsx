@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,10 +13,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound, ArrowRightLeft, LogOut, ArrowUp } from "lucide-react";
+import { Plus, Users, ArrowLeft, Trash2, UserPlus, Crown, Edit, Copy, Check, KeyRound, ArrowRightLeft, LogOut, ArrowUp, Camera } from "lucide-react";
 // Note: ArrowRightLeft kept for delete dialog transfer block suggestion
 import { Badge } from "@/components/ui/badge";
 import PendingInvites from "@/components/circles/PendingInvites";
@@ -32,6 +33,7 @@ interface Circle {
   created_at: string;
   invite_code: string;
   transfer_block?: boolean;
+  avatar_url?: string | null;
 }
 
 interface CircleMembership {
@@ -84,6 +86,12 @@ const Circles = () => {
   const [deleteConfirmStep, setDeleteConfirmStep] = useState<1 | 2>(1);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteMemberCount, setDeleteMemberCount] = useState<number | null>(null);
+  // Circle avatar upload
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploadCircleId, setAvatarUploadCircleId] = useState<string | null>(null);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [isCropOpen, setIsCropOpen] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   // memberPlans state removed — was only used for transfer ownership dialogs
 
   // Handle ?rescue= query param
@@ -533,6 +541,57 @@ const Circles = () => {
 
   const isOwner = (circle: Circle) => circle.owner_id === user?.id;
 
+  const handleAvatarClick = (circleId: string) => {
+    setAvatarUploadCircleId(circleId);
+    avatarInputRef.current?.click();
+  };
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !avatarUploadCircleId) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropImageSrc(reader.result as string);
+      setIsCropOpen(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleCropComplete = async (blob: Blob) => {
+    if (!avatarUploadCircleId || !user) return;
+    setIsCropOpen(false);
+    setIsUploadingAvatar(true);
+
+    const filePath = `circle-${avatarUploadCircleId}/${Date.now()}.jpg`;
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, blob, { contentType: "image/jpeg", upsert: true });
+
+    if (uploadError) {
+      toast({ title: "Upload failed", description: uploadError.message, variant: "destructive" });
+      setIsUploadingAvatar(false);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
+
+    const { error: updateError } = await supabase
+      .from("circles")
+      .update({ avatar_url: urlData.publicUrl })
+      .eq("id", avatarUploadCircleId);
+
+    if (updateError) {
+      toast({ title: "Error", description: "Failed to update circle photo.", variant: "destructive" });
+    } else {
+      toast({ title: "Photo updated!" });
+      await refetchCircles();
+    }
+    setIsUploadingAvatar(false);
+    setAvatarUploadCircleId(null);
+    setCropImageSrc(null);
+  };
+
   // handleTransferAndLeave and handleTransferOwnership removed — only transfer block is used now
 
   const handleTransferBlock = async (circle: Circle) => {
@@ -672,7 +731,22 @@ const Circles = () => {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12"><AvatarFallback className="bg-secondary text-foreground font-serif text-lg">{circle.name.charAt(0)}</AvatarFallback></Avatar>
+                    <button type="button" className="relative cursor-pointer group/avatar" onClick={() => handleAvatarClick(circle.id)} aria-label="Change circle photo">
+                      <Avatar className="h-12 w-12">
+                        {circle.avatar_url ? (
+                          <AvatarImage src={circle.avatar_url} alt={circle.name} />
+                        ) : null}
+                        <AvatarFallback className="bg-secondary text-foreground font-serif text-lg">{circle.name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="absolute inset-0 rounded-full bg-foreground/0 group-hover/avatar:bg-foreground/40 transition-colors flex items-center justify-center">
+                        <Camera className="w-4 h-4 text-background opacity-0 group-hover/avatar:opacity-100 transition-opacity" />
+                      </div>
+                      {isUploadingAvatar && avatarUploadCircleId === circle.id && (
+                        <div className="absolute inset-0 rounded-full bg-foreground/50 flex items-center justify-center">
+                          <div className="w-4 h-4 border-2 border-background border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </button>
                     <div>
                       <CardTitle className="font-serif text-lg flex items-center gap-2"><button type="button" className="hover:underline cursor-pointer text-left" onClick={() => { setContextCircle(circle.id); navigate("/feed"); }}>{circle.name}</button>{isOwner(circle) && <Crown className="w-4 h-4 text-muted-foreground" />}</CardTitle>
                       <CardDescription>Created {new Date(circle.created_at).toLocaleDateString()}</CardDescription>
@@ -930,6 +1004,21 @@ const Circles = () => {
         open={!!rescueCircleId}
         onOpenChange={(open) => !open && setRescueCircleId(null)}
       />
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleAvatarFileChange}
+      />
+      {cropImageSrc && (
+        <AvatarCropDialog
+          open={isCropOpen}
+          imageSrc={cropImageSrc}
+          onClose={() => { setIsCropOpen(false); setCropImageSrc(null); setAvatarUploadCircleId(null); }}
+          onCropComplete={handleCropComplete}
+        />
+      )}
     </main>
   );
 };

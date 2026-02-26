@@ -22,6 +22,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { LogOut, Users, Calendar, Settings, Pin, MessageSquare, Image, Menu, Home, User, Bell, Check, Trash2 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import icon from "@/assets/icon.png";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,6 +32,7 @@ interface Circle {
   id: string;
   name: string;
   owner_id?: string;
+  avatar_url?: string | null;
 }
 
 interface CircleHeaderProps {
@@ -215,6 +217,12 @@ export function CircleHeader({
           ) : circles.length > 0 && (
             <>
               <span className="text-muted-foreground text-lg">/</span>
+              {currentCircle?.avatar_url && (
+                <Avatar className="h-6 w-6">
+                  <AvatarImage src={currentCircle.avatar_url} alt={currentCircle.name} />
+                  <AvatarFallback className="text-xs">{currentCircle.name.charAt(0)}</AvatarFallback>
+                </Avatar>
+              )}
               {circles.length === 1 ? (
                 <span className="font-medium text-foreground">
                   {currentCircle?.name || "Circle"}
@@ -229,7 +237,15 @@ export function CircleHeader({
                   <SelectContent>
                     {circles.map((circle) => (
                       <SelectItem key={circle.id} value={circle.id}>
-                        {circle.name}
+                        <div className="flex items-center gap-2">
+                          {circle.avatar_url ? (
+                            <Avatar className="h-5 w-5">
+                              <AvatarImage src={circle.avatar_url} alt={circle.name} />
+                              <AvatarFallback className="text-[10px]">{circle.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                          ) : null}
+                          {circle.name}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
