@@ -31,10 +31,10 @@ const CTA = () => {
                 <ArrowRight className="w-5 h-5" />
               </Button>
             </Link>
-            <a href="tel:520-759-5200">
+            <a href="tel:480-648-9596">
               <Button variant="hero-outline" size="xl">
                 <Phone className="w-5 h-5" />
-                Call 520-759-5200
+                Call (480) 648-9596
               </Button>
             </a>
           </div>

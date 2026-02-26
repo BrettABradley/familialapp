@@ -38,9 +38,9 @@ const Header = () => {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
-            <a href="tel:520-759-5200" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+            <a href="tel:480-648-9596" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
               <Phone className="w-4 h-4" />
-              <span className="text-sm">520-759-5200</span>
+              <span className="text-sm">(480) 648-9596</span>
             </a>
             {user ? (
               <Button onClick={() => navigate("/feed")}>Go to Dashboard</Button>
@@ -99,12 +99,12 @@ const Header = () => {
                 Store
               </Link>
               <a 
-                href="tel:520-759-5200" 
+                href="tel:480-648-9596" 
                 className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors py-2"
                 onClick={() => setIsMenuOpen(false)}
               >
                 <Phone className="w-4 h-4" />
-                <span>Call Support: 520-759-5200</span>
+                <span>Call Support: (480) 648-9596</span>
               </a>
               <div className="flex flex-col gap-2 pt-4 border-t border-border/50">
                 {user ? (
