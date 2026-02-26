@@ -1,26 +1,38 @@
 
 
-## Plan: Populate "Test" circle with demo data
+## Plan: Allow all circle members to change the circle profile photo
 
-**Circle**: `ff8b3fee-518c-4701-98ef-5db86f6dfd17` (owner: `59b40736-dbc2-48aa-9c78-4e4b7bfc78cd`)
+### Current state
+- The `circles` table has an `avatar_url` column but it's never used in the UI
+- The circle card shows an `AvatarFallback` with the first letter of the circle name — no photo upload exists
+- RLS only allows the **owner** to UPDATE circles (`auth.uid() = owner_id`)
+- There's no dedicated RLS policy for members to update the avatar
 
-### Approach
-Use a database migration (runs as superuser, bypasses RLS) to insert all demo data in one batch.
+### Changes
 
-### Data to insert
+#### 1. Add a permissive RLS policy for members to update circle avatar
+Create a new database migration that adds a permissive UPDATE policy allowing any circle member to update `avatar_url` only. Since Postgres RLS can't restrict which columns are updated at the policy level, we'll use a trigger to prevent non-owners from changing other fields (name, description, etc.) while allowing avatar updates.
 
-1. **6 fake profiles** with random UUIDs (Mom, Dad, Sister, Brother, Cousin, Grandma) — these won't be real auth users but will display correctly in the UI
-2. **6 circle memberships** linking fake profiles to the Test circle
-3. **~10 feed posts** from various members (mix of text-only and text with content — no media URLs since we don't have uploaded files)
-4. **3 photo albums** (e.g., "Summer BBQ 2025", "Thanksgiving 2025", "Family Reunion") with placeholder descriptions
-5. **4 events** (upcoming and past) — 2-3 linked to albums via `album_id`
-6. **5-6 fridge pins** (notes, reminders — text-only since we can't upload images)
-7. **A few reactions and comments** on the posts for realism
+Alternative simpler approach: Add a **permissive** UPDATE policy for circle members, but use a **trigger** that ensures non-owners can only modify `avatar_url`.
 
-### Limitation
-- Fake members won't have auth accounts, so they can't log in — but their names, posts, and contributions will show up throughout the app for demo purposes
-- No actual media files (images/videos) since that requires storage uploads — posts and albums will be text-based
+#### 2. Add circle photo upload UI to the circle card
+In `src/pages/Circles.tsx`:
+- Add a camera/edit overlay on the circle Avatar in each card
+- On click, open a file picker for images
+- Upload the selected image to the `avatars` storage bucket (already public)
+- Update the circle's `avatar_url` in the database
+- Display the uploaded avatar in the Avatar component
+
+#### 3. Display circle avatar throughout the app
+- Update the Avatar in the circle card to show the `avatar_url` image when present
+- Update `CircleHeader.tsx` to show the circle avatar if available (in the circle selector)
+
+#### 4. Add storage policy for circle avatars
+The `avatars` bucket is already public. Add an RLS policy on `storage.objects` for the `avatars` bucket to allow authenticated users to upload circle avatar files.
 
 ### Files to modify
-- None — this is purely a database data insertion via migration
+- `src/pages/Circles.tsx` — add avatar upload UI + display
+- `src/components/layout/CircleHeader.tsx` — display circle avatar
+- New database migration — add permissive UPDATE policy for members + validation trigger
+- New storage migration — ensure upload policy covers circle avatars
 
