@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Heart, Phone } from "lucide-react";
+import { ArrowRight, Heart, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const CTA = () => {
@@ -31,10 +31,10 @@ const CTA = () => {
                 <ArrowRight className="w-5 h-5" />
               </Button>
             </Link>
-            <a href="tel:480-648-9596">
+            <a href="mailto:support@familialmedia.com">
               <Button variant="hero-outline" size="xl">
-                <Phone className="w-5 h-5" />
-                Call (480) 648-9596
+                <Mail className="w-5 h-5" />
+                Email Support
               </Button>
             </a>
           </div>

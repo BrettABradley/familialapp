@@ -1,4 +1,4 @@
-import { Heart, Phone } from "lucide-react";
+import { Heart, Mail, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
 import icon from "@/assets/icon.png";
 
@@ -16,6 +16,13 @@ const Footer = () => {
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               The private social network for families who value connection over content.
             </p>
+            <a 
+              href="mailto:support@familialmedia.com" 
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-2"
+            >
+              <Mail className="w-4 h-4" />
+              <span className="text-sm">support@familialmedia.com</span>
+            </a>
             <a 
               href="tel:480-648-9596" 
               className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
