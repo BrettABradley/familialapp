@@ -221,14 +221,36 @@ const Circles = () => {
   };
 
   const fetchMemberships = async (circleId: string) => {
+    const circle = circlesList.find(c => c.id === circleId);
+
     const { data } = await supabase
       .from("circle_memberships")
       .select(`*, profiles!circle_memberships_user_id_profiles_fkey(display_name, avatar_url)`)
       .eq("circle_id", circleId);
 
-    if (data) {
-      setMemberships(data as unknown as CircleMembership[]);
+    const members = (data as unknown as CircleMembership[]) || [];
+
+    // Add owner if not already in memberships
+    if (circle && !members.find(m => m.user_id === circle.owner_id)) {
+      const { data: ownerProfile } = await supabase
+        .from("profiles")
+        .select("display_name, avatar_url")
+        .eq("user_id", circle.owner_id)
+        .maybeSingle();
+
+      if (ownerProfile) {
+        members.unshift({
+          id: `owner-${circle.owner_id}`,
+          circle_id: circleId,
+          user_id: circle.owner_id,
+          role: "owner",
+          joined_at: circle.created_at,
+          profiles: ownerProfile,
+        } as unknown as CircleMembership);
+      }
     }
+
+    setMemberships(members);
   };
 
   const handleCreateCircle = async () => {
