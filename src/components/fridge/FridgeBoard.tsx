@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { Trash2, Mic, X } from "lucide-react";
+import { Trash2, Mic, X, Download } from "lucide-react";
 import { getMediaType } from "@/lib/mediaUtils";
 
 export interface FridgeBoardPin {
@@ -200,7 +200,10 @@ export function FridgeBoard({
                         />
                       )
                     ) : (
-                      <div className="flex aspect-square items-center justify-center bg-zinc-100 text-center text-[10px] text-zinc-500 p-1 font-mono">
+                      <div
+                        className="flex aspect-square items-center justify-center bg-zinc-100 text-center text-[10px] text-zinc-500 p-1 font-mono cursor-pointer"
+                        onClick={() => setEnlargedPin(pin)}
+                      >
                         {pin.title}
                       </div>
                     )}
@@ -284,7 +287,7 @@ export function FridgeBoard({
           <DialogTitle className="sr-only">
             {enlargedPin?.title || "Enlarged photo"}
           </DialogTitle>
-          {enlargedPin?.image_url && (
+          {enlargedPin && (
             <div
               className={cn(
                 "relative bg-white p-3",
@@ -305,18 +308,31 @@ export function FridgeBoard({
                   "shadow-[3px_3px_0_0_rgba(0,0,0,0.3)]"
                 )}
               />
-              {getMediaType(enlargedPin.image_url) === 'video' ? (
-                <video
-                  src={enlargedPin.image_url}
-                  controls
-                  className="w-full rounded-none bg-zinc-200"
-                />
+              {enlargedPin.image_url ? (
+                getMediaType(enlargedPin.image_url) === 'video' ? (
+                  <video
+                    src={enlargedPin.image_url}
+                    controls
+                    className="w-full rounded-none bg-zinc-200"
+                  />
+                ) : getMediaType(enlargedPin.image_url) === 'audio' ? (
+                  <div className="flex aspect-square items-center justify-center bg-zinc-100 flex-col gap-3 p-4">
+                    <Mic className="w-12 h-12 text-zinc-400" />
+                    <audio controls className="w-full" preload="metadata">
+                      <source src={enlargedPin.image_url} />
+                    </audio>
+                  </div>
+                ) : (
+                  <img
+                    src={enlargedPin.image_url}
+                    alt={enlargedPin.title}
+                    className="w-full rounded-none bg-zinc-200"
+                  />
+                )
               ) : (
-                <img
-                  src={enlargedPin.image_url}
-                  alt={enlargedPin.title}
-                  className="w-full rounded-none bg-zinc-200"
-                />
+                <div className="flex aspect-square items-center justify-center bg-zinc-100 text-center p-6 font-mono">
+                  <p className="text-lg font-bold text-zinc-700">{enlargedPin.title}</p>
+                </div>
               )}
               <div className="absolute bottom-0 left-0 right-0 px-3 pb-2">
                 <p className="truncate text-sm font-bold text-zinc-800 font-mono">
@@ -331,15 +347,55 @@ export function FridgeBoard({
                   {enlargedPin.circles?.name || ""}
                 </p>
               </div>
-              {/* Close button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-1 right-1 h-7 w-7 rounded-none text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
-                onClick={() => setEnlargedPin(null)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              {/* Action buttons */}
+              <div className="absolute top-1 right-1 flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-none text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
+                  onClick={async () => {
+                    if (enlargedPin.image_url) {
+                      try {
+                        const res = await fetch(enlargedPin.image_url);
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        const ext = enlargedPin.image_url.split(".").pop()?.split("?")[0] || "file";
+                        a.download = `${enlargedPin.title}.${ext}`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                      } catch {
+                        window.open(enlargedPin.image_url, "_blank");
+                      }
+                    } else {
+                      const text = `${enlargedPin.title}${enlargedPin.content ? `\n\n${enlargedPin.content}` : ""}`;
+                      const blob = new Blob([text], { type: "text/plain" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `${enlargedPin.title}.txt`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }
+                  }}
+                  aria-label="Download"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-none text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
+                  onClick={() => setEnlargedPin(null)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
