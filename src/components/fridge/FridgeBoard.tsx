@@ -280,7 +280,7 @@ export function FridgeBoard({
       <Dialog open={!!enlargedPin} onOpenChange={(open) => !open && setEnlargedPin(null)}>
         <DialogContent
           className={cn(
-            "max-w-md p-0 overflow-hidden border-0 bg-transparent shadow-none",
+            "max-w-lg p-0 overflow-hidden border-0 bg-transparent shadow-none",
             "[&>button]:hidden"
           )}
         >
@@ -294,7 +294,7 @@ export function FridgeBoard({
                 enlargedPin?.content ? "pb-16" : "pb-12",
                 "border-[6px] border-zinc-300",
                 "shadow-[8px_8px_0_0_rgba(0,0,0,0.25)]",
-                "mx-auto max-w-sm"
+                "mx-auto max-w-md"
               )}
               style={{ transform: `rotate(${(Math.random() * 4 - 2).toFixed(1)}deg)` }}
             >
@@ -349,44 +349,33 @@ export function FridgeBoard({
               </div>
               {/* Action buttons */}
               <div className="absolute top-1 right-1 flex gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 rounded-none text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
-                  onClick={async () => {
-                    if (enlargedPin.image_url) {
+                {enlargedPin.image_url && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 rounded-none text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
+                    onClick={async () => {
                       try {
-                        const res = await fetch(enlargedPin.image_url);
+                        const res = await fetch(enlargedPin.image_url!);
                         const blob = await res.blob();
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement("a");
                         a.href = url;
-                        const ext = enlargedPin.image_url.split(".").pop()?.split("?")[0] || "file";
+                        const ext = enlargedPin.image_url!.split(".").pop()?.split("?")[0] || "file";
                         a.download = `${enlargedPin.title}.${ext}`;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
                         URL.revokeObjectURL(url);
                       } catch {
-                        window.open(enlargedPin.image_url, "_blank");
+                        window.open(enlargedPin.image_url!, "_blank");
                       }
-                    } else {
-                      const text = `${enlargedPin.title}${enlargedPin.content ? `\n\n${enlargedPin.content}` : ""}`;
-                      const blob = new Blob([text], { type: "text/plain" });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `${enlargedPin.title}.txt`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(url);
-                    }
-                  }}
-                  aria-label="Download"
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
+                    }}
+                    aria-label="Download"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
