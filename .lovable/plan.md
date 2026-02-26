@@ -1,38 +1,56 @@
 
 
-## Plan: Allow all circle members to change the circle profile photo
+## Plan: Add HEIC/HEIF support across the platform
 
-### Current state
-- The `circles` table has an `avatar_url` column but it's never used in the UI
-- The circle card shows an `AvatarFallback` with the first letter of the circle name — no photo upload exists
-- RLS only allows the **owner** to UPDATE circles (`auth.uid() = owner_id`)
-- There's no dedicated RLS policy for members to update the avatar
+### Problem
+HEIC/HEIF is Apple's default photo format. Browsers don't natively support displaying HEIC files, and `accept="image/*"` doesn't always include `.heic/.heif` on all platforms. We need to: (1) explicitly accept HEIC in file inputs, and (2) convert HEIC to JPEG client-side before upload/display.
+
+### Approach
+Install `heic2any` (a client-side HEIC-to-JPEG converter) and create a shared utility that detects HEIC files and converts them to JPEG blobs before uploading.
 
 ### Changes
 
-#### 1. Add a permissive RLS policy for members to update circle avatar
-Create a new database migration that adds a permissive UPDATE policy allowing any circle member to update `avatar_url` only. Since Postgres RLS can't restrict which columns are updated at the policy level, we'll use a trigger to prevent non-owners from changing other fields (name, description, etc.) while allowing avatar updates.
+#### 1. Install `heic2any` package
+NPM package for client-side HEIC → JPEG conversion.
 
-Alternative simpler approach: Add a **permissive** UPDATE policy for circle members, but use a **trigger** that ensures non-owners can only modify `avatar_url`.
+#### 2. Create shared conversion utility (`src/lib/heicConverter.ts`)
+- Detect HEIC/HEIF by file type or extension
+- Convert to JPEG blob using `heic2any`
+- Return converted File object with `.jpg` extension
 
-#### 2. Add circle photo upload UI to the circle card
-In `src/pages/Circles.tsx`:
-- Add a camera/edit overlay on the circle Avatar in each card
-- On click, open a file picker for images
-- Upload the selected image to the `avatars` storage bucket (already public)
-- Update the circle's `avatar_url` in the database
-- Display the uploaded avatar in the Avatar component
+#### 3. Update all file input `accept` attributes to include `.heic,.heif`
+7 locations across 7 files:
+- `src/components/feed/CreatePostForm.tsx` — `accept="image/*,video/*,audio/*,.heic,.heif"`
+- `src/pages/Messages.tsx` (2 inputs) — media input + group avatar input
+- `src/pages/Albums.tsx` (2 inputs) — cover + photos
+- `src/pages/Circles.tsx` — circle avatar
+- `src/pages/Settings.tsx` — profile avatar
+- `src/pages/Fridge.tsx` — fridge pin image
+- `src/pages/ProfileView.tsx` — profile media
 
-#### 3. Display circle avatar throughout the app
-- Update the Avatar in the circle card to show the `avatar_url` image when present
-- Update `CircleHeader.tsx` to show the circle avatar if available (in the circle selector)
+#### 4. Add HEIC conversion before upload in each upload handler
+Before uploading, check if file is HEIC and convert. This affects the upload logic in:
+- `CreatePostForm.tsx` → `handleFileSelect`
+- `Messages.tsx` → `handleFileSelect` + `handleGroupAvatarUpload`
+- `Albums.tsx` → `handleCoverUpload` + `handleFileUpload`
+- `Circles.tsx` → `handleAvatarFileChange`
+- `Settings.tsx` → `handleFileSelect`
+- `Fridge.tsx` → `handleImageSelect`
+- `ProfileView.tsx` → `handleFileSelect`
 
-#### 4. Add storage policy for circle avatars
-The `avatars` bucket is already public. Add an RLS policy on `storage.objects` for the `avatars` bucket to allow authenticated users to upload circle avatar files.
+#### 5. Update `src/lib/mediaUtils.ts`
+Add `heic` and `heif` to the image extension list in `getMediaType`.
+
+### Files to create
+- `src/lib/heicConverter.ts`
 
 ### Files to modify
-- `src/pages/Circles.tsx` — add avatar upload UI + display
-- `src/components/layout/CircleHeader.tsx` — display circle avatar
-- New database migration — add permissive UPDATE policy for members + validation trigger
-- New storage migration — ensure upload policy covers circle avatars
+- `src/lib/mediaUtils.ts`
+- `src/components/feed/CreatePostForm.tsx`
+- `src/pages/Messages.tsx`
+- `src/pages/Albums.tsx`
+- `src/pages/Circles.tsx`
+- `src/pages/Settings.tsx`
+- `src/pages/Fridge.tsx`
+- `src/pages/ProfileView.tsx`
 
