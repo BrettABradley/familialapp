@@ -1,51 +1,23 @@
 
 
-## Plan: Album mass upload, Download All zip, cover crop, and profile media editing
+## Plan: Drag-and-drop album uploads + fix HEIC conversion
 
 ### Changes
 
-#### 1. Install `jszip` package
-Required for client-side zip file generation for the "Download All" feature.
+#### 1. Fix HEIC conversion failure (`src/lib/heicConverter.ts`)
+The `heic2any` library can fail silently or throw on certain HEIC variants. Fix by:
+- Converting files sequentially instead of `Promise.all` (avoids memory pressure with multiple large HEIC files)
+- Adding a per-file try/catch that skips failed conversions gracefully instead of aborting the entire batch
+- Reading the file as an ArrayBuffer first and creating a fresh Blob before passing to `heic2any` (some browsers pass File objects that `heic2any` can't read directly)
 
-#### 2. Album: Mass upload up to 100 images
-- Update the file input in `src/pages/Albums.tsx` to accept up to 100 files
-- Add a progress indicator showing upload progress (e.g., "Uploading 12/50...")
-- Add file size/count validation before starting
-
-#### 3. Album: "Download All" as zip
-- Add a "Download All" button in the album detail view header (top right area, next to existing buttons)
-- On click, fetch all photo blobs, bundle into a zip using JSZip, and trigger download
-- Show progress toast during zip creation
-
-#### 4. Album: Cover photo crop dialog
-- When setting a cover photo, open the `AvatarCropDialog` (generalized to support non-round crops) instead of uploading directly
-- Modify `AvatarCropDialog` to accept an `aspect` and `cropShape` prop so it can be reused for rectangular cover crops (aspect 3:1)
-- Upload the cropped result as the cover
-
-#### 5. Profile: Crop dialog when adding media
-- In `ProfileView.tsx`, after selecting a file for upload, if it's an image, open a crop dialog before the caption input
-- Reuse the generalized crop dialog with square aspect ratio
-- Upload the cropped result
-
-#### 6. Profile: Edit button for caption and crop on existing profile images
-- Add an "Edit" button in the lightbox view for own images
-- On click, show a dialog with:
-  - Textarea to edit the caption
-  - Button to re-crop the image (opens crop dialog, uploads new version, updates URL)
-- Requires an UPDATE RLS policy on `profile_images` for own images
-- Database migration to add UPDATE policy
+#### 2. Add drag-and-drop to album detail view (`src/pages/Albums.tsx`)
+- Add `isDragging` state
+- Add `onDragOver`, `onDragLeave`, `onDrop` handlers to the album detail `<main>` wrapper
+- On drop, extract files from `event.dataTransfer.files`, run through the same HEIC conversion + upload pipeline as `handleFileUpload`
+- Extract shared upload logic into a `processAndUploadFiles(files: File[])` function used by both the file input handler and the drop handler
+- Show a visual drop zone overlay (dashed border + "Drop photos here" text) when `isDragging` is true
 
 ### Files to modify
-- `src/components/profile/AvatarCropDialog.tsx` — generalize with `aspect` and `cropShape` props
-- `src/pages/Albums.tsx` — mass upload progress, Download All zip, cover crop flow
-- `src/pages/ProfileView.tsx` — crop on upload, edit caption/crop on existing images
-
-### Files to create
-- None (reuse existing crop component)
-
-### Database migration
-- Add UPDATE policy on `profile_images` for own images (`auth.uid() = user_id`)
-
-### New dependency
-- `jszip` for zip file creation
+- `src/lib/heicConverter.ts` — make conversion more robust
+- `src/pages/Albums.tsx` — add drag-and-drop + refactor upload logic
 
