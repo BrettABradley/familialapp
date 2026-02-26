@@ -3,6 +3,7 @@ export function getMediaType(url: string): 'image' | 'video' | 'audio' {
   if (!ext) return 'image';
   if (['mp4', 'mov', 'webm', 'avi', 'mkv'].includes(ext)) return 'video';
   if (['mp3', 'wav', 'ogg', 'm4a', 'aac'].includes(ext)) return 'audio';
+  if (['heic', 'heif'].includes(ext)) return 'image';
   // webm can be audio or video - default to video since it's more common in uploads
   return 'image';
 }

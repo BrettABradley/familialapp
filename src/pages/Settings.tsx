@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Camera, Save, ArrowLeft } from "lucide-react";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
+import { convertHeicToJpeg } from "@/lib/heicConverter";
 import SubscriptionCard from "@/components/settings/SubscriptionCard";
 import ReceiptHistory from "@/components/settings/ReceiptHistory";
 
@@ -39,9 +40,10 @@ const Settings = () => {
     }
   }, [profile]);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const rawFile = event.target.files?.[0];
+    if (!rawFile) return;
+    const file = await convertHeicToJpeg(rawFile);
     setPendingFile(file);
     const reader = new FileReader();
     reader.onload = () => setCropImageSrc(reader.result as string);
@@ -157,7 +159,7 @@ const Settings = () => {
               >
                 <Camera className="w-4 h-4" />
               </button>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+              <input ref={fileInputRef} type="file" accept="image/*,.heic,.heif" onChange={handleFileSelect} className="hidden" />
             </div>
             {isUploading && <p className="text-sm text-muted-foreground">Uploading...</p>}
           </div>

@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Settings, MapPin, ImagePlus, Trash2, Play, Download } from "lucide-react";
 import { getMediaType } from "@/lib/mediaUtils";
 import { Textarea } from "@/components/ui/textarea";
+import { convertHeicToJpeg } from "@/lib/heicConverter";
 
 interface ProfileData {
   user_id: string;
@@ -63,10 +64,11 @@ const ProfileView = () => {
     fetchData();
   }, [userId]);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    let file = event.target.files?.[0];
     if (!file) return;
     event.target.value = "";
+    file = await convertHeicToJpeg(file);
     setPendingFile(file);
     setUploadCaption("");
     setShowCaptionInput(true);
@@ -242,7 +244,7 @@ const ProfileView = () => {
                   <ImagePlus className="h-4 w-4 mr-2" />
                   {isUploading ? "Uploading..." : "Add Media"}
                 </Button>
-                <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
+                <input ref={fileInputRef} type="file" accept="image/*,video/*,.heic,.heif" onChange={handleFileSelect} className="hidden" />
               </>
             )}
           </div>

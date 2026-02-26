@@ -17,6 +17,7 @@ import { FridgeBoard, type FridgeBoardPin } from "@/components/fridge/FridgeBoar
 import { Plus, Pin, Image, FileText, Calendar, Users, Mic } from "lucide-react";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
+import { convertHeicToJpeg } from "@/lib/heicConverter";
 
 interface Circle {
   id: string;
@@ -81,9 +82,10 @@ const Fridge = () => {
     setIsLoadingPins(false);
   };
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    let file = e.target.files?.[0];
     if (!file) return;
+    file = await convertHeicToJpeg(file);
 
     setSelectedImage(file);
     const url = URL.createObjectURL(file);
@@ -349,7 +351,7 @@ const Fridge = () => {
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept="image/*"
+                        accept="image/*,.heic,.heif"
                         onChange={handleImageSelect}
                         className="hidden"
                       />

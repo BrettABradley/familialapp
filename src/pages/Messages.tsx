@@ -16,6 +16,7 @@ import { ArrowLeft, Send, MessageSquare, Search, Users, Plus, UsersRound, Pencil
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import { validateFileSize, getFileMediaType, getMediaType } from "@/lib/mediaUtils";
+import { convertHeicFiles, convertHeicToJpeg } from "@/lib/heicConverter";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -380,7 +381,8 @@ const Messages = () => {
   const handleGroupAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedGroup || !user || !e.target.files?.[0]) return;
     setIsUploadingGroupAvatar(true);
-    const file = e.target.files[0];
+    let file = e.target.files[0];
+    file = await convertHeicToJpeg(file);
     const filePath = `group-chats/${selectedGroup.id}/${Date.now()}-${file.name}`;
     const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file);
     if (uploadError) {
@@ -415,13 +417,14 @@ const Messages = () => {
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    let files = Array.from(e.target.files || []);
     if (files.length + selectedFiles.length > 4) {
       toast({ title: "Too many files", description: "You can attach up to 4 files per message.", variant: "destructive" });
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
+    files = await convertHeicFiles(files);
     for (const file of files) {
       const error = validateFileSize(file);
       if (error) {
@@ -576,7 +579,7 @@ const Messages = () => {
       {renderFilePreviewBar()}
       {renderUploadProgress()}
       <div className="flex items-center gap-2">
-        <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*" multiple onChange={handleFileSelect} className="hidden" />
+        <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.heic,.heif" multiple onChange={handleFileSelect} className="hidden" />
         <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isSending} className="flex-shrink-0">
           <Paperclip className="w-4 h-4" />
         </Button>
@@ -682,7 +685,7 @@ const Messages = () => {
               {selectedGroup.created_by === user?.id && (
                 <label className="absolute inset-0 flex items-center justify-center bg-foreground/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                   <Camera className="w-4 h-4 text-background" />
-                  <input type="file" accept="image/*" className="hidden" onChange={handleGroupAvatarUpload} disabled={isUploadingGroupAvatar} />
+                  <input type="file" accept="image/*,.heic,.heif" className="hidden" onChange={handleGroupAvatarUpload} disabled={isUploadingGroupAvatar} />
                 </label>
               )}
             </div>

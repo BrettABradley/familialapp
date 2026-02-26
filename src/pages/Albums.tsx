@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users, Camera, Pencil, Check, Download, ChevronLeft, ChevronRight } from "lucide-react";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
+import { convertHeicToJpeg, convertHeicFiles } from "@/lib/heicConverter";
 
 interface Circle {
   id: string;
@@ -168,8 +169,9 @@ const Albums = () => {
   };
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    let file = e.target.files?.[0];
     if (!file || !user || !selectedAlbum) return;
+    file = await convertHeicToJpeg(file);
 
     setIsUploadingCover(true);
 
@@ -208,8 +210,9 @@ const Albums = () => {
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+    let files = Array.from(e.target.files || []);
     if (!files.length || !user || !selectedAlbum) return;
+    files = await convertHeicFiles(files);
 
     setIsUploading(true);
 
@@ -388,7 +391,7 @@ const Albums = () => {
               <input
                 ref={coverInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
                 onChange={handleCoverUpload}
                 className="hidden"
               />
@@ -403,7 +406,7 @@ const Albums = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,.heic,.heif"
                 multiple
                 onChange={handleFileUpload}
                 className="hidden"

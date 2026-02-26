@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { ToastAction } from "@/components/ui/toast";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import { validateFileSize, getFileMediaType } from "@/lib/mediaUtils";
+import { convertHeicFiles } from "@/lib/heicConverter";
 
 interface CreatePostFormProps {
   onPostCreated: () => void;
@@ -34,12 +35,14 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    let files = Array.from(e.target.files || []);
     if (files.length + selectedFiles.length > 4) {
       toast({ title: "Too many files", description: "You can upload up to 4 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
       return;
     }
+
+    files = await convertHeicFiles(files);
 
     for (const file of files) {
       const error = validateFileSize(file);
@@ -245,7 +248,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
         )}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
-            <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*" multiple onChange={handleFileSelect} className="hidden" />
+            <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.heic,.heif" multiple onChange={handleFileSelect} className="hidden" />
             <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isPosting}>
               <Paperclip className="w-4 h-4 mr-2" />Add Media
             </Button>
