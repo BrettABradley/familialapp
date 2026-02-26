@@ -1,51 +1,31 @@
 
 
-## Plan: Add HEIC/HEIF support across the platform
+## Plan: Add HEIC loading toast + fix group/circle avatar upload errors
 
-### Problem
-HEIC/HEIF is Apple's default photo format. Browsers don't natively support displaying HEIC files, and `accept="image/*"` doesn't always include `.heic/.heif` on all platforms. We need to: (1) explicitly accept HEIC in file inputs, and (2) convert HEIC to JPEG client-side before upload/display.
-
-### Approach
-Install `heic2any` (a client-side HEIC-to-JPEG converter) and create a shared utility that detects HEIC files and converts them to JPEG blobs before uploading.
+### Root cause of upload error
+The storage policy for the `avatars` bucket restricts uploads to paths where the first folder matches the user's ID (`auth.uid()::text = (storage.foldername(name))[1]`). Group chat avatars upload to `group-chats/{groupId}/...` and circle avatars upload to `circles/{circleId}/...`, which don't match the user's ID and get rejected. The newer migration tried to add a permissive policy but the `DO` block found the existing policy name and skipped creation.
 
 ### Changes
 
-#### 1. Install `heic2any` package
-NPM package for client-side HEIC → JPEG conversion.
+#### 1. Database migration: fix storage upload policy
+- Drop the restrictive `"Authenticated users can upload avatars"` INSERT policy
+- Recreate it without the folder restriction, allowing any authenticated user to upload to the `avatars` bucket
+- Same for the UPDATE policy
 
-#### 2. Create shared conversion utility (`src/lib/heicConverter.ts`)
-- Detect HEIC/HEIF by file type or extension
-- Convert to JPEG blob using `heic2any`
-- Return converted File object with `.jpg` extension
+#### 2. Add HEIC conversion loading toast
+In all files that call `convertHeicToJpeg` or `convertHeicFiles`, wrap the conversion with a toast notification so users see feedback during the (potentially slow) conversion:
+- `src/components/feed/CreatePostForm.tsx`
+- `src/pages/Messages.tsx` (2 handlers)
+- `src/pages/Albums.tsx` (2 handlers)
+- `src/pages/Circles.tsx`
+- `src/pages/Settings.tsx`
+- `src/pages/Fridge.tsx`
+- `src/pages/ProfileView.tsx`
 
-#### 3. Update all file input `accept` attributes to include `.heic,.heif`
-7 locations across 7 files:
-- `src/components/feed/CreatePostForm.tsx` — `accept="image/*,video/*,audio/*,.heic,.heif"`
-- `src/pages/Messages.tsx` (2 inputs) — media input + group avatar input
-- `src/pages/Albums.tsx` (2 inputs) — cover + photos
-- `src/pages/Circles.tsx` — circle avatar
-- `src/pages/Settings.tsx` — profile avatar
-- `src/pages/Fridge.tsx` — fridge pin image
-- `src/pages/ProfileView.tsx` — profile media
-
-#### 4. Add HEIC conversion before upload in each upload handler
-Before uploading, check if file is HEIC and convert. This affects the upload logic in:
-- `CreatePostForm.tsx` → `handleFileSelect`
-- `Messages.tsx` → `handleFileSelect` + `handleGroupAvatarUpload`
-- `Albums.tsx` → `handleCoverUpload` + `handleFileUpload`
-- `Circles.tsx` → `handleAvatarFileChange`
-- `Settings.tsx` → `handleFileSelect`
-- `Fridge.tsx` → `handleImageSelect`
-- `ProfileView.tsx` → `handleFileSelect`
-
-#### 5. Update `src/lib/mediaUtils.ts`
-Add `heic` and `heif` to the image extension list in `getMediaType`.
-
-### Files to create
-- `src/lib/heicConverter.ts`
+Create a small wrapper in `src/lib/heicConverter.ts` that shows/dismisses a toast automatically when HEIC files are detected, e.g. `convertHeicWithToast(files, toast)`.
 
 ### Files to modify
-- `src/lib/mediaUtils.ts`
+- `src/lib/heicConverter.ts` — add toast-aware wrapper
 - `src/components/feed/CreatePostForm.tsx`
 - `src/pages/Messages.tsx`
 - `src/pages/Albums.tsx`
@@ -53,4 +33,7 @@ Add `heic` and `heif` to the image extension list in `getMediaType`.
 - `src/pages/Settings.tsx`
 - `src/pages/Fridge.tsx`
 - `src/pages/ProfileView.tsx`
+
+### Files to create
+- New database migration — fix avatars storage INSERT/UPDATE policies
 
