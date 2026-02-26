@@ -65,6 +65,7 @@ const Albums = () => {
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   
   // Cover crop state
   const [coverCropSrc, setCoverCropSrc] = useState<string | null>(null);
@@ -223,17 +224,17 @@ const Albums = () => {
     setPendingCoverFile(null);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    let files = Array.from(e.target.files || []);
-    if (!files.length || !user || !selectedAlbum) return;
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  const processAndUploadFiles = async (rawFiles: File[]) => {
+    if (!rawFiles.length || !user || !selectedAlbum) return;
 
-    if (files.length > 100) {
+    if (rawFiles.length > 100) {
       toast({ title: "Too many files", description: "You can upload up to 100 images at once.", variant: "destructive" });
       return;
     }
 
-    files = await convertHeicFiles(files);
+    const files = await convertHeicFiles(rawFiles);
+    if (files.length === 0) return;
+
     setIsUploading(true);
     setUploadProgress({ current: 0, total: files.length });
 
@@ -264,6 +265,35 @@ const Albums = () => {
     setIsUploading(false);
     setUploadProgress({ current: 0, total: 0 });
     toast({ title: "Photos uploaded!", description: `${files.length} photo(s) added to the album.` });
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    await processAndUploadFiles(files);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only leave when actually leaving the container
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (readOnly || isUploading) return;
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
+    await processAndUploadFiles(files);
   };
 
   const handleDownloadAll = async () => {
@@ -402,7 +432,22 @@ const Albums = () => {
       <ReadOnlyBanner circleId={selectedCircle} />
       {selectedAlbum ? (
         // Album Detail View
-        <>
+        <div
+          className="relative"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {/* Drag overlay */}
+          {isDragging && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 border-2 border-dashed border-primary rounded-lg pointer-events-none">
+              <div className="text-center">
+                <Upload className="w-12 h-12 mx-auto text-primary mb-2" />
+                <p className="text-lg font-semibold text-foreground">Drop photos here</p>
+                <p className="text-sm text-muted-foreground">Up to 100 images at once</p>
+              </div>
+            </div>
+          )}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
               <Button variant="ghost" size="sm" onClick={() => setSelectedAlbum(null)} className="mb-2">
@@ -619,7 +664,7 @@ const Albums = () => {
               title="Crop Album Cover"
             />
           )}
-        </>
+        </div>
       ) : (
         // Albums List View
         <>
