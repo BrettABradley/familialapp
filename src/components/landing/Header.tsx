@@ -34,6 +34,9 @@ const Header = () => {
             <Link to="/store" className="text-muted-foreground hover:text-foreground transition-colors">
               Store
             </Link>
+            <Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">
+              About
+            </Link>
             <a href="mailto:support@familialmedia.com" className="text-muted-foreground hover:text-foreground transition-colors">
               Contact Support
             </a>
@@ -96,6 +99,13 @@ const Header = () => {
                 onClick={() => setIsMenuOpen(false)}
               >
                 Store
+              </Link>
+              <Link 
+                to="/about" 
+                className="text-muted-foreground hover:text-foreground transition-colors py-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                About
               </Link>
               <a 
                 href="mailto:support@familialmedia.com" 
