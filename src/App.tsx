@@ -24,6 +24,7 @@ import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import CookiePolicy from "./pages/CookiePolicy";
+import About from "./pages/About";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/cookies" element={<CookiePolicy />} />
             <Route path="/store" element={<Store />} />
+            <Route path="/about" element={<About />} />
             
             {/* Authenticated routes with persistent layout */}
             <Route element={<AppLayout />}>
