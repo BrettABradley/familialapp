@@ -74,9 +74,10 @@ const Footer = () => {
                 </a>
               </li>
               <li>
-                <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <a href="mailto:support@familialmedia.com?subject=Careers" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                   Careers
                 </a>
+                <p className="text-xs text-muted-foreground mt-1">We're always open to growing our team — reach out!</p>
               </li>
             </ul>
           </div>
