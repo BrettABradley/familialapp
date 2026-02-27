@@ -1,25 +1,25 @@
 
 
-## Plan: Hidden invite code with reveal, copy, and refresh buttons
+## Plan: Create Privacy Policy page for Familial LLC
 
 ### Changes
 
-#### 1. Add state for invite code visibility (`src/pages/Circles.tsx`)
-- Add `visibleCodeId` state to track which circle's invite code is currently revealed (null = all hidden)
-- Add `refreshingCodeId` state for loading feedback during refresh
+#### 1. Create `src/pages/PrivacyPolicy.tsx`
+- Full privacy policy page with Header + Footer wrapping
+- Sections: Information We Collect, How We Use It, Information Sharing, Data Storage & Security, Children's Privacy (COPPA), Your Rights, Cookies, Changes to Policy, Contact
+- Tailored to Familial LLC's anti-tracking, no-algorithm, private-by-design positioning
+- Contact: support@familialmedia.com, (480) 648-9596
 
-#### 2. Update invite code display (lines 803-819)
-- Replace the always-visible `<code>` element with masked dots (`••••••••`) by default
-- Add an Eye/EyeOff toggle button to show/hide the code
-- Keep the existing Copy button (only copies when revealed, or copies regardless)
-- Add a RefreshCw button that calls Supabase to generate a new invite code
+#### 2. Update `src/App.tsx`
+- Add `/privacy` as a public route
 
-#### 3. Add `handleRefreshInviteCode` function
-- Generate a new 8-char code client-side (or use a simple random string)
-- Update the circle's `invite_code` in the database
-- Refetch circles to reflect the change
-- Show a toast confirmation
+#### 3. Update `src/components/landing/Footer.tsx`
+- Change Privacy Policy link from `<a href="#">` to `<Link to="/privacy">`
+
+### Files to create
+- `src/pages/PrivacyPolicy.tsx`
 
 ### Files to modify
-- `src/pages/Circles.tsx` — add visibility toggle, refresh button, and handler
+- `src/App.tsx`
+- `src/components/landing/Footer.tsx`
 
