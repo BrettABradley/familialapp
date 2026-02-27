@@ -26,6 +26,7 @@ import TermsOfService from "./pages/TermsOfService";
 import CookiePolicy from "./pages/CookiePolicy";
 import About from "./pages/About";
 import Careers from "./pages/Careers";
+import Blog from "./pages/Blog";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="/store" element={<Store />} />
             <Route path="/about" element={<About />} />
             <Route path="/careers" element={<Careers />} />
+            <Route path="/blog" element={<Blog />} />
             
             {/* Authenticated routes with persistent layout */}
             <Route element={<AppLayout />}>
