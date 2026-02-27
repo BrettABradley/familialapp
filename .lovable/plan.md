@@ -1,25 +1,25 @@
 
 
-## Plan: Create Careers page and update footer link
+## Plan: Add Blog placeholder page and link from footer
 
 ### Changes
 
-#### 1. Create `src/pages/Careers.tsx`
-- Same layout as About page (Header + Footer wrapping, prose styling)
-- Message: "We're always open to growing our team — reach out!"
-- Brief intro about working at Familial, link to email `support@familialmedia.com?subject=Careers`
+#### 1. Create `src/pages/Blog.tsx`
+- Same layout as About/Careers pages (Header + Footer, prose styling)
+- Title: "Blog"
+- Placeholder message: "Coming soon — stories, updates, and tips for staying connected as a family."
+- Optional: brief note that posts are on the way
 
 #### 2. Update `src/App.tsx`
-- Import Careers and add `/careers` as a public route
+- Import Blog and add `/blog` as a public route
 
 #### 3. Update `src/components/landing/Footer.tsx`
-- Remove the `<p>` subtitle under Careers (line 80)
-- Change the `mailto:` link to `<Link to="/careers">`
+- Change the Blog `<a href="#">` to `<Link to="/blog">`
 
 ### Files to create
-- `src/pages/Careers.tsx`
+- `src/pages/Blog.tsx`
 
 ### Files to modify
 - `src/App.tsx` (add route)
-- `src/components/landing/Footer.tsx` (lines 76-81)
+- `src/components/landing/Footer.tsx` (Blog link ~line 72)
 
