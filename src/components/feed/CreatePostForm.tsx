@@ -1,10 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +11,8 @@ import { Send, Paperclip, X, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ToastAction } from "@/components/ui/toast";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
+import { MentionInput } from "@/components/shared/MentionInput";
+import { useCircleMembers } from "@/hooks/useCircleMembers";
 import { validateFileSize, getFileMediaType } from "@/lib/mediaUtils";
 import { convertHeicFiles } from "@/lib/heicConverter";
 
@@ -26,13 +27,15 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  
+
+  const circleMembers = useCircleMembers();
 
   const [newPostContent, setNewPostContent] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isPosting, setIsPosting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [mentionedUserIds, setMentionedUserIds] = useState<Set<string>>(new Set());
 
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,6 +116,15 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
       setPreviewUrls([]);
       onPostCreated();
       toast({ title: "Posted!", description: "Your post has been shared with your circle." });
+
+      // Fire @mention notifications
+      if (newPost && mentionedUserIds.size > 0) {
+        supabase.rpc("create_mention_notifications", {
+          _mentioned_user_ids: Array.from(mentionedUserIds),
+          _post_id: newPost.id,
+          _circle_id: selectedCircle,
+        }).then();
+      }
 
       // Silent background moderation — fire-and-forget
       if (newPost) {
@@ -203,12 +215,15 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
       </CardHeader>
       <CardContent className="pt-0">
         <div className="relative mb-4">
-          <Textarea
-            placeholder="What's happening with the family?"
+          <MentionInput
+            placeholder="What's happening with the family? Use @ to tag someone"
             value={newPostContent}
-            onChange={(e) => setNewPostContent(e.target.value)}
+            onChange={(val) => setNewPostContent(val)}
+            members={circleMembers}
+            onMentionsChange={setMentionedUserIds}
             className="min-h-[100px] resize-none pb-10"
             maxLength={5000}
+            disabled={isPosting}
           />
           {(newPostContent.trim() || selectedFiles.length > 0) && (
             <Button
