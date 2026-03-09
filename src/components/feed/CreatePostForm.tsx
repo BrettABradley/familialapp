@@ -215,12 +215,15 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
       </CardHeader>
       <CardContent className="pt-0">
         <div className="relative mb-4">
-          <Textarea
-            placeholder="What's happening with the family?"
+          <MentionInput
+            placeholder="What's happening with the family? Use @ to tag someone"
             value={newPostContent}
-            onChange={(e) => setNewPostContent(e.target.value)}
+            onChange={(val) => setNewPostContent(val)}
+            members={circleMembers}
+            onMentionsChange={setMentionedUserIds}
             className="min-h-[100px] resize-none pb-10"
             maxLength={5000}
+            disabled={isPosting}
           />
           {(newPostContent.trim() || selectedFiles.length > 0) && (
             <Button
