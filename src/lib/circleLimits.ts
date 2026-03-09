@@ -1,11 +1,32 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export async function getCircleMemberCount(circleId: string): Promise<number> {
+  // Get circle owner
+  const { data: circleData } = await supabase
+    .from("circles")
+    .select("owner_id")
+    .eq("id", circleId)
+    .maybeSingle();
+
   const { count } = await supabase
     .from("circle_memberships")
     .select("id", { count: "exact", head: true })
     .eq("circle_id", circleId);
-  return (count ?? 0) + 1;
+
+  const memberCount = count ?? 0;
+
+  if (!circleData?.owner_id) return memberCount;
+
+  // Check if owner is already in circle_memberships
+  const { data: ownerMembership } = await supabase
+    .from("circle_memberships")
+    .select("id")
+    .eq("circle_id", circleId)
+    .eq("user_id", circleData.owner_id)
+    .maybeSingle();
+
+  // Only add +1 for owner if they're NOT in circle_memberships
+  return ownerMembership ? memberCount : memberCount + 1;
 }
 
 export async function getCircleMemberLimit(circleOwnerId: string, circleId?: string): Promise<{ limit: number; plan: string; extraMembers: number; maxMembers: number }> {

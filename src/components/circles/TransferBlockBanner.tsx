@@ -31,7 +31,7 @@ const TransferBlockBanner = () => {
     });
 
     if (error) {
-      if (error.message?.includes("CIRCLE_LIMIT_REACHED")) {
+      if (error.message?.includes("CIRCLE_LIMIT_REACHED") || error.message?.includes("PLAN_TOO_LOW")) {
         setShowUpgrade(true);
       } else {
         toast({ title: "Error", description: error.message || "Failed to claim ownership.", variant: "destructive" });
