@@ -27,13 +27,15 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  
+
+  const circleMembers = useCircleMembers();
 
   const [newPostContent, setNewPostContent] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isPosting, setIsPosting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [mentionedUserIds, setMentionedUserIds] = useState<Set<string>>(new Set());
 
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
