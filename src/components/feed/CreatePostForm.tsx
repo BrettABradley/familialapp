@@ -117,6 +117,15 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
       onPostCreated();
       toast({ title: "Posted!", description: "Your post has been shared with your circle." });
 
+      // Fire @mention notifications
+      if (newPost && mentionedUserIds.size > 0) {
+        supabase.rpc("create_mention_notifications", {
+          _mentioned_user_ids: Array.from(mentionedUserIds),
+          _post_id: newPost.id,
+          _circle_id: selectedCircle,
+        }).then();
+      }
+
       // Silent background moderation — fire-and-forget
       if (newPost) {
         const postId = newPost.id;
