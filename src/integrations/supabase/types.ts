@@ -1124,6 +1124,13 @@ export type Database = {
         Args: { _group_chat_id: string; _user_id: string }
         Returns: boolean
       }
+      lookup_circle_by_invite_code: {
+        Args: { _invite_code: string }
+        Returns: {
+          id: string
+          name: string
+        }[]
+      }
       shares_circle_with: {
         Args: { _other_user_id: string; _user_id: string }
         Returns: boolean

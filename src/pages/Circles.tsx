@@ -440,11 +440,10 @@ const Circles = () => {
     if (!joinCode.trim() || !user) return;
     setIsJoining(true);
 
-    const { data: circle, error: lookupError } = await supabase
-      .from("circles")
-      .select("id, name")
-      .eq("invite_code", joinCode.trim())
-      .maybeSingle();
+    const { data: circles_result, error: lookupError } = await supabase
+      .rpc("lookup_circle_by_invite_code", { _invite_code: joinCode.trim() });
+
+    const circle = circles_result?.[0] ?? null;
 
     if (lookupError || !circle) {
       toast({ title: "Invalid code", description: "No circle found with that invite code.", variant: "destructive" });
