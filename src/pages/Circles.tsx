@@ -440,56 +440,25 @@ const Circles = () => {
     if (!joinCode.trim() || !user) return;
     setIsJoining(true);
 
-    const { data: circles_result, error: lookupError } = await supabase
-      .rpc("lookup_circle_by_invite_code", { _invite_code: joinCode.trim() });
-
-    const circle = circles_result?.[0] ?? null;
-
-    if (lookupError || !circle) {
-      toast({ title: "Invalid code", description: "No circle found with that invite code.", variant: "destructive" });
-      setIsJoining(false);
-      return;
-    }
-
-    // Check if already a member or owner
-    const alreadyIn = circlesList.some((c) => c.id === circle.id);
-    if (alreadyIn) {
-      toast({ title: "Already a member", description: `You're already in "${circle.name}".` });
-      setIsJoining(false);
-      setJoinCode("");
-      setIsJoinOpen(false);
-      return;
-    }
-
-    // Check member limit before joining
-    const { data: circleDetail } = await supabase
-      .from("circles")
-      .select("owner_id")
-      .eq("id", circle.id)
-      .maybeSingle();
-
-    if (circleDetail) {
-      const capacity = await checkCircleCapacity(circle.id, circleDetail.owner_id);
-      if (capacity.isFull) {
-        setUpgradeInfo({ plan: capacity.plan, currentCount: capacity.currentCount, limit: capacity.limit, circleId: circle.id });
-        setUpgradeDialogOpen(true);
-        setIsJoining(false);
-        setIsJoinOpen(false);
-        return;
-      }
-    }
-
-    const { error: joinError } = await supabase
-      .from("circle_memberships")
-      .insert({ circle_id: circle.id, user_id: user.id, role: "member" });
+    const { data: joinResult, error: joinError } = await supabase
+      .rpc("join_circle_by_invite_code", { _invite_code: joinCode.trim() });
 
     if (joinError) {
-      const msg = joinError.message?.includes("member limit")
-        ? "This circle has reached its member limit."
-        : joinError.message || "Could not join circle.";
-      toast({ title: "Join failed", description: msg, variant: "destructive" });
+      const msg = joinError.message || "";
+      if (msg.includes("Already a member")) {
+        toast({ title: "Already a member", description: "You're already in this circle." });
+        setJoinCode("");
+        setIsJoinOpen(false);
+      } else if (msg.includes("Invalid invite code")) {
+        toast({ title: "Invalid code", description: "No circle found with that invite code.", variant: "destructive" });
+      } else if (msg.includes("member limit")) {
+        toast({ title: "Circle full", description: "This circle has reached its member limit.", variant: "destructive" });
+      } else {
+        toast({ title: "Join failed", description: msg || "Could not join circle.", variant: "destructive" });
+      }
     } else {
-      toast({ title: "Joined!", description: `You're now a member of "${circle.name}".` });
+      const joined = joinResult?.[0];
+      toast({ title: "Joined!", description: `You're now a member of "${joined?.circle_name ?? "the circle"}".` });
       await refetchCircles();
       setJoinCode("");
       setIsJoinOpen(false);
