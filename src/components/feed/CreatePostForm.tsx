@@ -1,10 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +11,8 @@ import { Send, Paperclip, X, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ToastAction } from "@/components/ui/toast";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
+import { MentionInput } from "@/components/shared/MentionInput";
+import { useCircleMembers } from "@/hooks/useCircleMembers";
 import { validateFileSize, getFileMediaType } from "@/lib/mediaUtils";
 import { convertHeicFiles } from "@/lib/heicConverter";
 
