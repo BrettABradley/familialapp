@@ -1102,6 +1102,14 @@ export type Database = {
         Args: { _circle_id: string }
         Returns: undefined
       }
+      create_mention_notifications: {
+        Args: {
+          _circle_id: string
+          _mentioned_user_ids: string[]
+          _post_id: string
+        }
+        Returns: undefined
+      }
       get_circle_count: { Args: never; Returns: number }
       get_circle_limit: { Args: never; Returns: number }
       has_circle_role: {
