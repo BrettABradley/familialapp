@@ -14,7 +14,6 @@ const navItems = [
 export function MobileNavigation() {
   const isMobile = useIsMobile();
   const location = useLocation();
-  const [open, setOpen] = useState(false);
 
   if (!isMobile) return null;
 
