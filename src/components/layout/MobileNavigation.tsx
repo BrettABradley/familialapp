@@ -36,42 +36,6 @@ export function MobileNavigation() {
             <span className="text-xs mt-1">{item.label}</span>
           </Link>
         ))}
-        <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger asChild>
-            <button
-              className={`flex flex-col items-center justify-center w-full h-full min-h-[44px] min-w-[44px] transition-colors ${
-                moreItems.some((item) => isActive(item.to))
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <MoreHorizontal className="w-5 h-5" />
-              <span className="text-xs mt-1">More</span>
-            </button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="pb-safe">
-            <SheetHeader>
-              <SheetTitle>More</SheetTitle>
-            </SheetHeader>
-            <div className="grid grid-cols-3 gap-4 py-6">
-              {moreItems.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  onClick={() => setOpen(false)}
-                  className={`flex flex-col items-center justify-center p-4 rounded-xl min-h-[80px] transition-colors ${
-                    isActive(item.to)
-                      ? "bg-primary/10 text-primary"
-                      : "bg-secondary/50 text-foreground hover:bg-secondary"
-                  }`}
-                >
-                  <item.icon className="w-6 h-6 mb-2" />
-                  <span className="text-sm font-medium">{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          </SheetContent>
-        </Sheet>
       </div>
     </nav>
   );

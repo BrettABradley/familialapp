@@ -253,7 +253,18 @@ export function CircleHeader({
               )}
             </>
           )}
-          {showNav && !overrideLabel && notifBell}
+          {showNav && !overrideLabel && (
+            <div className="flex items-center gap-1">
+              {isMobile && (
+                <Link to="/fridge">
+                  <Button variant="ghost" size="sm">
+                    <Pin className="w-4 h-4" />
+                  </Button>
+                </Link>
+              )}
+              {notifBell}
+            </div>
+          )}
         </div>
         {showNav && (
           <>
