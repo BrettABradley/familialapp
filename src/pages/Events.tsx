@@ -514,7 +514,7 @@ const Events = () => {
   };
 
   const renderEventCard = (event: Event) => (
-    <Card key={event.id} className="group">
+    <Card key={event.id} id={`event-${event.id}`} className="group transition-all duration-300">
       <CardContent className="py-4">
         <div className="flex items-start justify-between">
           <div className="space-y-1 flex-1">
