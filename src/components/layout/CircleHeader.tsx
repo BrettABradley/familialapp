@@ -270,16 +270,16 @@ export function CircleHeader({
 
         {/* Desktop Navigation */}
         {showNav && (
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-0">
             {navItems.map((item) => (
               <Link key={item.to} to={item.to}>
-                <Button variant="ghost" size="sm" className="gap-1.5">
+                <Button variant="ghost" size="sm" className="gap-1 px-2">
                   <item.icon className="w-4 h-4" />
                   <span>{item.label}</span>
                 </Button>
               </Link>
             ))}
-            <Button variant="ghost" size="sm" className="gap-1.5" onClick={onSignOut}>
+            <Button variant="ghost" size="sm" className="gap-1 px-2" onClick={onSignOut}>
               <LogOut className="w-4 h-4" />
               <span>Sign Out</span>
             </Button>
