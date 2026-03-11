@@ -21,7 +21,7 @@ export function CircleHeaderSkeleton() {
         {isMobile ? (
           <Skeleton className="h-10 w-10 rounded-lg" />
         ) : (
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2 md:ml-auto lg:absolute lg:left-1/2 lg:-translate-x-1/2">
             {Array.from({ length: 7 }).map((_, i) => (
               <Skeleton key={i} className="h-9 w-20 rounded-lg" />
             ))}
