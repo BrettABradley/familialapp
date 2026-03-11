@@ -253,6 +253,8 @@ export function CircleHeader({
               )}
             </>
           )}
+          {/* Desktop bell next to circle name */}
+          {!isMobile && showNav && !overrideLabel && notifBell}
         </div>
         {/* Mobile: fridge pin + bell */}
         {showNav && !overrideLabel && isMobile && (
@@ -268,8 +270,7 @@ export function CircleHeader({
 
         {/* Desktop Navigation */}
         {showNav && (
-          <div className="hidden md:flex items-center gap-1">
-            {!overrideLabel && notifBell}
+          <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item) => (
               <Link key={item.to} to={item.to}>
                 <Button variant="ghost" size="sm" className="gap-1.5">
@@ -282,7 +283,7 @@ export function CircleHeader({
               <LogOut className="w-4 h-4" />
               <span>Sign Out</span>
             </Button>
-          </div>
+          </nav>
         )}
       </div>
     </header>
