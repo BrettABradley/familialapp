@@ -15,7 +15,12 @@ function AppLayoutContent() {
   
   const isProfileRoute = location.pathname.startsWith("/profile") || location.pathname === "/settings";
 
+  // Track whether a sign-out is in progress to prevent the useEffect
+  // from doing a soft navigate that races with the hard redirect.
+  const signingOut = useRef(false);
+
   useEffect(() => {
+    if (signingOut.current) return;
     if (!authLoading && !user) {
       // Preserve return URL so checkout session_id isn't lost during auth redirect
       const fullPath = window.location.pathname + window.location.search;
@@ -27,6 +32,7 @@ function AppLayoutContent() {
   }, [user, authLoading, navigate]);
 
   const handleSignOut = async () => {
+    signingOut.current = true;
     localStorage.removeItem("selectedCircle");
     await signOut();
     window.location.href = "/auth";
