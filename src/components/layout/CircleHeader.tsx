@@ -203,7 +203,7 @@ export function CircleHeader({
 
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-      <div className="w-full px-4 py-3 flex items-center justify-between">
+      <div className="w-full px-4 py-3 flex items-center relative">
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-2">
             <img src={icon} alt="Familial" className="h-8 w-auto" />
@@ -268,9 +268,9 @@ export function CircleHeader({
           </div>
         )}
 
-        {/* Desktop Navigation */}
+        {/* Desktop Navigation - centered on lg+ */}
         {showNav && (
-          <nav className="hidden md:flex items-center gap-4">
+          <nav className="hidden md:flex items-center gap-4 md:ml-auto lg:absolute lg:left-1/2 lg:-translate-x-1/2">
             {navItems.map((item) => (
               <Link key={item.to} to={item.to}>
                 <Button variant="ghost" size="sm" className="gap-1.5">
