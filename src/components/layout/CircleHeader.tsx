@@ -270,7 +270,7 @@ export function CircleHeader({
 
         {/* Desktop Navigation */}
         {showNav && (
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-4">
             {navItems.map((item) => (
               <Link key={item.to} to={item.to}>
                 <Button variant="ghost" size="sm" className="gap-1.5">
