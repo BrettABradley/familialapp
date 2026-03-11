@@ -254,6 +254,7 @@ export function CircleHeader({
             </>
           )}
         </div>
+        {/* Mobile: fridge pin + bell */}
         {showNav && !overrideLabel && isMobile && (
           <div className="flex items-center gap-1">
             <Link to="/fridge">
@@ -264,27 +265,24 @@ export function CircleHeader({
             {notifBell}
           </div>
         )}
-        {!isMobile && showNav && !overrideLabel && notifBell}
-        {showNav && (
-          <>
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-2 md:gap-4">
-              {navItems.map((item) => (
-                <Link key={item.to} to={item.to}>
-                  <Button variant="ghost" size="sm">
-                    <item.icon className="w-4 h-4 md:mr-2" />
-                    <span className="hidden md:inline">{item.label}</span>
-                  </Button>
-                </Link>
-              ))}
-              <Button variant="ghost" size="sm" onClick={onSignOut}>
-                <LogOut className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Sign Out</span>
-              </Button>
-            </div>
 
-            {/* Mobile: no hamburger menu, bottom nav handles it */}
-          </>
+        {/* Desktop Navigation */}
+        {showNav && (
+          <div className="hidden md:flex items-center gap-1">
+            {!overrideLabel && notifBell}
+            {navItems.map((item) => (
+              <Link key={item.to} to={item.to}>
+                <Button variant="ghost" size="sm" className="gap-1.5">
+                  <item.icon className="w-4 h-4" />
+                  <span>{item.label}</span>
+                </Button>
+              </Link>
+            ))}
+            <Button variant="ghost" size="sm" className="gap-1.5" onClick={onSignOut}>
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
+            </Button>
+          </div>
         )}
       </div>
     </header>
