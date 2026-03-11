@@ -28,7 +28,7 @@ function AppLayoutContent() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate("/");
+    navigate("/auth");
   };
 
   // Show nothing while checking auth
