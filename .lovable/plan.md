@@ -1,23 +1,25 @@
 
 
-# Fix: Logout Not Actually Logging Out
+## Plan: Add Blog placeholder page and link from footer
 
-## Problem
-When you click "Sign Out," the app calls `supabase.auth.signOut()` and immediately navigates to `/` (the landing page). The issue is:
-1. The navigation happens before the auth state change fully propagates
-2. Landing on `/` (the marketing homepage) doesn't reflect logout status — it looks like nothing happened
+### Changes
 
-## Fix
-In `src/components/layout/AppLayout.tsx`, change `handleSignOut` to:
-1. **Await** the sign-out call (already done)
-2. Navigate to `/auth` instead of `/` so the user clearly sees they've been logged out
+#### 1. Create `src/pages/Blog.tsx`
+- Same layout as About/Careers pages (Header + Footer, prose styling)
+- Title: "Blog"
+- Placeholder message: "Coming soon — stories, updates, and tips for staying connected as a family."
+- Optional: brief note that posts are on the way
 
-```typescript
-const handleSignOut = async () => {
-  await signOut();
-  navigate("/auth");
-};
-```
+#### 2. Update `src/App.tsx`
+- Import Blog and add `/blog` as a public route
 
-Single line change in one file.
+#### 3. Update `src/components/landing/Footer.tsx`
+- Change the Blog `<a href="#">` to `<Link to="/blog">`
+
+### Files to create
+- `src/pages/Blog.tsx`
+
+### Files to modify
+- `src/App.tsx` (add route)
+- `src/components/landing/Footer.tsx` (Blog link ~line 72)
 
