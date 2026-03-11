@@ -27,8 +27,9 @@ function AppLayoutContent() {
   }, [user, authLoading, navigate]);
 
   const handleSignOut = async () => {
+    localStorage.removeItem("selectedCircle");
     await signOut();
-    navigate("/auth");
+    window.location.href = "/auth";
   };
 
   // Show nothing while checking auth
