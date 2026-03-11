@@ -94,6 +94,9 @@ const Events = () => {
   const { circles, selectedCircle, setSelectedCircle, profile, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkEventId = searchParams.get("eventId");
+  const scrolledRef = useRef(false);
 
   const [events, setEvents] = useState<Event[]>([]);
   const [pastEvents, setPastEvents] = useState<Event[]>([]);
