@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -94,6 +94,9 @@ const Events = () => {
   const { circles, selectedCircle, setSelectedCircle, profile, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkEventId = searchParams.get("eventId");
+  const scrolledRef = useRef(false);
 
   const [events, setEvents] = useState<Event[]>([]);
   const [pastEvents, setPastEvents] = useState<Event[]>([]);
@@ -135,6 +138,39 @@ const Events = () => {
       setIsLoadingEvents(false);
     }
   }, [circles, selectedCircle, contextLoading]);
+
+  // Deep-link: scroll to a specific event when eventId is in the URL
+  useEffect(() => {
+    if (!deepLinkEventId || isLoadingEvents || scrolledRef.current) return;
+
+    // Check upcoming first
+    const inUpcoming = events.find(e => e.id === deepLinkEventId);
+    const inPast = pastEvents.find(e => e.id === deepLinkEventId);
+
+    if (inUpcoming) {
+      setActiveTab("upcoming");
+    } else if (inPast) {
+      setActiveTab("past");
+    } else {
+      return; // event not found in either list
+    }
+
+    scrolledRef.current = true;
+
+    // Wait for tab switch + render
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const el = document.getElementById(`event-${deepLinkEventId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.classList.add("ring-2", "ring-primary", "ring-offset-2");
+          setTimeout(() => el.classList.remove("ring-2", "ring-primary", "ring-offset-2"), 3000);
+        }
+        // Clear the search param
+        setSearchParams({}, { replace: true });
+      }, 100);
+    });
+  }, [deepLinkEventId, isLoadingEvents, events, pastEvents]);
 
   const fetchAlbums = async () => {
     const circleIds = selectedCircle ? [selectedCircle] : circles.map(c => c.id);
@@ -478,7 +514,7 @@ const Events = () => {
   };
 
   const renderEventCard = (event: Event) => (
-    <Card key={event.id} className="group">
+    <Card key={event.id} id={`event-${event.id}`} className="group transition-all duration-300">
       <CardContent className="py-4">
         <div className="flex items-start justify-between">
           <div className="space-y-1 flex-1">
