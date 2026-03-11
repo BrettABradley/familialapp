@@ -611,12 +611,17 @@ const Events = () => {
                 <Input id="title" placeholder="e.g., Grandma's Birthday" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} />
               </div>
               <div className="space-y-2">
-                <Label>Start Date</Label>
-                <Calendar mode="single" selected={selectedDate} onSelect={(day) => { setSelectedDate(day); if (day && selectedEndDate && day > selectedEndDate) setSelectedEndDate(undefined); }} className="rounded-md border" />
-              </div>
-              <div className="space-y-2">
-                <Label>End Date (optional, for multi-day)</Label>
-                <Calendar mode="single" selected={selectedEndDate} onSelect={setSelectedEndDate} disabled={(date) => !!(selectedDate && date < selectedDate)} className="rounded-md border" />
+                <Label>Event Date(s)</Label>
+                <p className="text-xs text-muted-foreground">Click a start date, then click an end date for multi-day events</p>
+                <Calendar
+                  mode="range"
+                  selected={selectedDate ? { from: selectedDate, to: selectedEndDate } : undefined}
+                  onSelect={(range) => {
+                    setSelectedDate(range?.from);
+                    setSelectedEndDate(range?.to);
+                  }}
+                  className="rounded-md border pointer-events-auto"
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -665,12 +670,17 @@ const Events = () => {
               <Input id="edit-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} maxLength={200} />
             </div>
             <div className="space-y-2">
-              <Label>Start Date</Label>
-              <Calendar mode="single" selected={editDate} onSelect={(day) => { if (day) { setEditDate(day); if (editEndDate && day > editEndDate) setEditEndDate(undefined); } }} className="rounded-md border" />
-            </div>
-            <div className="space-y-2">
-              <Label>End Date (optional, for multi-day)</Label>
-              <Calendar mode="single" selected={editEndDate} onSelect={setEditEndDate} disabled={(date) => !!(editDate && date < editDate)} className="rounded-md border" />
+              <Label>Event Date(s)</Label>
+              <p className="text-xs text-muted-foreground">Click a start date, then click an end date for multi-day events</p>
+              <Calendar
+                mode="range"
+                selected={editDate ? { from: editDate, to: editEndDate } : undefined}
+                onSelect={(range) => {
+                  setEditDate(range?.from);
+                  setEditEndDate(range?.to);
+                }}
+                className="rounded-md border pointer-events-auto"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
