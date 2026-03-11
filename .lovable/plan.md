@@ -1,25 +1,35 @@
 
 
-## Plan: Add Blog placeholder page and link from footer
+# Plan: Notification Deep Links + Desktop Nav Spacing Fix
 
-### Changes
+## 1. Update event notification trigger to include event ID in link
 
-#### 1. Create `src/pages/Blog.tsx`
-- Same layout as About/Careers pages (Header + Footer, prose styling)
-- Title: "Blog"
-- Placeholder message: "Coming soon — stories, updates, and tips for staying connected as a family."
-- Optional: brief note that posts are on the way
+**Database migration**: Update the `notify_on_event_created` function to set `link` to `'/events?eventId=' || NEW.id` instead of just `'/events'`. This enables deep linking to a specific event.
 
-#### 2. Update `src/App.tsx`
-- Import Blog and add `/blog` as a public route
+## 2. Events page: auto-scroll to deep-linked event
 
-#### 3. Update `src/components/landing/Footer.tsx`
-- Change the Blog `<a href="#">` to `<Link to="/blog">`
+**`src/pages/Events.tsx`**:
+- Read `eventId` from URL search params via `useSearchParams`
+- After events load, find the matching event card and scroll it into view with a highlight animation
+- Add `id` attributes to event cards (`id={event.id}`) so we can target them
+- If the event is in the "Past" tab, auto-switch to that tab
+- Clear the search param after scrolling to avoid re-triggering
 
-### Files to create
-- `src/pages/Blog.tsx`
+## 3. Notification click uses React Router navigation (already working)
 
-### Files to modify
-- `src/App.tsx` (add route)
-- `src/components/landing/Footer.tsx` (Blog link ~line 72)
+The header bell and Notifications page already use `<Link to={n.link}>` which goes through React Router. No changes needed here — the deep link param just needs to be present in the `link` field.
+
+## 4. Fix desktop nav whitespace
+
+**`src/components/layout/CircleHeader.tsx`**:
+- Change desktop nav gap from `gap-1` to `gap-0` to tighten spacing between nav items
+- Reduce button padding on nav items with smaller horizontal padding class
+
+## Files to change
+
+| File | Change |
+|------|--------|
+| DB migration | Update `notify_on_event_created` link to include event ID |
+| `src/pages/Events.tsx` | Add `useSearchParams`, scroll-to-event logic, card IDs |
+| `src/components/layout/CircleHeader.tsx` | Tighten desktop nav spacing |
 
