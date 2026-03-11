@@ -1,25 +1,27 @@
 
 
-## Plan: Add Blog placeholder page and link from footer
+# Fix: Sign Out Not Actually Logging Out
 
-### Changes
+## Problem
+When clicking "Sign Out," the `signOut()` call completes but the navigation races with `onAuthStateChange` and stale React state. The `CircleContext` and other components may re-trigger queries before the auth state fully propagates, causing the app to appear still logged in. Additionally, `localStorage` retains `selectedCircle` and other cached data.
 
-#### 1. Create `src/pages/Blog.tsx`
-- Same layout as About/Careers pages (Header + Footer, prose styling)
-- Title: "Blog"
-- Placeholder message: "Coming soon — stories, updates, and tips for staying connected as a family."
-- Optional: brief note that posts are on the way
+## Solution
+Replace the soft `navigate("/auth")` with a hard redirect (`window.location.href = "/auth"`) after sign-out. This ensures:
+1. All React state is fully cleared (no stale context)
+2. `localStorage` circle selection doesn't cause ghost state
+3. No race condition between `onAuthStateChange` and React Router
 
-#### 2. Update `src/App.tsx`
-- Import Blog and add `/blog` as a public route
+## Changes
 
-#### 3. Update `src/components/landing/Footer.tsx`
-- Change the Blog `<a href="#">` to `<Link to="/blog">`
+### `src/components/layout/AppLayout.tsx`
+Update `handleSignOut`:
+```typescript
+const handleSignOut = async () => {
+  localStorage.removeItem("selectedCircle");
+  await signOut();
+  window.location.href = "/auth";
+};
+```
 
-### Files to create
-- `src/pages/Blog.tsx`
-
-### Files to modify
-- `src/App.tsx` (add route)
-- `src/components/landing/Footer.tsx` (Blog link ~line 72)
+Single file, 3-line change.
 
