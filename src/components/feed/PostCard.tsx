@@ -145,6 +145,7 @@ export const PostCard = ({
   isOwnPost,
   isCircleAdmin: isAdmin = false,
   currentUserId,
+  circleMembers = [],
   onReaction,
   onToggleComments,
   onCommentInputChange,
