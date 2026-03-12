@@ -253,7 +253,7 @@ export function CircleHeader({
               )}
             </>
           )}
-          {/* Desktop bell next to circle name */}
+        {/* Bell next to circle name (md+) */}
           {!isMobile && showNav && !overrideLabel && notifBell}
         </div>
         {/* Mobile: fridge pin + bell */}
@@ -268,9 +268,45 @@ export function CircleHeader({
           </div>
         )}
 
-        {/* Desktop Navigation - centered on lg+ */}
+        {/* Hamburger menu for md–xl range */}
         {showNav && (
-          <nav className="hidden md:flex items-center gap-4 md:ml-auto lg:absolute lg:left-1/2 lg:-translate-x-1/2">
+          <div className="hidden md:block xl:hidden ml-auto">
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-64">
+                <SheetHeader>
+                  <SheetTitle>Menu</SheetTitle>
+                </SheetHeader>
+                <nav className="flex flex-col gap-1 mt-4">
+                  {navItems.map((item) => (
+                    <SheetClose asChild key={item.to}>
+                      <Link to={item.to}>
+                        <Button variant="ghost" className="w-full justify-start gap-2">
+                          <item.icon className="w-4 h-4" />
+                          <span>{item.label}</span>
+                        </Button>
+                      </Link>
+                    </SheetClose>
+                  ))}
+                  <SheetClose asChild>
+                    <Button variant="ghost" className="w-full justify-start gap-2 text-destructive hover:text-destructive" onClick={onSignOut}>
+                      <LogOut className="w-4 h-4" />
+                      <span>Sign Out</span>
+                    </Button>
+                  </SheetClose>
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
+        )}
+
+        {/* Full Desktop Navigation - visible at xl+ */}
+        {showNav && (
+          <nav className="hidden xl:flex items-center gap-4 xl:absolute xl:left-1/2 xl:-translate-x-1/2">
             {navItems.map((item) => (
               <Link key={item.to} to={item.to}>
                 <Button variant="ghost" size="sm" className="gap-1.5">
