@@ -9,6 +9,7 @@ import { useFeedPosts } from "@/hooks/useFeedPosts";
 import { CreatePostForm } from "@/components/feed/CreatePostForm";
 import { PostCard } from "@/components/feed/PostCard";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
+import { useCircleMembers } from "@/hooks/useCircleMembers";
 
 const Feed = () => {
   const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly, isCircleAdmin } = useCircleContext();
