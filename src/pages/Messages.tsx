@@ -674,8 +674,8 @@ const Messages = () => {
 
   if (chatView === "group" && selectedGroup) {
     return (
-      <main className="container mx-auto px-4 py-8 max-w-2xl">
-        <div className="flex flex-col h-[calc(100vh-200px)]">
+      <main className="container mx-auto px-4 py-4 md:py-8 max-w-2xl">
+        <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-200px)] pb-16 md:pb-0">
           <div className="flex items-center gap-3 pb-4 border-b border-border mb-4">
             <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
             <div className="relative group cursor-pointer">
