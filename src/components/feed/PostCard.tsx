@@ -14,6 +14,11 @@ import { LinkPreviewCard } from "@/components/feed/LinkPreviewCard";
 import { getMediaType } from "@/lib/mediaUtils";
 import type { Post } from "@/hooks/useFeedPosts";
 
+interface CircleMemberRef {
+  user_id: string;
+  display_name: string | null;
+}
+
 interface PostCardProps {
   post: Post;
   isExpanded: boolean;
@@ -23,6 +28,7 @@ interface PostCardProps {
   isOwnPost: boolean;
   isCircleAdmin?: boolean;
   currentUserId?: string;
+  circleMembers?: CircleMemberRef[];
   onReaction: (postId: string) => void;
   onToggleComments: (postId: string) => void;
   onCommentInputChange: (postId: string, value: string) => void;
