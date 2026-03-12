@@ -18,7 +18,7 @@ import SubscriptionCard from "@/components/settings/SubscriptionCard";
 import ReceiptHistory from "@/components/settings/ReceiptHistory";
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { profile, isLoading: contextLoading, refetchProfile } = useCircleContext();
   const { toast } = useToast();
   const navigate = useNavigate();
