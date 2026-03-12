@@ -1,30 +1,25 @@
 
 
-## Fix: Desktop Nav Collapses Too Late
-
-**Problem**: The full horizontal nav (8 items with icon+label) shows starting at `md` (768px), but needs ~1100px+ to display properly. Between 768–1100px it's jumbled and unusable.
-
-**Solution**: Raise the full nav breakpoint to `xl` (1280px) and add a hamburger menu for the `md`–`xl` range.
+## Plan: Add Blog placeholder page and link from footer
 
 ### Changes
 
-**`src/components/layout/CircleHeader.tsx`**
+#### 1. Create `src/pages/Blog.tsx`
+- Same layout as About/Careers pages (Header + Footer, prose styling)
+- Title: "Blog"
+- Placeholder message: "Coming soon — stories, updates, and tips for staying connected as a family."
+- Optional: brief note that posts are on the way
 
-1. Change the inline nav from `hidden md:flex` → `hidden xl:flex` and update centering from `lg:absolute` → `xl:absolute`
-2. Add a hamburger menu (Sheet from right side) visible at `md`–`xl` range (`hidden md:block xl:hidden`):
-   - Menu icon button that opens a Sheet
-   - All nav items listed vertically with icons
-   - Sign Out at the bottom
-   - Each link closes the sheet on click
-3. Bell icon visibility: change from `!isMobile` to show on both hamburger and full nav ranges
+#### 2. Update `src/App.tsx`
+- Import Blog and add `/blog` as a public route
 
-**`src/components/layout/CircleHeaderSkeleton.tsx`**
-- Mirror the same breakpoint change (`md` → `xl`) for the skeleton nav placeholder
+#### 3. Update `src/components/landing/Footer.tsx`
+- Change the Blog `<a href="#">` to `<Link to="/blog">`
 
-**No mobile changes** — bottom nav bar and header pin/bell stay exactly the same.
+### Files to create
+- `src/pages/Blog.tsx`
 
-### Breakpoint behavior after fix
-- **< 768px**: Mobile bottom nav + header pin/bell (unchanged)
-- **768px–1279px**: Hamburger menu icon in header → opens Sheet with nav items
-- **≥ 1280px**: Full centered horizontal nav (unchanged look)
+### Files to modify
+- `src/App.tsx` (add route)
+- `src/components/landing/Footer.tsx` (Blog link ~line 72)
 
