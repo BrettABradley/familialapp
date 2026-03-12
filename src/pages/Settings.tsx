@@ -11,14 +11,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Camera, Save, ArrowLeft } from "lucide-react";
+import { Camera, Save, ArrowLeft, LogOut } from "lucide-react";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import SubscriptionCard from "@/components/settings/SubscriptionCard";
 import ReceiptHistory from "@/components/settings/ReceiptHistory";
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { profile, isLoading: contextLoading, refetchProfile } = useCircleContext();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -201,6 +201,17 @@ const Settings = () => {
 
       <SubscriptionCard />
       <ReceiptHistory />
+
+      <div className="mt-6 pb-24">
+        <Button
+          variant="outline"
+          onClick={async () => { await signOut(); navigate("/"); }}
+          className="w-full text-destructive hover:text-destructive border-destructive/30"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign Out
+        </Button>
+      </div>
     </main>
   );
 };

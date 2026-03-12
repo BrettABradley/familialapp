@@ -1,29 +1,25 @@
 
 
-## Add Sign Out Button to Settings Page
+## Plan: Add Blog placeholder page and link from footer
 
-**Problem**: On mobile, there's no way to sign out — the desktop nav has a Sign Out button, but the mobile bottom nav and Settings page don't.
+### Changes
 
-**Fix**: Add a Sign Out button at the bottom of the Settings page, after the ReceiptHistory section. This is the natural place mobile users would look.
+#### 1. Create `src/pages/Blog.tsx`
+- Same layout as About/Careers pages (Header + Footer, prose styling)
+- Title: "Blog"
+- Placeholder message: "Coming soon — stories, updates, and tips for staying connected as a family."
+- Optional: brief note that posts are on the way
 
-### Implementation
+#### 2. Update `src/App.tsx`
+- Import Blog and add `/blog` as a public route
 
-**File: `src/pages/Settings.tsx`**
-- Import `LogOut` from lucide-react
-- Import `useAuth` is already there — use `signOut` from the auth hook (need to destructure it)
-- Add a destructive-styled Sign Out button after `<ReceiptHistory />`, before closing `</main>`
-- Add a small separator/spacer before it for visual clarity
+#### 3. Update `src/components/landing/Footer.tsx`
+- Change the Blog `<a href="#">` to `<Link to="/blog">`
 
-```tsx
-<div className="mt-6 pb-24">
-  <Button variant="outline" onClick={handleSignOut} className="w-full text-destructive hover:text-destructive">
-    <LogOut className="w-4 h-4 mr-2" />
-    Sign Out
-  </Button>
-</div>
-```
+### Files to create
+- `src/pages/Blog.tsx`
 
-The `handleSignOut` function will call `signOut()` from the auth context and navigate to `/`. The `pb-24` ensures it's not hidden behind the mobile bottom nav.
-
-**Single file change, no backend changes needed.**
+### Files to modify
+- `src/App.tsx` (add route)
+- `src/components/landing/Footer.tsx` (Blog link ~line 72)
 
