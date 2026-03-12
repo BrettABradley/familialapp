@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Camera, Save, ArrowLeft } from "lucide-react";
+import { Camera, Save, ArrowLeft, LogOut } from "lucide-react";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import SubscriptionCard from "@/components/settings/SubscriptionCard";
