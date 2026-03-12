@@ -133,6 +133,7 @@ const Feed = () => {
               isOwnPost={post.author_id === user?.id}
               isCircleAdmin={adminStatus}
               currentUserId={user?.id}
+              circleMembers={circleMembers}
               onReaction={handleReaction}
               onToggleComments={toggleComments}
               onCommentInputChange={(postId, value) => setCommentInputs(prev => ({ ...prev, [postId]: value }))}
