@@ -1,65 +1,55 @@
 
 
-## Create Push Notification Edge Function for APNs
+## Push Notifications via Expo Push (No Apple Secrets Needed)
 
-### Overview
-Build a backend function that your mobile app can call to send Apple Push Notifications, plus a table to store device push tokens. Your mobile app authenticates with its user JWT — no service role key needed.
+### Why Expo Push
+Expo's push service is a free proxy that handles APNs/FCM for you. Your edge function sends a simple HTTP POST to `https://exp.host/--/api/v2/push/send` with the Expo push token — no `.p8` keys, no Key ID, no Team ID required. Expo manages the APNs connection on their end.
 
-### Required Secrets
-Before implementation, you'll need to add these secrets via Lovable Cloud → Secrets:
-- **APNS_KEY_ID** — Your APNs Key ID (from Apple Developer → Keys)
-- **APNS_TEAM_ID** — Your Apple Developer Team ID
-- **APNS_BUNDLE_ID** — Your app's bundle identifier (e.g., `com.familial.app`)
-- **APNS_AUTH_KEY_P8** — The contents of your `.p8` private key file (paste the full text including `-----BEGIN PRIVATE KEY-----`)
+### No Secrets Required
+- Expo push tokens look like `ExponentPushToken[xxxx]`
+- The Expo push API is **unauthenticated** for basic usage (no API key needed)
+- Zero Apple Developer credentials needed on the server side
 
 ### Database Changes
 
 **New table: `push_tokens`**
 - `id` (uuid, PK)
-- `user_id` (uuid, not null) — references the authenticated user
-- `device_token` (text, not null) — the APNs device token
-- `platform` (text, default `'ios'`)
-- `created_at` (timestamptz)
-- Unique constraint on `(user_id, device_token)`
-- RLS: users can insert/update/delete/select their own tokens only
+- `user_id` (uuid, not null)
+- `expo_token` (text, not null) — the Expo push token
+- `created_at` (timestamptz, default now())
+- Unique constraint on `(user_id, expo_token)`
+- RLS: users can insert/select/delete their own tokens only
 
 ### Edge Functions
 
-**1. `register-push-token`** — Mobile app calls this after obtaining an APNs device token
-- Authenticates via JWT (`getClaims`)
-- Upserts the device token into `push_tokens`
+**1. `register-push-token`**
+- Mobile app calls with user JWT after getting Expo push token
+- Upserts token into `push_tokens`
 
-**2. `send-push-notification`** — Called by database triggers or other edge functions (server-to-server) when a notification is created
-- Uses `SUPABASE_SERVICE_ROLE_KEY` to query `push_tokens` for the target user
-- Signs and sends the push via APNs HTTP/2 API using the `.p8` key
-- Triggered by a database trigger on the `notifications` table (INSERT)
+**2. `send-push-notification`**
+- Triggered by a database trigger on `notifications` INSERT
+- Uses service role key to look up target user's Expo tokens
+- POSTs to `https://exp.host/--/api/v2/push/send` with title, body, data
+- No secrets needed for the Expo API call
 
 ### Architecture
-
 ```text
-Mobile App                    Lovable Cloud
-───────────                   ────────────
-Register token ──JWT──→  register-push-token
-                              ↓ upserts push_tokens
+Mobile App (Expo)              Lovable Cloud
+─────────────────              ────────────
+getExpoPushTokenAsync()
+  → register-push-token ──→ [push_tokens table]
 
 DB trigger (notification INSERT)
-              ──→  send-push-notification
-                      ↓ reads push_tokens
-                      ↓ signs JWT for APNs
-                      ↓ sends to APNs HTTP/2
+  → send-push-notification
+      → reads push_tokens
+      → POST to exp.host/--/api/v2/push/send
+      → Push delivered via APNs/FCM automatically
 ```
 
-### Key Details
-- The mobile app only needs its user JWT to register tokens — no service role key
-- Push sending happens server-side via a database webhook/trigger on `notifications` INSERT
-- APNs authentication uses the token-based (`.p8` key) method, not certificates
-- The edge function constructs a short-lived JWT signed with the `.p8` key for each APNs request
-
 ### Steps
-1. Add the 4 APNs secrets
-2. Create `push_tokens` table with RLS
-3. Create `register-push-token` edge function
-4. Create `send-push-notification` edge function
-5. Add `supabase/config.toml` entries for both functions
-6. Set up a database webhook on `notifications` INSERT to invoke `send-push-notification`
+1. Create `push_tokens` table with RLS
+2. Create `register-push-token` edge function
+3. Create `send-push-notification` edge function
+4. Add config.toml entries for both functions
+5. Add database trigger on `notifications` INSERT to call `send-push-notification`
 
