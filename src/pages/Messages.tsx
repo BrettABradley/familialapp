@@ -575,24 +575,26 @@ const Messages = () => {
   };
 
   const renderMessageInput = () => (
-    <div className="border-t border-border pt-2 space-y-2">
+    <div className="border-t border-border pt-2 space-y-1">
       {renderFilePreviewBar()}
       {renderUploadProgress()}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.heic,.heif" multiple onChange={handleFileSelect} className="hidden" />
-        <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isSending} className="flex-shrink-0">
+        <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isSending} className="flex-shrink-0 h-9 w-9">
           <Paperclip className="w-4 h-4" />
         </Button>
-        <VoiceRecorder onRecordingComplete={handleVoiceRecording} />
+        <div className="flex-shrink-0">
+          <VoiceRecorder onRecordingComplete={handleVoiceRecording} />
+        </div>
         <Input
           placeholder="Type a message..."
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
           maxLength={5000}
-          className="flex-1"
+          className="flex-1 h-9"
         />
-        <Button onClick={handleSendMessage} disabled={(!newMessage.trim() && selectedFiles.length === 0) || isSending} className="flex-shrink-0">
+        <Button onClick={handleSendMessage} disabled={(!newMessage.trim() && selectedFiles.length === 0) || isSending} size="icon" className="flex-shrink-0 h-9 w-9">
           <Send className="w-4 h-4" />
         </Button>
       </div>
