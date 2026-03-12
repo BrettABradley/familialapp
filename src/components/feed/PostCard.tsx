@@ -395,7 +395,7 @@ export const PostCard = ({
                     </AlertDialog>
                   )}
                 </div>
-                <p className="text-sm text-foreground">{comment.content}</p>
+                <p className="text-sm text-foreground"><LinkifiedText text={comment.content} members={circleMembers} /></p>
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-xs text-muted-foreground">{new Date(comment.created_at).toLocaleDateString()}</p>
                   <button
