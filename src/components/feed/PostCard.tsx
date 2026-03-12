@@ -251,7 +251,7 @@ export const PostCard = ({
           </div>
         ) : post.content ? (
           <p className="text-foreground whitespace-pre-wrap mb-4">
-            <LinkifiedText text={post.content} />
+            <LinkifiedText text={post.content} members={circleMembers} />
           </p>
         ) : null}
 
