@@ -201,6 +201,17 @@ const Settings = () => {
 
       <SubscriptionCard />
       <ReceiptHistory />
+
+      <div className="mt-6 pb-24">
+        <Button
+          variant="outline"
+          onClick={async () => { await signOut(); navigate("/"); }}
+          className="w-full text-destructive hover:text-destructive border-destructive/30"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign Out
+        </Button>
+      </div>
     </main>
   );
 };
