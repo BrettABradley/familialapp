@@ -490,8 +490,8 @@ const Messages = () => {
         sender_id: user.id,
         recipient_id: selectedUser.user_id,
         content: newMessage.trim() || "",
-        media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
-      } as any);
+        media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+      });
       if (error) {
         toast({ title: "Error", description: "Failed to send message.", variant: "destructive" });
       } else {
@@ -505,8 +505,8 @@ const Messages = () => {
         group_chat_id: selectedGroup.id,
         sender_id: user.id,
         content: newMessage.trim() || "",
-        media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
-      } as any);
+        media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+      });
       if (error) {
         toast({ title: "Error", description: "Failed to send message.", variant: "destructive" });
       } else {
