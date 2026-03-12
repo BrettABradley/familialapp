@@ -15,6 +15,7 @@ const Feed = () => {
   const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly, isCircleAdmin } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
   const adminStatus = isCircleAdmin(selectedCircle);
+  const circleMembers = useCircleMembers();
   const [searchParams] = useSearchParams();
   const highlightPostId = searchParams.get("post");
   const scrolledRef = useRef(false);
