@@ -1,25 +1,25 @@
 
 
-## Make @Mentions Clickable Profile Links
-
-**Problem**: When a user @mentions someone in a post or comment, the name appears as plain text with no link to their profile.
-
-**Solution**: Enhance `LinkifiedText` to detect `@Name` patterns and render them as clickable links to `/profile/:userId`. Since `LinkifiedText` is a shared component, we'll pass in an optional members list to resolve names to user IDs.
+## Plan: Add Blog placeholder page and link from footer
 
 ### Changes
 
-**`src/components/shared/LinkifiedText.tsx`**
-- Add an optional `members` prop: `Array<{ user_id: string; display_name: string | null }>`
-- After splitting by URL regex, further split text segments by `@mention` pattern (`@(\w[\w\s]*?)(?=\s@|\s|$)` or similar)
-- When a mention matches a member's `display_name`, render as `<Link to={/profile/${userId}}>@Name</Link>` styled with `text-primary font-medium`
-- Non-matching `@` text stays as plain text
+#### 1. Create `src/pages/Blog.tsx`
+- Same layout as About/Careers pages (Header + Footer, prose styling)
+- Title: "Blog"
+- Placeholder message: "Coming soon — stories, updates, and tips for staying connected as a family."
+- Optional: brief note that posts are on the way
 
-**`src/components/feed/PostCard.tsx`**
-- Import and use `useCircleMembers` hook
-- Pass `members` to all `<LinkifiedText>` instances (post content on ~line 247 and comment content on ~line 391)
+#### 2. Update `src/App.tsx`
+- Import Blog and add `/blog` as a public route
 
-**`src/components/feed/CreatePostForm.tsx`** — no changes needed (already uses MentionInput for composing)
+#### 3. Update `src/components/landing/Footer.tsx`
+- Change the Blog `<a href="#">` to `<Link to="/blog">`
 
-### Profile route
-Already exists: `/profile/:userId` → `ProfileView` component. No routing changes needed.
+### Files to create
+- `src/pages/Blog.tsx`
+
+### Files to modify
+- `src/App.tsx` (add route)
+- `src/components/landing/Footer.tsx` (Blog link ~line 72)
 

@@ -9,11 +9,13 @@ import { useFeedPosts } from "@/hooks/useFeedPosts";
 import { CreatePostForm } from "@/components/feed/CreatePostForm";
 import { PostCard } from "@/components/feed/PostCard";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
+import { useCircleMembers } from "@/hooks/useCircleMembers";
 
 const Feed = () => {
   const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly, isCircleAdmin } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
   const adminStatus = isCircleAdmin(selectedCircle);
+  const circleMembers = useCircleMembers();
   const [searchParams] = useSearchParams();
   const highlightPostId = searchParams.get("post");
   const scrolledRef = useRef(false);
@@ -131,6 +133,7 @@ const Feed = () => {
               isOwnPost={post.author_id === user?.id}
               isCircleAdmin={adminStatus}
               currentUserId={user?.id}
+              circleMembers={circleMembers}
               onReaction={handleReaction}
               onToggleComments={toggleComments}
               onCommentInputChange={(postId, value) => setCommentInputs(prev => ({ ...prev, [postId]: value }))}
