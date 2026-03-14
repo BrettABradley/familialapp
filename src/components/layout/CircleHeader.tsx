@@ -202,7 +202,7 @@ export function CircleHeader({
   );
 
   return (
-    <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+    <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border pt-[env(safe-area-inset-top)]">
       <div className="w-full px-4 py-3 flex items-center relative">
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-2">
