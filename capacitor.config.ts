@@ -4,10 +4,6 @@ const config: CapacitorConfig = {
   appId: 'app.lovable.f745440093af4f4390a60d52ff08c778',
   appName: 'familialapp',
   webDir: 'dist',
-  server: {
-    url: 'https://f7454400-93af-4f43-90a6-0d52ff08c778.lovableproject.com?forceHideBadge=true',
-    cleartext: true
-  }
 };
 
 export default config;
