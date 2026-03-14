@@ -1,25 +1,22 @@
 
 
-## Plan: Add Blog placeholder page and link from footer
+## Add iOS Dependency for Capacitor
 
-### Changes
+### Current State
+- `@capacitor/core`, `@capacitor/cli`, and `@capacitor/android` are already installed
+- `capacitor.config.ts` is already configured
+- **Missing**: `@capacitor/ios`
 
-#### 1. Create `src/pages/Blog.tsx`
-- Same layout as About/Careers pages (Header + Footer, prose styling)
-- Title: "Blog"
-- Placeholder message: "Coming soon — stories, updates, and tips for staying connected as a family."
-- Optional: brief note that posts are on the way
+### Change
+**`package.json`** — Add `@capacitor/ios: "^8.2.0"` to dependencies.
 
-#### 2. Update `src/App.tsx`
-- Import Blog and add `/blog` as a public route
+That's the only code change needed. After this, your local steps are:
 
-#### 3. Update `src/components/landing/Footer.tsx`
-- Change the Blog `<a href="#">` to `<Link to="/blog">`
+1. Export to GitHub, git pull locally
+2. `npm install`
+3. `npx cap add ios` and `npx cap add android`
+4. `npm run build && npx cap sync`
+5. `npx cap open ios` (opens Xcode) / `npx cap open android` (opens Android Studio)
 
-### Files to create
-- `src/pages/Blog.tsx`
-
-### Files to modify
-- `src/App.tsx` (add route)
-- `src/components/landing/Footer.tsx` (Blog link ~line 72)
+**Production reminder**: Before submitting to the App Store or Play Store, remove the `server` block from `capacitor.config.ts` so the app uses bundled local files instead of the live preview URL.
 
