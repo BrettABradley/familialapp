@@ -1,31 +1,25 @@
 
 
-## Fix: iOS App Loading Lovable Login Instead of Your App
+## Plan: Add Blog placeholder page and link from footer
 
-The issue is that `capacitor.config.ts` has a `server.url` pointing to the Lovable preview URL, which requires Lovable editor authentication — that's why you see the Lovable login page instead of your Familial app.
+### Changes
 
-### Plan
+#### 1. Create `src/pages/Blog.tsx`
+- Same layout as About/Careers pages (Header + Footer, prose styling)
+- Title: "Blog"
+- Placeholder message: "Coming soon — stories, updates, and tips for staying connected as a family."
+- Optional: brief note that posts are on the way
 
-**1. Update `capacitor.config.ts`** — Remove the `server` block entirely so the app loads from bundled local files:
+#### 2. Update `src/App.tsx`
+- Import Blog and add `/blog` as a public route
 
-```typescript
-const config: CapacitorConfig = {
-  appId: 'app.lovable.f745440093af4f4390a60d52ff08c778',
-  appName: 'familialapp',
-  webDir: 'dist',
-};
-```
+#### 3. Update `src/components/landing/Footer.tsx`
+- Change the Blog `<a href="#">` to `<Link to="/blog">`
 
-**2. After the change**, you'll need to run these commands in your local terminal:
+### Files to create
+- `src/pages/Blog.tsx`
 
-```bash
-git pull
-npm run build
-npx cap sync
-npx cap open ios
-```
-
-Then hit Play ▶ in Xcode — you should see your actual Familial landing page instead of the Lovable login.
-
-> **Note**: With this approach, after making changes in Lovable you'll need to `git pull && npm run build && npx cap sync` to see updates in the simulator. This is more reliable than the live URL approach which caused the redirect issue.
+### Files to modify
+- `src/App.tsx` (add route)
+- `src/components/landing/Footer.tsx` (Blog link ~line 72)
 
