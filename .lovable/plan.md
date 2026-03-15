@@ -1,15 +1,25 @@
 
 
-## Update Bundle ID in `capacitor.config.ts`
+## Plan: Add Blog placeholder page and link from footer
 
-**What changes:**
-Update the `appId` in `capacitor.config.ts` from the Lovable default (`app.lovable.f745440093af4f4390a60d52ff08c778`) to your real bundle ID: `com.familialmedia.familial`.
+### Changes
 
-**After I make the change, here's what you do:**
+#### 1. Create `src/pages/Blog.tsx`
+- Same layout as About/Careers pages (Header + Footer, prose styling)
+- Title: "Blog"
+- Placeholder message: "Coming soon — stories, updates, and tips for staying connected as a family."
+- Optional: brief note that posts are on the way
 
-1. **Pull the latest code** from GitHub (Settings > GitHub if not connected yet)
-2. Run `npm install` then `npx cap sync ios` to sync the updated config to your Xcode project
-3. In Xcode, verify the Bundle Identifier now shows `com.familialmedia.familial` under **Signing & Capabilities**
-4. Connect your iPhone via USB, make sure signing works (green checkmark)
-5. **Product > Archive** → **Distribute App** → **App Store Connect** → **Upload**
+#### 2. Update `src/App.tsx`
+- Import Blog and add `/blog` as a public route
+
+#### 3. Update `src/components/landing/Footer.tsx`
+- Change the Blog `<a href="#">` to `<Link to="/blog">`
+
+### Files to create
+- `src/pages/Blog.tsx`
+
+### Files to modify
+- `src/App.tsx` (add route)
+- `src/components/landing/Footer.tsx` (Blog link ~line 72)
 

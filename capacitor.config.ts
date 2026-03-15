@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.f745440093af4f4390a60d52ff08c778',
+  appId: 'com.familialmedia.familial',
   appName: 'familialapp',
   webDir: 'dist',
 };
