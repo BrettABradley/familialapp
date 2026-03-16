@@ -525,37 +525,66 @@ const Messages = () => {
     if (selectedFiles.length > 0) mediaUrls = await uploadFiles();
 
     if (chatView === "dm" && selectedUser) {
-      const { error } = await supabase.from("private_messages").insert({
+      // Optimistic: append message locally immediately
+      const optimisticMsg: Message = {
+        id: crypto.randomUUID(),
         sender_id: senderId,
         recipient_id: selectedUser.user_id,
         content: newMessage.trim() || "(attachment)",
+        is_read: false,
+        created_at: new Date().toISOString(),
+        media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
+      };
+      const savedContent = newMessage;
+      setMessages(prev => [...prev, optimisticMsg]);
+      clearDraft();
+      setNewMessage("");
+      clearMediaState();
+
+      const { error } = await supabase.from("private_messages").insert({
+        sender_id: senderId,
+        recipient_id: selectedUser.user_id,
+        content: savedContent.trim() || "(attachment)",
         media_urls: mediaUrls.length > 0 ? mediaUrls : null,
       });
       if (error) {
         console.error("DM send error:", JSON.stringify(error));
+        // Revert optimistic update
+        setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+        setNewMessage(savedContent);
         toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
       } else {
-        clearDraft();
-        setNewMessage("");
-        clearMediaState();
-        fetchMessages();
+        // Silent background sync
         fetchConversations();
       }
     } else if (chatView === "group" && selectedGroup) {
-      const { error } = await supabase.from("group_chat_messages").insert({
+      // Optimistic: append message locally immediately
+      const optimisticMsg: GroupMessage = {
+        id: crypto.randomUUID(),
         group_chat_id: selectedGroup.id,
         sender_id: senderId,
         content: newMessage.trim() || "(attachment)",
+        created_at: new Date().toISOString(),
+        media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
+      };
+      const savedContent = newMessage;
+      setGroupMessages(prev => [...prev, optimisticMsg]);
+      clearDraft();
+      setNewMessage("");
+      clearMediaState();
+
+      const { error } = await supabase.from("group_chat_messages").insert({
+        group_chat_id: selectedGroup.id,
+        sender_id: senderId,
+        content: savedContent.trim() || "(attachment)",
         media_urls: mediaUrls.length > 0 ? mediaUrls : null,
       });
       if (error) {
         console.error("Group send error:", JSON.stringify(error));
+        // Revert optimistic update
+        setGroupMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+        setNewMessage(savedContent);
         toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
-      } else {
-        clearDraft();
-        setNewMessage("");
-        clearMediaState();
-        fetchGroupMessages();
       }
     }
 
