@@ -822,7 +822,7 @@ const Messages = () => {
         </div>
       </div>
     );
-    return createPortal(groupView, document.body);
+    return isMobile ? createPortal(groupView, document.body) : groupView;
   }
 
   // Conversations List
