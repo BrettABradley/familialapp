@@ -190,7 +190,7 @@ const Auth = () => {
             {isForgotPassword
               ? "Enter your email and we'll send you a reset link"
               : isLogin
-              ? "Sign in to connect with your family"
+              ? "Sign in or sign up to connect with your family"
               : "Create an account to start your family circle"}
           </CardDescription>
           {planParam && PLAN_PRICES[planParam] && (
