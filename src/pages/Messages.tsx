@@ -724,7 +724,7 @@ const Messages = () => {
           )}
           <div ref={messagesEndRef} />
         </div>
-        <div className="p-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }}>
+        <div className="flex-shrink-0 p-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }}>
           {readOnly ? (
             <p className="text-sm text-muted-foreground text-center py-2">This circle is read-only. Messaging is disabled.</p>
           ) : (
