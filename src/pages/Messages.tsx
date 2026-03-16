@@ -218,7 +218,7 @@ const Messages = () => {
 
   const fetchConversations = async () => {
     if (!user || !selectedCircle) return;
-    setIsLoadingConversations(true);
+    if (conversations.length === 0) setIsLoadingConversations(true);
 
     // Get member IDs for this circle
     const { data: memberships } = await supabase.from("circle_memberships").select("user_id").eq("circle_id", selectedCircle);
