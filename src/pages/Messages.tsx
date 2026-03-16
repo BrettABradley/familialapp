@@ -158,11 +158,11 @@ const Messages = () => {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'private_messages' }, (payload) => {
         const newMsg = payload.new as Message;
         if (newMsg.sender_id !== user.id && newMsg.recipient_id !== user.id) return;
+        // Skip messages sent by current user — already handled optimistically
+        if (newMsg.sender_id === user.id) return;
         if (selectedUser && (newMsg.sender_id === selectedUser.user_id || newMsg.recipient_id === selectedUser.user_id)) {
           setMessages(prev => [...prev, newMsg]);
-          if (newMsg.recipient_id === user.id) {
-            supabase.from("private_messages").update({ is_read: true }).eq("id", newMsg.id).then();
-          }
+          supabase.from("private_messages").update({ is_read: true }).eq("id", newMsg.id).then();
         }
         fetchConversations();
       })
