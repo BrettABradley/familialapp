@@ -698,8 +698,8 @@ const Messages = () => {
   // Chat view (DM or Group)
   if (chatView === "dm" && selectedUser) {
     const dmView = (
-      <div className="fixed inset-0 z-[60] bg-background flex flex-col md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]">
-        <div className="flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' }}>
+      <div className="fixed inset-0 z-[60] bg-background flex flex-col overflow-hidden md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]">
+        <div className="flex-shrink-0 flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' }}>
           <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
           <Link to={`/profile/${selectedUser.user_id}`}>
             <Avatar><AvatarImage src={selectedUser.avatar_url || undefined} /><AvatarFallback>{selectedUser.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback></Avatar>
@@ -708,7 +708,7 @@ const Messages = () => {
             <h2 className="font-serif text-xl font-bold text-foreground">{selectedUser.display_name || "Unknown"}</h2>
           </Link>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4" onTouchMove={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}>
           {messages.length === 0 ? (
             <div className="text-center py-12"><MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><p className="text-muted-foreground">Start a conversation with {selectedUser.display_name}</p></div>
           ) : (
@@ -724,7 +724,7 @@ const Messages = () => {
           )}
           <div ref={messagesEndRef} />
         </div>
-        <div className="p-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }}>
+        <div className="flex-shrink-0 p-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }}>
           {readOnly ? (
             <p className="text-sm text-muted-foreground text-center py-2">This circle is read-only. Messaging is disabled.</p>
           ) : (
@@ -738,8 +738,8 @@ const Messages = () => {
 
   if (chatView === "group" && selectedGroup) {
     const groupView = (
-      <div className="fixed inset-0 z-[60] bg-background flex flex-col md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]">
-        <div className="flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' }}>
+      <div className="fixed inset-0 z-[60] bg-background flex flex-col overflow-hidden md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]">
+        <div className="flex-shrink-0 flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' }}>
           <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
           <div className="relative group cursor-pointer">
             {selectedGroup.avatar_url ? (
@@ -811,7 +811,7 @@ const Messages = () => {
           </DialogContent>
         </Dialog>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4" onTouchMove={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}>
           {groupMessages.length === 0 ? (
             <div className="text-center py-12"><MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><p className="text-muted-foreground">Start the group conversation</p></div>
           ) : (
@@ -834,7 +834,7 @@ const Messages = () => {
           )}
           <div ref={messagesEndRef} />
         </div>
-        <div className="p-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }}>
+        <div className="flex-shrink-0 p-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }}>
           {readOnly ? (
             <p className="text-sm text-muted-foreground text-center py-2">This circle is read-only. Messaging is disabled.</p>
           ) : (
