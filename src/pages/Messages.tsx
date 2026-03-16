@@ -187,7 +187,7 @@ const Messages = () => {
   }, [selectedUser]);
 
   useEffect(() => {
-    if (selectedGroup) { fetchGroupMessages(); setChatView("group"); }
+    if (selectedGroup) { fetchGroupMessages(); setChatView("group"); restoreDraft("group", selectedGroup.id); }
   }, [selectedGroup]);
 
   useEffect(() => {

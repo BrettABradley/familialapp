@@ -30,7 +30,29 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
 
   const circleMembers = useCircleMembers();
 
-  const [newPostContent, setNewPostContent] = useState("");
+  const [newPostContent, setNewPostContent] = useState(() => {
+    if (selectedCircle) {
+      return sessionStorage.getItem(`draft-feed-${selectedCircle}`) || "";
+    }
+    return "";
+  });
+
+  // Persist feed draft to sessionStorage
+  const updatePostContent = (val: string) => {
+    setNewPostContent(val);
+    if (selectedCircle) {
+      if (val.trim()) sessionStorage.setItem(`draft-feed-${selectedCircle}`, val);
+      else sessionStorage.removeItem(`draft-feed-${selectedCircle}`);
+    }
+  };
+
+  // Restore draft when circle changes
+  useEffect(() => {
+    if (selectedCircle) {
+      const saved = sessionStorage.getItem(`draft-feed-${selectedCircle}`);
+      setNewPostContent(saved || "");
+    }
+  }, [selectedCircle]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isPosting, setIsPosting] = useState(false);
