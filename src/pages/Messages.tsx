@@ -542,13 +542,13 @@ const Messages = () => {
     } else if (chatView === "group" && selectedGroup) {
       const { error } = await supabase.from("group_chat_messages").insert({
         group_chat_id: selectedGroup.id,
-        sender_id: user.id,
-        content: newMessage.trim() || "",
+        sender_id: senderId,
+        content: newMessage.trim() || "(attachment)",
         media_urls: mediaUrls.length > 0 ? mediaUrls : null,
       });
       if (error) {
         console.error("Group send error:", JSON.stringify(error));
-        toast({ title: "Error", description: error.message || "Failed to send message.", variant: "destructive" });
+        toast({ title: "Error", description: error.details || error.message || "Failed to send message.", variant: "destructive" });
       } else {
         clearDraft();
         setNewMessage("");
