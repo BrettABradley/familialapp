@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { supabase } from "@/integrations/supabase/client";
