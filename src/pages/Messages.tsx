@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Link } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -74,6 +75,7 @@ type ChatView = "list" | "dm" | "group";
 
 const Messages = () => {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
@@ -531,7 +533,7 @@ const Messages = () => {
       });
       if (error) {
         console.error("DM send error:", JSON.stringify(error));
-        toast({ title: "Error", description: error.details || error.message || "Failed to send message.", variant: "destructive" });
+        toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
       } else {
         clearDraft();
         setNewMessage("");
@@ -548,7 +550,7 @@ const Messages = () => {
       });
       if (error) {
         console.error("Group send error:", JSON.stringify(error));
-        toast({ title: "Error", description: error.details || error.message || "Failed to send message.", variant: "destructive" });
+        toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
       } else {
         clearDraft();
         setNewMessage("");
@@ -711,7 +713,7 @@ const Messages = () => {
         </div>
       </div>
     );
-    return createPortal(dmView, document.body);
+    return isMobile ? createPortal(dmView, document.body) : dmView;
   }
 
   if (chatView === "group" && selectedGroup) {
@@ -821,7 +823,7 @@ const Messages = () => {
         </div>
       </div>
     );
-    return createPortal(groupView, document.body);
+    return isMobile ? createPortal(groupView, document.body) : groupView;
   }
 
   // Conversations List
