@@ -679,6 +679,17 @@ const Messages = () => {
 
   const showMemberList = isSearchFocused && filteredMembers.length > 0;
 
+  // Render active chat views BEFORE loading gate so they don't unmount during background refreshes
+  if (chatView === "dm" && selectedUser) {
+    const dmView = renderDmView();
+    return dmView;
+  }
+
+  if (chatView === "group" && selectedGroup) {
+    const groupView = renderGroupView();
+    return groupView;
+  }
+
   if (contextLoading || isLoadingConversations) {
     return (
       <main className="container mx-auto px-4 py-8 max-w-2xl">
