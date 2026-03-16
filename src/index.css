@@ -144,6 +144,11 @@
   }
 }
 
+/* Sonner toast safe area for iOS notch/Dynamic Island */
+[data-sonner-toaster] {
+  top: env(safe-area-inset-top, 0px) !important;
+}
+
 @layer utilities {
   .font-serif {
     font-family: var(--font-serif);
