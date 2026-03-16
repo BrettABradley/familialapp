@@ -664,7 +664,7 @@ const Messages = () => {
 
   // Chat view (DM or Group)
   if (chatView === "dm" && selectedUser) {
-    return (
+    const dmView = (
       <div className="fixed inset-0 z-[60] bg-background flex flex-col md:relative md:z-auto md:inset-auto">
         <div className="flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' }}>
           <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
@@ -700,6 +700,7 @@ const Messages = () => {
         </div>
       </div>
     );
+    return createPortal(dmView, document.body);
   }
 
   if (chatView === "group" && selectedGroup) {
