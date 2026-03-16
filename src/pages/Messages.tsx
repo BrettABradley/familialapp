@@ -532,7 +532,7 @@ const Messages = () => {
       });
       if (error) {
         console.error("DM send error:", JSON.stringify(error));
-        toast({ title: "Error", description: error.details || error.message || "Failed to send message.", variant: "destructive" });
+        toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
       } else {
         clearDraft();
         setNewMessage("");
