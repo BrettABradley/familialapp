@@ -708,7 +708,7 @@ const Messages = () => {
             <h2 className="font-serif text-xl font-bold text-foreground">{selectedUser.display_name || "Unknown"}</h2>
           </Link>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4" onTouchMove={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}>
           {messages.length === 0 ? (
             <div className="text-center py-12"><MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><p className="text-muted-foreground">Start a conversation with {selectedUser.display_name}</p></div>
           ) : (
