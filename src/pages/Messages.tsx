@@ -183,7 +183,7 @@ const Messages = () => {
   }, [user, selectedGroup]);
 
   useEffect(() => {
-    if (selectedUser) { fetchMessages(); markAsRead(); setChatView("dm"); }
+    if (selectedUser) { fetchMessages(); markAsRead(); setChatView("dm"); restoreDraft("dm", selectedUser.user_id); }
   }, [selectedUser]);
 
   useEffect(() => {
