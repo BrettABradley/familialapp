@@ -739,7 +739,7 @@ const Messages = () => {
   if (chatView === "group" && selectedGroup) {
     const groupView = (
       <div className="fixed inset-0 z-[60] bg-background flex flex-col overflow-hidden md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]">
-        <div className="flex-shrink-0 flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' }}>
+        <div className="flex-shrink-0 flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}>
           <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
           <div className="relative group cursor-pointer">
             {selectedGroup.avatar_url ? (
