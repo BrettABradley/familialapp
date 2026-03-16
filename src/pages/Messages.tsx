@@ -82,6 +82,33 @@ const Messages = () => {
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  
+  // Draft persistence helpers
+  const getDraftKey = () => {
+    if (chatView === "dm" && selectedUser) return `draft-dm-${selectedUser.user_id}`;
+    if (chatView === "group" && selectedGroup) return `draft-group-${selectedGroup.id}`;
+    return null;
+  };
+
+  const saveNewMessage = (val: string) => {
+    setNewMessage(val);
+    const key = getDraftKey();
+    if (key) {
+      if (val.trim()) sessionStorage.setItem(key, val);
+      else sessionStorage.removeItem(key);
+    }
+  };
+
+  const restoreDraft = (type: "dm" | "group", id: string) => {
+    const key = type === "dm" ? `draft-dm-${id}` : `draft-group-${id}`;
+    const saved = sessionStorage.getItem(key);
+    setNewMessage(saved || "");
+  };
+
+  const clearDraft = () => {
+    const key = getDraftKey();
+    if (key) sessionStorage.removeItem(key);
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [circleMembers, setCircleMembers] = useState<Profile[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -156,11 +183,11 @@ const Messages = () => {
   }, [user, selectedGroup]);
 
   useEffect(() => {
-    if (selectedUser) { fetchMessages(); markAsRead(); setChatView("dm"); }
+    if (selectedUser) { fetchMessages(); markAsRead(); setChatView("dm"); restoreDraft("dm", selectedUser.user_id); }
   }, [selectedUser]);
 
   useEffect(() => {
-    if (selectedGroup) { fetchGroupMessages(); setChatView("group"); }
+    if (selectedGroup) { fetchGroupMessages(); setChatView("group"); restoreDraft("group", selectedGroup.id); }
   }, [selectedGroup]);
 
   useEffect(() => {
@@ -495,6 +522,7 @@ const Messages = () => {
       if (error) {
         toast({ title: "Error", description: "Failed to send message.", variant: "destructive" });
       } else {
+        clearDraft();
         setNewMessage("");
         clearMediaState();
         fetchMessages();
@@ -510,6 +538,7 @@ const Messages = () => {
       if (error) {
         toast({ title: "Error", description: "Failed to send message.", variant: "destructive" });
       } else {
+        clearDraft();
         setNewMessage("");
         clearMediaState();
         fetchGroupMessages();
@@ -589,7 +618,7 @@ const Messages = () => {
         <Input
           placeholder="Type a message..."
           value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
+          onChange={(e) => saveNewMessage(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
           maxLength={5000}
           className="flex-1 h-9"
@@ -635,7 +664,7 @@ const Messages = () => {
   // Chat view (DM or Group)
   if (chatView === "dm" && selectedUser) {
     return (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col md:relative md:z-auto md:inset-auto">
+      <div className="fixed inset-0 z-[60] bg-background flex flex-col md:relative md:z-auto md:inset-auto">
         <div className="flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' }}>
           <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
           <Link to={`/profile/${selectedUser.user_id}`}>
@@ -674,7 +703,7 @@ const Messages = () => {
 
   if (chatView === "group" && selectedGroup) {
     return (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col md:relative md:z-auto md:inset-auto">
+      <div className="fixed inset-0 z-[60] bg-background flex flex-col md:relative md:z-auto md:inset-auto">
         <div className="flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' }}>
           <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
           <div className="relative group cursor-pointer">

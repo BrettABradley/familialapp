@@ -258,7 +258,7 @@ export function CircleHeader({
         </div>
         {/* Mobile: fridge pin + bell */}
         {showNav && !overrideLabel && isMobile && (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 ml-auto">
             <Link to="/fridge">
               <Button variant="ghost" size="sm">
                 <Pin className="w-4 h-4" />

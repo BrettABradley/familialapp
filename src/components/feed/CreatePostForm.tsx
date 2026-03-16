@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,7 +30,29 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
 
   const circleMembers = useCircleMembers();
 
-  const [newPostContent, setNewPostContent] = useState("");
+  const [newPostContent, setNewPostContent] = useState(() => {
+    if (selectedCircle) {
+      return sessionStorage.getItem(`draft-feed-${selectedCircle}`) || "";
+    }
+    return "";
+  });
+
+  // Persist feed draft to sessionStorage
+  const updatePostContent = (val: string) => {
+    setNewPostContent(val);
+    if (selectedCircle) {
+      if (val.trim()) sessionStorage.setItem(`draft-feed-${selectedCircle}`, val);
+      else sessionStorage.removeItem(`draft-feed-${selectedCircle}`);
+    }
+  };
+
+  // Restore draft when circle changes
+  useEffect(() => {
+    if (selectedCircle) {
+      const saved = sessionStorage.getItem(`draft-feed-${selectedCircle}`);
+      setNewPostContent(saved || "");
+    }
+  }, [selectedCircle]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isPosting, setIsPosting] = useState(false);
@@ -110,6 +132,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     if (error) {
       toast({ title: "Error", description: "Failed to create post.", variant: "destructive" });
     } else {
+      if (selectedCircle) sessionStorage.removeItem(`draft-feed-${selectedCircle}`);
       setNewPostContent("");
       setSelectedFiles([]);
       previewUrls.forEach(url => URL.revokeObjectURL(url));
@@ -218,7 +241,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
           <MentionInput
             placeholder="What's happening with the family? Use @ to tag someone"
             value={newPostContent}
-            onChange={(val) => setNewPostContent(val)}
+            onChange={(val) => updatePostContent(val)}
             members={circleMembers}
             onMentionsChange={setMentionedUserIds}
             className="min-h-[100px] resize-none pb-10"
@@ -231,7 +254,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
               size="sm"
               className="absolute bottom-2 right-2 text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2 text-xs"
               onClick={() => {
-                setNewPostContent("");
+                updatePostContent("");
                 previewUrls.forEach(url => URL.revokeObjectURL(url));
                 setSelectedFiles([]);
                 setPreviewUrls([]);
