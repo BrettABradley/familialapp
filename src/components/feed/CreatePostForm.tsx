@@ -132,6 +132,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     if (error) {
       toast({ title: "Error", description: "Failed to create post.", variant: "destructive" });
     } else {
+      if (selectedCircle) sessionStorage.removeItem(`draft-feed-${selectedCircle}`);
       setNewPostContent("");
       setSelectedFiles([]);
       previewUrls.forEach(url => URL.revokeObjectURL(url));
