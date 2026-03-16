@@ -82,6 +82,33 @@ const Messages = () => {
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  
+  // Draft persistence helpers
+  const getDraftKey = () => {
+    if (chatView === "dm" && selectedUser) return `draft-dm-${selectedUser.user_id}`;
+    if (chatView === "group" && selectedGroup) return `draft-group-${selectedGroup.id}`;
+    return null;
+  };
+
+  const saveNewMessage = (val: string) => {
+    setNewMessage(val);
+    const key = getDraftKey();
+    if (key) {
+      if (val.trim()) sessionStorage.setItem(key, val);
+      else sessionStorage.removeItem(key);
+    }
+  };
+
+  const restoreDraft = (type: "dm" | "group", id: string) => {
+    const key = type === "dm" ? `draft-dm-${id}` : `draft-group-${id}`;
+    const saved = sessionStorage.getItem(key);
+    setNewMessage(saved || "");
+  };
+
+  const clearDraft = () => {
+    const key = getDraftKey();
+    if (key) sessionStorage.removeItem(key);
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [circleMembers, setCircleMembers] = useState<Profile[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
