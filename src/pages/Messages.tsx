@@ -75,6 +75,7 @@ type ChatView = "list" | "dm" | "group";
 
 const Messages = () => {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
