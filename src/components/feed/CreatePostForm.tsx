@@ -254,7 +254,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
               size="sm"
               className="absolute bottom-2 right-2 text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2 text-xs"
               onClick={() => {
-                setNewPostContent("");
+                updatePostContent("");
                 previewUrls.forEach(url => URL.revokeObjectURL(url));
                 setSelectedFiles([]);
                 setPreviewUrls([]);

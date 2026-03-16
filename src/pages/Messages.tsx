@@ -538,6 +538,7 @@ const Messages = () => {
       if (error) {
         toast({ title: "Error", description: "Failed to send message.", variant: "destructive" });
       } else {
+        clearDraft();
         setNewMessage("");
         clearMediaState();
         fetchGroupMessages();
