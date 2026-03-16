@@ -873,7 +873,7 @@ const Circles = () => {
               memberships.map((member) => (
                 <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border border-border">
                   <Link to={`/profile/${member.user_id}`} onClick={() => setIsMembersOpen(false)}>
-                    <Avatar className="h-10 w-10"><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
+                    <Avatar className="h-10 w-10"><AvatarImage src={member.profiles?.avatar_url || undefined} /><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
                   </Link>
                   <div className="flex-1">
                     <Link to={`/profile/${member.user_id}`} onClick={() => setIsMembersOpen(false)} className="font-medium text-foreground hover:underline">
