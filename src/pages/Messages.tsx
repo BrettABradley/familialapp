@@ -510,6 +510,15 @@ const Messages = () => {
     if ((!newMessage.trim() && selectedFiles.length === 0) || !user) return;
     setIsSending(true);
 
+    // Refresh session to ensure token is fresh before insert
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session?.user) {
+      toast({ title: "Session expired", description: "Please sign in again.", variant: "destructive" });
+      setIsSending(false);
+      return;
+    }
+    const senderId = session.user.id;
+
     let mediaUrls: string[] = [];
     if (selectedFiles.length > 0) mediaUrls = await uploadFiles();
 
