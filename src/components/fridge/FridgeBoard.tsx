@@ -20,14 +20,14 @@ export interface FridgeBoardPin {
  * Fixed positions for up to 8 polaroid photos.
  */
 const PIN_LAYOUT: Array<{ top: string; left: string; rotate: number }> = [
-  { top: "8%", left: "6%", rotate: -6 },
-  { top: "10%", left: "38%", rotate: 4 },
-  { top: "6%", left: "70%", rotate: -2 },
-  { top: "42%", left: "10%", rotate: 3 },
-  { top: "44%", left: "44%", rotate: -5 },
-  { top: "40%", left: "74%", rotate: 5 },
-  { top: "74%", left: "14%", rotate: -3 },
-  { top: "76%", left: "56%", rotate: 2 },
+  { top: "8%", left: "4%", rotate: -6 },
+  { top: "10%", left: "34%", rotate: 4 },
+  { top: "6%", left: "62%", rotate: -2 },
+  { top: "42%", left: "6%", rotate: 3 },
+  { top: "44%", left: "36%", rotate: -5 },
+  { top: "40%", left: "62%", rotate: 5 },
+  { top: "74%", left: "10%", rotate: -3 },
+  { top: "76%", left: "48%", rotate: 2 },
 ];
 
 /**

@@ -183,7 +183,7 @@ export function CircleHeader({
       <SheetTrigger asChild>
         {bellButton}
       </SheetTrigger>
-      <SheetContent side="top" className="p-0 rounded-b-lg">
+      <SheetContent side="top" className="p-0 rounded-b-lg pt-[env(safe-area-inset-top)]">
         <SheetHeader className="sr-only">
           <SheetTitle>Notifications</SheetTitle>
         </SheetHeader>

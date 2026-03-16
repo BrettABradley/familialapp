@@ -181,16 +181,16 @@ const Auth = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <img src={logo} alt="Familial" className="h-16 w-auto" />
+            <img src={logo} alt="Familial" className="h-24 w-auto" />
           </div>
           <CardTitle className="font-serif text-2xl">
-            {isForgotPassword ? "Reset Password" : isLogin ? "Welcome Back" : "Join Familial"}
+            {isForgotPassword ? "Reset Password" : isLogin ? "Welcome" : "Join Familial"}
           </CardTitle>
           <CardDescription>
             {isForgotPassword
               ? "Enter your email and we'll send you a reset link"
               : isLogin
-              ? "Sign in to connect with your family"
+              ? "Sign in or sign up to connect with your family"
               : "Create an account to start your family circle"}
           </CardDescription>
           {planParam && PLAN_PRICES[planParam] && (
