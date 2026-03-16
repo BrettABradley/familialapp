@@ -674,109 +674,110 @@ const Messages = () => {
 
   if (chatView === "group" && selectedGroup) {
     return (
-      <main className="container mx-auto px-4 py-4 md:py-8 max-w-2xl">
-        <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-200px)] pb-16 md:pb-0">
-          <div className="flex items-center gap-3 pb-4 border-b border-border mb-4">
-            <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
-            <div className="relative group cursor-pointer">
-              {selectedGroup.avatar_url ? (
-                <Avatar><AvatarImage src={selectedGroup.avatar_url} /><AvatarFallback><UsersRound className="w-5 h-5" /></AvatarFallback></Avatar>
-              ) : (
-                <div className="p-2 rounded-full bg-secondary"><UsersRound className="w-5 h-5" /></div>
-              )}
-              {selectedGroup.created_by === user?.id && (
-                <label className="absolute inset-0 flex items-center justify-center bg-foreground/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                  <Camera className="w-4 h-4 text-background" />
-                  <input type="file" accept="image/*,.heic,.heif" className="hidden" onChange={handleGroupAvatarUpload} disabled={isUploadingGroupAvatar} />
-                </label>
-              )}
-            </div>
-            <button onClick={handleViewMembers} className="text-left hover:underline">
-              <h2 className="font-serif text-xl font-bold text-foreground flex-1">{selectedGroup.name}</h2>
-            </button>
-            {selectedGroup.created_by === user?.id && (
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" onClick={handleEditGroup}><Pencil className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setIsDeleteGroupOpen(true)}><Trash2 className="w-4 h-4" /></Button>
-              </div>
-            )}
-          </div>
-
-          {/* Delete Group Confirmation */}
-          <AlertDialog open={isDeleteGroupOpen} onOpenChange={setIsDeleteGroupOpen}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Group Chat</AlertDialogTitle>
-                <AlertDialogDescription>This will permanently delete "{selectedGroup.name}" and all its messages. This cannot be undone.</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteGroup} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          {/* Edit Group Name Dialog */}
-          <Dialog open={isEditGroupOpen} onOpenChange={setIsEditGroupOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="font-serif">Edit Group Name</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 mt-2">
-                <Input value={editGroupName} onChange={(e) => setEditGroupName(e.target.value)} maxLength={100} placeholder="Group name" />
-                <Button className="w-full" onClick={handleSaveGroupName} disabled={!editGroupName.trim()}>Save</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* View Members Dialog */}
-          <Dialog open={isViewMembersOpen} onOpenChange={setIsViewMembersOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="font-serif">Group Members</DialogTitle>
-                <DialogDescription>{selectedGroup.name} — {groupMembersList.length} member{groupMembersList.length !== 1 ? 's' : ''}</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-2 mt-2 max-h-64 overflow-y-auto">
-                {groupMembersList.map(member => (
-                  <Link key={member.user_id} to={`/profile/${member.user_id}`} onClick={() => setIsViewMembersOpen(false)} className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary transition-colors">
-                    <Avatar className="h-8 w-8"><AvatarImage src={member.avatar_url || undefined} /><AvatarFallback className="text-xs">{member.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback></Avatar>
-                    <span className="text-sm font-medium text-foreground">{member.display_name || "Unknown"}</span>
-                    {member.user_id === selectedGroup.created_by && <span className="text-xs text-muted-foreground ml-auto">Creator</span>}
-                  </Link>
-                ))}
-              </div>
-            </DialogContent>
-          </Dialog>
-          <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-            {groupMessages.length === 0 ? (
-              <div className="text-center py-12"><MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><p className="text-muted-foreground">Start the group conversation</p></div>
+      <div className="fixed inset-0 z-50 bg-background flex flex-col md:relative md:z-auto md:inset-auto">
+        <div className="flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' }}>
+          <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
+          <div className="relative group cursor-pointer">
+            {selectedGroup.avatar_url ? (
+              <Avatar><AvatarImage src={selectedGroup.avatar_url} /><AvatarFallback><UsersRound className="w-5 h-5" /></AvatarFallback></Avatar>
             ) : (
-              groupMessages.map((msg) => {
-                const senderProfile = groupMemberProfiles.get(msg.sender_id);
-                const isMe = msg.sender_id === user?.id;
-                return (
-                  <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[70%] rounded-lg px-4 py-2 ${isMe ? 'bg-foreground text-background' : 'bg-secondary text-foreground'}`}>
-                      {!isMe && (
-                        <Link to={`/profile/${msg.sender_id}`} className="text-xs font-semibold mb-1 opacity-70 hover:underline block">{senderProfile?.display_name || "Unknown"}</Link>
-                      )}
-                      {msg.content && <p>{msg.content}</p>}
-                      {renderMediaAttachments(msg.media_urls)}
-                      <p className={`text-xs mt-1 ${isMe ? 'text-background/70' : 'text-muted-foreground'}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                    </div>
-                  </div>
-                );
-              })
+              <div className="p-2 rounded-full bg-secondary"><UsersRound className="w-5 h-5" /></div>
             )}
-            <div ref={messagesEndRef} />
+            {selectedGroup.created_by === user?.id && (
+              <label className="absolute inset-0 flex items-center justify-center bg-foreground/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                <Camera className="w-4 h-4 text-background" />
+                <input type="file" accept="image/*,.heic,.heif" className="hidden" onChange={handleGroupAvatarUpload} disabled={isUploadingGroupAvatar} />
+              </label>
+            )}
           </div>
+          <button onClick={handleViewMembers} className="text-left hover:underline">
+            <h2 className="font-serif text-xl font-bold text-foreground flex-1">{selectedGroup.name}</h2>
+          </button>
+          {selectedGroup.created_by === user?.id && (
+            <div className="flex items-center gap-1 ml-auto">
+              <Button variant="ghost" size="icon" onClick={handleEditGroup}><Pencil className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setIsDeleteGroupOpen(true)}><Trash2 className="w-4 h-4" /></Button>
+            </div>
+          )}
+        </div>
+
+        {/* Delete Group Confirmation */}
+        <AlertDialog open={isDeleteGroupOpen} onOpenChange={setIsDeleteGroupOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Group Chat</AlertDialogTitle>
+              <AlertDialogDescription>This will permanently delete "{selectedGroup.name}" and all its messages. This cannot be undone.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteGroup} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Edit Group Name Dialog */}
+        <Dialog open={isEditGroupOpen} onOpenChange={setIsEditGroupOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-serif">Edit Group Name</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-2">
+              <Input value={editGroupName} onChange={(e) => setEditGroupName(e.target.value)} maxLength={100} placeholder="Group name" />
+              <Button className="w-full" onClick={handleSaveGroupName} disabled={!editGroupName.trim()}>Save</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* View Members Dialog */}
+        <Dialog open={isViewMembersOpen} onOpenChange={setIsViewMembersOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-serif">Group Members</DialogTitle>
+              <DialogDescription>{selectedGroup.name} — {groupMembersList.length} member{groupMembersList.length !== 1 ? 's' : ''}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 mt-2 max-h-64 overflow-y-auto">
+              {groupMembersList.map(member => (
+                <Link key={member.user_id} to={`/profile/${member.user_id}`} onClick={() => setIsViewMembersOpen(false)} className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary transition-colors">
+                  <Avatar className="h-8 w-8"><AvatarImage src={member.avatar_url || undefined} /><AvatarFallback className="text-xs">{member.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback></Avatar>
+                  <span className="text-sm font-medium text-foreground">{member.display_name || "Unknown"}</span>
+                  {member.user_id === selectedGroup.created_by && <span className="text-xs text-muted-foreground ml-auto">Creator</span>}
+                </Link>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {groupMessages.length === 0 ? (
+            <div className="text-center py-12"><MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><p className="text-muted-foreground">Start the group conversation</p></div>
+          ) : (
+            groupMessages.map((msg) => {
+              const senderProfile = groupMemberProfiles.get(msg.sender_id);
+              const isMe = msg.sender_id === user?.id;
+              return (
+                <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[70%] rounded-lg px-4 py-2 ${isMe ? 'bg-foreground text-background' : 'bg-secondary text-foreground'}`}>
+                    {!isMe && (
+                      <Link to={`/profile/${msg.sender_id}`} className="text-xs font-semibold mb-1 opacity-70 hover:underline block">{senderProfile?.display_name || "Unknown"}</Link>
+                    )}
+                    {msg.content && <p>{msg.content}</p>}
+                    {renderMediaAttachments(msg.media_urls)}
+                    <p className={`text-xs mt-1 ${isMe ? 'text-background/70' : 'text-muted-foreground'}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+        <div className="p-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }}>
           {readOnly ? (
             <p className="text-sm text-muted-foreground text-center py-2">This circle is read-only. Messaging is disabled.</p>
           ) : (
             renderMessageInput()
           )}
         </div>
-      </main>
+      </div>
     );
   }
 
