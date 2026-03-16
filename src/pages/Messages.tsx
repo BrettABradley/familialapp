@@ -664,7 +664,7 @@ const Messages = () => {
           onChange={(e) => saveNewMessage(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
           maxLength={5000}
-          className="flex-1 h-9"
+          className="flex-1 h-9 text-[16px]"
         />
         <Button onClick={handleSendMessage} disabled={(!newMessage.trim() && selectedFiles.length === 0) || isSending} size="icon" className="flex-shrink-0 h-9 w-9">
           <Send className="w-4 h-4" />
