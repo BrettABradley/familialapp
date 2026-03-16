@@ -158,11 +158,11 @@ const Messages = () => {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'private_messages' }, (payload) => {
         const newMsg = payload.new as Message;
         if (newMsg.sender_id !== user.id && newMsg.recipient_id !== user.id) return;
+        // Skip messages sent by current user — already handled optimistically
+        if (newMsg.sender_id === user.id) return;
         if (selectedUser && (newMsg.sender_id === selectedUser.user_id || newMsg.recipient_id === selectedUser.user_id)) {
           setMessages(prev => [...prev, newMsg]);
-          if (newMsg.recipient_id === user.id) {
-            supabase.from("private_messages").update({ is_read: true }).eq("id", newMsg.id).then();
-          }
+          supabase.from("private_messages").update({ is_read: true }).eq("id", newMsg.id).then();
         }
         fetchConversations();
       })
@@ -218,7 +218,7 @@ const Messages = () => {
 
   const fetchConversations = async () => {
     if (!user || !selectedCircle) return;
-    setIsLoadingConversations(true);
+    if (conversations.length === 0) setIsLoadingConversations(true);
 
     // Get member IDs for this circle
     const { data: memberships } = await supabase.from("circle_memberships").select("user_id").eq("circle_id", selectedCircle);
@@ -664,7 +664,7 @@ const Messages = () => {
           onChange={(e) => saveNewMessage(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
           maxLength={5000}
-          className="flex-1 h-9"
+          className="flex-1 h-9 text-[16px]"
         />
         <Button onClick={handleSendMessage} disabled={(!newMessage.trim() && selectedFiles.length === 0) || isSending} size="icon" className="flex-shrink-0 h-9 w-9">
           <Send className="w-4 h-4" />
@@ -679,17 +679,8 @@ const Messages = () => {
 
   const showMemberList = isSearchFocused && filteredMembers.length > 0;
 
-  if (contextLoading || isLoadingConversations) {
-    return (
-      <main className="container mx-auto px-4 py-8 max-w-2xl">
-        <div className="mb-8"><Skeleton className="h-9 w-32 mb-2" /><Skeleton className="h-5 w-56" /></div>
-        <Card className="mb-6"><CardContent className="py-4"><div className="flex gap-2"><Skeleton className="h-10 flex-1" /><Skeleton className="h-10 w-10" /></div></CardContent></Card>
-        {[1, 2, 3].map(i => (
-          <Card key={i} className="mb-3"><CardContent className="py-4"><div className="flex items-center gap-3"><Skeleton className="h-12 w-12 rounded-full" /><div className="flex-1"><Skeleton className="h-5 w-32 mb-2" /><Skeleton className="h-4 w-48" /></div></div></CardContent></Card>
-        ))}
-      </main>
-    );
-  }
+  // Render active chat views BEFORE loading gate so they don't unmount during background refreshes
+  // (DM and group chat views are rendered below, after the circles check)
 
   if (circles.length === 0) {
     return (
@@ -853,6 +844,18 @@ const Messages = () => {
       </div>
     );
     return isMobile ? createPortal(groupView, document.body) : groupView;
+  }
+
+  if (contextLoading || isLoadingConversations) {
+    return (
+      <main className="container mx-auto px-4 py-8 max-w-2xl">
+        <div className="mb-8"><Skeleton className="h-9 w-32 mb-2" /><Skeleton className="h-5 w-56" /></div>
+        <Card className="mb-6"><CardContent className="py-4"><div className="flex gap-2"><Skeleton className="h-10 flex-1" /><Skeleton className="h-10 w-10" /></div></CardContent></Card>
+        {[1, 2, 3].map(i => (
+          <Card key={i} className="mb-3"><CardContent className="py-4"><div className="flex items-center gap-3"><Skeleton className="h-12 w-12 rounded-full" /><div className="flex-1"><Skeleton className="h-5 w-32 mb-2" /><Skeleton className="h-4 w-48" /></div></div></CardContent></Card>
+        ))}
+      </main>
+    );
   }
 
   // Conversations List
