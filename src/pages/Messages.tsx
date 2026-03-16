@@ -635,40 +635,40 @@ const Messages = () => {
   // Chat view (DM or Group)
   if (chatView === "dm" && selectedUser) {
     return (
-      <main className="container mx-auto px-4 py-4 md:py-8 max-w-2xl">
-        <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-200px)] pb-16 md:pb-0">
-          <div className="flex items-center gap-3 pb-4 border-b border-border mb-4">
-            <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
-            <Link to={`/profile/${selectedUser.user_id}`}>
-              <Avatar><AvatarImage src={selectedUser.avatar_url || undefined} /><AvatarFallback>{selectedUser.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback></Avatar>
-            </Link>
-            <Link to={`/profile/${selectedUser.user_id}`} className="hover:underline">
-              <h2 className="font-serif text-xl font-bold text-foreground">{selectedUser.display_name || "Unknown"}</h2>
-            </Link>
-          </div>
-          <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-            {messages.length === 0 ? (
-              <div className="text-center py-12"><MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><p className="text-muted-foreground">Start a conversation with {selectedUser.display_name}</p></div>
-            ) : (
-              messages.map((msg) => (
-                <div key={msg.id} className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[70%] rounded-lg px-4 py-2 ${msg.sender_id === user?.id ? 'bg-foreground text-background' : 'bg-secondary text-foreground'}`}>
-                    {msg.content && <p>{msg.content}</p>}
-                    {renderMediaAttachments(msg.media_urls)}
-                    <p className={`text-xs mt-1 ${msg.sender_id === user?.id ? 'text-background/70' : 'text-muted-foreground'}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                  </div>
+      <div className="fixed inset-0 z-50 bg-background flex flex-col md:relative md:z-auto md:inset-auto">
+        <div className="flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.5rem)' }}>
+          <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
+          <Link to={`/profile/${selectedUser.user_id}`}>
+            <Avatar><AvatarImage src={selectedUser.avatar_url || undefined} /><AvatarFallback>{selectedUser.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback></Avatar>
+          </Link>
+          <Link to={`/profile/${selectedUser.user_id}`} className="hover:underline">
+            <h2 className="font-serif text-xl font-bold text-foreground">{selectedUser.display_name || "Unknown"}</h2>
+          </Link>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.length === 0 ? (
+            <div className="text-center py-12"><MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><p className="text-muted-foreground">Start a conversation with {selectedUser.display_name}</p></div>
+          ) : (
+            messages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[70%] rounded-lg px-4 py-2 ${msg.sender_id === user?.id ? 'bg-foreground text-background' : 'bg-secondary text-foreground'}`}>
+                  {msg.content && <p>{msg.content}</p>}
+                  {renderMediaAttachments(msg.media_urls)}
+                  <p className={`text-xs mt-1 ${msg.sender_id === user?.id ? 'text-background/70' : 'text-muted-foreground'}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
-              ))
-            )}
-            <div ref={messagesEndRef} />
-          </div>
+              </div>
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+        <div className="p-3" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)' }}>
           {readOnly ? (
             <p className="text-sm text-muted-foreground text-center py-2">This circle is read-only. Messaging is disabled.</p>
           ) : (
             renderMessageInput()
           )}
         </div>
-      </main>
+      </div>
     );
   }
 
