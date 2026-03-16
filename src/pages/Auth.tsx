@@ -181,7 +181,7 @@ const Auth = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <img src={logo} alt="Familial" className="h-16 w-auto" />
+            <img src={logo} alt="Familial" className="h-24 w-auto" />
           </div>
           <CardTitle className="font-serif text-2xl">
             {isForgotPassword ? "Reset Password" : isLogin ? "Welcome Back" : "Join Familial"}
