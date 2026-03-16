@@ -524,14 +524,14 @@ const Messages = () => {
 
     if (chatView === "dm" && selectedUser) {
       const { error } = await supabase.from("private_messages").insert({
-        sender_id: user.id,
+        sender_id: senderId,
         recipient_id: selectedUser.user_id,
-        content: newMessage.trim() || "",
+        content: newMessage.trim() || "(attachment)",
         media_urls: mediaUrls.length > 0 ? mediaUrls : null,
       });
       if (error) {
         console.error("DM send error:", JSON.stringify(error));
-        toast({ title: "Error", description: error.message || "Failed to send message.", variant: "destructive" });
+        toast({ title: "Error", description: error.details || error.message || "Failed to send message.", variant: "destructive" });
       } else {
         clearDraft();
         setNewMessage("");
