@@ -712,7 +712,7 @@ const Messages = () => {
         </div>
       </div>
     );
-    return createPortal(dmView, document.body);
+    return isMobile ? createPortal(dmView, document.body) : dmView;
   }
 
   if (chatView === "group" && selectedGroup) {
