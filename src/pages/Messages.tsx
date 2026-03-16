@@ -510,19 +510,28 @@ const Messages = () => {
     if ((!newMessage.trim() && selectedFiles.length === 0) || !user) return;
     setIsSending(true);
 
+    // Refresh session to ensure token is fresh before insert
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session?.user) {
+      toast({ title: "Session expired", description: "Please sign in again.", variant: "destructive" });
+      setIsSending(false);
+      return;
+    }
+    const senderId = session.user.id;
+
     let mediaUrls: string[] = [];
     if (selectedFiles.length > 0) mediaUrls = await uploadFiles();
 
     if (chatView === "dm" && selectedUser) {
       const { error } = await supabase.from("private_messages").insert({
-        sender_id: user.id,
+        sender_id: senderId,
         recipient_id: selectedUser.user_id,
-        content: newMessage.trim() || "",
+        content: newMessage.trim() || "(attachment)",
         media_urls: mediaUrls.length > 0 ? mediaUrls : null,
       });
       if (error) {
         console.error("DM send error:", JSON.stringify(error));
-        toast({ title: "Error", description: error.message || "Failed to send message.", variant: "destructive" });
+        toast({ title: "Error", description: error.details || error.message || "Failed to send message.", variant: "destructive" });
       } else {
         clearDraft();
         setNewMessage("");
@@ -533,13 +542,13 @@ const Messages = () => {
     } else if (chatView === "group" && selectedGroup) {
       const { error } = await supabase.from("group_chat_messages").insert({
         group_chat_id: selectedGroup.id,
-        sender_id: user.id,
-        content: newMessage.trim() || "",
+        sender_id: senderId,
+        content: newMessage.trim() || "(attachment)",
         media_urls: mediaUrls.length > 0 ? mediaUrls : null,
       });
       if (error) {
         console.error("Group send error:", JSON.stringify(error));
-        toast({ title: "Error", description: error.message || "Failed to send message.", variant: "destructive" });
+        toast({ title: "Error", description: error.details || error.message || "Failed to send message.", variant: "destructive" });
       } else {
         clearDraft();
         setNewMessage("");
