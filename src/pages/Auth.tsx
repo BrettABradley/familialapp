@@ -184,7 +184,7 @@ const Auth = () => {
             <img src={logo} alt="Familial" className="h-24 w-auto" />
           </div>
           <CardTitle className="font-serif text-2xl">
-            {isForgotPassword ? "Reset Password" : isLogin ? "Welcome Back" : "Join Familial"}
+            {isForgotPassword ? "Reset Password" : isLogin ? "Welcome" : "Join Familial"}
           </CardTitle>
           <CardDescription>
             {isForgotPassword
