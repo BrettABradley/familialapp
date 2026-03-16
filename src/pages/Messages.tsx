@@ -521,7 +521,8 @@ const Messages = () => {
         media_urls: mediaUrls.length > 0 ? mediaUrls : null,
       });
       if (error) {
-        toast({ title: "Error", description: "Failed to send message.", variant: "destructive" });
+        console.error("DM send error:", JSON.stringify(error));
+        toast({ title: "Error", description: error.message || "Failed to send message.", variant: "destructive" });
       } else {
         clearDraft();
         setNewMessage("");
@@ -537,7 +538,8 @@ const Messages = () => {
         media_urls: mediaUrls.length > 0 ? mediaUrls : null,
       });
       if (error) {
-        toast({ title: "Error", description: "Failed to send message.", variant: "destructive" });
+        console.error("Group send error:", JSON.stringify(error));
+        toast({ title: "Error", description: error.message || "Failed to send message.", variant: "destructive" });
       } else {
         clearDraft();
         setNewMessage("");
