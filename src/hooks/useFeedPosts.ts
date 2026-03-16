@@ -71,7 +71,8 @@ export const useFeedPosts = () => {
   const fetchPosts = async (reset = false) => {
     if (!selectedCircle) return;
 
-    if (reset) setIsLoadingPosts(true);
+    // Only show skeleton on initial load when there are no posts yet
+    if (reset && posts.length === 0) setIsLoadingPosts(true);
     const circleIds = [selectedCircle];
     const cursor = !reset && posts.length > 0 ? posts[posts.length - 1].created_at : null;
 
