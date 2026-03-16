@@ -240,7 +240,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
           <MentionInput
             placeholder="What's happening with the family? Use @ to tag someone"
             value={newPostContent}
-            onChange={(val) => setNewPostContent(val)}
+            onChange={(val) => updatePostContent(val)}
             members={circleMembers}
             onMentionsChange={setMentionedUserIds}
             className="min-h-[100px] resize-none pb-10"
