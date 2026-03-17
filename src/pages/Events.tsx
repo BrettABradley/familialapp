@@ -678,10 +678,10 @@ const Events = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="location">Location (optional)</Label>
-                  <Input id="location" placeholder="Place" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} maxLength={300} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400)} />
+                  <Input id="location" placeholder="Place" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} maxLength={300} onFocus={(e) => { const target = e.target; setTimeout(() => { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 400); }} />
                 </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 pb-4">
                 <Label>Photo Album (optional)</Label>
                 <Select value={selectedAlbumId} onValueChange={setSelectedAlbumId}>
                   <SelectTrigger><SelectValue placeholder="Link a photo album" /></SelectTrigger>
