@@ -90,9 +90,8 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
           </div>
         </>
       ) : (
-        <Button type="button" variant="outline" size="sm" onClick={startRecording}>
-          <Mic className="w-4 h-4 mr-1" />
-          Record Voice Note
+        <Button type="button" variant="ghost" size="icon" onClick={startRecording} className="h-9 w-9 flex-shrink-0">
+          <Mic className="w-4 h-4" />
         </Button>
       )}
     </div>

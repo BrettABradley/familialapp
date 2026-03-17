@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -646,11 +647,34 @@ const Messages = () => {
     );
   };
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    saveNewMessage(e.target.value);
+    // Auto-resize
+    const ta = e.target;
+    ta.style.height = 'auto';
+    ta.style.height = `${Math.min(ta.scrollHeight, 150)}px`;
+    // Scroll latest message into view as input grows
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+      // Reset height after send
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+    }
+  };
+
   const renderMessageInput = () => (
     <div className="border-t border-border pt-2 space-y-1">
       {renderFilePreviewBar()}
       {renderUploadProgress()}
-      <div className="flex items-center gap-1">
+      <div className="flex items-end gap-1">
         <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.heic,.heif" multiple onChange={handleFileSelect} className="hidden" />
         <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isSending} className="flex-shrink-0 h-9 w-9">
           <Paperclip className="w-4 h-4" />
@@ -658,15 +682,17 @@ const Messages = () => {
         <div className="flex-shrink-0">
           <VoiceRecorder onRecordingComplete={handleVoiceRecording} />
         </div>
-        <Input
+        <Textarea
+          ref={textareaRef}
           placeholder="Type a message..."
           value={newMessage}
-          onChange={(e) => saveNewMessage(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+          onChange={handleTextareaChange}
+          onKeyDown={handleTextareaKeyDown}
           maxLength={5000}
-          className="flex-1 h-9 text-[16px]"
+          rows={1}
+          className="flex-1 min-h-[36px] max-h-[150px] resize-none text-[16px] py-2"
         />
-        <Button onClick={handleSendMessage} disabled={(!newMessage.trim() && selectedFiles.length === 0) || isSending} size="icon" className="flex-shrink-0 h-9 w-9">
+        <Button onClick={() => { handleSendMessage(); if (textareaRef.current) textareaRef.current.style.height = 'auto'; }} disabled={(!newMessage.trim() && selectedFiles.length === 0) || isSending} size="icon" className="flex-shrink-0 h-9 w-9">
           <Send className="w-4 h-4" />
         </Button>
       </div>
