@@ -699,7 +699,8 @@ const Messages = () => {
   if (chatView === "dm" && selectedUser) {
     const dmView = (
       <div className="fixed inset-0 z-[60] bg-background flex flex-col overflow-hidden md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]">
-        <div className="flex-shrink-0 flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px) + 1rem, 4rem)' }}>
+        <div className="flex-shrink-0 bg-background border-b border-border" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <div className="flex items-center gap-3 px-4 py-3 min-h-[3.5rem]">
           <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
           <Link to={`/profile/${selectedUser.user_id}`}>
             <Avatar><AvatarImage src={selectedUser.avatar_url || undefined} /><AvatarFallback>{selectedUser.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback></Avatar>
@@ -707,6 +708,7 @@ const Messages = () => {
           <Link to={`/profile/${selectedUser.user_id}`} className="hover:underline">
             <h2 className="font-serif text-xl font-bold text-foreground">{selectedUser.display_name || "Unknown"}</h2>
           </Link>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4" onTouchMove={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}>
           {messages.length === 0 ? (
@@ -739,7 +741,8 @@ const Messages = () => {
   if (chatView === "group" && selectedGroup) {
     const groupView = (
       <div className="fixed inset-0 z-[60] bg-background flex flex-col overflow-hidden md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]">
-        <div className="flex-shrink-0 flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px) + 1rem, 4rem)' }}>
+        <div className="flex-shrink-0 bg-background border-b border-border" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+          <div className="flex items-center gap-3 px-4 py-3 min-h-[3.5rem]">
           <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
           <div className="relative group cursor-pointer">
             {selectedGroup.avatar_url ? (
@@ -763,6 +766,7 @@ const Messages = () => {
               <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setIsDeleteGroupOpen(true)}><Trash2 className="w-4 h-4" /></Button>
             </div>
           )}
+          </div>
         </div>
 
         {/* Delete Group Confirmation */}
