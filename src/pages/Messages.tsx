@@ -699,7 +699,7 @@ const Messages = () => {
   if (chatView === "dm" && selectedUser) {
     const dmView = (
       <div className="fixed inset-0 z-[60] bg-background flex flex-col overflow-hidden md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]">
-        <div className="flex-shrink-0 bg-background border-b border-border" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 3.25rem)' }}>
+        <div className="fixed top-0 left-0 right-0 z-10 bg-background border-b border-border md:relative md:top-auto md:left-auto md:right-auto md:z-auto" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 3.25rem)' }}>
           <div className="flex items-center gap-3 px-4 py-3 min-h-[3.5rem]">
           <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
           <Link to={`/profile/${selectedUser.user_id}`}>
@@ -710,6 +710,7 @@ const Messages = () => {
           </Link>
           </div>
         </div>
+        <div className="md:hidden" style={{ height: 'calc(max(env(safe-area-inset-top, 0px), 3.25rem) + 3.5rem)' }} />
         <div className="flex-1 overflow-y-auto p-4 space-y-4" onTouchMove={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}>
           {messages.length === 0 ? (
             <div className="text-center py-12"><MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><p className="text-muted-foreground">Start a conversation with {selectedUser.display_name}</p></div>
