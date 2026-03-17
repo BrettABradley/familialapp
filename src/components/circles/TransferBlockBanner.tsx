@@ -16,7 +16,7 @@ const TransferBlockBanner = () => {
   const [showUpgrade, setShowUpgrade] = useState(false);
 
   const circle = circles.find(c => c.id === selectedCircle);
-  if (!circle || !(circle as any).transfer_block) return null;
+  if (!circle || !circle.transfer_block) return null;
 
   const isOwner = circle.owner_id === user?.id;
 
@@ -25,6 +25,9 @@ const TransferBlockBanner = () => {
     setIsClaiming(true);
 
     const oldOwnerId = circle.owner_id;
+
+    // Refresh session to prevent stale auth on mobile
+    await supabase.auth.getSession();
 
     const { error } = await supabase.rpc("claim_circle_ownership", {
       _circle_id: circle.id,
