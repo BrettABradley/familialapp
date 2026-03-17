@@ -37,9 +37,9 @@ const Header = () => {
             <Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">
               About
             </Link>
-            <a href="mailto:support@familialmedia.com" className="text-muted-foreground hover:text-foreground transition-colors">
-              Contact Support
-            </a>
+            <Link to="/support" className="text-muted-foreground hover:text-foreground transition-colors">
+              Support
+            </Link>
           </nav>
 
           {/* Desktop CTA */}
