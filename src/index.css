@@ -142,6 +142,11 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-serif);
   }
+
+  /* Keep focused inputs visible above the on-screen keyboard */
+  input, textarea {
+    scroll-margin-bottom: 260px;
+  }
 }
 
 /* Sonner toast safe area for iOS notch/Dynamic Island */
