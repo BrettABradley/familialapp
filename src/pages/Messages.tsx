@@ -699,7 +699,7 @@ const Messages = () => {
   if (chatView === "dm" && selectedUser) {
     const dmView = (
       <div className="fixed inset-0 z-[60] bg-background flex flex-col overflow-hidden md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]">
-        <div className="flex-shrink-0 flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}>
+        <div className="flex-shrink-0 flex items-center gap-3 p-4 border-b border-border" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px) + 1rem, 3.5rem)' }}>
           <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
           <Link to={`/profile/${selectedUser.user_id}`}>
             <Avatar><AvatarImage src={selectedUser.avatar_url || undefined} /><AvatarFallback>{selectedUser.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback></Avatar>
