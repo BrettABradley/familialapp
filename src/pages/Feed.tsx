@@ -15,6 +15,8 @@ import { useCircleMembers } from "@/hooks/useCircleMembers";
 const Feed = () => {
   const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly, isCircleAdmin } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
+  const mainRef = useRef<HTMLMainElement>(null);
+  useKeyboardDismissOnScroll(mainRef);
   const adminStatus = isCircleAdmin(selectedCircle);
   const circleMembers = useCircleMembers();
   const [searchParams] = useSearchParams();
