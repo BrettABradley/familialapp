@@ -708,6 +708,7 @@ const Messages = () => {
           <Link to={`/profile/${selectedUser.user_id}`} className="hover:underline">
             <h2 className="font-serif text-xl font-bold text-foreground">{selectedUser.display_name || "Unknown"}</h2>
           </Link>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4" onTouchMove={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}>
           {messages.length === 0 ? (
