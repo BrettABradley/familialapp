@@ -684,7 +684,7 @@ const Albums = () => {
                 <Button><Plus className="w-4 h-4 mr-2" />Create Album</Button>
               </DialogTrigger>
               <DialogContent className="[&>button:last-child]:hidden">
-                <DialogHeader className="flex flex-row items-start justify-between">
+                <DialogHeader className="sticky top-0 z-10 bg-background flex flex-row items-start justify-between pb-3 -mx-6 px-6 -mt-[max(env(safe-area-inset-top,0px),1.5rem)] pt-[max(env(safe-area-inset-top,0px),1.5rem)] border-b border-border sm:border-b-0 sm:static sm:mt-0 sm:pt-0 sm:mx-0 sm:px-0">
                   <div>
                     <DialogTitle className="font-serif">Create Photo Album</DialogTitle>
                     <DialogDescription>Create a new album to organize your photos.</DialogDescription>
@@ -693,7 +693,7 @@ const Albums = () => {
                     <Trash2 className="w-5 h-5" />
                   </Button>
                 </DialogHeader>
-                <div className="space-y-4 mt-4">
+                <div className="space-y-4 mt-2">
                   <div className="space-y-2">
                     <Label htmlFor="albumName">Album Name *</Label>
                     <Input id="albumName" placeholder="e.g., Summer Vacation 2024" value={newAlbum.name} onChange={(e) => setNewAlbum({ ...newAlbum, name: e.target.value })} maxLength={100} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
