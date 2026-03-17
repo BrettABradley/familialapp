@@ -26,6 +26,9 @@ const TransferBlockBanner = () => {
 
     const oldOwnerId = circle.owner_id;
 
+    // Refresh session to prevent stale auth on mobile
+    await supabase.auth.getSession();
+
     const { error } = await supabase.rpc("claim_circle_ownership", {
       _circle_id: circle.id,
     });

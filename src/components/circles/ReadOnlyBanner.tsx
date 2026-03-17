@@ -19,15 +19,14 @@ const ReadOnlyBanner = ({ circleId }: ReadOnlyBannerProps) => {
   const circle = circles.find(c => c.id === targetCircleId);
   const isOwner = circle?.owner_id === user?.id;
 
-  const isTransferBlock = circle && (circle as any).transfer_block;
+  // TransferBlockBanner in AppLayout already handles transfer_block with a claim button
+  if (circle?.transfer_block) return null;
 
   return (
     <Alert className="mb-6 border-amber-500/50 bg-amber-500/10">
       <AlertTriangle className="h-4 w-4 text-amber-500" />
       <AlertDescription className="text-sm">
-        {isTransferBlock ? (
-          "This circle is on transfer block and is read-only until someone claims ownership."
-        ) : isOwner ? (
+        {isOwner ? (
           <>
             This circle is read-only. You've exceeded your plan's circle limit.{" "}
             <Link to="/#pricing" className="underline font-medium text-primary hover:text-primary/80">
