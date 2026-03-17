@@ -149,6 +149,11 @@
   top: env(safe-area-inset-top, 0px) !important;
 }
 
+/* Keyboard-aware chat layout */
+:root {
+  --keyboard-height: 0px;
+}
+
 @layer utilities {
   .font-serif {
     font-family: var(--font-serif);

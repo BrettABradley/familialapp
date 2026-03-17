@@ -9,6 +9,10 @@ const config: CapacitorConfig = {
       overlaysWebView: true,
       style: 'LIGHT',
     },
+    Keyboard: {
+      resize: 'none',
+      resizeOnFullScreen: false,
+    },
   },
 };
 
