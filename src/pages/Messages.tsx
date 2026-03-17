@@ -768,7 +768,7 @@ const Messages = () => {
           )}
           </div>
         </div>
-        <div className="md:hidden" style={{ height: 'calc(max(env(safe-area-inset-top, 0px), 3.25rem) + 3.5rem)' }} />
+        
 
         {/* Delete Group Confirmation */}
         <AlertDialog open={isDeleteGroupOpen} onOpenChange={setIsDeleteGroupOpen}>
