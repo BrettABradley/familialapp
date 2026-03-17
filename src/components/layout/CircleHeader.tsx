@@ -118,23 +118,25 @@ export function CircleHeader({
     setUnreadCount(0);
   };
 
-  const notifContent = (
+  const notifContent = (isInsideSheet: boolean) => (
     <>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <span className="font-serif font-semibold text-sm">Notifications</span>
-        <div className="flex gap-1">
-          {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleMarkAllRead}>
-              <Check className="w-3 h-3 mr-1" />Mark read
-            </Button>
-          )}
-          {notifications.length > 0 && (
-            <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={handleClearAll}>
-              <Trash2 className="w-3 h-3 mr-1" />Clear all
-            </Button>
-          )}
+      {!isInsideSheet && (
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <span className="font-serif font-semibold text-sm">Notifications</span>
+          <div className="flex gap-1">
+            {unreadCount > 0 && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleMarkAllRead}>
+                <Check className="w-3 h-3 mr-1" />Mark read
+              </Button>
+            )}
+            {notifications.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={handleClearAll}>
+                <Trash2 className="w-3 h-3 mr-1" />Clear all
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
       <div className="max-h-72 overflow-y-auto">
         {notifications.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">No notifications</p>
@@ -186,13 +188,25 @@ export function CircleHeader({
       <SheetContent side="top" className="p-0 rounded-b-lg pt-[env(safe-area-inset-top)]">
         <SheetHeader className="flex flex-row items-center justify-between px-4 pt-3 pb-0">
           <SheetTitle className="text-sm font-serif font-semibold">Notifications</SheetTitle>
+          <div className="flex gap-1">
+            {unreadCount > 0 && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleMarkAllRead}>
+                <Check className="w-3 h-3 mr-1" />Mark read
+              </Button>
+            )}
+            {notifications.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={handleClearAll}>
+                <Trash2 className="w-3 h-3 mr-1" />Clear all
+              </Button>
+            )}
+          </div>
           <SheetClose asChild>
             <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px]">
               <X className="w-4 h-4" />
             </Button>
           </SheetClose>
         </SheetHeader>
-        {notifContent}
+        {notifContent(true)}
       </SheetContent>
     </Sheet>
   ) : (
@@ -201,7 +215,7 @@ export function CircleHeader({
         {bellButton}
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
-        {notifContent}
+        {notifContent(false)}
       </PopoverContent>
     </Popover>
   );

@@ -101,9 +101,7 @@ const Feed = () => {
   return (
     <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl">
       <ReadOnlyBanner circleId={selectedCircle} />
-      {circles.length > 0 && !readOnly ? (
-        <CreatePostForm onPostCreated={() => fetchPosts(true)} />
-      ) : (
+      {circles.length === 0 ? (
         <Card className="mb-8">
           <CardContent className="py-12 text-center">
             <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
@@ -114,7 +112,9 @@ const Feed = () => {
             </Link>
           </CardContent>
         </Card>
-      )}
+      ) : !readOnly ? (
+        <CreatePostForm onPostCreated={() => fetchPosts(true)} />
+      ) : null}
 
       <div className="space-y-6">
         {posts.length === 0 && circles.length > 0 && (

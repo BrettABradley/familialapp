@@ -27,6 +27,7 @@ import CookiePolicy from "./pages/CookiePolicy";
 import About from "./pages/About";
 import Careers from "./pages/Careers";
 import Blog from "./pages/Blog";
+import Support from "./pages/Support";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +50,7 @@ const App = () => (
             <Route path="/about" element={<About />} />
             <Route path="/careers" element={<Careers />} />
             <Route path="/blog" element={<Blog />} />
+            <Route path="/support" element={<Support />} />
             
             {/* Authenticated routes with persistent layout */}
             <Route element={<AppLayout />}>
