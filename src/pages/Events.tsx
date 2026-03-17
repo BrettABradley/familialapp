@@ -628,10 +628,15 @@ const Events = () => {
           <DialogTrigger asChild>
             <Button disabled={readOnly}><Plus className="w-4 h-4 mr-2" />Add Event</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="font-serif">Create Event</DialogTitle>
-              <DialogDescription>Add a new event to share with your circle.</DialogDescription>
+          <DialogContent className="max-w-md [&>button:last-child]:hidden">
+            <DialogHeader className="flex flex-row items-start justify-between">
+              <div>
+                <DialogTitle className="font-serif">Create Event</DialogTitle>
+                <DialogDescription>Add a new event to share with your circle.</DialogDescription>
+              </div>
+              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive shrink-0 min-h-[44px] min-w-[44px]" onClick={() => setIsCreateOpen(false)}>
+                <Trash2 className="w-5 h-5" />
+              </Button>
             </DialogHeader>
             <div className="space-y-4 mt-4">
               <div className="space-y-2">
@@ -648,6 +653,10 @@ const Events = () => {
               <div className="space-y-2">
                 <Label htmlFor="title">Event Title</Label>
                 <Input id="title" placeholder="e.g., Grandma's Birthday" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description (optional)</Label>
+                <Textarea id="description" placeholder="Add details..." value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
               </div>
               <div className="space-y-2">
                 <Label>Event Date(s)</Label>
@@ -669,7 +678,7 @@ const Events = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="location">Location (optional)</Label>
-                  <Input id="location" placeholder="Place" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} maxLength={300} />
+                  <Input id="location" placeholder="Place" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} maxLength={300} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
                 </div>
               </div>
               <div className="space-y-2">
@@ -684,10 +693,6 @@ const Events = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description (optional)</Label>
-                <Textarea id="description" placeholder="Add details..." value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} />
-              </div>
               <div className="sticky bottom-0 bg-background pt-2 pb-1">
                 <Button className="w-full" onClick={handleCreateEvent} disabled={!title.trim() || !selectedCircle || !selectedDate || isCreating}>
                   {isCreating ? "Creating..." : "Create Event"}
@@ -700,15 +705,24 @@ const Events = () => {
 
       {/* Edit Event Dialog */}
       <Dialog open={!!editingEvent} onOpenChange={(open) => !open && setEditingEvent(null)}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-serif">Edit Event</DialogTitle>
-            <DialogDescription>Update the event details.</DialogDescription>
+        <DialogContent className="max-w-md [&>button:last-child]:hidden">
+          <DialogHeader className="flex flex-row items-start justify-between">
+            <div>
+              <DialogTitle className="font-serif">Edit Event</DialogTitle>
+              <DialogDescription>Update the event details.</DialogDescription>
+            </div>
+            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive shrink-0 min-h-[44px] min-w-[44px]" onClick={() => setEditingEvent(null)}>
+              <Trash2 className="w-5 h-5" />
+            </Button>
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="edit-title">Event Title</Label>
               <Input id="edit-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} maxLength={200} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description (optional)</Label>
+              <Textarea id="edit-description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} maxLength={2000} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
             </div>
             <div className="space-y-2">
               <Label>Event Date(s)</Label>
@@ -730,7 +744,7 @@ const Events = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-location">Location (optional)</Label>
-                <Input id="edit-location" placeholder="Place" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} maxLength={300} />
+                <Input id="edit-location" placeholder="Place" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} maxLength={300} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
               </div>
             </div>
             <div className="space-y-2">
@@ -744,10 +758,6 @@ const Events = () => {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-description">Description (optional)</Label>
-              <Textarea id="edit-description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} maxLength={2000} />
             </div>
             <div className="sticky bottom-0 bg-background pt-2 pb-1">
               <Button className="w-full" onClick={handleSaveEdit} disabled={!editTitle.trim() || !editDate || isSavingEdit}>
