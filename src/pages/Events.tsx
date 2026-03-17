@@ -629,7 +629,7 @@ const Events = () => {
             <Button disabled={readOnly}><Plus className="w-4 h-4 mr-2" />Add Event</Button>
           </DialogTrigger>
           <DialogContent className="max-w-md [&>button:last-child]:hidden">
-            <DialogHeader className="flex flex-row items-start justify-between">
+            <DialogHeader className="sticky top-0 z-10 bg-background flex flex-row items-start justify-between pb-3 -mx-6 px-6 -mt-[max(env(safe-area-inset-top,0px),1.5rem)] pt-[max(env(safe-area-inset-top,0px),1.5rem)] border-b border-border sm:border-b-0 sm:static sm:mt-0 sm:pt-0 sm:mx-0 sm:px-0">
               <div>
                 <DialogTitle className="font-serif">Create Event</DialogTitle>
                 <DialogDescription>Add a new event to share with your circle.</DialogDescription>
@@ -638,7 +638,7 @@ const Events = () => {
                 <Trash2 className="w-5 h-5" />
               </Button>
             </DialogHeader>
-            <div className="space-y-4 mt-4">
+            <div className="space-y-4 mt-2">
               <div className="space-y-2">
                 <Label>Circle</Label>
                 <Select value={selectedCircle} onValueChange={setSelectedCircle}>
