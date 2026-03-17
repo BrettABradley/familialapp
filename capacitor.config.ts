@@ -4,6 +4,12 @@ const config: CapacitorConfig = {
   appId: 'com.familialmedia.familial',
   appName: 'familialapp',
   webDir: 'dist',
+  plugins: {
+    StatusBar: {
+      overlaysWebView: false,
+      style: 'DARK',
+    },
+  },
 };
 
 export default config;
