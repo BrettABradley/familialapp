@@ -215,7 +215,7 @@ export function CircleHeader({
         {bellButton}
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
-        {notifContent}
+        {notifContent(false)}
       </PopoverContent>
     </Popover>
   );
