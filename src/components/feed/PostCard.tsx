@@ -43,6 +43,7 @@ const VideoPlayer = ({ url }: { url: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [showPlaceholder, setShowPlaceholder] = useState(true);
   const [thumbnail, setThumbnail] = useState<string | null>(null);
+  const [aspectRatio, setAspectRatio] = useState<string>("16/9");
 
   useEffect(() => {
     const video = document.createElement("video");
@@ -83,19 +84,31 @@ const VideoPlayer = ({ url }: { url: string }) => {
     };
   }, [url]);
 
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      const w = videoRef.current.videoWidth;
+      const h = videoRef.current.videoHeight;
+      if (w && h) {
+        setAspectRatio(`${w}/${h}`);
+      }
+    }
+    setShowPlaceholder(false);
+  };
+
   return (
     <div className="relative group rounded-lg overflow-hidden bg-secondary">
       {showPlaceholder && (
-        <div className="w-full aspect-video rounded-lg bg-muted animate-pulse absolute inset-0 z-10" />
+        <div className="w-full rounded-lg bg-muted animate-pulse absolute inset-0 z-10" style={{ aspectRatio }} />
       )}
       <video
         ref={videoRef}
         controls
-        className="w-full rounded-lg aspect-video object-contain"
+        className="w-full rounded-lg object-contain max-h-[600px]"
+        style={{ aspectRatio }}
         preload="metadata"
         playsInline
         {...(thumbnail ? { poster: thumbnail } : {})}
-        onLoadedMetadata={() => setShowPlaceholder(false)}
+        onLoadedMetadata={handleLoadedMetadata}
       >
         <source src={url} type="video/mp4" />
         <source src={url} type="video/quicktime" />
