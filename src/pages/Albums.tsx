@@ -683,21 +683,26 @@ const Albums = () => {
               <DialogTrigger asChild>
                 <Button><Plus className="w-4 h-4 mr-2" />Create Album</Button>
               </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="font-serif">Create Photo Album</DialogTitle>
-                  <DialogDescription>Create a new album to organize your photos.</DialogDescription>
+              <DialogContent className="[&>button:last-child]:hidden">
+                <DialogHeader className="flex flex-row items-start justify-between">
+                  <div>
+                    <DialogTitle className="font-serif">Create Photo Album</DialogTitle>
+                    <DialogDescription>Create a new album to organize your photos.</DialogDescription>
+                  </div>
+                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive shrink-0 min-h-[44px] min-w-[44px]" onClick={() => setIsCreateOpen(false)}>
+                    <Trash2 className="w-5 h-5" />
+                  </Button>
                 </DialogHeader>
                 <div className="space-y-4 mt-4">
                   <div className="space-y-2">
                     <Label htmlFor="albumName">Album Name *</Label>
-                    <Input id="albumName" placeholder="e.g., Summer Vacation 2024" value={newAlbum.name} onChange={(e) => setNewAlbum({ ...newAlbum, name: e.target.value })} maxLength={100} />
+                    <Input id="albumName" placeholder="e.g., Summer Vacation 2024" value={newAlbum.name} onChange={(e) => setNewAlbum({ ...newAlbum, name: e.target.value })} maxLength={100} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="albumDesc">Description</Label>
-                    <Textarea id="albumDesc" placeholder="What's this album about?" value={newAlbum.description} onChange={(e) => setNewAlbum({ ...newAlbum, description: e.target.value })} maxLength={500} />
+                    <Textarea id="albumDesc" placeholder="What's this album about?" value={newAlbum.description} onChange={(e) => setNewAlbum({ ...newAlbum, description: e.target.value })} maxLength={500} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
                   </div>
-                  <div className="sticky bottom-0 bg-background pt-2 pb-1">
+                  <div className="sticky bottom-0 bg-background pt-2 pb-4">
                     <Button className="w-full" onClick={handleCreateAlbum} disabled={!newAlbum.name.trim()}>Create Album</Button>
                   </div>
                 </div>

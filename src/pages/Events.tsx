@@ -693,7 +693,7 @@ const Events = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="sticky bottom-0 bg-background pt-2 pb-1">
+              <div className="sticky bottom-0 bg-background pt-2 pb-4">
                 <Button className="w-full" onClick={handleCreateEvent} disabled={!title.trim() || !selectedCircle || !selectedDate || isCreating}>
                   {isCreating ? "Creating..." : "Create Event"}
                 </Button>
