@@ -272,8 +272,6 @@ export function CircleHeader({
               )}
             </>
           )}
-        {/* Bell next to circle name (md+) */}
-          {!isMobile && showNav && !overrideLabel && notifBell}
         </div>
         {/* Mobile: fridge pin + bell */}
         {showNav && !overrideLabel && isMobile && (
@@ -287,9 +285,10 @@ export function CircleHeader({
           </div>
         )}
 
-        {/* Hamburger menu for md–xl range */}
+        {/* Hamburger menu for md–xl range (includes bell) */}
         {showNav && (
-          <div className="hidden md:block xl:hidden ml-auto">
+          <div className="hidden md:flex xl:hidden items-center gap-1 ml-auto">
+            {!overrideLabel && notifBell}
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="sm">
@@ -334,11 +333,18 @@ export function CircleHeader({
                 </Button>
               </Link>
             ))}
+          </nav>
+        )}
+
+        {/* Right side: bell + sign out (xl+ only) */}
+        {showNav && (
+          <div className="hidden xl:flex items-center gap-2 ml-auto">
+            {!overrideLabel && notifBell}
             <Button variant="ghost" size="sm" className="gap-1.5" onClick={onSignOut}>
               <LogOut className="w-4 h-4" />
               <span>Sign Out</span>
             </Button>
-          </nav>
+          </div>
         )}
       </div>
     </header>

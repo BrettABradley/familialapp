@@ -91,7 +91,7 @@ const VideoPlayer = ({ url }: { url: string }) => {
       <video
         ref={videoRef}
         controls
-        className="w-full rounded-lg max-h-[400px]"
+        className="w-full rounded-lg aspect-video object-contain"
         preload="metadata"
         playsInline
         {...(thumbnail ? { poster: thumbnail } : {})}
@@ -258,6 +258,15 @@ export const PostCard = ({
         {/* Link Preview */}
         {firstUrl && <LinkPreviewCard url={firstUrl} />}
 
+        {/* Video and audio items — rendered full-width ABOVE image grid */}
+        {otherMedia.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {otherMedia.map((url, index) => (
+              <MediaItem key={index} url={url} index={index} onDownload={onDownloadImage} />
+            ))}
+          </div>
+        )}
+
         {/* Image grid */}
         {imageUrls.length > 0 && (
           <div className={`grid gap-2 mb-4 ${imageUrls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
@@ -304,15 +313,6 @@ export const PostCard = ({
             )}
           </DialogContent>
         </Dialog>
-
-        {/* Video and audio items */}
-        {otherMedia.length > 0 && (
-          <div className="space-y-2 mb-4">
-            {otherMedia.map((url, index) => (
-              <MediaItem key={index} url={url} index={index} onDownload={onDownloadImage} />
-            ))}
-          </div>
-        )}
 
         <div className="flex items-center gap-4 pt-2 border-t border-border">
           <div className="flex items-center">
