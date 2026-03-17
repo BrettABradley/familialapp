@@ -107,13 +107,13 @@ const Header = () => {
               >
                 About
               </Link>
-              <a 
-                href="mailto:support@familialmedia.com" 
+              <Link 
+                to="/support" 
                 className="text-muted-foreground hover:text-foreground transition-colors py-2"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Contact Support
-              </a>
+                Support
+              </Link>
               <div className="flex flex-col gap-2 pt-4 border-t border-border/50">
                 {user ? (
                   <Link to="/feed" onClick={() => setIsMenuOpen(false)}>

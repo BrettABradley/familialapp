@@ -50,6 +50,7 @@ const App = () => (
             <Route path="/about" element={<About />} />
             <Route path="/careers" element={<Careers />} />
             <Route path="/blog" element={<Blog />} />
+            <Route path="/support" element={<Support />} />
             
             {/* Authenticated routes with persistent layout */}
             <Route element={<AppLayout />}>
