@@ -294,7 +294,7 @@ const ProfileView = () => {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
+    <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
       {/* Profile Header */}
       <Card>
         <CardContent className="py-8">

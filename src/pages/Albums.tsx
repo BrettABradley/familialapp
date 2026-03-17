@@ -697,7 +697,9 @@ const Albums = () => {
                     <Label htmlFor="albumDesc">Description</Label>
                     <Textarea id="albumDesc" placeholder="What's this album about?" value={newAlbum.description} onChange={(e) => setNewAlbum({ ...newAlbum, description: e.target.value })} maxLength={500} />
                   </div>
-                  <Button className="w-full" onClick={handleCreateAlbum} disabled={!newAlbum.name.trim()}>Create Album</Button>
+                  <div className="sticky bottom-0 bg-background pt-2 pb-1">
+                    <Button className="w-full" onClick={handleCreateAlbum} disabled={!newAlbum.name.trim()}>Create Album</Button>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>

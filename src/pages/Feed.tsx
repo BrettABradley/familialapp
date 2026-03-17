@@ -99,7 +99,7 @@ const Feed = () => {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-2xl">
+    <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl">
       <ReadOnlyBanner circleId={selectedCircle} />
       {circles.length > 0 && !readOnly ? (
         <CreatePostForm onPostCreated={() => fetchPosts(true)} />

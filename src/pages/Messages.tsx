@@ -954,7 +954,7 @@ const Messages = () => {
               </Dialog>
             </div>
             {showMemberList && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-lg shadow-lg z-10 max-h-64 overflow-y-auto">
+              <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-lg shadow-lg z-10 max-h-[calc(50vh-var(--keyboard-height,0px))] overflow-y-auto">
                 <p className="text-xs text-muted-foreground px-3 pt-2 pb-1">Circle members</p>
                 {filteredMembers.map((profile) => (
                   <div

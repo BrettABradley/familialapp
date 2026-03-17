@@ -747,9 +747,11 @@ const Events = () => {
               <Label htmlFor="edit-description">Description (optional)</Label>
               <Textarea id="edit-description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} maxLength={2000} />
             </div>
-            <Button className="w-full" onClick={handleSaveEdit} disabled={!editTitle.trim() || !editDate || isSavingEdit}>
-              {isSavingEdit ? "Saving..." : "Save Changes"}
-            </Button>
+            <div className="sticky bottom-0 bg-background pt-2 pb-1">
+              <Button className="w-full" onClick={handleSaveEdit} disabled={!editTitle.trim() || !editDate || isSavingEdit}>
+                {isSavingEdit ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

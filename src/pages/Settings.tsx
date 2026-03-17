@@ -135,7 +135,7 @@ const Settings = () => {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-2xl">
+    <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl">
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
