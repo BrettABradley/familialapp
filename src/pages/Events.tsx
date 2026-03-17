@@ -674,11 +674,11 @@ const Events = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="time">Time (optional)</Label>
-                  <Input id="time" type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} />
+                  <Input id="time" type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="location">Location (optional)</Label>
-                  <Input id="location" placeholder="Place" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} maxLength={300} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
+                  <Input id="location" placeholder="Place" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} maxLength={300} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400)} />
                 </div>
               </div>
               <div className="space-y-2">
@@ -693,7 +693,7 @@ const Events = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="sticky bottom-0 bg-background pt-2 pb-1">
+              <div className="sticky bottom-0 bg-background pt-2 pb-4">
                 <Button className="w-full" onClick={handleCreateEvent} disabled={!title.trim() || !selectedCircle || !selectedDate || isCreating}>
                   {isCreating ? "Creating..." : "Create Event"}
                 </Button>
@@ -759,7 +759,7 @@ const Events = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="sticky bottom-0 bg-background pt-2 pb-1">
+            <div className="sticky bottom-0 bg-background pt-2 pb-4">
               <Button className="w-full" onClick={handleSaveEdit} disabled={!editTitle.trim() || !editDate || isSavingEdit}>
                 {isSavingEdit ? "Saving..." : "Save Changes"}
               </Button>
