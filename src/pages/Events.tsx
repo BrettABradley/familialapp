@@ -744,7 +744,7 @@ const Events = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-location">Location (optional)</Label>
-                <Input id="edit-location" placeholder="Place" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} maxLength={300} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
+                <Input id="edit-location" placeholder="Place" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} maxLength={300} onFocus={(e) => { const target = e.target; setTimeout(() => { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 400); }} />
               </div>
             </div>
             <div className="space-y-2">
