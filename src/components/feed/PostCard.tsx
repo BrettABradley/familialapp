@@ -91,7 +91,7 @@ const VideoPlayer = ({ url }: { url: string }) => {
       <video
         ref={videoRef}
         controls
-        className="w-full rounded-lg max-h-[400px]"
+        className="w-full rounded-lg aspect-video object-contain"
         preload="metadata"
         playsInline
         {...(thumbnail ? { poster: thumbnail } : {})}
