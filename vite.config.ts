@@ -21,5 +21,6 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     include: ["@tanstack/react-query"],
+    exclude: ["@capacitor/keyboard", "@capacitor/status-bar", "@capacitor/core"],
   },
 }));
