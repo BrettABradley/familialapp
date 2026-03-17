@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useKeyboardDismissOnScroll } from "@/hooks/useKeyboardDismissOnScroll";
 import { Link, useSearchParams } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -97,6 +98,8 @@ const Events = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const deepLinkEventId = searchParams.get("eventId");
   const scrolledRef = useRef(false);
+  const mainRef = useRef<HTMLElement>(null);
+  useKeyboardDismissOnScroll(mainRef);
 
   const [events, setEvents] = useState<Event[]>([]);
   const [pastEvents, setPastEvents] = useState<Event[]>([]);
@@ -614,7 +617,7 @@ const Events = () => {
     : albums;
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-4xl">
+    <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-4xl">
       <ReadOnlyBanner circleId={selectedCircle} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
@@ -659,7 +662,7 @@ const Events = () => {
                   className="rounded-md border pointer-events-auto"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="time">Time (optional)</Label>
                   <Input id="time" type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} />
@@ -685,9 +688,11 @@ const Events = () => {
                 <Label htmlFor="description">Description (optional)</Label>
                 <Textarea id="description" placeholder="Add details..." value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} />
               </div>
-              <Button className="w-full" onClick={handleCreateEvent} disabled={!title.trim() || !selectedCircle || !selectedDate || isCreating}>
-                {isCreating ? "Creating..." : "Create Event"}
-              </Button>
+              <div className="sticky bottom-0 bg-background pt-2 pb-1">
+                <Button className="w-full" onClick={handleCreateEvent} disabled={!title.trim() || !selectedCircle || !selectedDate || isCreating}>
+                  {isCreating ? "Creating..." : "Create Event"}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -718,7 +723,7 @@ const Events = () => {
                 className="rounded-md border pointer-events-auto"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-time">Time (optional)</Label>
                 <Input id="edit-time" type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} />
@@ -744,9 +749,11 @@ const Events = () => {
               <Label htmlFor="edit-description">Description (optional)</Label>
               <Textarea id="edit-description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} maxLength={2000} />
             </div>
-            <Button className="w-full" onClick={handleSaveEdit} disabled={!editTitle.trim() || !editDate || isSavingEdit}>
-              {isSavingEdit ? "Saving..." : "Save Changes"}
-            </Button>
+            <div className="sticky bottom-0 bg-background pt-2 pb-1">
+              <Button className="w-full" onClick={handleSaveEdit} disabled={!editTitle.trim() || !editDate || isSavingEdit}>
+                {isSavingEdit ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

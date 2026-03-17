@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useKeyboardDismissOnScroll } from "@/hooks/useKeyboardDismissOnScroll";
 import { useNavigate } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,6 +24,8 @@ const Settings = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  useKeyboardDismissOnScroll(mainRef);
   
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
@@ -132,7 +135,7 @@ const Settings = () => {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-2xl">
+    <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl">
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">

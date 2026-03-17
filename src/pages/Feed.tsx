@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useKeyboardDismissOnScroll } from "@/hooks/useKeyboardDismissOnScroll";
 import { Link, useSearchParams } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ import { useCircleMembers } from "@/hooks/useCircleMembers";
 const Feed = () => {
   const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly, isCircleAdmin } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
+  const mainRef = useRef<HTMLElement>(null);
+  useKeyboardDismissOnScroll(mainRef);
   const adminStatus = isCircleAdmin(selectedCircle);
   const circleMembers = useCircleMembers();
   const [searchParams] = useSearchParams();
@@ -96,7 +99,7 @@ const Feed = () => {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-2xl">
+    <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl">
       <ReadOnlyBanner circleId={selectedCircle} />
       {circles.length > 0 && !readOnly ? (
         <CreatePostForm onPostCreated={() => fetchPosts(true)} />

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useKeyboardDismissOnScroll } from "@/hooks/useKeyboardDismissOnScroll";
 import { Link, useSearchParams } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -49,6 +50,8 @@ const Albums = () => {
   const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
+  const mainRef = useRef<HTMLElement>(null);
+  useKeyboardDismissOnScroll(mainRef);
   const [searchParams] = useSearchParams();
   const circleIdParam = searchParams.get("circle");
   const albumIdParam = searchParams.get("album");
@@ -428,7 +431,7 @@ const Albums = () => {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-4xl">
+    <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-4xl">
       <ReadOnlyBanner circleId={selectedCircle} />
       {selectedAlbum ? (
         // Album Detail View
@@ -694,7 +697,9 @@ const Albums = () => {
                     <Label htmlFor="albumDesc">Description</Label>
                     <Textarea id="albumDesc" placeholder="What's this album about?" value={newAlbum.description} onChange={(e) => setNewAlbum({ ...newAlbum, description: e.target.value })} maxLength={500} />
                   </div>
-                  <Button className="w-full" onClick={handleCreateAlbum} disabled={!newAlbum.name.trim()}>Create Album</Button>
+                  <div className="sticky bottom-0 bg-background pt-2 pb-1">
+                    <Button className="w-full" onClick={handleCreateAlbum} disabled={!newAlbum.name.trim()}>Create Album</Button>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>

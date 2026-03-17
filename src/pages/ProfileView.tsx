@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useKeyboardDismissOnScroll } from "@/hooks/useKeyboardDismissOnScroll";
 import { useParams, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +35,8 @@ const ProfileView = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  useKeyboardDismissOnScroll(mainRef);
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [images, setImages] = useState<ProfileImage[]>([]);
@@ -291,7 +294,7 @@ const ProfileView = () => {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
+    <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
       {/* Profile Header */}
       <Card>
         <CardContent className="py-8">
