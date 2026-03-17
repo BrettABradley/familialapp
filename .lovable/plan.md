@@ -1,20 +1,25 @@
 
 
-## Plan: Move Support to Footer Nav, Fix Security Dead Link
+## Plan: Add Blog placeholder page and link from footer
 
 ### Changes
 
-**1. `src/components/landing/Header.tsx`**
-- Remove the "Support" link from the desktop top nav (line 40-42)
-- Remove the "Support" link from the mobile menu as well
+#### 1. Create `src/pages/Blog.tsx`
+- Same layout as About/Careers pages (Header + Footer, prose styling)
+- Title: "Blog"
+- Placeholder message: "Coming soon — stories, updates, and tips for staying connected as a family."
+- Optional: brief note that posts are on the way
 
-**2. `src/components/landing/Footer.tsx`**
-- Add a "Support" link (`Link to="/support"`) in the Product section (next to Security)
-- Change the Security dead link (`href="#"`) to point to a real route — `/support` makes sense since the Support page covers platform security context, OR create a simple anchor to a security section. Most practical: link Security to `/support` with a hash like `/support#security` or just `/privacy` since privacy/security are closely related.
+#### 2. Update `src/App.tsx`
+- Import Blog and add `/blog` as a public route
 
-I'll link Security to `/privacy` (the Privacy Policy page already exists and covers data security) unless you'd prefer a dedicated security page.
+#### 3. Update `src/components/landing/Footer.tsx`
+- Change the Blog `<a href="#">` to `<Link to="/blog">`
+
+### Files to create
+- `src/pages/Blog.tsx`
 
 ### Files to modify
-- `src/components/landing/Header.tsx` — remove Support from top nav + mobile menu
-- `src/components/landing/Footer.tsx` — add Support link, fix Security link to `/privacy`
+- `src/App.tsx` (add route)
+- `src/components/landing/Footer.tsx` (Blog link ~line 72)
 

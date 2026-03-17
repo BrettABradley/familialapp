@@ -37,9 +37,6 @@ const Header = () => {
             <Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">
               About
             </Link>
-            <Link to="/support" className="text-muted-foreground hover:text-foreground transition-colors">
-              Support
-            </Link>
           </nav>
 
           {/* Desktop CTA */}
@@ -106,13 +103,6 @@ const Header = () => {
                 onClick={() => setIsMenuOpen(false)}
               >
                 About
-              </Link>
-              <Link 
-                to="/support" 
-                className="text-muted-foreground hover:text-foreground transition-colors py-2"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Support
               </Link>
               <div className="flex flex-col gap-2 pt-4 border-t border-border/50">
                 {user ? (
