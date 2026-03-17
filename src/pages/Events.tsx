@@ -686,9 +686,11 @@ const Events = () => {
                 <Label htmlFor="description">Description (optional)</Label>
                 <Textarea id="description" placeholder="Add details..." value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} />
               </div>
-              <Button className="w-full" onClick={handleCreateEvent} disabled={!title.trim() || !selectedCircle || !selectedDate || isCreating}>
-                {isCreating ? "Creating..." : "Create Event"}
-              </Button>
+              <div className="sticky bottom-0 bg-background pt-2 pb-1">
+                <Button className="w-full" onClick={handleCreateEvent} disabled={!title.trim() || !selectedCircle || !selectedDate || isCreating}>
+                  {isCreating ? "Creating..." : "Create Event"}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
