@@ -98,6 +98,8 @@ const Events = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const deepLinkEventId = searchParams.get("eventId");
   const scrolledRef = useRef(false);
+  const mainRef = useRef<HTMLElement>(null);
+  useKeyboardDismissOnScroll(mainRef);
 
   const [events, setEvents] = useState<Event[]>([]);
   const [pastEvents, setPastEvents] = useState<Event[]>([]);

@@ -24,7 +24,7 @@ const Settings = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const mainRef = useRef<HTMLMainElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   useKeyboardDismissOnScroll(mainRef);
   
   const [displayName, setDisplayName] = useState("");

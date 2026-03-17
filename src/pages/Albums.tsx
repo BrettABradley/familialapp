@@ -50,7 +50,7 @@ const Albums = () => {
   const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
-  const mainRef = useRef<HTMLMainElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   useKeyboardDismissOnScroll(mainRef);
   const [searchParams] = useSearchParams();
   const circleIdParam = searchParams.get("circle");
