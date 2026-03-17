@@ -1,5 +1,5 @@
 import Header from "@/components/landing/Header";
-import { Footer } from "@/components/landing/Footer";
+import Footer from "@/components/landing/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Newspaper, Calendar, Image, MessageSquare, Pin, Mail, Phone } from "lucide-react";
 
