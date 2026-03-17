@@ -660,7 +660,7 @@ const Events = () => {
                   className="rounded-md border pointer-events-auto"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="time">Time (optional)</Label>
                   <Input id="time" type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} />
