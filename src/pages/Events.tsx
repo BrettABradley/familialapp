@@ -674,7 +674,7 @@ const Events = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="time">Time (optional)</Label>
-                  <Input id="time" type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} />
+                  <Input id="time" type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="location">Location (optional)</Label>
