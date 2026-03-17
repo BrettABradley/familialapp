@@ -16,7 +16,7 @@ const TransferBlockBanner = () => {
   const [showUpgrade, setShowUpgrade] = useState(false);
 
   const circle = circles.find(c => c.id === selectedCircle);
-  if (!circle || !(circle as any).transfer_block) return null;
+  if (!circle || !circle.transfer_block) return null;
 
   const isOwner = circle.owner_id === user?.id;
 
