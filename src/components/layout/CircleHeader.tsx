@@ -21,7 +21,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { LogOut, Users, Calendar, Settings, Pin, MessageSquare, Image, Menu, Home, User, Bell, Check, Trash2 } from "lucide-react";
+import { LogOut, Users, Calendar, Settings, Pin, MessageSquare, Image, Menu, Home, User, Bell, Check, Trash2, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import icon from "@/assets/icon.png";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -184,8 +184,13 @@ export function CircleHeader({
         {bellButton}
       </SheetTrigger>
       <SheetContent side="top" className="p-0 rounded-b-lg pt-[env(safe-area-inset-top)]">
-        <SheetHeader className="sr-only">
-          <SheetTitle>Notifications</SheetTitle>
+        <SheetHeader className="flex flex-row items-center justify-between px-4 pt-3 pb-0">
+          <SheetTitle className="text-sm font-serif font-semibold">Notifications</SheetTitle>
+          <SheetClose asChild>
+            <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px]">
+              <X className="w-4 h-4" />
+            </Button>
+          </SheetClose>
         </SheetHeader>
         {notifContent}
       </SheetContent>
