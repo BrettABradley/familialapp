@@ -27,6 +27,7 @@ import CookiePolicy from "./pages/CookiePolicy";
 import About from "./pages/About";
 import Careers from "./pages/Careers";
 import Blog from "./pages/Blog";
+import Support from "./pages/Support";
 
 const queryClient = new QueryClient();
 
