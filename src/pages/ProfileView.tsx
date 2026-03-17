@@ -35,6 +35,8 @@ const ProfileView = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mainRef = useRef<HTMLMainElement>(null);
+  useKeyboardDismissOnScroll(mainRef);
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [images, setImages] = useState<ProfileImage[]>([]);
