@@ -766,6 +766,7 @@ const Messages = () => {
               <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setIsDeleteGroupOpen(true)}><Trash2 className="w-4 h-4" /></Button>
             </div>
           )}
+          </div>
         </div>
 
         {/* Delete Group Confirmation */}
