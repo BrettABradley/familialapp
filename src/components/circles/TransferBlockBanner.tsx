@@ -26,7 +26,7 @@ const TransferBlockBanner = () => {
 
     const oldOwnerId = circle.owner_id;
 
-    const { error } = await supabase.rpc("claim_circle_ownership" as any, {
+    const { error } = await supabase.rpc("claim_circle_ownership", {
       _circle_id: circle.id,
     });
 
