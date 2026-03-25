@@ -178,7 +178,7 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-start pt-[calc(env(safe-area-inset-top,0px)+1rem)] sm:pt-0 sm:justify-center px-4 overflow-y-auto pb-[env(safe-area-inset-bottom,0px)]">
+    <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center px-4 overflow-y-auto pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">

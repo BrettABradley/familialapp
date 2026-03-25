@@ -35,6 +35,15 @@ const DialogContent = React.forwardRef<
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      onFocusCapture={(e) => {
+        const container = e.currentTarget;
+        const prevScrollTop = container.scrollTop;
+        requestAnimationFrame(() => {
+          if (container.scrollTop !== prevScrollTop) {
+            container.scrollTop = prevScrollTop;
+          }
+        });
+      }}
       className={cn(
         "fixed z-50 grid w-full gap-4 border bg-background shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         // Mobile: top-anchored, full-width, respects dynamic viewport (keyboard) + safe-area
