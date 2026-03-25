@@ -1,29 +1,45 @@
 
 
-## Plan: Fix Post-Login Redirect + Auth Page Logo Size + Unnecessary Keyboard Scroll
+## Plan: Fix Login Logo Size, Post-Login Redirect, Card Position, and Auto-Scroll Bugs
 
-### Three Issues
+### Four Issues
 
-**Issue 1 — Login redirects to Settings instead of Circles**: When a user's session expires while on `/settings` (or `/profile`), `AppLayout` saves that path to `postAuthRedirect`. On next login, `Auth.tsx` reads it and navigates there instead of `/circles`. Fix: exclude `/settings` and `/profile` paths from being saved as redirect targets.
+**Issue 1 — Logo too small**: The logo was changed to `h-16 sm:h-24` but user wants the original `h-24` size on mobile too. Revert to `h-24`.
 
-**Issue 2 — Logo too large on mobile login**: The `h-24` logo pushes the card content down, making it look awkward and contributing to the keyboard overlap issue. Reduce to `h-16` on mobile, keep `h-24` on desktop.
+**Issue 2 — Login redirects to Settings**: Despite the exclusion logic in `AppLayout`, a stale `postAuthRedirect` value may persist in localStorage from before the fix was deployed. Two fixes needed: (a) clear `postAuthRedirect` during sign-out, (b) add a safety check in `Auth.tsx` that rejects saved redirects to `/settings` or `/profile`.
 
-**Issue 3 — Unnecessary scroll on keyboard open**: The global `scroll-margin-bottom: 260px` on all inputs causes the browser to aggressively scroll inputs into view even when they're already visible. This creates the jarring "scroll up" effect on forms like Create Album and Events where everything fits. Reduce this value to something more conservative (e.g., `80px` — just enough to clear the input, not enough to force a large scroll).
+**Issue 3 — Card too high on mobile (overlapping Dynamic Island)**: The card uses `pt-12` which isn't enough on phones with a Dynamic Island. Change to `pt-[calc(env(safe-area-inset-top,0px)+1rem)]` so the card sits below the camera cutout, and remove the fixed `pt-12`.
+
+**Issue 4 — Unnecessary auto-scrolling on input focus**: Multiple form components have manual `onFocus={() => scrollIntoView()}` handlers that force the page to jump even when the input is already visible. With `resize: 'body'` now active, the browser handles this natively. These manual handlers should be removed from:
+- `src/pages/Events.tsx` — 6 occurrences on description, time, location inputs (create + edit forms)
+- `src/pages/Albums.tsx` — 2 occurrences on album name and description inputs
+- `src/pages/Circles.tsx` — 1 occurrence on alias rename input
+
+The global `scroll-margin-bottom: 80px` in CSS already provides a small buffer for the native scroll behavior.
 
 ### Changes
 
-#### 1. `src/components/layout/AppLayout.tsx` — Filter redirect paths
-- Don't save `/settings` or `/profile` to `postAuthRedirect` — these are not meaningful return destinations after login. Always land on `/circles`.
+#### 1. `src/pages/Auth.tsx`
+- Revert logo from `h-16 sm:h-24` back to `h-24`
+- Change `pt-12` to `pt-[calc(env(safe-area-inset-top,0px)+1rem)]` to respect Dynamic Island
+- Add safety filter on `savedRedirect` — skip if it starts with `/settings` or `/profile`
 
-#### 2. `src/pages/Auth.tsx` — Smaller logo on mobile
-- Change logo from `h-24` to `h-16 sm:h-24` so it's more compact on mobile
-- Also fix the duplicate nested div in the loading state
+#### 2. `src/components/layout/AppLayout.tsx`
+- In `handleSignOut`, also clear `postAuthRedirect` from localStorage
 
-#### 3. `src/index.css` — Reduce scroll-margin-bottom
-- Change from `260px` to `80px` to prevent unnecessary large scrolls when inputs are already visible. The keyboard resize (`resize: 'body'`) handles the main visibility — the margin just needs a small buffer.
+#### 3. `src/pages/Events.tsx`
+- Remove all `onFocus={(e) => setTimeout(() => e.target.scrollIntoView(...))}` handlers (6 instances)
+
+#### 4. `src/pages/Albums.tsx`
+- Remove `onFocus` scrollIntoView handlers (2 instances)
+
+#### 5. `src/pages/Circles.tsx`
+- Remove `onFocus` scrollIntoView handler (1 instance)
 
 ### Files to modify
-- `src/components/layout/AppLayout.tsx` — filter saved redirect paths
-- `src/pages/Auth.tsx` — smaller mobile logo, fix loading state
-- `src/index.css` — reduce scroll-margin-bottom
+- `src/pages/Auth.tsx`
+- `src/components/layout/AppLayout.tsx`
+- `src/pages/Events.tsx`
+- `src/pages/Albums.tsx`
+- `src/pages/Circles.tsx`
 
