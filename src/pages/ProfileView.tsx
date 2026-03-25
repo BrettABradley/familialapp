@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, MapPin, ImagePlus, Trash2, Play, Download, Pencil } from "lucide-react";
+import { Settings, MapPin, ImagePlus, Trash2, Play, Download, Pencil, X } from "lucide-react";
 import { getMediaType } from "@/lib/mediaUtils";
 import { Textarea } from "@/components/ui/textarea";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
@@ -383,31 +383,44 @@ const ProfileView = () => {
 
       {/* Image Lightbox */}
       <Dialog open={!!enlargedImage} onOpenChange={(open) => !open && setEnlargedImage(null)}>
-        <DialogContent className="max-w-3xl p-2 bg-background/95">
+        <DialogContent className="max-w-3xl p-2 bg-background/95 [&>button:last-child]:hidden">
           {enlargedImage && (
             <div className="flex flex-col items-center">
-              <div className="relative group">
+              <div className="flex items-center justify-end gap-2 w-full mb-2 pr-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                  onClick={() => handleDownload(enlargedImage.image_url)}
+                  aria-label="Download"
+                >
+                  <Download className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                  onClick={() => setEnlargedImage(null)}
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+              <div className="relative">
                 {getMediaType(enlargedImage.image_url) === 'video' ? (
                   <video
                     src={enlargedImage.image_url}
                     controls
                     autoPlay
-                    className="max-h-[80vh] w-auto rounded-lg"
+                    className="max-h-[75vh] w-auto rounded-lg"
                   />
                 ) : (
                   <img
                     src={enlargedImage.image_url}
                     alt={enlargedImage.caption || "Profile photo"}
-                    className="max-h-[80vh] w-auto object-contain rounded-lg"
+                    className="max-h-[75vh] w-auto object-contain rounded-lg"
                   />
                 )}
-                <button
-                  onClick={() => handleDownload(enlargedImage.image_url)}
-                  className="absolute bottom-2 right-2 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
-                  aria-label="Download"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
               </div>
               {(profileData?.display_name || enlargedImage.caption) && (
                 <p className="mt-3 text-sm text-muted-foreground">
