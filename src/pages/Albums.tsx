@@ -586,12 +586,44 @@ const Albums = () => {
 
           {/* Enlarged photo dialog with navigation */}
           <Dialog open={!!enlargedPhoto} onOpenChange={(open) => !open && setEnlargedPhoto(null)}>
-            <DialogContent className="max-w-3xl p-2 sm:p-4">
+            <DialogContent className="max-w-3xl p-2 sm:p-4 [&>button:last-child]:hidden">
               <DialogTitle className="sr-only">{enlargedPhoto?.caption || "Photo"}</DialogTitle>
               {enlargedPhoto && (() => {
                 const currentIndex = photos.findIndex(p => p.id === enlargedPhoto.id);
                 return (
                   <div className="flex flex-col items-center">
+                    <div className="flex items-center justify-end gap-2 w-full mb-2 pt-2 pr-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                        onClick={() => {
+                          fetch(enlargedPhoto.photo_url)
+                            .then(r => r.blob())
+                            .then(blob => {
+                              const link = document.createElement("a");
+                              link.href = URL.createObjectURL(blob);
+                              link.download = enlargedPhoto.photo_url.split("/").pop() || "photo.jpg";
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                              URL.revokeObjectURL(link.href);
+                            });
+                        }}
+                        aria-label="Download"
+                      >
+                        <Download className="h-5 w-5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                        onClick={() => setEnlargedPhoto(null)}
+                        aria-label="Close"
+                      >
+                        <X className="h-5 w-5" />
+                      </Button>
+                    </div>
                     <div className="relative group w-full flex items-center justify-center">
                       {photos.length > 1 && (
                         <Button
@@ -621,31 +653,11 @@ const Albums = () => {
                         </Button>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-3">
-                      {photos.length > 1 && (
+                    {photos.length > 1 && (
+                      <div className="flex items-center gap-3 mt-3">
                         <span className="text-sm text-muted-foreground">{currentIndex + 1} / {photos.length}</span>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const link = document.createElement("a");
-                          fetch(enlargedPhoto.photo_url)
-                            .then(r => r.blob())
-                            .then(blob => {
-                              link.href = URL.createObjectURL(blob);
-                              link.download = enlargedPhoto.photo_url.split("/").pop() || "photo.jpg";
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                              URL.revokeObjectURL(link.href);
-                            });
-                        }}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </Button>
-                    </div>
+                      </div>
+                    )}
                     {enlargedPhoto.caption && (
                       <p className="mt-2 text-sm text-muted-foreground">{enlargedPhoto.caption}</p>
                     )}

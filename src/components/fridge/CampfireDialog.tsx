@@ -115,7 +115,7 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
           {/* Custom mobile close button — large & visible */}
           <button
             onClick={() => onOpenChange(false)}
-            className="absolute top-3 right-3 z-50 md:hidden flex items-center justify-center w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm border border-white/20 active:bg-black/70 transition-colors"
+            className="absolute top-3 right-3 z-50 flex items-center justify-center w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm border border-white/20 active:bg-black/70 transition-colors"
             aria-label="Close"
           >
             <X className="w-5 h-5 text-white" />
