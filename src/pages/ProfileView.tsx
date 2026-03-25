@@ -386,7 +386,7 @@ const ProfileView = () => {
         <DialogContent className="max-w-3xl p-2 bg-background/95 [&>button:last-child]:hidden">
           {enlargedImage && (
             <div className="flex flex-col items-center">
-              <div className="flex items-center justify-end gap-2 w-full mb-2 pt-2 pr-1">
+              <div className="flex items-center justify-end gap-2 w-full mb-2 pt-[max(env(safe-area-inset-top,0px),0.5rem)] pr-1">
                 <Button
                   variant="ghost"
                   size="icon"
