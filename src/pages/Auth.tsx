@@ -171,13 +171,15 @@ const Auth = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center px-4 overflow-y-auto pb-[env(safe-area-inset-bottom,0px)]">
+    <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-start pt-12 sm:pt-0 sm:justify-center px-4 overflow-y-auto pb-[env(safe-area-inset-bottom,0px)]">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
