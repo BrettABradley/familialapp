@@ -1,30 +1,34 @@
 
 
-## Plan: Add Voice Memos to Campfire Stories
+## Plan: Drop Close Buttons Below the Notch Globally
 
 ### Problem
-Campfire stories currently only support text. Users want to record and share 2-minute voice memos as campfire responses.
+On the native mobile app, the X close button on dialogs sits behind the iPhone Dynamic Island/notch because the absolute positioning (`top-4`) doesn't account for the safe area inset. This affects the campfire dialog, fridge creation dialog, personal profile post lightbox, and any other dialog using the default close button.
+
+### Root Cause
+- `dialog.tsx` default close button: `absolute right-4 top-4` — this is relative to the dialog container, but since the container uses `pt-[max(env(safe-area-inset-top),1.5rem)]`, the button overlaps the safe area
+- `CampfireDialog.tsx` custom close button: `absolute top-3 right-3` — directly behind the Dynamic Island
 
 ### Changes
 
-#### 1. Database Migration
-- Add `audio_url text` nullable column to `campfire_stories` table
-- Update the validation trigger to allow stories with audio but no text content (currently `content` is NOT NULL)
+#### 1. `src/components/ui/dialog.tsx` — Global fix for all dialogs
+- Change close button from `top-4` to `top-[max(env(safe-area-inset-top,0px),1rem)]` so it always clears the notch on mobile
+- On desktop (`sm:` breakpoint), the safe area inset is 0 so it just uses `1rem` — no visual change
 
-#### 2. `src/components/fridge/CampfireDialog.tsx`
-- Import `VoiceRecorder` component (already exists, supports 2-min max)
-- Add state for recorded audio blob/file and preview URL
-- In the submit form area, add a VoiceRecorder below the textarea
-- When a voice memo is recorded, show an audio player preview with a Remove button
-- On submit: if audio exists, upload to `post-media` storage bucket, get public URL, and include `audio_url` in the insert
-- Allow submission with text-only, audio-only, or both
-- In the chat bubble display area, render an `<audio>` player when `currentStory.audio_url` exists (alongside any text)
-- Update the `CampfireStory` interface to include `audio_url`
+#### 2. `src/components/fridge/CampfireDialog.tsx` — Campfire close button
+- Change `top-3 right-3` to `top-[max(env(safe-area-inset-top,0px),0.75rem)] right-3` to clear the Dynamic Island
 
-#### 3. Content length adjustment
-- Make `content` column nullable or allow empty string when audio is provided — handled via migration changing `content` to nullable with a check that at least one of content/audio_url is present
+#### 3. `src/components/ui/sheet.tsx` — Sheet close button
+- Change `top-6` to `top-[max(env(safe-area-inset-top,0px),1.5rem)]` for consistency
+
+#### 4. `src/pages/ProfileView.tsx` — Profile post lightbox custom buttons
+- The custom Download + X button row needs safe-area top padding: change `pt-2` to `pt-[max(env(safe-area-inset-top,0px),0.5rem)]`
 
 ### Files to modify
-- New migration SQL — add `audio_url` column, make `content` nullable, add validation
-- `src/components/fridge/CampfireDialog.tsx` — voice recording UI + audio playback in stories
+- `src/components/ui/dialog.tsx` — safe-area-aware close button top position
+- `src/components/ui/sheet.tsx` — safe-area-aware close button top position
+- `src/components/fridge/CampfireDialog.tsx` — safe-area-aware custom close button
+- `src/pages/ProfileView.tsx` — safe-area padding on custom button row
+
+This single global change in `dialog.tsx` fixes every dialog that uses the default close button (fridge creation, albums, events, avatar crop, etc.) without needing per-component fixes.
 
