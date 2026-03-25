@@ -871,29 +871,16 @@ const Circles = () => {
               <p className="text-muted-foreground text-center py-4">No members yet</p>
             ) : (
               memberships.map((member) => (
-                <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border border-border">
-                  <Link to={`/profile/${member.user_id}`} onClick={() => setIsMembersOpen(false)}>
-                    <Avatar className="h-10 w-10"><AvatarImage src={member.profiles?.avatar_url || undefined} /><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
-                  </Link>
-                  <div className="flex-1">
-                    <Link to={`/profile/${member.user_id}`} onClick={() => setIsMembersOpen(false)} className="font-medium text-foreground hover:underline">
-                      {member.profiles?.display_name || "Unknown"}
-                    </Link>
-                    <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
-                  </div>
-                   {selectedCircle && isOwner(selectedCircle) && member.user_id !== user?.id && (
-                    <div className="flex items-center gap-2">
-                      <Select value={member.role} onValueChange={(val) => handleUpdateRole(member, val)}>
-                        <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="member">Member</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(member)} aria-label={`Remove ${member.profiles?.display_name || 'member'}`}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                    </div>
-                  )}
-                </div>
+                <MemberRow
+                  key={member.id}
+                  member={member}
+                  isOwner={!!selectedCircle && isOwner(selectedCircle)}
+                  currentUserId={user?.id}
+                  circleId={selectedCircle?.id}
+                  onUpdateRole={handleUpdateRole}
+                  onRemove={handleRemoveMember}
+                  onCloseDialog={() => setIsMembersOpen(false)}
+                />
               ))
             )}
           </div>

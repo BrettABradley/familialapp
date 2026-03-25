@@ -401,6 +401,17 @@ export function FridgeBoard({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Campfire Dialog */}
+      {campfirePin && (
+        <CampfireDialog
+          open={!!campfirePin}
+          onOpenChange={(open) => !open && setCampfirePin(null)}
+          pinId={campfirePin.id}
+          pinTitle={campfirePin.title}
+          prompt={campfirePin.campfire_prompt || null}
+        />
+      )}
     </section>
   );
 }
