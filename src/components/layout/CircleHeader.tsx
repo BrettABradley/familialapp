@@ -174,11 +174,6 @@ function NotificationBell({ userId, selectedCircle, variant }: { userId: string;
           <SheetHeader className="flex flex-row items-center justify-between px-4 pt-3 pb-0">
             <SheetTitle className="text-sm font-serif font-semibold">Notifications</SheetTitle>
             {actionButtons}
-            <SheetClose asChild>
-              <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px]">
-                <X className="w-4 h-4" />
-              </Button>
-            </SheetClose>
           </SheetHeader>
           {notifList}
         </SheetContent>
