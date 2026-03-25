@@ -170,7 +170,7 @@ export function CircleHeader({
   );
 
   const bellButton = (
-    <Button variant="ghost" size="sm" className="relative" onClick={() => setBellOpen(!bellOpen)}>
+    <Button variant="ghost" size="sm" className="relative">
       <Bell className="w-4 h-4" />
       {unreadCount > 0 && (
         <span className="absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">

@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp, Trash2, Pencil, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp, Trash2, Pencil, Check, X, ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { LinkifiedText } from "@/components/shared/LinkifiedText";
 import { LinkPreviewCard } from "@/components/feed/LinkPreviewCard";
@@ -118,11 +118,65 @@ const VideoPlayer = ({ url }: { url: string }) => {
   );
 };
 
-const MediaItem = ({ url, index, onDownload, onImageClick }: { url: string; index: number; onDownload: (url: string) => void; onImageClick?: (index: number) => void }) => {
+const VideoThumbnail = ({ url, onClick }: { url: string; onClick: () => void }) => {
+  const [thumbnail, setThumbnail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+
+    const handleSeeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 360;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          setThumbnail(canvas.toDataURL("image/jpeg", 0.7));
+        }
+      } catch {}
+      video.removeEventListener("seeked", handleSeeked);
+      video.src = "";
+      video.load();
+    };
+
+    video.addEventListener("loadeddata", () => { video.currentTime = 0.1; });
+    video.addEventListener("seeked", handleSeeked);
+    video.addEventListener("error", () => {});
+    video.load();
+
+    return () => { video.removeEventListener("seeked", handleSeeked); video.src = ""; };
+  }, [url]);
+
+  return (
+    <div
+      className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer bg-secondary"
+      onClick={onClick}
+    >
+      {thumbnail ? (
+        <img src={thumbnail} alt="Video thumbnail" className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full bg-muted animate-pulse" />
+      )}
+      <div className="absolute inset-0 flex items-center justify-center bg-foreground/10 group-hover:bg-foreground/20 transition-colors">
+        <div className="bg-background/80 rounded-full p-3">
+          <Play className="w-6 h-6 text-foreground fill-current" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MediaItem = ({ url, index, onDownload, onImageClick, onVideoClick }: { url: string; index: number; onDownload: (url: string) => void; onImageClick?: (index: number) => void; onVideoClick?: (url: string) => void }) => {
   const mediaType = getMediaType(url);
 
   if (mediaType === 'video') {
-    return <VideoPlayer url={url} />;
+    return <VideoThumbnail url={url} onClick={() => onVideoClick?.(url)} />;
   }
 
   if (mediaType === 'audio') {
