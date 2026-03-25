@@ -394,6 +394,27 @@ export const PostCard = ({
           </DialogContent>
         </Dialog>
 
+        {/* Video Lightbox */}
+        <Dialog open={videoLightboxUrl !== null} onOpenChange={(open) => !open && setVideoLightboxUrl(null)}>
+          <DialogContent className="max-w-4xl p-2 bg-background/95">
+            {videoLightboxUrl && (
+              <div className="flex flex-col items-center">
+                <video
+                  controls
+                  autoPlay
+                  className="max-h-[80vh] w-auto object-contain rounded-lg"
+                  preload="metadata"
+                  playsInline
+                >
+                  <source src={videoLightboxUrl} type="video/mp4" />
+                  <source src={videoLightboxUrl} type="video/quicktime" />
+                  <source src={videoLightboxUrl} />
+                </video>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
         <div className="flex items-center gap-4 pt-2 border-t border-border">
           <div className="flex items-center">
             <Button variant="ghost" size="sm" onClick={() => onReaction(post.id)} className={hasUserReacted ? "text-destructive" : ""}>
