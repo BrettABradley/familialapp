@@ -360,12 +360,12 @@ export function FridgeBoard({
                 </p>
               </div>
               {/* Action buttons */}
-              <div className="absolute top-1 right-1 flex gap-1">
+              <div className="absolute top-2 right-2 flex gap-2">
                 {enlargedPin.image_url && (
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 rounded-none text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
+                    className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
                     onClick={async () => {
                       try {
                         const res = await fetch(enlargedPin.image_url!);
@@ -385,16 +385,16 @@ export function FridgeBoard({
                     }}
                     aria-label="Download"
                   >
-                    <Download className="h-4 w-4" />
+                    <Download className="h-5 w-5" />
                   </Button>
                 )}
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 rounded-none text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50"
+                  className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
                   onClick={() => setEnlargedPin(null)}
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-5 w-5" />
                 </Button>
               </div>
             </div>
