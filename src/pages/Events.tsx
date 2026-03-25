@@ -654,7 +654,7 @@ const Events = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="description">Description (optional)</Label>
-                <Textarea id="description" placeholder="Add details..." value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
+                <Textarea id="description" placeholder="Add details..." value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} />
               </div>
               <div className="space-y-2">
                 <Label>Event Date(s)</Label>
@@ -672,11 +672,11 @@ const Events = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="time">Time (optional)</Label>
-                  <Input id="time" type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
+                  <Input id="time" type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="location">Location (optional)</Label>
-                  <Input id="location" placeholder="Place" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} maxLength={300} onFocus={(e) => { const target = e.target; setTimeout(() => { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 400); }} />
+                  <Input id="location" placeholder="Place" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} maxLength={300} />
                 </div>
               </div>
               <div className="space-y-2 pb-4">
@@ -718,7 +718,7 @@ const Events = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-description">Description (optional)</Label>
-              <Textarea id="edit-description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} maxLength={2000} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
+              <Textarea id="edit-description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} maxLength={2000} />
             </div>
             <div className="space-y-2">
               <Label>Event Date(s)</Label>
@@ -740,7 +740,7 @@ const Events = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-location">Location (optional)</Label>
-                <Input id="edit-location" placeholder="Place" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} maxLength={300} onFocus={(e) => { const target = e.target; setTimeout(() => { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 400); }} />
+                <Input id="edit-location" placeholder="Place" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} maxLength={300} />
               </div>
             </div>
             <div className="space-y-2">
