@@ -10,8 +10,8 @@ const config: CapacitorConfig = {
       style: 'LIGHT',
     },
     Keyboard: {
-      resize: 'none',
-      resizeOnFullScreen: false,
+      resize: 'body',
+      resizeOnFullScreen: true,
     },
   },
 };
