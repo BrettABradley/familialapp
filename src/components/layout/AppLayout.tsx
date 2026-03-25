@@ -35,6 +35,7 @@ function AppLayoutContent() {
   const handleSignOut = async () => {
     signingOut.current = true;
     localStorage.removeItem("selectedCircle");
+    localStorage.removeItem("postAuthRedirect");
     await signOut();
     window.location.href = "/auth";
   };

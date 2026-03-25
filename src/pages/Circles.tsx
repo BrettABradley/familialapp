@@ -122,7 +122,7 @@ const MemberRow = ({ member, isOwner: isCircleOwner, currentUserId, circleId, on
                 maxLength={50}
                 className="h-7 text-xs"
                 autoFocus
-                onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
+                
                 onKeyDown={(e) => { if (e.key === "Enter") saveAlias(); if (e.key === "Escape") setIsEditingAlias(false); }}
                 onBlur={saveAlias}
               />

@@ -706,11 +706,11 @@ const Albums = () => {
                 <div className="space-y-4 pb-48">
                   <div className="space-y-2">
                     <Label htmlFor="albumName">Album Name *</Label>
-                    <Input id="albumName" placeholder="e.g., Summer Vacation 2024" value={newAlbum.name} onChange={(e) => setNewAlbum({ ...newAlbum, name: e.target.value })} maxLength={100} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
+                    <Input id="albumName" placeholder="e.g., Summer Vacation 2024" value={newAlbum.name} onChange={(e) => setNewAlbum({ ...newAlbum, name: e.target.value })} maxLength={100} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="albumDesc">Description</Label>
-                    <Textarea id="albumDesc" placeholder="What's this album about?" value={newAlbum.description} onChange={(e) => setNewAlbum({ ...newAlbum, description: e.target.value })} maxLength={500} onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)} />
+                    <Textarea id="albumDesc" placeholder="What's this album about?" value={newAlbum.description} onChange={(e) => setNewAlbum({ ...newAlbum, description: e.target.value })} maxLength={500} />
                   </div>
                   <div className="sticky bottom-0 bg-background pt-2 pb-4">
                     <Button className="w-full" onClick={handleCreateAlbum} disabled={!newAlbum.name.trim()}>Create Album</Button>
