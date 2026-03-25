@@ -64,13 +64,12 @@ const MemberRow = ({ member, isOwner: isCircleOwner, currentUserId, circleId, on
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!circleId || !currentUserId || member.user_id === currentUserId) return;
+    if (!currentUserId || member.user_id === currentUserId) return;
     supabase
       .from("member_aliases" as any)
       .select("alias")
       .eq("user_id", currentUserId)
       .eq("target_user_id", member.user_id)
-      .eq("circle_id", circleId)
       .maybeSingle()
       .then(({ data }: any) => {
         if (data) {
@@ -78,14 +77,14 @@ const MemberRow = ({ member, isOwner: isCircleOwner, currentUserId, circleId, on
           setAliasValue(data.alias);
         }
       });
-  }, [circleId, currentUserId, member.user_id]);
+  }, [currentUserId, member.user_id]);
 
   const saveAlias = async () => {
-    if (!circleId || !currentUserId) return;
+    if (!currentUserId) return;
     setIsEditingAlias(false);
     const trimmed = aliasValue.trim();
     if (!trimmed) {
-      await supabase.from("member_aliases" as any).delete().eq("user_id", currentUserId).eq("target_user_id", member.user_id).eq("circle_id", circleId);
+      await supabase.from("member_aliases" as any).delete().eq("user_id", currentUserId).eq("target_user_id", member.user_id);
       setSavedAlias(null);
       setAliasValue("");
       return;
@@ -93,9 +92,9 @@ const MemberRow = ({ member, isOwner: isCircleOwner, currentUserId, circleId, on
     const { error } = await supabase.from("member_aliases" as any).upsert({
       user_id: currentUserId,
       target_user_id: member.user_id,
-      circle_id: circleId,
+      circle_id: circleId || "",
       alias: trimmed,
-    } as any, { onConflict: "user_id,target_user_id,circle_id" });
+    } as any, { onConflict: "user_id,target_user_id" });
     if (error) {
       toast({ title: "Error", description: "Failed to save alias.", variant: "destructive" });
     } else {

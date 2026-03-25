@@ -193,13 +193,12 @@ export const useFeedPosts = () => {
 
       // Helper to get alias or fallback to display name
       const getActorName = async (recipientId: string): Promise<string> => {
-        if (!post?.circle_id || !user) return displayName;
+        if (!user) return displayName;
         const { data } = await supabase
           .from("member_aliases" as any)
           .select("alias")
           .eq("user_id", recipientId)
           .eq("target_user_id", user.id)
-          .eq("circle_id", post.circle_id)
           .maybeSingle();
         return (data as any)?.alias || displayName;
       };
