@@ -95,7 +95,9 @@ const Fridge = () => {
   };
 
   const handleCreatePin = async () => {
-    if (!title.trim() || !selectedCircle || !user) return;
+    const effectiveTitle = pinType === "campfire" ? "Campfire" : title.trim();
+    if (!effectiveTitle || !selectedCircle || !user) return;
+    if (pinType === "campfire" && !campfirePrompt.trim()) return;
 
     if (pins.length >= 8) {
       toast({
@@ -123,7 +125,7 @@ const Fridge = () => {
     }
 
     const insertData: any = {
-      title: title.trim(),
+      title: pinType === "campfire" ? "Campfire" : title.trim(),
       content: pinType === "campfire" ? null : (content.trim() ? content.trim() : null),
       circle_id: selectedCircle,
       pinned_by: user.id,
@@ -264,7 +266,7 @@ const Fridge = () => {
                 </DialogDescription>
               </DialogHeader>
               <ScrollArea className="max-h-[70vh]">
-              <div className="space-y-4 mt-4 pr-4">
+              <div className="space-y-4 mt-4 px-1">
                 <div className="space-y-2">
                   <Label>Circle</Label>
                   <Select value={selectedCircle} onValueChange={setSelectedCircle}>
@@ -302,16 +304,18 @@ const Fridge = () => {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="title">Title</Label>
-                  <Input
-                    id="title"
-                    placeholder="e.g., Grocery List"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    maxLength={100}
-                  />
-                </div>
+                {pinType !== "campfire" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Title</Label>
+                    <Input
+                      id="title"
+                      placeholder="e.g., Grocery List"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      maxLength={100}
+                    />
+                  </div>
+                )}
 
                 {pinType === "campfire" ? (
                   <div className="space-y-2">
@@ -421,7 +425,9 @@ const Fridge = () => {
                 <Button 
                   className="w-full" 
                   onClick={handleCreatePin}
-                  disabled={!title.trim() || !selectedCircle || isCreating}
+                  disabled={
+                    (pinType === "campfire" ? !campfirePrompt.trim() : !title.trim()) || !selectedCircle || isCreating
+                  }
                 >
                   {isCreating ? "Pinning..." : "Pin to Fridge"}
                 </Button>
