@@ -51,22 +51,25 @@ export type Database = {
       }
       campfire_stories: {
         Row: {
+          audio_url: string | null
           author_id: string
-          content: string
+          content: string | null
           created_at: string
           fridge_pin_id: string
           id: string
         }
         Insert: {
+          audio_url?: string | null
           author_id: string
-          content: string
+          content?: string | null
           created_at?: string
           fridge_pin_id: string
           id?: string
         }
         Update: {
+          audio_url?: string | null
           author_id?: string
-          content?: string
+          content?: string | null
           created_at?: string
           fridge_pin_id?: string
           id?: string
