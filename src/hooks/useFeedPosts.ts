@@ -191,15 +191,28 @@ export const useFeedPosts = () => {
       const post = posts.find(p => p.id === postId);
       const displayName = profile?.display_name || "Someone";
 
+      // Helper to get alias or fallback to display name
+      const getActorName = async (recipientId: string): Promise<string> => {
+        if (!post?.circle_id || !user) return displayName;
+        const { data } = await supabase
+          .from("member_aliases" as any)
+          .select("alias")
+          .eq("user_id", recipientId)
+          .eq("target_user_id", user.id)
+          .eq("circle_id", post.circle_id)
+          .maybeSingle();
+        return (data as any)?.alias || displayName;
+      };
+
       if (parentCommentId) {
-        // Reply notification — notify the parent comment author
         const parentComment = post?.comments?.find(c => c.id === parentCommentId);
         if (parentComment && parentComment.author_id !== user.id) {
+          const actorName = await getActorName(parentComment.author_id);
           supabase.from("notifications").insert({
             user_id: parentComment.author_id,
             type: "comment_reply",
             title: "Reply to your comment",
-            message: `${displayName} replied: "${content.slice(0, 100)}"`,
+            message: `${actorName} replied: "${content.slice(0, 100)}"`,
             related_post_id: postId,
             related_user_id: user.id,
             related_circle_id: post?.circle_id || null,
@@ -208,13 +221,13 @@ export const useFeedPosts = () => {
         }
       }
 
-      // Always notify the post author about comments (unless it's their own)
       if (post && post.author_id !== user.id) {
+        const actorName = await getActorName(post.author_id);
         supabase.from("notifications").insert({
           user_id: post.author_id,
           type: "comment",
           title: parentCommentId ? "New reply on your post" : "New comment on your post",
-          message: `${displayName}: "${content.slice(0, 100)}"`,
+          message: `${actorName}: "${content.slice(0, 100)}"`,
           related_post_id: postId,
           related_user_id: user.id,
           related_circle_id: post.circle_id,
