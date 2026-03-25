@@ -67,7 +67,7 @@ const ResetPassword = () => {
 
   if (!isRecovery) {
     return (
-      <div className="min-h-[100dvh] bg-background flex flex-col justify-center px-4 overflow-y-auto pb-[env(safe-area-inset-bottom,0px)]">
+      <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center px-4 overflow-y-auto pb-[env(safe-area-inset-bottom,0px)]">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
@@ -89,7 +89,7 @@ const ResetPassword = () => {
   }
 
   return (
-      <div className="min-h-[100dvh] bg-background flex flex-col justify-center px-4 overflow-y-auto pb-[env(safe-area-inset-bottom,0px)]">
+      <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center px-4 overflow-y-auto pb-[env(safe-area-inset-bottom,0px)]">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
