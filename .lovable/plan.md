@@ -1,45 +1,24 @@
 
 
-## Plan: Fix Login Logo Size, Post-Login Redirect, Card Position, and Auto-Scroll Bugs
+## Plan: Make Form Dialogs Smoothly Scrollable + Re-center Auth Page
 
-### Four Issues
+### Problem
+When tapping inputs in dialogs (Create Album, Create Event, Fridge post, member name edit), the browser's native focus-scroll behavior causes jarring jumps. The user wants these forms to feel like a natural scrollable list — tap an input, type, then scroll down to the next field manually.
 
-**Issue 1 — Logo too small**: The logo was changed to `h-16 sm:h-24` but user wants the original `h-24` size on mobile too. Revert to `h-24`.
+### Root Cause
+The browser automatically calls `scrollIntoView` on any focused input. Combined with `scroll-margin-bottom: 80px`, this causes visible jumps even when the input is already on screen. The fix is to **prevent the browser's automatic scroll-on-focus inside dialogs**.
 
-**Issue 2 — Login redirects to Settings**: Despite the exclusion logic in `AppLayout`, a stale `postAuthRedirect` value may persist in localStorage from before the fix was deployed. Two fixes needed: (a) clear `postAuthRedirect` during sign-out, (b) add a safety check in `Auth.tsx` that rejects saved redirects to `/settings` or `/profile`.
+### Solution
 
-**Issue 3 — Card too high on mobile (overlapping Dynamic Island)**: The card uses `pt-12` which isn't enough on phones with a Dynamic Island. Change to `pt-[calc(env(safe-area-inset-top,0px)+1rem)]` so the card sits below the camera cutout, and remove the fixed `pt-12`.
+#### 1. `src/components/ui/dialog.tsx` — Suppress auto-scroll on focus inside dialogs
+Add a `focus` event listener (capture phase) on the dialog content element that calls `e.preventDefault()` on the browser's automatic scroll. This is done by using `preventScroll: true` isn't available on the focus event itself, but we can intercept it: after focus fires, immediately reset the scroll position of the dialog container. A cleaner approach: add a thin wrapper that listens for `focus` events on inputs and calls `e.target.focus({ preventScroll: true })` — but this would recurse. 
 
-**Issue 4 — Unnecessary auto-scrolling on input focus**: Multiple form components have manual `onFocus={() => scrollIntoView()}` handlers that force the page to jump even when the input is already visible. With `resize: 'body'` now active, the browser handles this natively. These manual handlers should be removed from:
-- `src/pages/Events.tsx` — 6 occurrences on description, time, location inputs (create + edit forms)
-- `src/pages/Albums.tsx` — 2 occurrences on album name and description inputs
-- `src/pages/Circles.tsx` — 1 occurrence on alias rename input
+**Best approach**: Add an `onFocus` capture handler on `DialogContent` that saves the dialog's `scrollTop` before the browser adjusts it, then restores it in a `requestAnimationFrame`. This prevents the jarring jump while still allowing the user to manually scroll.
 
-The global `scroll-margin-bottom: 80px` in CSS already provides a small buffer for the native scroll behavior.
-
-### Changes
-
-#### 1. `src/pages/Auth.tsx`
-- Revert logo from `h-16 sm:h-24` back to `h-24`
-- Change `pt-12` to `pt-[calc(env(safe-area-inset-top,0px)+1rem)]` to respect Dynamic Island
-- Add safety filter on `savedRedirect` — skip if it starts with `/settings` or `/profile`
-
-#### 2. `src/components/layout/AppLayout.tsx`
-- In `handleSignOut`, also clear `postAuthRedirect` from localStorage
-
-#### 3. `src/pages/Events.tsx`
-- Remove all `onFocus={(e) => setTimeout(() => e.target.scrollIntoView(...))}` handlers (6 instances)
-
-#### 4. `src/pages/Albums.tsx`
-- Remove `onFocus` scrollIntoView handlers (2 instances)
-
-#### 5. `src/pages/Circles.tsx`
-- Remove `onFocus` scrollIntoView handler (1 instance)
+#### 2. `src/pages/Auth.tsx` — Re-center the login page
+Change back to `justify-center` (vertically centered) now that the dialog scroll fix handles keyboard UX. Use `sm:justify-center` and also `justify-center` on mobile. The `overflow-y-auto` ensures it's still scrollable if the viewport shrinks with the keyboard, but the card starts centered.
 
 ### Files to modify
-- `src/pages/Auth.tsx`
-- `src/components/layout/AppLayout.tsx`
-- `src/pages/Events.tsx`
-- `src/pages/Albums.tsx`
-- `src/pages/Circles.tsx`
+- `src/components/ui/dialog.tsx` — add focus-capture scroll preservation
+- `src/pages/Auth.tsx` — re-center the card layout (revert `justify-start pt-[...]` back to `justify-center` with safe-area padding kept)
 
