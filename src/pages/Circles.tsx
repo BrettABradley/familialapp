@@ -122,6 +122,7 @@ const MemberRow = ({ member, isOwner: isCircleOwner, currentUserId, circleId, on
                 maxLength={50}
                 className="h-7 text-xs"
                 autoFocus
+                onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
                 onKeyDown={(e) => { if (e.key === "Enter") saveAlias(); if (e.key === "Escape") setIsEditingAlias(false); }}
                 onBlur={saveAlias}
               />
@@ -969,9 +970,9 @@ const Circles = () => {
 
       {/* Members Dialog */}
       <Dialog open={isMembersOpen} onOpenChange={setIsMembersOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md !p-4 !pt-[max(env(safe-area-inset-top,0px),1rem)]">
           <DialogHeader><DialogTitle className="font-serif">{selectedCircle?.name} Members</DialogTitle></DialogHeader>
-          <div className="space-y-3 mt-4 max-h-96 overflow-y-auto">
+          <div className="space-y-3 mt-2 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto -mx-1 px-1">
             {memberships.length === 0 ? (
               <p className="text-muted-foreground text-center py-4">No members yet</p>
             ) : (
