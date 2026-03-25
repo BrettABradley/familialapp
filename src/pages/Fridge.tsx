@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FridgeBoard, type FridgeBoardPin } from "@/components/fridge/FridgeBoard";
-import { Plus, Pin, Image, FileText, Calendar, Users, Mic } from "lucide-react";
+import { Plus, Pin, Image, FileText, Calendar, Users, Mic, Flame } from "lucide-react";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
@@ -34,6 +34,7 @@ interface FridgePin {
   image_url: string | null;
   pin_type: string;
   created_at: string;
+  campfire_prompt: string | null;
   circles?: Circle;
 }
 
@@ -50,6 +51,7 @@ const Fridge = () => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [pinType, setPinType] = useState("note");
+  const [campfirePrompt, setCampfirePrompt] = useState("");
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -120,14 +122,19 @@ const Fridge = () => {
       }
     }
 
-    const { error } = await supabase.from("fridge_pins").insert({
+    const insertData: any = {
       title: title.trim(),
-      content: content.trim() ? content.trim() : null,
+      content: pinType === "campfire" ? null : (content.trim() ? content.trim() : null),
       circle_id: selectedCircle,
       pinned_by: user.id,
       pin_type: pinType,
       image_url: imageUrl,
-    });
+    };
+    if (pinType === "campfire" && campfirePrompt.trim()) {
+      insertData.campfire_prompt = campfirePrompt.trim();
+    }
+
+    const { error } = await supabase.from("fridge_pins").insert(insertData);
 
     if (error) {
       toast({
@@ -152,6 +159,7 @@ const Fridge = () => {
     setTitle("");
     setContent("");
     setPinType("note");
+    setCampfirePrompt("");
     setSelectedImage(null);
     if (imagePreview) {
       URL.revokeObjectURL(imagePreview);
@@ -284,6 +292,12 @@ const Fridge = () => {
                       <SelectItem value="image">Photo</SelectItem>
                       <SelectItem value="voice_note">Voice Note</SelectItem>
                       <SelectItem value="event">Event/Reminder</SelectItem>
+                      <SelectItem value="campfire">
+                        <span className="flex items-center gap-1">
+                          <Flame className="w-3 h-3 text-orange-500" />
+                          Campfire
+                        </span>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -299,17 +313,32 @@ const Fridge = () => {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="content">Description (optional, max 150 chars)</Label>
-                  <Textarea
-                    id="content"
-                    placeholder="Add details..."
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    maxLength={150}
-                  />
-                </div>
+                {pinType === "campfire" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="campfirePrompt">Campfire Prompt (max 200 chars)</Label>
+                    <Textarea
+                      id="campfirePrompt"
+                      placeholder="e.g., What's your favorite family road trip?"
+                      value={campfirePrompt}
+                      onChange={(e) => setCampfirePrompt(e.target.value)}
+                      maxLength={200}
+                    />
+                    <p className="text-xs text-muted-foreground">Each circle member can share one story around the campfire.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="content">Description (optional, max 150 chars)</Label>
+                    <Textarea
+                      id="content"
+                      placeholder="Add details..."
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      maxLength={150}
+                    />
+                  </div>
+                )}
 
+                {pinType !== "campfire" && (
                 <div className="space-y-2">
                   <Label>{pinType === 'voice_note' ? 'Voice Note' : 'Image (optional)'}</Label>
                   {pinType === 'voice_note' ? (
@@ -388,7 +417,7 @@ const Fridge = () => {
                     </>
                   )}
                 </div>
-
+                )}
                 <Button 
                   className="w-full" 
                   onClick={handleCreatePin}

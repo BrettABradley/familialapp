@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp, Trash2, Pencil, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp, Trash2, Pencil, Check, X, ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { LinkifiedText } from "@/components/shared/LinkifiedText";
 import { LinkPreviewCard } from "@/components/feed/LinkPreviewCard";
@@ -118,11 +118,65 @@ const VideoPlayer = ({ url }: { url: string }) => {
   );
 };
 
-const MediaItem = ({ url, index, onDownload, onImageClick }: { url: string; index: number; onDownload: (url: string) => void; onImageClick?: (index: number) => void }) => {
+const VideoThumbnail = ({ url, onClick }: { url: string; onClick: () => void }) => {
+  const [thumbnail, setThumbnail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+
+    const handleSeeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 360;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          setThumbnail(canvas.toDataURL("image/jpeg", 0.7));
+        }
+      } catch {}
+      video.removeEventListener("seeked", handleSeeked);
+      video.src = "";
+      video.load();
+    };
+
+    video.addEventListener("loadeddata", () => { video.currentTime = 0.1; });
+    video.addEventListener("seeked", handleSeeked);
+    video.addEventListener("error", () => {});
+    video.load();
+
+    return () => { video.removeEventListener("seeked", handleSeeked); video.src = ""; };
+  }, [url]);
+
+  return (
+    <div
+      className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer bg-secondary"
+      onClick={onClick}
+    >
+      {thumbnail ? (
+        <img src={thumbnail} alt="Video thumbnail" className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full bg-muted animate-pulse" />
+      )}
+      <div className="absolute inset-0 flex items-center justify-center bg-foreground/10 group-hover:bg-foreground/20 transition-colors">
+        <div className="bg-background/80 rounded-full p-3">
+          <Play className="w-6 h-6 text-foreground fill-current" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MediaItem = ({ url, index, onDownload, onImageClick, onVideoClick }: { url: string; index: number; onDownload: (url: string) => void; onImageClick?: (index: number) => void; onVideoClick?: (url: string) => void }) => {
   const mediaType = getMediaType(url);
 
   if (mediaType === 'video') {
-    return <VideoPlayer url={url} />;
+    return <VideoThumbnail url={url} onClick={() => onVideoClick?.(url)} />;
   }
 
   if (mediaType === 'audio') {
@@ -174,6 +228,7 @@ export const PostCard = ({
   const [editContent, setEditContent] = useState(post.content || "");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [videoLightboxUrl, setVideoLightboxUrl] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
   const handleSaveEdit = async () => {
@@ -190,8 +245,9 @@ export const PostCard = ({
   };
 
   // Separate media by type for layout
+  const visualMedia = post.media_urls?.filter(u => getMediaType(u) === 'image' || getMediaType(u) === 'video') || [];
+  const audioMedia = post.media_urls?.filter(u => getMediaType(u) === 'audio') || [];
   const imageUrls = post.media_urls?.filter(u => getMediaType(u) === 'image') || [];
-  const otherMedia = post.media_urls?.filter(u => getMediaType(u) !== 'image') || [];
 
   // Extract first URL from post content for link preview
   const firstUrl = post.content?.match(/(https?:\/\/[^\s]+)/)?.[0] || null;
@@ -271,20 +327,31 @@ export const PostCard = ({
         {/* Link Preview */}
         {firstUrl && <LinkPreviewCard url={firstUrl} />}
 
-        {/* Video and audio items — rendered full-width ABOVE image grid */}
-        {otherMedia.length > 0 && (
+        {/* Audio items */}
+        {audioMedia.length > 0 && (
           <div className="space-y-2 mb-4">
-            {otherMedia.map((url, index) => (
+            {audioMedia.map((url, index) => (
               <MediaItem key={index} url={url} index={index} onDownload={onDownloadImage} />
             ))}
           </div>
         )}
 
-        {/* Image grid */}
-        {imageUrls.length > 0 && (
-          <div className={`grid gap-2 mb-4 ${imageUrls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-            {imageUrls.map((url, index) => (
-              <MediaItem key={index} url={url} index={index} onDownload={onDownloadImage} onImageClick={(i) => setLightboxIndex(i)} />
+        {/* Visual media grid (images + video thumbnails together) */}
+        {visualMedia.length > 0 && (
+          <div className={`grid gap-2 mb-4 ${visualMedia.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {visualMedia.map((url, index) => (
+              <MediaItem
+                key={index}
+                url={url}
+                index={index}
+                onDownload={onDownloadImage}
+                onImageClick={(i) => {
+                  // Find the index within imageUrls only
+                  const imgIdx = imageUrls.indexOf(url);
+                  if (imgIdx !== -1) setLightboxIndex(imgIdx);
+                }}
+                onVideoClick={(videoUrl) => setVideoLightboxUrl(videoUrl)}
+              />
             ))}
           </div>
         )}
@@ -322,6 +389,27 @@ export const PostCard = ({
                     </Button>
                   </div>
                 )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Video Lightbox */}
+        <Dialog open={videoLightboxUrl !== null} onOpenChange={(open) => !open && setVideoLightboxUrl(null)}>
+          <DialogContent className="max-w-4xl p-2 bg-background/95">
+            {videoLightboxUrl && (
+              <div className="flex flex-col items-center">
+                <video
+                  controls
+                  autoPlay
+                  className="max-h-[80vh] w-auto object-contain rounded-lg"
+                  preload="metadata"
+                  playsInline
+                >
+                  <source src={videoLightboxUrl} type="video/mp4" />
+                  <source src={videoLightboxUrl} type="video/quicktime" />
+                  <source src={videoLightboxUrl} />
+                </video>
               </div>
             )}
           </DialogContent>

@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Trash2, Mic, X, Download } from "lucide-react";
 import { getMediaType } from "@/lib/mediaUtils";
+import { PixelCampfire } from "./PixelCampfire";
+import { CampfireDialog } from "./CampfireDialog";
 
 export interface FridgeBoardPin {
   id: string;
@@ -13,6 +15,8 @@ export interface FridgeBoardPin {
   circle_id: string;
   pinned_by: string;
   created_at: string;
+  pin_type?: string;
+  campfire_prompt?: string | null;
   circles?: { id: string; name: string };
 }
 
@@ -58,6 +62,7 @@ export function FridgeBoard({
   circleName?: string;
 }) {
   const [enlargedPin, setEnlargedPin] = useState<FridgeBoardPin | null>(null);
+  const [campfirePin, setCampfirePin] = useState<FridgeBoardPin | null>(null);
 
   return (
     <section
@@ -181,7 +186,14 @@ export function FridgeBoard({
                     />
 
                     {/* Photo/Media area - clickable */}
-                    {pin.image_url ? (
+                    {pin.pin_type === 'campfire' ? (
+                      <div
+                        className="flex aspect-square items-center justify-center bg-zinc-900 cursor-pointer"
+                        onClick={() => setCampfirePin(pin)}
+                      >
+                        <PixelCampfire size="sm" />
+                      </div>
+                    ) : pin.image_url ? (
                       getMediaType(pin.image_url) === 'audio' ? (
                         <div className="flex aspect-square items-center justify-center bg-zinc-100 flex-col gap-1 p-2">
                           <Mic className="w-6 h-6 text-zinc-500" />
@@ -389,6 +401,17 @@ export function FridgeBoard({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Campfire Dialog */}
+      {campfirePin && (
+        <CampfireDialog
+          open={!!campfirePin}
+          onOpenChange={(open) => !open && setCampfirePin(null)}
+          pinId={campfirePin.id}
+          pinTitle={campfirePin.title}
+          prompt={campfirePin.campfire_prompt || null}
+        />
+      )}
     </section>
   );
 }

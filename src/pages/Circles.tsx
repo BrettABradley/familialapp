@@ -48,6 +48,112 @@ interface CircleMembership {
   };
 }
 
+// Inline alias editor for each member in the Members dialog
+const MemberRow = ({ member, isOwner: isCircleOwner, currentUserId, circleId, onUpdateRole, onRemove, onCloseDialog }: {
+  member: CircleMembership;
+  isOwner: boolean;
+  currentUserId?: string;
+  circleId?: string;
+  onUpdateRole: (m: CircleMembership, role: string) => void;
+  onRemove: (m: CircleMembership) => void;
+  onCloseDialog: () => void;
+}) => {
+  const [aliasValue, setAliasValue] = useState("");
+  const [isEditingAlias, setIsEditingAlias] = useState(false);
+  const [savedAlias, setSavedAlias] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!circleId || !currentUserId || member.user_id === currentUserId) return;
+    supabase
+      .from("member_aliases" as any)
+      .select("alias")
+      .eq("user_id", currentUserId)
+      .eq("target_user_id", member.user_id)
+      .eq("circle_id", circleId)
+      .maybeSingle()
+      .then(({ data }: any) => {
+        if (data) {
+          setSavedAlias(data.alias);
+          setAliasValue(data.alias);
+        }
+      });
+  }, [circleId, currentUserId, member.user_id]);
+
+  const saveAlias = async () => {
+    if (!circleId || !currentUserId) return;
+    setIsEditingAlias(false);
+    const trimmed = aliasValue.trim();
+    if (!trimmed) {
+      await supabase.from("member_aliases" as any).delete().eq("user_id", currentUserId).eq("target_user_id", member.user_id).eq("circle_id", circleId);
+      setSavedAlias(null);
+      setAliasValue("");
+      return;
+    }
+    const { error } = await supabase.from("member_aliases" as any).upsert({
+      user_id: currentUserId,
+      target_user_id: member.user_id,
+      circle_id: circleId,
+      alias: trimmed,
+    } as any, { onConflict: "user_id,target_user_id,circle_id" });
+    if (error) {
+      toast({ title: "Error", description: "Failed to save alias.", variant: "destructive" });
+    } else {
+      setSavedAlias(trimmed);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 p-2 rounded-lg border border-border">
+      <Link to={`/profile/${member.user_id}`} onClick={onCloseDialog}>
+        <Avatar className="h-10 w-10"><AvatarImage src={member.profiles?.avatar_url || undefined} /><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
+      </Link>
+      <div className="flex-1 min-w-0">
+        <Link to={`/profile/${member.user_id}`} onClick={onCloseDialog} className="font-medium text-foreground hover:underline">
+          {member.profiles?.display_name || "Unknown"}
+        </Link>
+        <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
+        {member.user_id !== currentUserId && (
+          isEditingAlias ? (
+            <div className="flex items-center gap-1 mt-1">
+              <Input
+                value={aliasValue}
+                onChange={(e) => setAliasValue(e.target.value)}
+                placeholder="e.g., Aunt Sarah"
+                maxLength={50}
+                className="h-7 text-xs"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter") saveAlias(); if (e.key === "Escape") setIsEditingAlias(false); }}
+                onBlur={saveAlias}
+              />
+            </div>
+          ) : (
+            <button
+              className="text-xs text-muted-foreground hover:text-foreground mt-0.5 flex items-center gap-1"
+              onClick={() => setIsEditingAlias(true)}
+            >
+              <Edit className="w-3 h-3" />
+              {savedAlias || "Set nickname"}
+            </button>
+          )
+        )}
+      </div>
+      {isCircleOwner && member.user_id !== currentUserId && (
+        <div className="flex items-center gap-2">
+          <Select value={member.role} onValueChange={(val) => onUpdateRole(member, val)}>
+            <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="member">Member</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="ghost" size="sm" onClick={() => onRemove(member)} aria-label={`Remove ${member.profiles?.display_name || 'member'}`}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Circles = () => {
   const { user } = useAuth();
   const { circles, isLoading: contextLoading, refetchCircles, profile, setSelectedCircle: setContextCircle } = useCircleContext();
@@ -871,29 +977,16 @@ const Circles = () => {
               <p className="text-muted-foreground text-center py-4">No members yet</p>
             ) : (
               memberships.map((member) => (
-                <div key={member.id} className="flex items-center gap-3 p-2 rounded-lg border border-border">
-                  <Link to={`/profile/${member.user_id}`} onClick={() => setIsMembersOpen(false)}>
-                    <Avatar className="h-10 w-10"><AvatarImage src={member.profiles?.avatar_url || undefined} /><AvatarFallback>{member.profiles?.display_name?.charAt(0) || "U"}</AvatarFallback></Avatar>
-                  </Link>
-                  <div className="flex-1">
-                    <Link to={`/profile/${member.user_id}`} onClick={() => setIsMembersOpen(false)} className="font-medium text-foreground hover:underline">
-                      {member.profiles?.display_name || "Unknown"}
-                    </Link>
-                    <p className="text-xs text-muted-foreground capitalize">{member.role}</p>
-                  </div>
-                   {selectedCircle && isOwner(selectedCircle) && member.user_id !== user?.id && (
-                    <div className="flex items-center gap-2">
-                      <Select value={member.role} onValueChange={(val) => handleUpdateRole(member, val)}>
-                        <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="member">Member</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button variant="ghost" size="sm" onClick={() => handleRemoveMember(member)} aria-label={`Remove ${member.profiles?.display_name || 'member'}`}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                    </div>
-                  )}
-                </div>
+                <MemberRow
+                  key={member.id}
+                  member={member}
+                  isOwner={!!selectedCircle && isOwner(selectedCircle)}
+                  currentUserId={user?.id}
+                  circleId={selectedCircle?.id}
+                  onUpdateRole={handleUpdateRole}
+                  onRemove={handleRemoveMember}
+                  onCloseDialog={() => setIsMembersOpen(false)}
+                />
               ))
             )}
           </div>
