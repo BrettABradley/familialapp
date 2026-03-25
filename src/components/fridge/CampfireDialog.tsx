@@ -7,7 +7,7 @@ import { PixelCampfire } from "./PixelCampfire";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CampfireStory {
@@ -33,12 +33,13 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
   const { user } = useAuth();
   const { toast } = useToast();
   const [stories, setStories] = useState<CampfireStory[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
   const [storyText, setStoryText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const hasUserSubmitted = stories.some(s => s.author_id === user?.id);
+  const currentStory = stories.find(s => s.author_id === selectedAuthor) || null;
 
   useEffect(() => {
     if (open) {
@@ -48,7 +49,6 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
 
   const fetchStories = async () => {
     setIsLoading(true);
-    // Use a manual join approach since campfire_stories isn't in generated types yet
     const { data, error } = await supabase
       .from("campfire_stories" as any)
       .select("id, content, author_id, created_at")
@@ -56,7 +56,6 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
       .order("created_at", { ascending: true });
 
     if (!error && data) {
-      // Fetch profiles for authors
       const authorIds = [...new Set((data as any[]).map((s: any) => s.author_id))];
       const { data: profiles } = await supabase
         .from("profiles")
@@ -64,13 +63,14 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
         .in("user_id", authorIds);
 
       const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
-      const enriched = (data as any[]).map((s: any) => ({
+      const enriched: CampfireStory[] = (data as any[]).map((s: any) => ({
         ...s,
         profiles: profileMap.get(s.author_id) || null,
       }));
       setStories(enriched);
-      if (enriched.length > 0 && currentIndex >= enriched.length) {
-        setCurrentIndex(enriched.length - 1);
+      // Auto-select first story if none selected
+      if (enriched.length > 0 && !selectedAuthor) {
+        setSelectedAuthor(enriched[0].author_id);
       }
     }
     setIsLoading(false);
@@ -97,89 +97,92 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
     } else {
       setStoryText("");
       await fetchStories();
+      setSelectedAuthor(user.id);
       toast({ title: "Story shared! 🔥", description: "Your story has been added to the campfire." });
     }
     setIsSubmitting(false);
   };
-
-  const currentStory = stories[currentIndex];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md p-0 overflow-hidden">
         <DialogTitle className="sr-only">{pinTitle}</DialogTitle>
 
-        {/* Campfire header area */}
-        <div className="bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-800 px-6 pt-8 pb-4 flex flex-col items-center text-center">
+        {/* Campsite hero */}
+        <div className="relative bg-gradient-to-b from-[#0a0a2e] via-[#121240] to-[#1a1a3e] px-6 pt-6 pb-4 flex flex-col items-center text-center overflow-hidden">
+          {/* Stars in the header */}
+          <div className="absolute top-3 left-[20%] w-1 h-1 bg-white/60 rounded-none animate-[campfire-spark_2s_ease-in-out_infinite]" />
+          <div className="absolute top-5 right-[25%] w-1 h-1 bg-white/40 rounded-none animate-[campfire-spark_3s_ease-in-out_infinite_1s]" />
+          <div className="absolute top-2 right-[15%] w-0.5 h-0.5 bg-white/50 rounded-none" />
+
           <PixelCampfire size="lg" />
-          <h2 className="font-serif text-lg font-bold text-amber-100 mt-4">{pinTitle}</h2>
+
           {prompt && (
-            <p className="text-sm text-amber-200/80 mt-1 italic">"{prompt}"</p>
+            <p className="text-sm text-amber-200/90 mt-3 italic max-w-[280px]">"{prompt}"</p>
           )}
+
+          {/* Avatar ring around campfire — contributors */}
+          {stories.length > 0 && (
+            <div className="flex items-center justify-center gap-2 mt-4 flex-wrap">
+              {stories.map(s => (
+                <button
+                  key={s.author_id}
+                  onClick={() => setSelectedAuthor(s.author_id)}
+                  className={cn(
+                    "flex flex-col items-center gap-1 p-1 rounded-lg transition-all",
+                    selectedAuthor === s.author_id
+                      ? "ring-2 ring-amber-400 bg-amber-400/10"
+                      : "opacity-60 hover:opacity-100"
+                  )}
+                >
+                  <Avatar className="h-9 w-9 border-2 border-amber-800/50">
+                    <AvatarImage src={s.profiles?.avatar_url || undefined} />
+                    <AvatarFallback className="text-[10px] bg-amber-900/50 text-amber-100">
+                      {s.profiles?.display_name?.charAt(0).toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-[10px] text-amber-200/80 max-w-[50px] truncate">
+                    {s.profiles?.display_name?.split(" ")[0] || "?"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
           <p className="text-xs text-zinc-400 mt-2">
             {stories.length} {stories.length === 1 ? "story" : "stories"} shared
           </p>
         </div>
 
-        {/* Stories area */}
-        <div className="px-6 py-4 min-h-[200px]">
+        {/* Story content area */}
+        <div className="px-6 py-4 min-h-[140px]">
           {isLoading ? (
-            <div className="flex items-center justify-center h-32">
+            <div className="flex items-center justify-center h-24">
               <div className="w-6 h-6 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : stories.length === 0 ? (
-            <div className="text-center py-6">
+          ) : stories.length === 0 && hasUserSubmitted ? null : stories.length === 0 ? (
+            <div className="text-center py-4">
               <p className="text-muted-foreground text-sm">No stories yet. Be the first to share!</p>
             </div>
           ) : currentStory ? (
-            <div className="space-y-4">
-              {/* Story card */}
-              <div className="bg-secondary rounded-lg p-4 min-h-[100px]">
-                <div className="flex items-center gap-2 mb-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={currentStory.profiles?.avatar_url || undefined} />
-                    <AvatarFallback className="text-xs">
-                      {currentStory.profiles?.display_name?.charAt(0).toUpperCase() || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {currentStory.profiles?.display_name || "Unknown"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(currentStory.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
+            <div className="bg-secondary rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Avatar className="h-7 w-7">
+                  <AvatarImage src={currentStory.profiles?.avatar_url || undefined} />
+                  <AvatarFallback className="text-xs">
+                    {currentStory.profiles?.display_name?.charAt(0).toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {currentStory.profiles?.display_name || "Unknown"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(currentStory.created_at).toLocaleDateString()}
+                  </p>
                 </div>
-                <p className="text-sm text-foreground whitespace-pre-wrap">{currentStory.content}</p>
               </div>
-
-              {/* Navigation */}
-              {stories.length > 1 && (
-                <div className="flex items-center justify-center gap-4">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9"
-                    disabled={currentIndex === 0}
-                    onClick={() => setCurrentIndex(i => i - 1)}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="text-sm text-muted-foreground">
-                    {currentIndex + 1} / {stories.length}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9"
-                    disabled={currentIndex === stories.length - 1}
-                    onClick={() => setCurrentIndex(i => i + 1)}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+              <p className="text-sm text-foreground whitespace-pre-wrap">{currentStory.content}</p>
             </div>
           ) : null}
 

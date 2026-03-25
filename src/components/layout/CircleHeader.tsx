@@ -54,46 +54,36 @@ const navItems = [
   { to: "/messages", icon: MessageSquare, label: "Messages" },
 ];
 
-export function CircleHeader({
-  circles,
-  selectedCircle,
-  onCircleChange,
-  onSignOut,
-  showNav = true,
-  overrideLabel,
-}: CircleHeaderProps) {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const currentCircle = circles.find((c) => c.id === selectedCircle);
-  const isMobile = useIsMobile();
-  const [sheetOpen, setSheetOpen] = useState(false);
+interface NotifItem { id: string; title: string; message: string | null; is_read: boolean; created_at: string; type: string; link: string | null; related_post_id: string | null; }
 
-  // Notification bell state
-  interface NotifItem { id: string; title: string; message: string | null; is_read: boolean; created_at: string; type: string; link: string | null; related_post_id: string | null; }
+/**
+ * Self-contained notification bell that manages its own open state.
+ * Each instance is independent — no shared state conflicts.
+ */
+function NotificationBell({ userId, selectedCircle, variant }: { userId: string; selectedCircle: string; variant: "mobile" | "popover" }) {
   const [notifications, setNotifications] = useState<NotifItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [bellOpen, setBellOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (!user || !selectedCircle) return;
+    if (!userId || !selectedCircle) return;
     fetchNotifications();
 
     const channel = supabase
-      .channel('header-notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => {
+      .channel(`bell-${variant}-${selectedCircle}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, () => {
         fetchNotifications();
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [user, selectedCircle]);
+  }, [userId, selectedCircle]);
 
   const fetchNotifications = async () => {
-    if (!user) return;
     const { data } = await supabase
       .from("notifications")
       .select("id, title, message, is_read, created_at, type, link, related_post_id")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("related_circle_id", selectedCircle)
       .order("created_at", { ascending: false })
       .limit(20);
@@ -104,39 +94,46 @@ export function CircleHeader({
   };
 
   const handleClearAll = async () => {
-    if (!user) return;
-    await supabase.from("notifications").delete().eq("user_id", user.id).eq("related_circle_id", selectedCircle);
+    await supabase.from("notifications").delete().eq("user_id", userId).eq("related_circle_id", selectedCircle);
     setNotifications([]);
     setUnreadCount(0);
-    setBellOpen(false);
+    setOpen(false);
   };
 
   const handleMarkAllRead = async () => {
-    if (!user) return;
-    await supabase.from("notifications").update({ is_read: true }).eq("user_id", user.id).eq("is_read", false);
+    await supabase.from("notifications").update({ is_read: true }).eq("user_id", userId).eq("is_read", false);
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     setUnreadCount(0);
   };
 
-  const notifContent = (isInsideSheet: boolean) => (
-    <>
-      {!isInsideSheet && (
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <span className="font-serif font-semibold text-sm">Notifications</span>
-          <div className="flex gap-1">
-            {unreadCount > 0 && (
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleMarkAllRead}>
-                <Check className="w-3 h-3 mr-1" />Mark read
-              </Button>
-            )}
-            {notifications.length > 0 && (
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={handleClearAll}>
-                <Trash2 className="w-3 h-3 mr-1" />Clear all
-              </Button>
-            )}
-          </div>
-        </div>
+  const bellButton = (
+    <Button variant="ghost" size="sm" className="relative">
+      <Bell className="w-4 h-4" />
+      {unreadCount > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+          {unreadCount > 9 ? "9+" : unreadCount}
+        </span>
       )}
+    </Button>
+  );
+
+  const actionButtons = (
+    <div className="flex gap-1">
+      {unreadCount > 0 && (
+        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleMarkAllRead}>
+          <Check className="w-3 h-3 mr-1" />Mark read
+        </Button>
+      )}
+      {notifications.length > 0 && (
+        <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={handleClearAll}>
+          <Trash2 className="w-3 h-3 mr-1" />Clear all
+        </Button>
+      )}
+    </div>
+  );
+
+  const notifList = (
+    <>
       <div className="max-h-72 overflow-y-auto">
         {notifications.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">No notifications</p>
@@ -150,7 +147,7 @@ export function CircleHeader({
               </div>
             );
             return n.link ? (
-              <Link key={n.id} to={n.link} onClick={() => setBellOpen(false)}>
+              <Link key={n.id} to={n.link} onClick={() => setOpen(false)}>
                 {inner}
               </Link>
             ) : (
@@ -161,7 +158,7 @@ export function CircleHeader({
       </div>
       {notifications.length > 0 && (
         <div className="border-t border-border px-4 py-2">
-          <Link to="/notifications" onClick={() => setBellOpen(false)}>
+          <Link to="/notifications" onClick={() => setOpen(false)}>
             <Button variant="ghost" size="sm" className="w-full text-xs">View all notifications</Button>
           </Link>
         </div>
@@ -169,56 +166,52 @@ export function CircleHeader({
     </>
   );
 
-  const bellButton = (
-    <Button variant="ghost" size="sm" className="relative">
-      <Bell className="w-4 h-4" />
-      {unreadCount > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-          {unreadCount > 9 ? "9+" : unreadCount}
-        </span>
-      )}
-    </Button>
-  );
+  if (variant === "mobile") {
+    return (
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetTrigger asChild>{bellButton}</SheetTrigger>
+        <SheetContent side="top" className="p-0 rounded-b-lg pt-[env(safe-area-inset-top)]">
+          <SheetHeader className="flex flex-row items-center justify-between px-4 pt-3 pb-0">
+            <SheetTitle className="text-sm font-serif font-semibold">Notifications</SheetTitle>
+            {actionButtons}
+            <SheetClose asChild>
+              <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px]">
+                <X className="w-4 h-4" />
+              </Button>
+            </SheetClose>
+          </SheetHeader>
+          {notifList}
+        </SheetContent>
+      </Sheet>
+    );
+  }
 
-  const notifBell = isMobile ? (
-    <Sheet open={bellOpen} onOpenChange={setBellOpen}>
-      <SheetTrigger asChild>
-        {bellButton}
-      </SheetTrigger>
-      <SheetContent side="top" className="p-0 rounded-b-lg pt-[env(safe-area-inset-top)]">
-        <SheetHeader className="flex flex-row items-center justify-between px-4 pt-3 pb-0">
-          <SheetTitle className="text-sm font-serif font-semibold">Notifications</SheetTitle>
-          <div className="flex gap-1">
-            {unreadCount > 0 && (
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleMarkAllRead}>
-                <Check className="w-3 h-3 mr-1" />Mark read
-              </Button>
-            )}
-            {notifications.length > 0 && (
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive" onClick={handleClearAll}>
-                <Trash2 className="w-3 h-3 mr-1" />Clear all
-              </Button>
-            )}
-          </div>
-          <SheetClose asChild>
-            <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px]">
-              <X className="w-4 h-4" />
-            </Button>
-          </SheetClose>
-        </SheetHeader>
-        {notifContent(true)}
-      </SheetContent>
-    </Sheet>
-  ) : (
-    <Popover open={bellOpen} onOpenChange={setBellOpen}>
-      <PopoverTrigger asChild>
-        {bellButton}
-      </PopoverTrigger>
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>{bellButton}</PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
-        {notifContent(false)}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <span className="font-serif font-semibold text-sm">Notifications</span>
+          {actionButtons}
+        </div>
+        {notifList}
       </PopoverContent>
     </Popover>
   );
+}
+
+export function CircleHeader({
+  circles,
+  selectedCircle,
+  onCircleChange,
+  onSignOut,
+  showNav = true,
+  overrideLabel,
+}: CircleHeaderProps) {
+  const { user } = useAuth();
+  const currentCircle = circles.find((c) => c.id === selectedCircle);
+  const isMobile = useIsMobile();
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border pt-[env(safe-area-inset-top)]">
@@ -273,22 +266,25 @@ export function CircleHeader({
             </>
           )}
         </div>
-        {/* Mobile: fridge pin + bell */}
-        {showNav && !overrideLabel && isMobile && (
-          <div className="flex items-center gap-1 ml-auto">
+
+        {/* Mobile: fridge pin + bell (only on mobile, uses Sheet) */}
+        {showNav && !overrideLabel && isMobile && user && (
+          <div className="flex items-center gap-1 ml-auto md:hidden">
             <Link to="/fridge">
               <Button variant="ghost" size="sm">
                 <Pin className="w-4 h-4" />
               </Button>
             </Link>
-            {notifBell}
+            <NotificationBell userId={user.id} selectedCircle={selectedCircle} variant="mobile" />
           </div>
         )}
 
-        {/* Hamburger menu for md–xl range (includes bell) */}
+        {/* Hamburger menu for md–xl range (includes bell as popover) */}
         {showNav && (
           <div className="hidden md:flex xl:hidden items-center gap-1 ml-auto">
-            {!overrideLabel && notifBell}
+            {!overrideLabel && user && (
+              <NotificationBell userId={user.id} selectedCircle={selectedCircle} variant="popover" />
+            )}
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="sm">
@@ -339,7 +335,9 @@ export function CircleHeader({
         {/* Right side: bell + sign out (xl+ only) */}
         {showNav && (
           <div className="hidden xl:flex items-center gap-2 ml-auto">
-            {!overrideLabel && notifBell}
+            {!overrideLabel && user && (
+              <NotificationBell userId={user.id} selectedCircle={selectedCircle} variant="popover" />
+            )}
             <Button variant="ghost" size="sm" className="gap-1.5" onClick={onSignOut}>
               <LogOut className="w-4 h-4" />
               <span>Sign Out</span>
