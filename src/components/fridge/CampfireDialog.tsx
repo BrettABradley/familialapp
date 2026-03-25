@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,7 +7,7 @@ import { PixelCampfire } from "./PixelCampfire";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Send } from "lucide-react";
+import { Send, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CampfireStory {
@@ -37,6 +37,7 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
   const [storyText, setStoryText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const avatarRowRef = useRef<HTMLDivElement>(null);
 
   const hasUserSubmitted = stories.some(s => s.author_id === user?.id);
   const currentStory = stories.find(s => s.author_id === selectedAuthor) || null;
@@ -44,6 +45,7 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
   useEffect(() => {
     if (open) {
       fetchStories();
+      setSelectedAuthor(null);
     }
   }, [open, pinId]);
 
@@ -68,12 +70,12 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
         profiles: profileMap.get(s.author_id) || null,
       }));
       setStories(enriched);
-      // Auto-select first story if none selected
-      if (enriched.length > 0 && !selectedAuthor) {
-        setSelectedAuthor(enriched[0].author_id);
-      }
     }
     setIsLoading(false);
+  };
+
+  const handleAvatarTap = (authorId: string) => {
+    setSelectedAuthor(prev => prev === authorId ? null : authorId);
   };
 
   const handleSubmit = async () => {
@@ -110,42 +112,76 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
 
         {/* Campsite hero */}
         <div className="relative bg-gradient-to-b from-[#0a0a2e] via-[#121240] to-[#1a1a3e] px-6 pt-6 pb-4 flex flex-col items-center text-center overflow-hidden">
+          {/* Custom mobile close button — large & visible */}
+          <button
+            onClick={() => onOpenChange(false)}
+            className="absolute top-3 right-3 z-50 md:hidden flex items-center justify-center w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm border border-white/20 active:bg-black/70 transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+
           {/* Stars in the header */}
           <div className="absolute top-3 left-[20%] w-1 h-1 bg-white/60 rounded-none animate-[campfire-spark_2s_ease-in-out_infinite]" />
           <div className="absolute top-5 right-[25%] w-1 h-1 bg-white/40 rounded-none animate-[campfire-spark_3s_ease-in-out_infinite_1s]" />
           <div className="absolute top-2 right-[15%] w-0.5 h-0.5 bg-white/50 rounded-none" />
 
-          <PixelCampfire size="lg" />
+          <PixelCampfire size="lg" storyCount={stories.length} />
 
           {prompt && (
             <p className="text-sm text-amber-200/90 mt-3 italic max-w-[280px]">"{prompt}"</p>
           )}
 
-          {/* Avatar ring around campfire — contributors */}
+          {/* Scrollable avatar row */}
           {stories.length > 0 && (
-            <div className="flex items-center justify-center gap-2 mt-4 flex-wrap">
-              {stories.map(s => (
-                <button
-                  key={s.author_id}
-                  onClick={() => setSelectedAuthor(s.author_id)}
-                  className={cn(
-                    "flex flex-col items-center gap-1 p-1 rounded-lg transition-all",
-                    selectedAuthor === s.author_id
-                      ? "ring-2 ring-amber-400 bg-amber-400/10"
-                      : "opacity-60 hover:opacity-100"
-                  )}
-                >
-                  <Avatar className="h-9 w-9 border-2 border-amber-800/50">
-                    <AvatarImage src={s.profiles?.avatar_url || undefined} />
-                    <AvatarFallback className="text-[10px] bg-amber-900/50 text-amber-100">
-                      {s.profiles?.display_name?.charAt(0).toUpperCase() || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-[10px] text-amber-200/80 max-w-[50px] truncate">
-                    {s.profiles?.display_name?.split(" ")[0] || "?"}
-                  </span>
-                </button>
-              ))}
+            <div
+              ref={avatarRowRef}
+              className="flex items-start gap-2 mt-4 w-full overflow-x-auto pb-2 px-2 scrollbar-none"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              <div className="flex items-start gap-2 mx-auto">
+                {stories.map(s => (
+                  <button
+                    key={s.author_id}
+                    onClick={() => handleAvatarTap(s.author_id)}
+                    className={cn(
+                      "flex flex-col items-center gap-1 p-1 rounded-lg transition-all shrink-0",
+                      selectedAuthor === s.author_id
+                        ? "ring-2 ring-amber-400 bg-amber-400/10"
+                        : "opacity-60 hover:opacity-100"
+                    )}
+                  >
+                    <Avatar className="h-9 w-9 border-2 border-amber-800/50">
+                      <AvatarImage src={s.profiles?.avatar_url || undefined} />
+                      <AvatarFallback className="text-[10px] bg-amber-900/50 text-amber-100">
+                        {s.profiles?.display_name?.charAt(0).toUpperCase() || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-[10px] text-amber-200/80 max-w-[50px] truncate">
+                      {s.profiles?.display_name?.split(" ")[0] || "?"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Chat bubble — appears when an avatar is selected */}
+          {currentStory && selectedAuthor && (
+            <div className="relative w-full max-w-[300px] mt-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              {/* Triangle caret */}
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-amber-900/60" />
+              <div className="bg-amber-900/60 backdrop-blur-sm border border-amber-700/30 rounded-lg p-3 text-left">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <p className="text-xs font-medium text-amber-100">
+                    {currentStory.profiles?.display_name || "Unknown"}
+                  </p>
+                  <p className="text-[10px] text-amber-200/50">
+                    {new Date(currentStory.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <p className="text-sm text-amber-50/90 whitespace-pre-wrap leading-relaxed">{currentStory.content}</p>
+              </div>
             </div>
           )}
 
@@ -154,41 +190,14 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
           </p>
         </div>
 
-        {/* Story content area */}
-        <div className="px-6 py-4 min-h-[140px]">
+        {/* Bottom area — only submit form if user hasn't posted */}
+        <div className="px-6 py-4">
           {isLoading ? (
-            <div className="flex items-center justify-center h-24">
+            <div className="flex items-center justify-center h-16">
               <div className="w-6 h-6 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : stories.length === 0 && hasUserSubmitted ? null : stories.length === 0 ? (
-            <div className="text-center py-4">
-              <p className="text-muted-foreground text-sm">No stories yet. Be the first to share!</p>
-            </div>
-          ) : currentStory ? (
-            <div className="bg-secondary rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Avatar className="h-7 w-7">
-                  <AvatarImage src={currentStory.profiles?.avatar_url || undefined} />
-                  <AvatarFallback className="text-xs">
-                    {currentStory.profiles?.display_name?.charAt(0).toUpperCase() || "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    {currentStory.profiles?.display_name || "Unknown"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(currentStory.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              <p className="text-sm text-foreground whitespace-pre-wrap">{currentStory.content}</p>
-            </div>
-          ) : null}
-
-          {/* Submit story input */}
-          {!hasUserSubmitted && user && (
-            <div className={cn("space-y-3", stories.length > 0 && "mt-4 pt-4 border-t border-border")}>
+          ) : !hasUserSubmitted && user ? (
+            <div className="space-y-3">
               <p className="text-sm font-medium text-foreground">Share your story</p>
               <Textarea
                 value={storyText}
@@ -209,13 +218,13 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
                 </Button>
               </div>
             </div>
-          )}
-
-          {hasUserSubmitted && (
-            <p className="text-xs text-muted-foreground text-center mt-3">
+          ) : stories.length === 0 ? (
+            <p className="text-muted-foreground text-sm text-center">No stories yet. Be the first to share!</p>
+          ) : hasUserSubmitted ? (
+            <p className="text-xs text-muted-foreground text-center">
               ✓ You've shared your story
             </p>
-          )}
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

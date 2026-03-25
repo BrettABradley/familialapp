@@ -1,13 +1,15 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Rich pixel-art campsite scene: night sky with moon & stars, pine trees,
- * stone ring, logs, animated fire with sparks, tent, ground details, fireflies.
+ * Rich pixel-art campsite scene with dynamic fire that scales with story count.
  */
-export function PixelCampfire({ className, size = "md" }: { className?: string; size?: "sm" | "md" | "lg" }) {
+export function PixelCampfire({ className, size = "md", storyCount = 0 }: { className?: string; size?: "sm" | "md" | "lg"; storyCount?: number }) {
   const sizeMap = { sm: "w-full h-full", md: "w-32 h-32", lg: "w-full aspect-[4/3]" };
   const isSmall = size === "sm";
   const isLarge = size === "lg";
+
+  // Fire scales from 1x to 2x based on story count
+  const fireScale = 1 + Math.min(storyCount * 0.15, 1);
 
   return (
     <div className={cn("relative flex items-end justify-center overflow-hidden", sizeMap[size], className)} style={{ imageRendering: "pixelated" }}>
@@ -26,7 +28,7 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
         }} />
       )}
 
-      {/* Stars - many layers for depth */}
+      {/* Stars */}
       <div className="absolute top-[5%] left-[10%] w-1 h-1 bg-white/90 rounded-none animate-[campfire-spark_2s_ease-in-out_infinite]" />
       <div className="absolute top-[8%] left-[30%] w-0.5 h-0.5 bg-white/60 rounded-none animate-[campfire-spark_3s_ease-in-out_infinite_0.5s]" />
       <div className="absolute top-[12%] left-[50%] w-1 h-1 bg-white/70 rounded-none animate-[campfire-spark_2.5s_ease-in-out_infinite_1s]" />
@@ -51,7 +53,7 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
         </>
       )}
 
-      {/* Distant mountain range silhouette */}
+      {/* Mountain range */}
       {!isSmall && (
         <div className="absolute left-0 right-0" style={{ bottom: isLarge ? "32%" : "30%" }}>
           <div className="flex items-end justify-center w-full" style={{ height: isLarge ? 40 : 20 }}>
@@ -65,10 +67,9 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
         </div>
       )}
 
-      {/* Pine tree silhouettes - varied sizes and positions */}
+      {/* Pine trees */}
       {!isSmall && (
         <>
-          {/* Far left tree cluster */}
           <div className="absolute" style={{ bottom: isLarge ? "28%" : "26%", left: "3%" }}>
             <div className="flex flex-col items-center">
               {[0, 1, 2].map(layer => (
@@ -82,7 +83,6 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
               <div className="rounded-none" style={{ width: isLarge ? 4 : 2, height: isLarge ? 8 : 4, backgroundColor: "#2a1a0a" }} />
             </div>
           </div>
-          {/* Left mid tree */}
           <div className="absolute" style={{ bottom: isLarge ? "28%" : "26%", left: "12%" }}>
             <div className="flex flex-col items-center">
               {[0, 1, 2, 3].map(layer => (
@@ -96,7 +96,6 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
               <div className="rounded-none" style={{ width: isLarge ? 4 : 2, height: isLarge ? 10 : 5, backgroundColor: "#3a2510" }} />
             </div>
           </div>
-          {/* Right tree */}
           <div className="absolute" style={{ bottom: isLarge ? "28%" : "26%", right: "8%" }}>
             <div className="flex flex-col items-center">
               {[0, 1, 2].map(layer => (
@@ -110,7 +109,6 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
               <div className="rounded-none" style={{ width: isLarge ? 4 : 2, height: isLarge ? 8 : 4, backgroundColor: "#2a1a0a" }} />
             </div>
           </div>
-          {/* Far right small tree */}
           <div className="absolute" style={{ bottom: isLarge ? "28%" : "26%", right: "18%" }}>
             <div className="flex flex-col items-center">
               {[0, 1].map(layer => (
@@ -132,7 +130,7 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
       <div className="absolute left-0 right-0 bg-[#2d1f0e]" style={{ height: isSmall ? 8 : isLarge ? 24 : 14, bottom: isSmall ? 12 : isLarge ? 40 : 20 }} />
       <div className="absolute left-0 right-0 bg-[#3a2a14]" style={{ height: isSmall ? 3 : isLarge ? 8 : 4, bottom: isSmall ? 20 : isLarge ? 64 : 34 }} />
 
-      {/* Ground texture dots */}
+      {/* Ground texture */}
       {!isSmall && (
         <>
           {[15, 30, 50, 70, 85].map((left, i) => (
@@ -146,7 +144,7 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
         </>
       )}
 
-      {/* Tent silhouette (left side) */}
+      {/* Tent */}
       {!isSmall && (
         <div className="absolute" style={{ bottom: isLarge ? 60 : 32, left: isLarge ? "20%" : "18%" }}>
           <div className="w-0 h-0" style={{
@@ -157,7 +155,6 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
             borderRightColor: "transparent",
             borderBottomColor: "#2a1a0a",
           }} />
-          {/* Tent opening */}
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 rounded-none" style={{
             width: isLarge ? 10 : 5,
             height: isLarge ? 14 : 7,
@@ -166,7 +163,7 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
         </div>
       )}
 
-      {/* Stone ring around fire */}
+      {/* Stone ring */}
       <div className="absolute left-1/2 -translate-x-1/2 flex gap-[1px]" style={{ bottom: isSmall ? 18 : isLarge ? 56 : 30 }}>
         {[...Array(isSmall ? 5 : isLarge ? 9 : 7)].map((_, i) => (
           <div key={i} className="rounded-none" style={{
@@ -177,7 +174,7 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
         ))}
       </div>
 
-      {/* Logs (crossed) */}
+      {/* Logs */}
       <div className="absolute left-1/2 -translate-x-1/2 flex gap-0.5" style={{ bottom: isSmall ? 18 : isLarge ? 56 : 30 }}>
         <div className="bg-amber-900 rounded-none" style={{ width: isSmall ? 6 : isLarge ? 18 : 10, height: isSmall ? 3 : isLarge ? 7 : 5 }} />
         <div className="bg-amber-800 rounded-none" style={{ width: isSmall ? 6 : isLarge ? 18 : 10, height: isSmall ? 3 : isLarge ? 7 : 5 }} />
@@ -195,9 +192,12 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
         transform: "translateX(-50%) rotate(10deg)",
       }} />
 
-      {/* Fire layers */}
-      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center" style={{ bottom: isSmall ? 20 : isLarge ? 60 : 33 }}>
-        {/* Outer - red */}
+      {/* Fire layers — scaled dynamically */}
+      <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center" style={{
+        bottom: isSmall ? 20 : isLarge ? 60 : 33,
+        transform: `translateX(-50%) scale(${fireScale})`,
+        transformOrigin: "bottom center",
+      }}>
         <div
           className="absolute bottom-0 rounded-none animate-[campfire-flicker_0.5s_ease-in-out_infinite_alternate]"
           style={{
@@ -207,7 +207,6 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
             opacity: 0.7,
           }}
         />
-        {/* Mid - orange */}
         <div
           className="absolute bottom-0 rounded-none animate-[campfire-flicker_0.4s_ease-in-out_infinite_alternate-reverse]"
           style={{
@@ -217,7 +216,6 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
             opacity: 0.85,
           }}
         />
-        {/* Core - yellow */}
         <div
           className="rounded-none animate-[campfire-flicker_0.3s_ease-in-out_infinite_alternate]"
           style={{
@@ -226,7 +224,6 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
             backgroundColor: "hsl(48, 96%, 53%)",
           }}
         />
-        {/* White-hot center */}
         <div
           className="absolute bottom-0 rounded-none animate-[campfire-flicker_0.25s_ease-in-out_infinite_alternate]"
           style={{
@@ -248,18 +245,18 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
         )}
       </div>
 
-      {/* Fire glow on ground */}
+      {/* Fire glow */}
       <div
         className="absolute left-1/2 -translate-x-1/2 rounded-full animate-[campfire-glow_1s_ease-in-out_infinite_alternate] pointer-events-none"
         style={{
-          width: isSmall ? 40 : isLarge ? 140 : 70,
-          height: isSmall ? 20 : isLarge ? 60 : 32,
+          width: (isSmall ? 40 : isLarge ? 140 : 70) * fireScale,
+          height: (isSmall ? 20 : isLarge ? 60 : 32) * fireScale,
           bottom: isSmall ? 10 : isLarge ? 32 : 16,
           background: "radial-gradient(ellipse, hsla(25, 95%, 53%, 0.4) 0%, hsla(25, 95%, 53%, 0.1) 50%, transparent 70%)",
         }}
       />
 
-      {/* Ambient firelight on trees/tent */}
+      {/* Ambient firelight */}
       {isLarge && (
         <div
           className="absolute left-1/2 -translate-x-1/2 rounded-full animate-[campfire-glow_1.5s_ease-in-out_infinite_alternate] pointer-events-none"
@@ -272,7 +269,7 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
         />
       )}
 
-      {/* Fireflies (lg only) */}
+      {/* Fireflies */}
       {isLarge && (
         <>
           <div className="absolute w-1 h-1 rounded-none animate-[campfire-spark_3s_ease-in-out_infinite]" style={{ top: "40%", left: "8%", backgroundColor: "hsla(60, 100%, 70%, 0.6)" }} />
@@ -281,7 +278,7 @@ export function PixelCampfire({ className, size = "md" }: { className?: string; 
         </>
       )}
 
-      {/* Small log/stump detail right side */}
+      {/* Stump detail */}
       {!isSmall && (
         <div className="absolute rounded-none" style={{
           bottom: isLarge ? 56 : 30,
