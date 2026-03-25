@@ -1,26 +1,18 @@
 
 
-## Plan: Campfire Dialog UX Improvements
+## Plan: Fix Members Dialog Scrolling and Keyboard UX
 
-### 1. Bigger, more visible close button on mobile
-- In `CampfireDialog.tsx`, add a custom close button (an `X` icon from lucide) positioned top-right inside the campsite hero area, sized at 40x40px with a semi-transparent dark background circle for contrast against the night sky. Style it with `md:hidden` so it only appears on mobile (the default dialog close button is small and hard to see on dark backgrounds).
-- Keep the existing `[&>button]` styling but supplement it with this explicit mobile close button that calls `onOpenChange(false)`.
+### Problem
+The Members dialog uses `DialogContent` with default padding and a fixed `max-h-96` inner scroll container, creating a large white frame (header + footer padding) that eats into visible member space. On mobile, the alias input keyboard pushes content out of view.
 
-### 2. Show story as a chat bubble only when avatar is tapped (hide the always-visible story card)
-- Remove the always-visible story content area at the bottom. Instead, when a user taps an avatar, show their story as an inline speech/chat bubble that appears near or below their avatar within the campsite hero section.
-- Use a styled card with a small triangle/caret pointing toward the selected avatar, overlaid on the campsite environment.
-- When no avatar is selected (or tapped again to deselect), the bubble disappears — only the campfire scene and avatars are visible.
-- The submit form for the current user's story remains at the bottom but only shows if they haven't submitted yet.
+### Changes in `src/pages/Circles.tsx`
 
-### 3. Fire scales with number of stories + scrollable avatar area
-- Pass `storyCount` to `PixelCampfire` component. Scale the fire size layers based on story count:
-  - Base size at 0-1 stories
-  - Each additional story increases fire width/height by ~10-15% (capped at ~2x)
-  - More stories = bigger, more impressive fire
-- Wrap the avatar row in a horizontal `ScrollArea` so when there are many contributors, users can scroll left/right through the avatars without breaking the layout.
-- On mobile, the scroll area should be touch-scrollable with `overflow-x-auto`.
+1. **Reduce dialog chrome**: Remove the `max-h-96` constraint on the member list and instead let the `DialogContent` scrollable area handle it. Use `sm:max-h-[70vh]` on the member list so it fills more of the dialog on mobile while staying bounded on desktop.
+
+2. **Compact padding**: Add tighter padding classes to the `DialogContent` for this dialog (`p-4 pt-[max(env(safe-area-inset-top,0px),1rem)]`) so the white border/frame around the member list is minimal.
+
+3. **Keyboard-safe alias input**: Add `scroll-margin-bottom: 260px` (already global for input/textarea) — verify the alias `Input` inherits this. Wrap the member list in a container that allows the focused input to scroll into view above the keyboard. The `MemberRow` alias input should call `scrollIntoView({ block: 'center' })` on focus to ensure it's visible above the keyboard.
 
 ### Files to modify
-- `src/components/fridge/CampfireDialog.tsx` — custom mobile close button, chat bubble story display, scrollable avatars
-- `src/components/fridge/PixelCampfire.tsx` — accept `storyCount` prop, scale fire dimensions dynamically
+- `src/pages/Circles.tsx` — Members dialog layout and MemberRow alias input focus behavior
 
