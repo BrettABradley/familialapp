@@ -69,6 +69,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // If session is already expired/invalid, signOut may throw —
       // we still want to clear local state and redirect.
     }
+    // Force-clear persisted auth token from localStorage so stale sessions
+    // don't silently re-authenticate on next page load.
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        localStorage.removeItem(key);
+      }
+    });
     setSession(null);
     setUser(null);
   };
