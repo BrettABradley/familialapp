@@ -1,33 +1,22 @@
 
 
-## Plan: Fix Keyboard Blocking Dialogs on Mobile
+## Plan: Fix Desktop Sign-Out Not Actually Logging Out
 
 ### Root Cause
-The Capacitor config uses `Keyboard: { resize: 'none' }`, which means the webview does **not** shrink when the iOS keyboard opens. The dialog uses `max-h-[100dvh]` but `100dvh` never changes, so the bottom of the dialog (submit buttons, form fields) gets hidden behind the keyboard with no way to scroll to them.
+When `supabase.auth.signOut()` fails (e.g., session already expired server-side — confirmed by auth logs showing repeated "session_not_found" 403s), the Supabase client does **not** clear the persisted auth token from localStorage. So while React state is cleared via `setSession(null)` / `setUser(null)`, on the next page load the old token is read back from localStorage, re-authenticating the user silently. The sign-out appears to do nothing.
 
-### Solution
-Use the `VisualViewport` API to track the actual visible area and apply it as a CSS custom property. When the keyboard opens, `window.visualViewport.height` shrinks to reflect the real available space. The dialog will use this value instead of `100dvh` on mobile.
+Additionally, the Settings page sign-out navigates to `/` (the landing page) instead of `/auth`, which is inconsistent.
 
 ### Changes
 
-#### 1. `src/hooks/useVisualViewport.ts` — New hook
-- Listen to `window.visualViewport` resize events
-- Set `--visual-viewport-height` CSS custom property on `document.documentElement`
-- Defaults to `100dvh` when VisualViewport API is unavailable
+#### 1. `src/hooks/useAuth.tsx` — Force-clear persisted session on sign-out
+- After calling `supabase.auth.signOut()` (whether it succeeds or fails), manually remove the Supabase auth token from localStorage using the key pattern `sb-<project-ref>-auth-token`
+- This guarantees the stale session is fully purged even when the server returns a 403
 
-#### 2. `src/App.tsx` — Activate the hook
-- Call `useVisualViewport()` at the app root so the CSS variable is always up to date
+#### 2. `src/pages/Settings.tsx` — Use hard redirect to `/auth`
+- Change `navigate("/")` to `window.location.href = "/auth"` to match the AppLayout sign-out behavior and ensure a full page reload clears all in-memory state
 
-#### 3. `src/components/ui/dialog.tsx` — Use visual viewport height
-- Change mobile `max-h-[100dvh]` to `max-h-[var(--visual-viewport-height,100dvh)]`
-- This makes the dialog shrink when the keyboard opens, keeping all content scrollable
-
-#### 4. `src/components/ui/alert-dialog.tsx` — Same fix
-- AlertDialogContent also needs the visual viewport max-height for mobile consistency
-
-### Files to create/modify
-- **New**: `src/hooks/useVisualViewport.ts`
-- `src/App.tsx` — add hook call
-- `src/components/ui/dialog.tsx` — swap `100dvh` for CSS variable
-- `src/components/ui/alert-dialog.tsx` — add mobile-aware max-height
+### Files to modify
+- `src/hooks/useAuth.tsx` — add localStorage cleanup
+- `src/pages/Settings.tsx` — fix redirect target
 
