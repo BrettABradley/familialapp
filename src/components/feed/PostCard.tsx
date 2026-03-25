@@ -228,6 +228,7 @@ export const PostCard = ({
   const [editContent, setEditContent] = useState(post.content || "");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [videoLightboxUrl, setVideoLightboxUrl] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
   const handleSaveEdit = async () => {
@@ -244,8 +245,9 @@ export const PostCard = ({
   };
 
   // Separate media by type for layout
+  const visualMedia = post.media_urls?.filter(u => getMediaType(u) === 'image' || getMediaType(u) === 'video') || [];
+  const audioMedia = post.media_urls?.filter(u => getMediaType(u) === 'audio') || [];
   const imageUrls = post.media_urls?.filter(u => getMediaType(u) === 'image') || [];
-  const otherMedia = post.media_urls?.filter(u => getMediaType(u) !== 'image') || [];
 
   // Extract first URL from post content for link preview
   const firstUrl = post.content?.match(/(https?:\/\/[^\s]+)/)?.[0] || null;
@@ -325,20 +327,31 @@ export const PostCard = ({
         {/* Link Preview */}
         {firstUrl && <LinkPreviewCard url={firstUrl} />}
 
-        {/* Video and audio items — rendered full-width ABOVE image grid */}
-        {otherMedia.length > 0 && (
+        {/* Audio items */}
+        {audioMedia.length > 0 && (
           <div className="space-y-2 mb-4">
-            {otherMedia.map((url, index) => (
+            {audioMedia.map((url, index) => (
               <MediaItem key={index} url={url} index={index} onDownload={onDownloadImage} />
             ))}
           </div>
         )}
 
-        {/* Image grid */}
-        {imageUrls.length > 0 && (
-          <div className={`grid gap-2 mb-4 ${imageUrls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-            {imageUrls.map((url, index) => (
-              <MediaItem key={index} url={url} index={index} onDownload={onDownloadImage} onImageClick={(i) => setLightboxIndex(i)} />
+        {/* Visual media grid (images + video thumbnails together) */}
+        {visualMedia.length > 0 && (
+          <div className={`grid gap-2 mb-4 ${visualMedia.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {visualMedia.map((url, index) => (
+              <MediaItem
+                key={index}
+                url={url}
+                index={index}
+                onDownload={onDownloadImage}
+                onImageClick={(i) => {
+                  // Find the index within imageUrls only
+                  const imgIdx = imageUrls.indexOf(url);
+                  if (imgIdx !== -1) setLightboxIndex(imgIdx);
+                }}
+                onVideoClick={(videoUrl) => setVideoLightboxUrl(videoUrl)}
+              />
             ))}
           </div>
         )}
