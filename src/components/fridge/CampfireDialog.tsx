@@ -4,15 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PixelCampfire } from "./PixelCampfire";
+import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { Send, X } from "lucide-react";
+import { Send, X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CampfireStory {
   id: string;
-  content: string;
+  content: string | null;
+  audio_url: string | null;
   author_id: string;
   created_at: string;
   profiles?: {
@@ -35,6 +37,8 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
   const [stories, setStories] = useState<CampfireStory[]>([]);
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
   const [storyText, setStoryText] = useState("");
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const avatarRowRef = useRef<HTMLDivElement>(null);
@@ -49,11 +53,18 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
     }
   }, [open, pinId]);
 
+  // Cleanup audio preview URL on unmount or change
+  useEffect(() => {
+    return () => {
+      if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
+    };
+  }, [audioPreviewUrl]);
+
   const fetchStories = async () => {
     setIsLoading(true);
     const { data, error } = await supabase
       .from("campfire_stories" as any)
-      .select("id, content, author_id, created_at")
+      .select("id, content, audio_url, author_id, created_at")
       .eq("fridge_pin_id", pinId)
       .order("created_at", { ascending: true });
 
@@ -78,16 +89,47 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
     setSelectedAuthor(prev => prev === authorId ? null : authorId);
   };
 
+  const handleRecordingComplete = (blob: Blob) => {
+    setAudioBlob(blob);
+    setAudioPreviewUrl(URL.createObjectURL(blob));
+  };
+
+  const handleRemoveAudio = () => {
+    if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
+    setAudioBlob(null);
+    setAudioPreviewUrl(null);
+  };
+
   const handleSubmit = async () => {
-    if (!storyText.trim() || !user) return;
+    if ((!storyText.trim() && !audioBlob) || !user) return;
     setIsSubmitting(true);
+
+    let audioUrl: string | null = null;
+
+    // Upload audio if present
+    if (audioBlob) {
+      const fileName = `campfire/${pinId}/${user.id}_${Date.now()}.webm`;
+      const { error: uploadError } = await supabase.storage
+        .from("post-media")
+        .upload(fileName, audioBlob, { contentType: "audio/webm" });
+
+      if (uploadError) {
+        toast({ title: "Upload failed", description: "Could not upload voice memo.", variant: "destructive" });
+        setIsSubmitting(false);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from("post-media").getPublicUrl(fileName);
+      audioUrl = urlData.publicUrl;
+    }
 
     const { error } = await supabase
       .from("campfire_stories" as any)
       .insert({
         fridge_pin_id: pinId,
         author_id: user.id,
-        content: storyText.trim(),
+        content: storyText.trim() || null,
+        audio_url: audioUrl,
       } as any);
 
     if (error) {
@@ -98,12 +140,15 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
       }
     } else {
       setStoryText("");
+      handleRemoveAudio();
       await fetchStories();
       setSelectedAuthor(user.id);
       toast({ title: "Story shared! 🔥", description: "Your story has been added to the campfire." });
     }
     setIsSubmitting(false);
   };
+
+  const canSubmit = storyText.trim().length > 0 || audioBlob !== null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -112,7 +157,7 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
 
         {/* Campsite hero */}
         <div className="relative bg-gradient-to-b from-[#0a0a2e] via-[#121240] to-[#1a1a3e] px-6 pt-6 pb-4 flex flex-col items-center text-center overflow-hidden">
-          {/* Custom mobile close button — large & visible */}
+          {/* Custom mobile close button */}
           <button
             onClick={() => onOpenChange(false)}
             className="absolute top-3 right-3 z-50 flex items-center justify-center w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm border border-white/20 active:bg-black/70 transition-colors"
@@ -121,7 +166,7 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
             <X className="w-5 h-5 text-white" />
           </button>
 
-          {/* Stars in the header */}
+          {/* Stars */}
           <div className="absolute top-3 left-[20%] w-1 h-1 bg-white/60 rounded-none animate-[campfire-spark_2s_ease-in-out_infinite]" />
           <div className="absolute top-5 right-[25%] w-1 h-1 bg-white/40 rounded-none animate-[campfire-spark_3s_ease-in-out_infinite_1s]" />
           <div className="absolute top-2 right-[15%] w-0.5 h-0.5 bg-white/50 rounded-none" />
@@ -169,7 +214,6 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
           {/* Chat bubble — appears when an avatar is selected */}
           {currentStory && selectedAuthor && (
             <div className="relative w-full max-w-[300px] mt-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
-              {/* Triangle caret */}
               <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-amber-900/60" />
               <div className="bg-amber-900/60 backdrop-blur-sm border border-amber-700/30 rounded-lg p-3 text-left">
                 <div className="flex items-center gap-2 mb-1.5">
@@ -180,7 +224,17 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
                     {new Date(currentStory.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <p className="text-sm text-amber-50/90 whitespace-pre-wrap leading-relaxed">{currentStory.content}</p>
+                {currentStory.content && (
+                  <p className="text-sm text-amber-50/90 whitespace-pre-wrap leading-relaxed">{currentStory.content}</p>
+                )}
+                {currentStory.audio_url && (
+                  <audio
+                    controls
+                    src={currentStory.audio_url}
+                    className="w-full mt-2 h-8"
+                    preload="metadata"
+                  />
+                )}
               </div>
             </div>
           )}
@@ -190,7 +244,7 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
           </p>
         </div>
 
-        {/* Bottom area — only submit form if user hasn't posted */}
+        {/* Bottom area */}
         <div className="px-6 py-4">
           {isLoading ? (
             <div className="flex items-center justify-center h-16">
@@ -206,12 +260,26 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
                 maxLength={500}
                 className="min-h-[80px] resize-none"
               />
+
+              {/* Audio preview */}
+              {audioPreviewUrl && (
+                <div className="flex items-center gap-2 rounded-md border border-input bg-muted/50 p-2">
+                  <audio controls src={audioPreviewUrl} className="flex-1 h-8" preload="metadata" />
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-destructive" onClick={handleRemoveAudio}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{storyText.length}/500</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{storyText.length}/500</span>
+                  {!audioBlob && <VoiceRecorder onRecordingComplete={handleRecordingComplete} maxDuration={120} />}
+                </div>
                 <Button
                   size="sm"
                   onClick={handleSubmit}
-                  disabled={!storyText.trim() || isSubmitting}
+                  disabled={!canSubmit || isSubmitting}
                 >
                   <Send className="w-4 h-4 mr-1" />
                   {isSubmitting ? "Sharing..." : "Share"}
