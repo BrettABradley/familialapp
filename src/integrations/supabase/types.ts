@@ -49,6 +49,38 @@ export type Database = {
           },
         ]
       }
+      campfire_stories: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          fridge_pin_id: string
+          id: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          fridge_pin_id: string
+          id?: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          fridge_pin_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campfire_stories_fridge_pin_id_fkey"
+            columns: ["fridge_pin_id"]
+            isOneToOne: false
+            referencedRelation: "fridge_pins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       circle_invites: {
         Row: {
           circle_id: string
@@ -476,6 +508,7 @@ export type Database = {
       }
       fridge_pins: {
         Row: {
+          campfire_prompt: string | null
           circle_id: string
           content: string | null
           created_at: string
@@ -487,6 +520,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          campfire_prompt?: string | null
           circle_id: string
           content?: string | null
           created_at?: string
@@ -498,6 +532,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          campfire_prompt?: string | null
           circle_id?: string
           content?: string | null
           created_at?: string
@@ -617,6 +652,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "group_chats_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_aliases: {
+        Row: {
+          alias: string
+          circle_id: string
+          created_at: string
+          id: string
+          target_user_id: string
+          user_id: string
+        }
+        Insert: {
+          alias: string
+          circle_id: string
+          created_at?: string
+          id?: string
+          target_user_id: string
+          user_id: string
+        }
+        Update: {
+          alias?: string
+          circle_id?: string
+          created_at?: string
+          id?: string
+          target_user_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_aliases_circle_id_fkey"
             columns: ["circle_id"]
             isOneToOne: false
             referencedRelation: "circles"
