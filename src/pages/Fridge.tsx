@@ -417,7 +417,7 @@ const Fridge = () => {
                     </>
                   )}
                 </div>
-
+                )}
                 <Button 
                   className="w-full" 
                   onClick={handleCreatePin}
