@@ -170,10 +170,8 @@ const Auth = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center px-4">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
       </div>
     );
   }
@@ -183,7 +181,7 @@ const Auth = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <img src={logo} alt="Familial" className="h-24 w-auto" />
+            <img src={logo} alt="Familial" className="h-16 sm:h-24 w-auto" />
           </div>
           <CardTitle className="font-serif text-2xl">
             {isForgotPassword ? "Reset Password" : isLogin ? "Welcome" : "Join Familial"}

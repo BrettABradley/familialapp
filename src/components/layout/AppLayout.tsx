@@ -24,7 +24,8 @@ function AppLayoutContent() {
     if (!authLoading && !user) {
       // Preserve return URL so checkout session_id isn't lost during auth redirect
       const fullPath = window.location.pathname + window.location.search;
-      if (fullPath !== "/" && fullPath !== "/auth") {
+      const isExcluded = fullPath === "/" || fullPath === "/auth" || fullPath.startsWith("/settings") || fullPath.startsWith("/profile");
+      if (!isExcluded) {
         localStorage.setItem("postAuthRedirect", fullPath);
       }
       navigate("/auth");

@@ -145,7 +145,7 @@
 
   /* Keep focused inputs visible above the on-screen keyboard */
   input, textarea {
-    scroll-margin-bottom: 260px;
+    scroll-margin-bottom: 80px;
   }
 }
 
