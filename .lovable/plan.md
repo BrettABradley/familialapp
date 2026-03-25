@@ -1,18 +1,22 @@
 
+Goal: ensure the campfire dialog shows only one close button on mobile, keeping the larger custom mobile X and removing the duplicate built-in one.
 
-## Plan: Fix Members Dialog Scrolling and Keyboard UX
+Plan
+1. Update `src/components/fridge/CampfireDialog.tsx`
+- The duplicate X is coming from `DialogContent`’s built-in close button plus the custom mobile close button already added in the campfire hero.
+- Keep the custom large mobile close button.
+- Hide the default `DialogContent` close button only for this dialog by adding a scoped class override on `DialogContent` (mobile-only), instead of changing the shared dialog component globally.
 
-### Problem
-The Members dialog uses `DialogContent` with default padding and a fixed `max-h-96` inner scroll container, creating a large white frame (header + footer padding) that eats into visible member space. On mobile, the alias input keyboard pushes content out of view.
+2. Preserve desktop behavior
+- Make the override mobile-specific so desktop/tablet can still use the standard close button if desired.
+- Keep existing z-index/color styling for the campfire dialog so the custom mobile X remains highly visible over the dark background.
 
-### Changes in `src/pages/Circles.tsx`
+3. Verify no other dialogs are affected
+- Since the fix will be scoped to `CampfireDialog` only, other dialogs across the app will continue using the shared default close behavior unchanged.
 
-1. **Reduce dialog chrome**: Remove the `max-h-96` constraint on the member list and instead let the `DialogContent` scrollable area handle it. Use `sm:max-h-[70vh]` on the member list so it fills more of the dialog on mobile while staying bounded on desktop.
+Technical detail
+- Best approach: apply a class on `CampfireDialog`’s `DialogContent` like a child selector that hides the Radix close button on small screens only, while leaving the custom `<button>` inside the hero visible.
+- Avoid editing `src/components/ui/dialog.tsx` unless absolutely necessary, because that would affect all dialogs in the app.
 
-2. **Compact padding**: Add tighter padding classes to the `DialogContent` for this dialog (`p-4 pt-[max(env(safe-area-inset-top,0px),1rem)]`) so the white border/frame around the member list is minimal.
-
-3. **Keyboard-safe alias input**: Add `scroll-margin-bottom: 260px` (already global for input/textarea) — verify the alias `Input` inherits this. Wrap the member list in a container that allows the focused input to scroll into view above the keyboard. The `MemberRow` alias input should call `scrollIntoView({ block: 'center' })` on focus to ensure it's visible above the keyboard.
-
-### Files to modify
-- `src/pages/Circles.tsx` — Members dialog layout and MemberRow alias input focus behavior
-
+Files to modify
+- `src/components/fridge/CampfireDialog.tsx`
