@@ -105,7 +105,7 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md p-0 overflow-hidden">
+      <DialogContent className="max-w-md p-0 overflow-hidden [&>button]:z-50 [&>button]:text-white [&>button]:hover:text-white/80">
         <DialogTitle className="sr-only">{pinTitle}</DialogTitle>
 
         {/* Campsite hero */}

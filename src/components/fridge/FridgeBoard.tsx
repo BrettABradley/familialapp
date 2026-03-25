@@ -188,7 +188,7 @@ export function FridgeBoard({
                     {/* Photo/Media area - clickable */}
                     {pin.pin_type === 'campfire' ? (
                       <div
-                        className="flex aspect-square items-center justify-center bg-zinc-900 cursor-pointer"
+                        className="aspect-square cursor-pointer overflow-hidden"
                         onClick={() => setCampfirePin(pin)}
                       >
                         <PixelCampfire size="sm" />
