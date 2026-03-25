@@ -1,91 +1,26 @@
 
-Goal: fix the bell behavior, clean up the fridge pin dialog edge, upgrade campfire into a richer campsite experience, remove campfire title entry, and make aliases global per person instead of per-circle.
 
-1. Fix the notification bell double-open/immediate-close bug
-- Root cause: the same `notifBell` element is rendered in two responsive containers at once (`md/xl hidden` via CSS, but still mounted), so two controlled popovers/sheets share the same `bellOpen` state.
-- Update `src/components/layout/CircleHeader.tsx` to render separate notification components per breakpoint instead of reusing one `notifBell` instance in multiple places.
-- Keep one mounted bell trigger per layout:
-  - mobile: top sheet
-  - tablet/desktop (`md` to `xl`): popover next to hamburger
-  - wide desktop (`xl+`): popover on right side
-- Preserve current “no manual click toggle” approach and keep `onOpenChange` as the only open-state source.
+## Plan: Campfire Dialog UX Improvements
 
-2. Fix the left edge getting clipped in “Pin Something”
-- In `src/pages/Fridge.tsx`, adjust the create dialog layout so the form content is not visually jammed against the left edge.
-- Likely fix:
-  - move the `ScrollArea` padding from the inner wrapper to the dialog content/viewport more evenly
-  - remove the asymmetric `pr-4`-only layout
-  - ensure the dialog content uses balanced horizontal padding and enough width on mobile/desktop
-- Result: the create modal should look centered and clean, especially at the left border.
+### 1. Bigger, more visible close button on mobile
+- In `CampfireDialog.tsx`, add a custom close button (an `X` icon from lucide) positioned top-right inside the campsite hero area, sized at 40x40px with a semi-transparent dark background circle for contrast against the night sky. Style it with `md:hidden` so it only appears on mobile (the default dialog close button is small and hard to see on dark backgrounds).
+- Keep the existing `[&>button]` styling but supplement it with this explicit mobile close button that calls `onOpenChange(false)`.
 
-3. Remove campfire title input and make prompt the only authored field
-- The database still needs a `title`, so keep storing a system label like `"Campfire"` behind the scenes.
-- In `src/pages/Fridge.tsx`:
-  - hide the Title field when `pinType === "campfire"`
-  - require only the prompt for campfire creation
-  - disable the submit button based on `campfirePrompt` instead of `title`
-  - insert `title: "Campfire"` automatically for campfire pins
-- In fridge board + campfire dialog, stop presenting the generic title prominently; the prompt becomes the visible focal content.
+### 2. Show story as a chat bubble only when avatar is tapped (hide the always-visible story card)
+- Remove the always-visible story content area at the bottom. Instead, when a user taps an avatar, show their story as an inline speech/chat bubble that appears near or below their avatar within the campsite hero section.
+- Use a styled card with a small triangle/caret pointing toward the selected avatar, overlaid on the campsite environment.
+- When no avatar is selected (or tapped again to deselect), the bubble disappears — only the campfire scene and avatars are visible.
+- The submit form for the current user's story remains at the bottom but only shows if they haven't submitted yet.
 
-4. Upgrade campfire into a full campsite experience
-- Replace the current minimal fire-only visual with a richer campsite scene in:
-  - `src/components/fridge/PixelCampfire.tsx`
-  - `src/components/fridge/CampfireDialog.tsx`
-- Design direction:
-  - pixelated animated fire remains central
-  - add campsite environment: night sky, trees/silhouettes, ground ring, rocks/logs, glow
-  - keep it CSS-driven/pixel-art styled so it stays lightweight and responsive
-- On the fridge board:
-  - keep the pin compact, but make the campfire card feel more like a tiny campsite rather than a plain dark square
-- In the dialog:
-  - make the campsite the main hero area
-  - keep mobile-first sizing so the environment still looks good without pushing the story UI too far down
+### 3. Fire scales with number of stories + scrollable avatar area
+- Pass `storyCount` to `PixelCampfire` component. Scale the fire size layers based on story count:
+  - Base size at 0-1 stories
+  - Each additional story increases fire width/height by ~10-15% (capped at ~2x)
+  - More stories = bigger, more impressive fire
+- Wrap the avatar row in a horizontal `ScrollArea` so when there are many contributors, users can scroll left/right through the avatars without breaking the layout.
+- On mobile, the scroll area should be touch-scrollable with `overflow-x-auto`.
 
-5. Put member avatars around the campfire and make them the story navigation
-- In `src/components/fridge/CampfireDialog.tsx`, change the “one-at-a-time” navigation from generic arrows-first to people-first navigation.
-- Fetch stories exactly as now, but render contributor avatar chips around/below the campfire.
-- Clicking a person:
-  - sets that person’s story as the active story
-  - highlights their avatar/name
-  - shows their story in the main card
-- Keep arrows/swipe as optional secondary navigation, but the primary interaction becomes “tap a family member around the fire.”
-- If no one has posted yet, show the empty-state and prompt input cleanly.
+### Files to modify
+- `src/components/fridge/CampfireDialog.tsx` — custom mobile close button, chat bubble story display, scrollable avatars
+- `src/components/fridge/PixelCampfire.tsx` — accept `storyCount` prop, scale fire dimensions dynamically
 
-6. Make aliases global across circles for the same person
-- Current issue: `member_aliases` is circle-scoped (`user_id + target_user_id + circle_id`), which conflicts with your requirement.
-- Change the data model so aliases are stored per relationship pair, not per circle:
-  - one alias per `user_id + target_user_id`
-  - remove circle-specific uniqueness from behavior
-- Migration plan:
-  - deduplicate existing alias rows per pair
-  - keep the newest/non-empty alias
-  - replace the unique constraint with pair-level uniqueness
-  - update RLS to allow managing aliases for people you share a circle with
-- Update all lookups:
-  - `src/pages/Circles.tsx` member editor should query/save by `user_id + target_user_id`
-  - `src/hooks/useFeedPosts.ts` should stop filtering by `circle_id`
-  - notification SQL functions should resolve aliases by pair, not by pair+circle
-- Result: if you rename someone in one circle, that same alias is used everywhere for that person.
-
-7. Files likely involved
-- `src/components/layout/CircleHeader.tsx`
-- `src/pages/Fridge.tsx`
-- `src/components/fridge/FridgeBoard.tsx`
-- `src/components/fridge/CampfireDialog.tsx`
-- `src/components/fridge/PixelCampfire.tsx`
-- `src/pages/Circles.tsx`
-- `src/hooks/useFeedPosts.ts`
-- new migration in `supabase/migrations/` to reshape `member_aliases` and update notification functions
-
-8. Technical notes
-- No role/auth model changes needed.
-- Campfire one-story-per-person rule can stay as-is via the existing `campfire_stories` unique constraint.
-- For campfire creation, the UI can remove the title field without changing the non-null `fridge_pins.title` column by auto-populating a system title.
-- The bell bug is most likely a rendering/layout duplication bug, not a notification data bug.
-
-Implementation order
-1. Bell render fix
-2. Fridge create dialog spacing fix
-3. Campfire create flow cleanup (prompt-only)
-4. Campfire campsite visual + avatar-based story navigation
-5. Alias migration + app/query updates
