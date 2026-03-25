@@ -159,6 +159,11 @@
   --keyboard-height: 0px;
 }
 
+/* Hide elements when the on-screen keyboard is open (Capacitor native) */
+.keyboard-open .keyboard-hide {
+  display: none !important;
+}
+
 @layer utilities {
   .font-serif {
     font-family: var(--font-serif);
