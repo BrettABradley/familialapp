@@ -236,6 +236,7 @@ const Fridge = () => {
   
 
   return (
+    <PullToRefreshWrapper onRefresh={async () => { await fetchPins(); }}>
     <main className="container mx-auto px-4 py-8 max-w-4xl">
       <ReadOnlyBanner circleId={selectedCircle} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
@@ -460,6 +461,7 @@ const Fridge = () => {
         />
       )}
     </main>
+    </PullToRefreshWrapper>
   );
 };
 

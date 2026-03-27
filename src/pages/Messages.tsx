@@ -892,6 +892,7 @@ const Messages = () => {
 
   // Conversations List
   return (
+    <PullToRefreshWrapper onRefresh={async () => { await fetchConversations(); }}>
     <main className="container mx-auto px-4 py-8 max-w-2xl">
       <ReadOnlyBanner circleId={selectedCircle} />
       <div className="mb-8">
@@ -1041,6 +1042,7 @@ const Messages = () => {
         </div>
       )}
     </main>
+    </PullToRefreshWrapper>
   );
 };
 
