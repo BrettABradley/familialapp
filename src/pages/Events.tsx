@@ -636,7 +636,7 @@ const Events = () => {
                 <Trash2 className="w-5 h-5" />
               </Button>
             </DialogHeader>
-            <div className="space-y-4 pb-48">
+            <div className="space-y-4 pb-4">
               <div className="space-y-2">
                 <Label>Circle</Label>
                 <Select value={selectedCircle} onValueChange={setSelectedCircle}>
@@ -656,6 +656,16 @@ const Events = () => {
                 <Label htmlFor="description">Description (optional)</Label>
                 <Textarea id="description" placeholder="Add details..." value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} />
               </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="time">Time (optional)</Label>
+                  <Input id="time" type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="location">Location (optional)</Label>
+                  <Input id="location" placeholder="Place" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} maxLength={300} />
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label>Event Date(s)</Label>
                 <p className="text-xs text-muted-foreground">Click a start date, then click an end date for multi-day events</p>
@@ -668,16 +678,6 @@ const Events = () => {
                   }}
                   className="rounded-md border pointer-events-auto"
                 />
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="time">Time (optional)</Label>
-                  <Input id="time" type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location (optional)</Label>
-                  <Input id="location" placeholder="Place" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} maxLength={300} />
-                </div>
               </div>
               <div className="space-y-2 pb-4">
                 <Label>Photo Album (optional)</Label>
@@ -711,14 +711,24 @@ const Events = () => {
               <Trash2 className="w-5 h-5" />
             </Button>
           </DialogHeader>
-          <div className="space-y-4 pb-48">
-            <div className="space-y-2">
+            <div className="space-y-4 pb-4">
+             <div className="space-y-2">
               <Label htmlFor="edit-title">Event Title</Label>
               <Input id="edit-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} maxLength={200} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-description">Description (optional)</Label>
               <Textarea id="edit-description" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} maxLength={2000} />
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-time">Time (optional)</Label>
+                <Input id="edit-time" type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-location">Location (optional)</Label>
+                <Input id="edit-location" placeholder="Place" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} maxLength={300} />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Event Date(s)</Label>
@@ -732,16 +742,6 @@ const Events = () => {
                 }}
                 className="rounded-md border pointer-events-auto"
               />
-            </div>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-time">Time (optional)</Label>
-                <Input id="edit-time" type="time" value={editTime} onChange={(e) => setEditTime(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-location">Location (optional)</Label>
-                <Input id="edit-location" placeholder="Place" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} maxLength={300} />
-              </div>
             </div>
             <div className="space-y-2">
               <Label>Photo Album (optional)</Label>

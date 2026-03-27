@@ -266,7 +266,7 @@ const Fridge = () => {
                 </DialogDescription>
               </DialogHeader>
               <ScrollArea className="max-h-[70vh]">
-              <div className="space-y-4 mt-4 px-1">
+              <div className="space-y-4 mt-4 px-1 pb-32">
                 <div className="space-y-2">
                   <Label>Circle</Label>
                   <Select value={selectedCircle} onValueChange={setSelectedCircle}>
