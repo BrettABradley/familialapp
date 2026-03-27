@@ -1,52 +1,27 @@
 
 
-## Plan: Pull-to-Refresh on Mobile App Pages
+## Plan: Create Test Account for Apple Review
 
-### What
-Add native-feel pull-to-refresh behavior so that scrolling to the top and pulling down triggers a data refresh. Only active on the native Capacitor app (not web browser).
+Apple requires a demo account during App Store review. We need to create a working test account in the authentication system.
 
-### Approach
-Create a reusable `usePullToRefresh` hook that listens for `touchstart`/`touchmove`/`touchend` on a scrollable container. When the user pulls down while already at `scrollTop === 0`, show a small spinner indicator and call the provided refresh callback. The hook checks `Capacitor.isNativePlatform()` so it's a no-op on web.
+### Steps
 
-Create a small `PullToRefreshIndicator` component that renders the animated spinner at the top when pulling.
+1. **Temporarily enable auto-confirm** for email signups (so the test account doesn't need email verification)
+2. **Create the test account** by signing up through the app with these credentials:
+   - **Email:** `appreview@familialapp.com`
+   - **Password:** `FamilialReview2026!`
+3. **Disable auto-confirm** after account creation (restore normal email verification)
+4. **Pre-populate the account** — ensure it belongs to at least one circle with sample data so the reviewer can see the app's features
 
-### Changes
+### What you provide to Apple
+In App Store Connect under "App Review Information → Sign-In Information":
+- **Username:** `appreview@familialapp.com`
+- **Password:** `FamilialReview2026!`
 
-#### 1. New: `src/hooks/usePullToRefresh.ts`
-- Touch gesture detection: track pull distance when container is at scroll top
-- Threshold of ~60px to trigger refresh
-- Returns `{ isRefreshing, pullDistance, containerRef }` 
-- Calls provided `onRefresh` async callback, sets `isRefreshing` during execution
-- Only activates on native platform (`Capacitor.isNativePlatform()`)
+### Implementation
+- Use the auth configuration tool to toggle auto-confirm
+- Sign up the account programmatically
+- Optionally create a demo circle with sample posts/events so the reviewer has content to browse
 
-#### 2. New: `src/components/shared/PullToRefreshWrapper.tsx`
-- Wraps children with the pull indicator (a spinning arrow/loader that appears when pulling down)
-- Shows a `Loader2` spinner during refresh
-- Applies CSS transform to slide content down proportional to pull distance
-
-#### 3. `src/pages/Feed.tsx`
-- Wrap the `<main>` content in `PullToRefreshWrapper` with `onRefresh={() => fetchPosts(true)}`
-
-#### 4. `src/pages/Events.tsx`
-- Wrap content in `PullToRefreshWrapper` with `onRefresh` calling `fetchEvents()` and `fetchPastEvents()`
-
-#### 5. `src/pages/Albums.tsx`
-- Wrap content in `PullToRefreshWrapper` with `onRefresh={() => fetchAlbums()}`
-
-#### 6. `src/pages/Messages.tsx`
-- Wrap content in `PullToRefreshWrapper` with `onRefresh={() => fetchConversations()}`
-
-#### 7. `src/pages/Fridge.tsx`
-- Wrap content in `PullToRefreshWrapper` with `onRefresh={() => fetchPins()}`
-
-### Files to create
-- `src/hooks/usePullToRefresh.ts`
-- `src/components/shared/PullToRefreshWrapper.tsx`
-
-### Files to modify
-- `src/pages/Feed.tsx`
-- `src/pages/Events.tsx`
-- `src/pages/Albums.tsx`
-- `src/pages/Messages.tsx`
-- `src/pages/Fridge.tsx`
+Shall I proceed with creating this account?
 
