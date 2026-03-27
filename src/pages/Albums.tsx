@@ -703,7 +703,7 @@ const Albums = () => {
                     <Trash2 className="w-5 h-5" />
                   </Button>
                 </DialogHeader>
-                <div className="space-y-4 pb-48">
+                <div className="space-y-4 pb-4">
                   <div className="space-y-2">
                     <Label htmlFor="albumName">Album Name *</Label>
                     <Input id="albumName" placeholder="e.g., Summer Vacation 2024" value={newAlbum.name} onChange={(e) => setNewAlbum({ ...newAlbum, name: e.target.value })} maxLength={100} />
