@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, CalendarDays, MapPin, Clock, Trash2, Loader2, Image, Pencil, Check, X, UserCheck, HelpCircle, XCircle, Users } from "lucide-react";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
+import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { format, parse } from "date-fns";
 
 /** Parse "YYYY-MM-DD" as local date (avoids UTC-midnight timezone shift). */

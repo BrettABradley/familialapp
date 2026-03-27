@@ -17,6 +17,7 @@ import { FridgeBoard, type FridgeBoardPin } from "@/components/fridge/FridgeBoar
 import { Plus, Pin, Image, FileText, Calendar, Users, Mic, Flame } from "lucide-react";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
+import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 
 interface Circle {
