@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Send, MessageSquare, Search, Users, Plus, UsersRound, Pencil, Camera, Trash2, Paperclip, X } from "lucide-react";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
+import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import { validateFileSize, getFileMediaType, getMediaType } from "@/lib/mediaUtils";
 import { convertHeicFiles, convertHeicToJpeg } from "@/lib/heicConverter";
@@ -891,6 +892,7 @@ const Messages = () => {
 
   // Conversations List
   return (
+    <PullToRefreshWrapper onRefresh={async () => { await fetchConversations(); }}>
     <main className="container mx-auto px-4 py-8 max-w-2xl">
       <ReadOnlyBanner circleId={selectedCircle} />
       <div className="mb-8">
@@ -1040,6 +1042,7 @@ const Messages = () => {
         </div>
       )}
     </main>
+    </PullToRefreshWrapper>
   );
 };
 

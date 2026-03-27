@@ -17,6 +17,7 @@ import { FridgeBoard, type FridgeBoardPin } from "@/components/fridge/FridgeBoar
 import { Plus, Pin, Image, FileText, Calendar, Users, Mic, Flame } from "lucide-react";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
+import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 
 interface Circle {
@@ -235,6 +236,7 @@ const Fridge = () => {
   
 
   return (
+    <PullToRefreshWrapper onRefresh={async () => { await fetchPins(); }}>
     <main className="container mx-auto px-4 py-8 max-w-4xl">
       <ReadOnlyBanner circleId={selectedCircle} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
@@ -459,6 +461,7 @@ const Fridge = () => {
         />
       )}
     </main>
+    </PullToRefreshWrapper>
   );
 };
 

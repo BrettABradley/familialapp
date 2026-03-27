@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users, Camera, Pencil, Check, Download, ChevronLeft, ChevronRight, Archive } from "lucide-react";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
+import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { convertHeicToJpeg, convertHeicFiles } from "@/lib/heicConverter";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import JSZip from "jszip";
@@ -431,6 +432,7 @@ const Albums = () => {
   }
 
   return (
+    <PullToRefreshWrapper onRefresh={async () => { await fetchAlbums(); }}>
     <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-4xl">
       <ReadOnlyBanner circleId={selectedCircle} />
       {selectedAlbum ? (
@@ -768,6 +770,7 @@ const Albums = () => {
         </>
       )}
     </main>
+    </PullToRefreshWrapper>
   );
 };
 

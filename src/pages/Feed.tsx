@@ -11,6 +11,7 @@ import { CreatePostForm } from "@/components/feed/CreatePostForm";
 import { PostCard } from "@/components/feed/PostCard";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { useCircleMembers } from "@/hooks/useCircleMembers";
+import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 
 const Feed = () => {
   const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly, isCircleAdmin } = useCircleContext();
@@ -99,6 +100,7 @@ const Feed = () => {
   }
 
   return (
+    <PullToRefreshWrapper onRefresh={async () => { await fetchPosts(true); }}>
     <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl">
       <ReadOnlyBanner circleId={selectedCircle} />
       {circles.length === 0 ? (
@@ -159,6 +161,7 @@ const Feed = () => {
         )}
       </div>
     </main>
+    </PullToRefreshWrapper>
   );
 };
 

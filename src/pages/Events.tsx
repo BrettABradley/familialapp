@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, CalendarDays, MapPin, Clock, Trash2, Loader2, Image, Pencil, Check, X, UserCheck, HelpCircle, XCircle, Users } from "lucide-react";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
+import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { format, parse } from "date-fns";
 
 /** Parse "YYYY-MM-DD" as local date (avoids UTC-midnight timezone shift). */
@@ -618,6 +619,7 @@ const Events = () => {
     : albums;
 
   return (
+    <PullToRefreshWrapper onRefresh={async () => { await fetchEvents(); await fetchPastEvents(); }}>
     <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-4xl">
       <ReadOnlyBanner circleId={selectedCircle} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
@@ -835,6 +837,7 @@ const Events = () => {
         </div>
       </div>
     </main>
+    </PullToRefreshWrapper>
   );
 };
 
