@@ -17,6 +17,14 @@ const Index = () => {
   const { user, loading } = useAuth();
 
   useEffect(() => {
+    // Detect recovery tokens in URL hash and redirect to reset-password page
+    const hash = window.location.hash;
+    if (hash.includes("type=recovery") || hash.includes("type=signup")) {
+      const targetPath = hash.includes("type=recovery") ? "/reset-password" : "/auth";
+      navigate(`${targetPath}${hash}`, { replace: true });
+      return;
+    }
+
     if (Capacitor.isNativePlatform() && !loading) {
       navigate(user ? "/circles" : "/auth", { replace: true });
     }
