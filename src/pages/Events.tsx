@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, CalendarDays, MapPin, Clock, Trash2, Loader2, Image, Pencil, Check, X, UserCheck, HelpCircle, XCircle, Users } from "lucide-react";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { format, parse } from "date-fns";
@@ -636,7 +637,8 @@ const Events = () => {
                 <Trash2 className="w-5 h-5" />
               </Button>
             </DialogHeader>
-            <div className="space-y-4 pb-4">
+            <ScrollArea className="max-h-[70vh]">
+            <div className="space-y-4 px-1 pb-32">
               <div className="space-y-2">
                 <Label>Circle</Label>
                 <Select value={selectedCircle} onValueChange={setSelectedCircle}>
@@ -691,12 +693,11 @@ const Events = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="sticky bottom-0 bg-background pt-2 pb-4">
-                <Button className="w-full" onClick={handleCreateEvent} disabled={!title.trim() || !selectedCircle || !selectedDate || isCreating}>
-                  {isCreating ? "Creating..." : "Create Event"}
-                </Button>
-              </div>
+              <Button className="w-full" onClick={handleCreateEvent} disabled={!title.trim() || !selectedCircle || !selectedDate || isCreating}>
+                {isCreating ? "Creating..." : "Create Event"}
+              </Button>
             </div>
+            </ScrollArea>
           </DialogContent>
         </Dialog>
       </div>
@@ -711,7 +712,8 @@ const Events = () => {
               <Trash2 className="w-5 h-5" />
             </Button>
           </DialogHeader>
-            <div className="space-y-4 pb-4">
+            <ScrollArea className="max-h-[70vh]">
+            <div className="space-y-4 px-1 pb-32">
              <div className="space-y-2">
               <Label htmlFor="edit-title">Event Title</Label>
               <Input id="edit-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} maxLength={200} />
@@ -755,12 +757,11 @@ const Events = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="sticky bottom-0 bg-background pt-2 pb-4">
               <Button className="w-full" onClick={handleSaveEdit} disabled={!editTitle.trim() || !editDate || isSavingEdit}>
                 {isSavingEdit ? "Saving..." : "Save Changes"}
               </Button>
-            </div>
           </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
