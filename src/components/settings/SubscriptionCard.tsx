@@ -164,8 +164,10 @@ const SubscriptionCard = () => {
       const { data, error } = await supabase.functions.invoke("cancel-subscription");
       if (error) throw error;
       if (data?.success) {
-        setPlanData((prev) => prev ? { ...prev, cancel_at_period_end: true, current_period_end: data.current_period_end } : prev);
-        toast({ title: "Subscription canceled", description: `You'll keep access until ${formatDate(data.current_period_end)}.` });
+        const endDate = data.current_period_end || planData.current_period_end;
+        setPlanData((prev) => prev ? { ...prev, cancel_at_period_end: true, current_period_end: endDate } : prev);
+        const formattedEnd = formatDate(endDate);
+        toast({ title: "Subscription canceled", description: formattedEnd ? `You'll keep access until ${formattedEnd}.` : "Your subscription has been canceled." });
       }
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to cancel.", variant: "destructive" });
