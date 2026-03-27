@@ -1,26 +1,52 @@
 
 
-## Plan: Fix Cancel Date Missing + Sticky Toast Issues
+## Plan: Pull-to-Refresh on Mobile App Pages
 
-### Issue 1 — Cancel toast shows "You'll keep access until ."
-The `formatDate` in `SubscriptionCard.tsx` returns `""` when `dateStr` is null. The edge function does return the date, but if it's null for any reason, the toast has no fallback. Fix: use the existing `planData.current_period_end` as fallback, and guard the toast message so it never shows an empty date.
+### What
+Add native-feel pull-to-refresh behavior so that scrolling to the top and pulling down triggers a data refresh. Only active on the native Capacitor app (not web browser).
 
-### Issue 2 — Invite toast gets stuck, no way to dismiss
-`TOAST_REMOVE_DELAY` in `src/hooks/use-toast.ts` is set to `1000000` ms (~16 minutes). Toasts effectively never auto-dismiss. Fix: reduce to `5000` ms (5 seconds) so all toasts auto-dismiss naturally.
+### Approach
+Create a reusable `usePullToRefresh` hook that listens for `touchstart`/`touchmove`/`touchend` on a scrollable container. When the user pulls down while already at `scrollTop === 0`, show a small spinner indicator and call the provided refresh callback. The hook checks `Capacitor.isNativePlatform()` so it's a no-op on web.
+
+Create a small `PullToRefreshIndicator` component that renders the animated spinner at the top when pulling.
 
 ### Changes
 
-#### 1. `src/hooks/use-toast.ts` (line 6)
-- Change `TOAST_REMOVE_DELAY` from `1000000` to `5000`
+#### 1. New: `src/hooks/usePullToRefresh.ts`
+- Touch gesture detection: track pull distance when container is at scroll top
+- Threshold of ~60px to trigger refresh
+- Returns `{ isRefreshing, pullDistance, containerRef }` 
+- Calls provided `onRefresh` async callback, sets `isRefreshing` during execution
+- Only activates on native platform (`Capacitor.isNativePlatform()`)
 
-#### 2. `src/components/settings/SubscriptionCard.tsx` (line 168)
-- Add fallback: use `planData.current_period_end` if `data.current_period_end` is missing
-- Guard against empty date in the toast message
+#### 2. New: `src/components/shared/PullToRefreshWrapper.tsx`
+- Wraps children with the pull indicator (a spinning arrow/loader that appears when pulling down)
+- Shows a `Loader2` spinner during refresh
+- Applies CSS transform to slide content down proportional to pull distance
 
-### App update
-These are frontend-only changes. You will need to rebuild and deploy the app update for the mobile app to pick them up.
+#### 3. `src/pages/Feed.tsx`
+- Wrap the `<main>` content in `PullToRefreshWrapper` with `onRefresh={() => fetchPosts(true)}`
+
+#### 4. `src/pages/Events.tsx`
+- Wrap content in `PullToRefreshWrapper` with `onRefresh` calling `fetchEvents()` and `fetchPastEvents()`
+
+#### 5. `src/pages/Albums.tsx`
+- Wrap content in `PullToRefreshWrapper` with `onRefresh={() => fetchAlbums()}`
+
+#### 6. `src/pages/Messages.tsx`
+- Wrap content in `PullToRefreshWrapper` with `onRefresh={() => fetchConversations()}`
+
+#### 7. `src/pages/Fridge.tsx`
+- Wrap content in `PullToRefreshWrapper` with `onRefresh={() => fetchPins()}`
+
+### Files to create
+- `src/hooks/usePullToRefresh.ts`
+- `src/components/shared/PullToRefreshWrapper.tsx`
 
 ### Files to modify
-- `src/hooks/use-toast.ts`
-- `src/components/settings/SubscriptionCard.tsx`
+- `src/pages/Feed.tsx`
+- `src/pages/Events.tsx`
+- `src/pages/Albums.tsx`
+- `src/pages/Messages.tsx`
+- `src/pages/Fridge.tsx`
 
