@@ -1,19 +1,26 @@
 
 
-## Plan: Add ScrollArea to Create Event Form (Match Fridge Pattern)
+## Plan: Fix Cancel Date Missing + Sticky Toast Issues
 
-### What
-Wrap the Create Event form content in a `ScrollArea` with bottom padding, matching the pattern used in the "Pin to Fridge" dialog. This gives users a smooth scrollbar to navigate the form instead of relying on the dialog's own overflow scroll.
+### Issue 1 — Cancel toast shows "You'll keep access until ."
+The `formatDate` in `SubscriptionCard.tsx` returns `""` when `dateStr` is null. The edge function does return the date, but if it's null for any reason, the toast has no fallback. Fix: use the existing `planData.current_period_end` as fallback, and guard the toast message so it never shows an empty date.
+
+### Issue 2 — Invite toast gets stuck, no way to dismiss
+`TOAST_REMOVE_DELAY` in `src/hooks/use-toast.ts` is set to `1000000` ms (~16 minutes). Toasts effectively never auto-dismiss. Fix: reduce to `5000` ms (5 seconds) so all toasts auto-dismiss naturally.
 
 ### Changes
 
-#### `src/pages/Events.tsx`
-- Wrap the `div.space-y-4` (lines 639-698) inside a `<ScrollArea className="max-h-[70vh]">` container
-- Add `pb-32` to the inner div (change `pb-4` to `pb-32`) so the bottom fields and button can be scrolled well above the keyboard
-- Import `ScrollArea` from `@/components/ui/scroll-area`
+#### 1. `src/hooks/use-toast.ts` (line 6)
+- Change `TOAST_REMOVE_DELAY` from `1000000` to `5000`
 
-Also apply the same pattern to the **Edit Event** form for consistency.
+#### 2. `src/components/settings/SubscriptionCard.tsx` (line 168)
+- Add fallback: use `planData.current_period_end` if `data.current_period_end` is missing
+- Guard against empty date in the toast message
 
-### Result
-The Create/Edit Event dialogs will have the same smooth scrollbar feel as the Fridge dialog, keeping the experience consistent across the app.
+### App update
+These are frontend-only changes. You will need to rebuild and deploy the app update for the mobile app to pick them up.
+
+### Files to modify
+- `src/hooks/use-toast.ts`
+- `src/components/settings/SubscriptionCard.tsx`
 
