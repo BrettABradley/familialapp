@@ -1,24 +1,36 @@
 
 
-## Plan: Make Form Dialogs Smoothly Scrollable + Re-center Auth Page
+## Plan: Fix Keyboard-Blocked Forms on Mobile
 
-### Problem
-When tapping inputs in dialogs (Create Album, Create Event, Fridge post, member name edit), the browser's native focus-scroll behavior causes jarring jumps. The user wants these forms to feel like a natural scrollable list — tap an input, type, then scroll down to the next field manually.
+### Four Issues
 
-### Root Cause
-The browser automatically calls `scrollIntoView` on any focused input. Combined with `scroll-margin-bottom: 80px`, this causes visible jumps even when the input is already on screen. The fix is to **prevent the browser's automatic scroll-on-focus inside dialogs**.
+1. **Login Page** — Sign In button blocked by keyboard. The card is vertically centered, so when the keyboard opens there's no room to scroll to the button. Fix: shift the card up slightly on mobile by using `justify-start` with modest top padding instead of `justify-center`, so the button remains reachable when the keyboard shrinks the viewport.
 
-### Solution
+2. **Create Event** — Location field is blocked because it sits after the calendar (a tall element). Fix: reorder the form fields so Time and Location come **before** the calendar, right after Description. This way the text inputs the user types into are near the top, and the calendar (which doesn't need the keyboard) is below.
 
-#### 1. `src/components/ui/dialog.tsx` — Suppress auto-scroll on focus inside dialogs
-Add a `focus` event listener (capture phase) on the dialog content element that calls `e.preventDefault()` on the browser's automatic scroll. This is done by using `preventScroll: true` isn't available on the focus event itself, but we can intercept it: after focus fires, immediately reset the scroll position of the dialog container. A cleaner approach: add a thin wrapper that listens for `focus` events on inputs and calls `e.target.focus({ preventScroll: true })` — but this would recurse. 
+3. **Create Album** — Unnecessary scroll animation when focusing inputs. The form only has 2 fields + a button — everything fits on screen even with the keyboard. Fix: reduce the excessive `pb-48` padding to `pb-4` so the dialog doesn't have extra scrollable space that triggers the jarring movement.
 
-**Best approach**: Add an `onFocus` capture handler on `DialogContent` that saves the dialog's `scrollTop` before the browser adjusts it, then restores it in a `requestAnimationFrame`. This prevents the jarring jump while still allowing the user to manually scroll.
+4. **Pin to Fridge** — Form gets blocked by keyboard. Similar to albums, the `ScrollArea` with `max-h-[70vh]` constrains the scrollable area. Fix: add bottom padding (`pb-32`) inside the scroll area so the submit button can be scrolled into view above the keyboard.
 
-#### 2. `src/pages/Auth.tsx` — Re-center the login page
-Change back to `justify-center` (vertically centered) now that the dialog scroll fix handles keyboard UX. Use `sm:justify-center` and also `justify-center` on mobile. The `overflow-y-auto` ensures it's still scrollable if the viewport shrinks with the keyboard, but the card starts centered.
+### Changes
+
+#### 1. `src/pages/Auth.tsx` (line 181)
+- Change `justify-center` to `justify-start pt-[calc(env(safe-area-inset-top,0px)+3rem)]` on mobile, keep `sm:justify-center sm:pt-0` for desktop
+- This shifts the card up just enough that the Sign In button clears the keyboard
+
+#### 2. `src/pages/Events.tsx` — Create Event form (lines 672-681) and Edit Event form (lines 736-745)
+- Move the Time and Location fields to appear **before** the Calendar in both create and edit forms
+- This puts all keyboard-requiring inputs near the top, calendar below
+
+#### 3. `src/pages/Albums.tsx` (line 706)
+- Reduce `pb-48` to `pb-4` on the create album form — the form is short enough that massive bottom padding is unnecessary and causes the scroll jump
+
+#### 4. `src/pages/Fridge.tsx` (lines 269, 425-434)
+- Add `pb-32` to the inner `div.space-y-4` so the "Pin to Fridge" button can be scrolled past the keyboard
 
 ### Files to modify
-- `src/components/ui/dialog.tsx` — add focus-capture scroll preservation
-- `src/pages/Auth.tsx` — re-center the card layout (revert `justify-start pt-[...]` back to `justify-center` with safe-area padding kept)
+- `src/pages/Auth.tsx`
+- `src/pages/Events.tsx`
+- `src/pages/Albums.tsx`
+- `src/pages/Fridge.tsx`
 
