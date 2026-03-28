@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Users, ArrowUp, Plus, Loader2 } from "lucide-react";
+import { openExternalUrl } from "@/lib/externalUrl";
 import {
   AlertDialog,
   AlertDialogAction,

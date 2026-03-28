@@ -12,18 +12,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Camera, Save, ArrowLeft, LogOut } from "lucide-react";
+import { Camera, Save, ArrowLeft, LogOut, Trash2, Loader2 } from "lucide-react";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
+import { pickImage } from "@/lib/imagePicker";
 import SubscriptionCard from "@/components/settings/SubscriptionCard";
 import ReceiptHistory from "@/components/settings/ReceiptHistory";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const Settings = () => {
   const { user, signOut } = useAuth();
   const { profile, isLoading: contextLoading, refetchProfile } = useCircleContext();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   useKeyboardDismissOnScroll(mainRef);
   
@@ -35,6 +45,11 @@ const Settings = () => {
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
+  // Delete account state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
   useEffect(() => {
     if (profile) {
       setDisplayName(profile.display_name || "");
@@ -43,15 +58,21 @@ const Settings = () => {
     }
   }, [profile]);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const rawFile = event.target.files?.[0];
-    if (!rawFile) return;
-    const file = await convertHeicToJpeg(rawFile);
-    setPendingFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setCropImageSrc(reader.result as string);
-    reader.readAsDataURL(file);
-    event.target.value = "";
+  const handlePickImage = async () => {
+    try {
+      const result = await pickImage();
+      if (!result) return;
+
+      const file = await convertHeicToJpeg(result.file);
+      setPendingFile(file);
+
+      // Re-read as data URL after potential HEIC conversion
+      const reader = new FileReader();
+      reader.onload = () => setCropImageSrc(reader.result as string);
+      reader.readAsDataURL(file);
+    } catch (err) {
+      toast({ title: "Error", description: "Could not access camera or photos. Please check permissions.", variant: "destructive" });
+    }
   };
 
   const handleCroppedUpload = async (blob: Blob) => {
@@ -114,6 +135,27 @@ const Settings = () => {
     setIsSaving(false);
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== "DELETE") return;
+    setIsDeleting(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("delete-account");
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      await signOut();
+      window.location.href = "/auth";
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to delete account. Please contact support.",
+        variant: "destructive",
+      });
+      setIsDeleting(false);
+    }
+  };
+
   if (contextLoading) {
     return (
       <main className="container mx-auto px-4 py-8 max-w-2xl">
@@ -155,14 +197,13 @@ const Settings = () => {
                 </AvatarFallback>
               </Avatar>
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={handlePickImage}
                 disabled={isUploading}
                 className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-2 hover:bg-primary/90 transition-colors"
                 aria-label="Upload profile photo"
               >
                 <Camera className="w-4 h-4" />
               </button>
-              <input ref={fileInputRef} type="file" accept="image/*,.heic,.heif" onChange={handleFileSelect} className="hidden" />
             </div>
             {isUploading && <p className="text-sm text-muted-foreground">Uploading...</p>}
           </div>
@@ -205,6 +246,29 @@ const Settings = () => {
       <SubscriptionCard />
       <ReceiptHistory />
 
+      {/* Delete Account */}
+      <Card className="mt-6 border-destructive/30">
+        <CardHeader>
+          <CardTitle className="font-serif text-lg text-destructive flex items-center gap-2">
+            <Trash2 className="h-4 w-4" />
+            Delete Account
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Permanently delete your account and all associated data. This action cannot be undone.
+          </p>
+          <Button
+            variant="destructive"
+            onClick={() => setDeleteDialogOpen(true)}
+            className="w-full"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete Account
+          </Button>
+        </CardContent>
+      </Card>
+
       <div className="mt-6 pb-24">
         <Button
           variant="outline"
@@ -215,6 +279,53 @@ const Settings = () => {
           Sign Out
         </Button>
       </div>
+
+      {/* Delete Account Confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setDeleteDialogOpen(false);
+          setDeleteConfirmText("");
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  This will <strong>permanently delete</strong> your account, all your circles, posts, messages, and data. Any active subscription will be canceled immediately.
+                </p>
+                <p className="font-medium text-foreground">
+                  This action cannot be undone.
+                </p>
+                <div className="space-y-2 pt-2">
+                  <Label htmlFor="deleteConfirm" className="text-sm">
+                    Type <strong>DELETE</strong> to confirm
+                  </Label>
+                  <Input
+                    id="deleteConfirm"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="DELETE"
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirmText !== "DELETE" || isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Delete Forever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 };
