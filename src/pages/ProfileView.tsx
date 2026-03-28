@@ -386,7 +386,7 @@ const ProfileView = () => {
 
       {/* Image Lightbox */}
       <Dialog open={!!enlargedImage} onOpenChange={(open) => !open && setEnlargedImage(null)}>
-        <DialogContent className="max-w-3xl p-2 bg-background/95 [&>button:last-child]:hidden">
+        <DialogContent className="max-w-[95vw] w-fit p-2 bg-background/95 [&>button:last-child]:hidden">
           {enlargedImage && (
             <div className="flex flex-col items-center">
               <div className="flex items-center justify-end gap-2 w-full mb-2 pt-[max(env(safe-area-inset-top,0px),0.5rem)] pr-1">
@@ -415,13 +415,13 @@ const ProfileView = () => {
                     src={enlargedImage.image_url}
                     controls
                     autoPlay
-                    className="max-h-[75vh] w-auto rounded-lg"
+                    className="max-h-[90vh] w-auto rounded-lg"
                   />
                 ) : (
                   <img
                     src={enlargedImage.image_url}
                     alt={enlargedImage.caption || "Profile photo"}
-                    className="max-h-[75vh] w-auto object-contain rounded-lg"
+                    className="max-h-[90vh] w-auto object-contain rounded-lg"
                   />
                 )}
               </div>

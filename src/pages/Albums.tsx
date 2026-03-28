@@ -588,7 +588,7 @@ const Albums = () => {
 
           {/* Enlarged photo dialog with navigation */}
           <Dialog open={!!enlargedPhoto} onOpenChange={(open) => !open && setEnlargedPhoto(null)}>
-            <DialogContent className="max-w-3xl p-2 sm:p-4 [&>button:last-child]:hidden">
+            <DialogContent className="max-w-[95vw] w-fit p-2 sm:p-4 [&>button:last-child]:hidden">
               <DialogTitle className="sr-only">{enlargedPhoto?.caption || "Photo"}</DialogTitle>
               {enlargedPhoto && (() => {
                 const currentIndex = photos.findIndex(p => p.id === enlargedPhoto.id);
@@ -641,7 +641,7 @@ const Albums = () => {
                       <img
                         src={enlargedPhoto.photo_url}
                         alt={enlargedPhoto.caption || "Photo"}
-                        className="max-h-[80vh] w-auto rounded-md object-contain"
+                        className="max-h-[90vh] w-auto rounded-md object-contain"
                       />
                       {photos.length > 1 && (
                         <Button
