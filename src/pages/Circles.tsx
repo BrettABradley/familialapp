@@ -156,7 +156,7 @@ const MemberRow = ({ member, isOwner: isCircleOwner, currentUserId, circleId, on
 
 const Circles = () => {
   const { user } = useAuth();
-  const { circles, isLoading: contextLoading, refetchCircles, profile, setSelectedCircle: setContextCircle } = useCircleContext();
+  const { circles, isLoading: contextLoading, refetchCircles, profile, setSelectedCircle: setContextCircle, userPlan } = useCircleContext();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
@@ -769,7 +769,7 @@ const Circles = () => {
             </DialogContent>
           </Dialog>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" />Create Circle</Button></DialogTrigger>
+            <DialogTrigger asChild><Button disabled={circleCount >= circleLimit} className={circleCount >= circleLimit ? "opacity-50" : ""}><Plus className="w-4 h-4 mr-2" />Create Circle</Button></DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle className="font-serif">Create a New Circle</DialogTitle>
@@ -788,8 +788,8 @@ const Circles = () => {
               </div>
             </DialogContent>
           </Dialog>
-          <Button variant="outline" onClick={() => navigate("/upgrade")}>
-            <ArrowUp className="w-4 h-4 mr-2" />Upgrade
+          <Button variant="outline" size="icon" onClick={() => navigate("/upgrade")} disabled={userPlan?.plan === "extended"} className={userPlan?.plan === "extended" ? "opacity-50" : ""} title="Upgrade Plan">
+            <ArrowUp className="w-4 h-4" />
           </Button>
         </div>
       </div>
