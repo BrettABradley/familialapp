@@ -292,13 +292,61 @@ export function FridgeBoard({
       <Dialog open={!!enlargedPin} onOpenChange={(open) => !open && setEnlargedPin(null)}>
         <DialogContent
           className={cn(
-            "max-w-lg p-0 overflow-hidden border-0 bg-transparent shadow-none",
-            "[&>button]:hidden"
+            "p-0 overflow-hidden border-0 shadow-none [&>button]:hidden",
+            "inset-0 bg-black/90 flex flex-col items-center justify-center",
+            "sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-lg sm:rounded-lg sm:bg-transparent"
           )}
         >
           <DialogTitle className="sr-only">
             {enlargedPin?.title || "Enlarged photo"}
           </DialogTitle>
+
+          {/* Top control bar — safe-area aware */}
+          {enlargedPin && (
+            <div
+              className="absolute top-0 left-0 right-0 z-30 flex justify-end gap-2 px-4"
+              style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 3.25rem)" }}
+            >
+              {enlargedPin.image_url && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(enlargedPin.image_url!);
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      const ext = enlargedPin.image_url!.split(".").pop()?.split("?")[0] || "file";
+                      a.download = `${enlargedPin.title}.${ext}`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    } catch {
+                      window.open(enlargedPin.image_url!, "_blank");
+                    }
+                  }}
+                  aria-label="Download"
+                >
+                  <Download className="h-5 w-5" />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-11 w-11 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                onClick={() => setEnlargedPin(null)}
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
+
+          {/* Polaroid frame */}
           {enlargedPin && (
             <div
               className={cn(
@@ -306,7 +354,7 @@ export function FridgeBoard({
                 enlargedPin?.content ? "pb-16" : "pb-12",
                 "border-[6px] border-zinc-300",
                 "shadow-[8px_8px_0_0_rgba(0,0,0,0.25)]",
-                "mx-auto max-w-md"
+                "mx-4 sm:mx-auto max-w-md"
               )}
               style={{ transform: `rotate(${(Math.random() * 4 - 2).toFixed(1)}deg)` }}
             >
@@ -358,44 +406,6 @@ export function FridgeBoard({
                 <p className="truncate text-xs text-zinc-500 font-mono">
                   {enlargedPin.circles?.name || ""}
                 </p>
-              </div>
-              {/* Action buttons */}
-              <div className="absolute top-2 right-2 flex gap-2">
-                {enlargedPin.image_url && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
-                    onClick={async () => {
-                      try {
-                        const res = await fetch(enlargedPin.image_url!);
-                        const blob = await res.blob();
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        const ext = enlargedPin.image_url!.split(".").pop()?.split("?")[0] || "file";
-                        a.download = `${enlargedPin.title}.${ext}`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                      } catch {
-                        window.open(enlargedPin.image_url!, "_blank");
-                      }
-                    }}
-                    aria-label="Download"
-                  >
-                    <Download className="h-5 w-5" />
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
-                  onClick={() => setEnlargedPin(null)}
-                >
-                  <X className="h-5 w-5" />
-                </Button>
               </div>
             </div>
           )}
