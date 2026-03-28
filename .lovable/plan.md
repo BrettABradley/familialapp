@@ -1,41 +1,54 @@
 
 
-# Add Encryption Compliance Flag to Capacitor Config
+# Enhanced Account Deletion: 3-Step Confirmation + Complete Data Cleanup + Transfer Block
 
-Apple asks about encryption compliance on every TestFlight/App Store upload unless you declare `ITSAppUsesNonExemptEncryption = NO` in your `Info.plist`. We can automate this by adding it to `capacitor.config.ts` so it gets merged into the native project on every `npx cap sync`.
+## Overview
 
-## What changes
+Upgrade the account deletion flow with a 3-step "Are you sure?" confirmation, comprehensive billing cancellation, full user data cleanup, and automatic transfer block for owned circles that still have members. Also reposition the Delete Account button below Sign Out and make it smaller/less prominent.
 
-**File: `capacitor.config.ts`**
+## Changes
 
-Add an `appendUserAgent` or `iOS` config block that injects the plist key automatically:
+### 1. Settings UI (`src/pages/Settings.tsx`)
 
-```ts
-const config: CapacitorConfig = {
-  // ...existing config
-  ios: {
-    contentInset: 'automatic',
-    // This merges into Info.plist on cap sync
-    appendUserAgent: undefined,
-  },
-};
-```
+**Layout change**: Move the Delete Account card *below* the Sign Out button. Make the delete button smaller (`size="sm"`, `variant="ghost"` with destructive text) so it's clearly secondary to Sign Out.
 
-However, Capacitor doesn't support arbitrary plist injection from `capacitor.config.ts`. The correct approach is to create a **Capacitor hook script** or simply add the key via a small post-sync script.
+**3-Step confirmation dialog**:
+- **Step 1 — Warning** (1/3): "This will permanently delete your account." Lists consequences: all data removed, subscriptions canceled, owned circles transferred or deleted. Buttons: Cancel / "I understand, continue"
+- **Step 2 — What gets deleted** (2/3): Specific list — posts, comments, messages, photos, fridge pins, memberships. Notes that owned circles with members will be placed on transfer block. Buttons: Back / "Continue to final step"  
+- **Step 3 — Type DELETE** (3/3): Final confirmation with text input. Buttons: Back / "Delete Forever"
 
-**Simplest reliable approach**: Create a `scripts/set-encryption-flag.sh` script that adds the key to the iOS plist after each `cap sync`, and document it. But since you want zero manual steps:
+State: replace `deleteDialogOpen` boolean with `deleteStep` (0 = closed, 1–3).
 
-**Best approach**: Add the key directly in the Capacitor iOS project's `Info.plist` via a `cordova-custom-config`-style plugin, or more practically, just set it in `capacitor.config.ts` under the undocumented `ios.overrideUserInterfaceStyle` pattern — but Capacitor doesn't support arbitrary plist keys natively.
+### 2. Edge Function (`supabase/functions/delete-account/index.ts`)
 
-**Recommended solution**: Create a small `scripts/ios-post-sync.sh` that runs `PlistBuddy` to inject the flag, and update `package.json` with a convenience script.
+**Billing cleanup expansion**:
+- Query Stripe subscriptions with `status=active&status=trialing&status=past_due` (currently only `active`)
 
-## Plan
+**Transfer block for owned circles with members**:
+- Before deleting owned circles, check each for remaining members
+- If a circle has other members: set `transfer_block = true` and skip deletion (leave circle intact for members to claim)
+- If a circle has no other members: delete it and all its data (existing logic)
 
-1. **Create `scripts/ios-post-sync.sh`** — a 3-line script that uses `/usr/libexec/PlistBuddy` to set `ITSAppUsesNonExemptEncryption` to `false` in `ios/App/App/Info.plist`
+**Global user data cleanup** (content authored in circles they don't own):
+- Delete user's posts in any circle → cascade comments/reactions on those posts
+- Delete user's comments, reactions, fridge pins, campfire stories, event RSVPs
+- Delete user's album photos
+- Delete user's group chat messages
+- Clean up storage files (avatars bucket: `{userId}/` prefix)
 
-2. **Add npm script to `package.json`** — `"cap:sync:ios": "npx cap sync ios && sh scripts/ios-post-sync.sh"` so you just run `npm run cap:sync:ios` and it handles everything
+**Order of operations**:
+1. Cancel Stripe subscriptions (active, trialing, past_due)
+2. Handle owned circles: transfer-block those with members, delete empty ones
+3. Delete user-authored content globally (posts, comments, reactions, pins, stories, RSVPs, album photos, group chat messages)
+4. Remove circle memberships
+5. Delete user-specific records (notifications, DMs, push tokens, profile images, user plans, aliases, store offers, profiles)
+6. Clean up storage files
+7. Delete auth user
 
-3. **Also add `NSCameraUsageDescription` and `NSPhotoLibraryUsageDescription`** to the same script so you never lose those either after a fresh `cap sync`
+### Files to modify
 
-This way, every time you sync, the encryption flag and privacy strings are automatically injected — no more Apple compliance prompts.
+| Action | File |
+|--------|------|
+| Modify | `src/pages/Settings.tsx` — 3-step dialog, reposition delete below sign out, smaller button |
+| Modify | `supabase/functions/delete-account/index.ts` — transfer block logic, expanded billing + data cleanup |
 
