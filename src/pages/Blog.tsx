@@ -1,9 +1,11 @@
 import Header from "@/components/landing/Header";
 import Footer from "@/components/landing/Footer";
+import SEO from "@/components/shared/SEO";
 
 const Blog = () => {
   return (
     <div className="min-h-screen bg-background">
+      <SEO title="Blog - Familial" description="Stories, updates, and tips for staying connected as a family from Familial." path="/blog" />
       <Header />
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 max-w-4xl">
         <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground mb-4">Blog</h1>
