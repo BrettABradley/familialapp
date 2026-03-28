@@ -217,8 +217,8 @@ Deno.serve(async (req) => {
     // Delete user's album photos
     await adminClient.from("album_photos").delete().eq("uploaded_by", userId);
 
-    // Delete user's group chat messages
-    await adminClient.from("group_chat_messages").delete().eq("sender_id", userId);
+    // NOTE: Group chat messages are intentionally NOT deleted.
+    // Other members should still see the conversation — the sender will show as "Deleted User".
 
     // ──────────────────────────────────────────────
     // 4. Remove circle memberships
@@ -230,8 +230,8 @@ Deno.serve(async (req) => {
     // 5. Delete user-specific records
     // ──────────────────────────────────────────────
     await adminClient.from("notifications").delete().eq("user_id", userId);
-    await adminClient.from("private_messages").delete().eq("sender_id", userId);
-    await adminClient.from("private_messages").delete().eq("recipient_id", userId);
+    // NOTE: Private messages are intentionally NOT deleted.
+    // The other person keeps their conversation history — the deleted user shows as "Deleted User".
     await adminClient.from("push_tokens").delete().eq("user_id", userId);
     await adminClient.from("profile_images").delete().eq("user_id", userId);
     await adminClient.from("user_plans").delete().eq("user_id", userId);
