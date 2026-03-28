@@ -421,7 +421,7 @@ const ProfileView = () => {
                   <img
                     src={enlargedImage.image_url}
                     alt={enlargedImage.caption || "Profile photo"}
-                    className="max-h-[75vh] w-auto object-contain rounded-lg"
+                    className="max-h-[90vh] w-auto object-contain rounded-lg"
                   />
                 )}
               </div>
