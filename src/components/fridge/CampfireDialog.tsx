@@ -156,7 +156,7 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
         <DialogTitle className="sr-only">{pinTitle}</DialogTitle>
 
         {/* Campsite hero */}
-        <div className="relative bg-gradient-to-b from-[#0a0a2e] via-[#121240] to-[#1a1a3e] px-6 pt-6 pb-4 flex flex-col items-center text-center overflow-hidden">
+        <div className="relative bg-gradient-to-b from-[#0a0a2e] via-[#121240] to-[#1a1a3e] px-6 pt-[max(env(safe-area-inset-top,0px),1.5rem)] pb-4 flex flex-col items-center text-center overflow-hidden">
           {/* Custom mobile close button */}
           <button
             onClick={() => onOpenChange(false)}

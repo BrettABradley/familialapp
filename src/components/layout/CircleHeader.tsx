@@ -171,7 +171,7 @@ function NotificationBell({ userId, selectedCircle, variant }: { userId: string;
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>{bellButton}</SheetTrigger>
         <SheetContent side="top" className="p-0 rounded-b-lg pt-[env(safe-area-inset-top)]">
-          <SheetHeader className="flex flex-row items-center justify-between px-4 pt-3 pb-0">
+          <SheetHeader className="flex flex-row items-center justify-between px-4 pt-3 pb-0 pr-12">
             <SheetTitle className="text-sm font-serif font-semibold">Notifications</SheetTitle>
             {actionButtons}
           </SheetHeader>
