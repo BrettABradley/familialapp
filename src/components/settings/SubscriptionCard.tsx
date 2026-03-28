@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCard, ExternalLink, Loader2, RotateCcw } from "lucide-react";
+import { openExternalUrl } from "@/lib/externalUrl";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -111,7 +112,7 @@ const SubscriptionCard = () => {
     try {
       const { data, error } = await supabase.functions.invoke("customer-portal");
       if (error) throw error;
-      if (data?.url) window.location.href = data.url;
+      if (data?.url) openExternalUrl(data.url);
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to open billing portal.", variant: "destructive" });
     } finally {
