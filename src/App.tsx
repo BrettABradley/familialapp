@@ -21,6 +21,7 @@ import Notifications from "./pages/Notifications";
 import Albums from "./pages/Albums";
 import Messages from "./pages/Messages";
 import ResetPassword from "./pages/ResetPassword";
+import Upgrade from "./pages/Upgrade";
 import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
@@ -68,6 +69,7 @@ const App = () => {
               
               <Route path="/albums" element={<Albums />} />
               <Route path="/messages" element={<Messages />} />
+              <Route path="/upgrade" element={<Upgrade />} />
             </Route>
             
             <Route path="*" element={<NotFound />} />

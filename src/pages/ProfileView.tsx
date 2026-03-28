@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useKeyboardDismissOnScroll } from "@/hooks/useKeyboardDismissOnScroll";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, MapPin, ImagePlus, Trash2, Play, Download, Pencil, X } from "lucide-react";
+import { Settings, MapPin, ImagePlus, Trash2, Play, Download, Pencil, X, ArrowUp } from "lucide-react";
 import { getMediaType } from "@/lib/mediaUtils";
 import { Textarea } from "@/components/ui/textarea";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
@@ -34,6 +34,7 @@ const ProfileView = () => {
   const { userId } = useParams<{ userId: string }>();
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   useKeyboardDismissOnScroll(mainRef);
@@ -311,11 +312,16 @@ const ProfileView = () => {
                   {profileData.display_name || "Unknown"}
                 </h1>
                 {isOwnProfile && (
-                  <Link to="/settings">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                      <Settings className="h-4 w-4" />
+                  <div className="flex items-center gap-1">
+                    <Link to="/settings">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => navigate("/upgrade")} title="Upgrade Membership">
+                      <ArrowUp className="h-4 w-4" />
                     </Button>
-                  </Link>
+                  </div>
                 )}
               </div>
               {profileData.location && (

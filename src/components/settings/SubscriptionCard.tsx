@@ -317,7 +317,7 @@ const SubscriptionCard = () => {
             )}
 
             {!isPaid && !isFounder && (
-              <Button onClick={() => navigate("/#pricing")} className="w-full">
+              <Button onClick={() => navigate("/upgrade")} className="w-full">
                 Upgrade Plan
               </Button>
             )}
