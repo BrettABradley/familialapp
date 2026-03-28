@@ -255,14 +255,21 @@ const Messages = () => {
     if (userIds.size === 0) { setConversations([]); setIsLoadingConversations(false); return; }
 
     const { data: profiles } = await supabase.from("profiles").select("*").in("user_id", Array.from(userIds));
-    if (!profiles) { setIsLoadingConversations(false); return; }
+    const profileMap = new Map<string, Profile>();
+    (profiles || []).forEach(p => profileMap.set(p.user_id, p));
 
     const convs: Conversation[] = [];
-    profiles.forEach(profile => {
-      const userMessages = filteredMessages.filter(msg => msg.sender_id === profile.user_id || msg.recipient_id === profile.user_id);
+    userIds.forEach(uid => {
+      const profile: Profile = profileMap.get(uid) || {
+        id: uid,
+        user_id: uid,
+        display_name: "Deleted User",
+        avatar_url: null,
+      };
+      const userMessages = filteredMessages.filter(msg => msg.sender_id === uid || msg.recipient_id === uid);
       const lastMessage = userMessages[0];
       if (!lastMessage) return;
-      const unreadCount = userMessages.filter(msg => msg.sender_id === profile.user_id && !msg.is_read).length;
+      const unreadCount = userMessages.filter(msg => msg.sender_id === uid && !msg.is_read).length;
       convs.push({ user: profile, lastMessage, unreadCount });
     });
     convs.sort((a, b) => new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime());
@@ -854,7 +861,7 @@ const Messages = () => {
                 <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[70%] rounded-lg px-4 py-2 ${isMe ? 'bg-foreground text-background' : 'bg-secondary text-foreground'}`}>
                     {!isMe && (
-                      <Link to={`/profile/${msg.sender_id}`} className="text-xs font-semibold mb-1 opacity-70 hover:underline block">{senderProfile?.display_name || "Unknown"}</Link>
+                      <Link to={`/profile/${msg.sender_id}`} className="text-xs font-semibold mb-1 opacity-70 hover:underline block">{senderProfile?.display_name || "Deleted User"}</Link>
                     )}
                     {msg.content && <p>{msg.content}</p>}
                     {renderMediaAttachments(msg.media_urls)}
