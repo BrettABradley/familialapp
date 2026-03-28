@@ -29,7 +29,7 @@ const ReadOnlyBanner = ({ circleId }: ReadOnlyBannerProps) => {
         {isOwner ? (
           <>
             This circle is read-only. You've exceeded your plan's circle limit.{" "}
-            <Link to="/#pricing" className="underline font-medium text-primary hover:text-primary/80">
+            <Link to="/upgrade" className="underline font-medium text-primary hover:text-primary/80">
               Upgrade your plan
             </Link>{" "}
             to restore full access.
