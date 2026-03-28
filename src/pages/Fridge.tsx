@@ -19,6 +19,7 @@ import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
+import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 
 interface Circle {
   id: string;
@@ -57,6 +58,7 @@ const Fridge = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isLoadingPins, setIsLoadingPins] = useState(true);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (circles.length > 0) {
@@ -90,9 +92,25 @@ const Fridge = () => {
     if (!file) return;
     file = await convertHeicToJpeg(file);
 
+    if (pinType === 'voice_note') {
+      // Voice notes skip cropping
+      setSelectedImage(file);
+      const url = URL.createObjectURL(file);
+      setImagePreview(url);
+    } else {
+      // Show crop dialog for images
+      const url = URL.createObjectURL(file);
+      setCropSrc(url);
+    }
+  };
+
+  const handleCropComplete = (croppedBlob: Blob) => {
+    const file = new File([croppedBlob], `cropped-${Date.now()}.jpg`, { type: "image/jpeg" });
     setSelectedImage(file);
-    const url = URL.createObjectURL(file);
-    setImagePreview(url);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(URL.createObjectURL(file));
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
   };
 
   const handleCreatePin = async () => {
@@ -168,6 +186,10 @@ const Fridge = () => {
       URL.revokeObjectURL(imagePreview);
     }
     setImagePreview(null);
+    if (cropSrc) {
+      URL.revokeObjectURL(cropSrc);
+    }
+    setCropSrc(null);
   };
 
   const handleDeletePin = async (pin: FridgePin) => {
@@ -461,6 +483,20 @@ const Fridge = () => {
         />
       )}
     </main>
+    {cropSrc && (
+      <AvatarCropDialog
+        open={!!cropSrc}
+        imageSrc={cropSrc}
+        onClose={() => {
+          URL.revokeObjectURL(cropSrc);
+          setCropSrc(null);
+        }}
+        onCropComplete={handleCropComplete}
+        aspect={1}
+        cropShape="rect"
+        title="Crop Image"
+      />
+    )}
     </PullToRefreshWrapper>
   );
 };
