@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Users, ArrowUp, Plus, Loader2 } from "lucide-react";
+import { openExternalUrl } from "@/lib/externalUrl";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,7 +57,7 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
 
       if (error) throw error;
       if (data?.url) {
-        window.location.href = data.url;
+        openExternalUrl(data.url);
       }
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });
