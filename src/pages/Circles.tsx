@@ -393,7 +393,7 @@ const Circles = () => {
           description: (
             <span>
               You've reached your circle creation limit.{" "}
-              <a href="/#pricing" className="underline font-medium text-primary hover:text-primary/80">
+              <a href="/upgrade" className="underline font-medium text-primary hover:text-primary/80">
                 Upgrade your plan
               </a>{" "}
               to create more circles.
@@ -788,6 +788,9 @@ const Circles = () => {
               </div>
             </DialogContent>
           </Dialog>
+          <Button variant="outline" onClick={() => navigate("/upgrade")}>
+            <ArrowUp className="w-4 h-4 mr-2" />Upgrade
+          </Button>
         </div>
       </div>
 
