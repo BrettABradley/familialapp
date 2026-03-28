@@ -1,46 +1,34 @@
 
 
-# Add Swipe Gesture Support to Feed & Album Lightboxes
+# Fix Grey Side & Modernize ProfileView Lightbox
 
 ## Problem
-On mobile, users must tap small arrow buttons to navigate between images in lightboxes. Swiping left/right is the expected mobile interaction pattern.
-
-## Approach
-Add touch event handlers (`onTouchStart`, `onTouchEnd`) directly to the lightbox image elements in both files. No new dependencies needed — simple vanilla touch tracking with a swipe threshold.
+The ProfileView lightbox at line 389 uses the old dialog style (`w-fit`) which causes a grey strip on mobile — same issue as the feed. It also lacks the fullscreen mobile treatment, safe-area handling, and navigation that feed/albums now have.
 
 ## Changes
 
-### 1. `src/components/feed/PostCard.tsx` — Feed image lightbox
-- Add `touchStartX` ref to track swipe start position
-- Attach `onTouchStart` and `onTouchEnd` handlers to the lightbox `img` element
-- On swipe left (delta > 50px): advance to next image if available
-- On swipe right (delta > 50px): go to previous image if available
+**File: `src/pages/ProfileView.tsx`** (lines 387-430)
 
-### 2. `src/pages/Albums.tsx` — Album photo lightbox
-- Same touch handler pattern on the enlarged photo `img` element
-- Navigate through `photos` array using `setEnlargedPhoto`
+1. **DialogContent** — replace old classes with the same fullscreen mobile pattern used in PostCard/Albums:
+   - `inset-0 bg-black/95 border-none p-0 flex flex-col items-center justify-center` for mobile
+   - `sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-[95vw] sm:w-fit sm:rounded-lg sm:bg-background/95 sm:p-2` for desktop
 
-## Technical detail
+2. **Top control bar** — safe-area-aware on mobile (`pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4`), with download and close buttons as 44×44 rounded ghost buttons
 
-Both lightboxes will use the same pattern:
+3. **Centered image** — `max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain`
 
-```tsx
-const touchStartX = useRef<number>(0);
+4. **Navigation arrows** — add left/right ChevronLeft/ChevronRight arrows to navigate through `images` array (hidden at boundaries), plus swipe gesture support via `touchStartX` ref
 
-// On the img element:
-onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
-onTouchEnd={(e) => {
-  const delta = touchStartX.current - e.changedTouches[0].clientX;
-  if (delta > 50 && canGoNext) goNext();
-  else if (delta < -50 && canGoPrev) goPrev();
-}}
-```
+5. **Image counter** — floating counter at bottom center showing position in gallery
 
-50px threshold prevents accidental swipes. No CSS changes needed.
+**Also in the same change — Feed fix from prior approved plan:**
+
+**File: `src/components/feed/PostCard.tsx`** (lines 362, 434)
+- Change `w-fit` → `sm:w-fit` on both image and video lightbox DialogContent classes
 
 ## Files to modify
 | File | Change |
 |------|--------|
-| `src/components/feed/PostCard.tsx` | Add touch swipe handlers to lightbox image |
-| `src/pages/Albums.tsx` | Add touch swipe handlers to lightbox image |
+| `src/pages/ProfileView.tsx` | Replace lightbox dialog with fullscreen mobile pattern, add nav arrows + swipe |
+| `src/components/feed/PostCard.tsx` | `w-fit` → `sm:w-fit` on both lightbox dialogs |
 
