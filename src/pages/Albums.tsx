@@ -59,6 +59,7 @@ const Albums = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [enlargedPhoto, setEnlargedPhoto] = useState<AlbumPhoto | null>(null);
+  const touchStartXRef = useRef<number>(0);
   
   const [albums, setAlbums] = useState<Album[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
