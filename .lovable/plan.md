@@ -1,54 +1,40 @@
 
 
-# Swipe Gestures, Profile Centering & Fridge Cropping
+# Fix Grey Strip & Unified Media Swipe in Lightboxes
 
-## 3 changes across 4 files
+## Problems
+1. **Grey strip on right side** of feed and profile lightboxes — caused by Tailwind CSS specificity: the dialog base class applies `px-6` which isn't overridden by `p-0` (both generate equal-specificity rules, and `px-*` appears later in the Tailwind stylesheet).
+2. **Videos missing from swipe navigation** in feed lightbox — images and videos use separate lightbox dialogs, so swiping only cycles through images and skips videos entirely.
 
-### 1. Add swipe-down-to-close on all lightboxes (Feed, Albums, ProfileView)
+## Changes
 
-Currently all three lightboxes track `touchStartX` for horizontal swipe. Add a companion `touchStartY` ref and on `onTouchEnd`, if the vertical delta exceeds 80px downward (and horizontal delta is small), close the lightbox.
+### 1. Fix grey strip (Feed + Profile lightboxes)
+**Files:** `src/components/feed/PostCard.tsx`, `src/pages/ProfileView.tsx`
 
-**Files:** `src/components/feed/PostCard.tsx`, `src/pages/Albums.tsx`, `src/pages/ProfileView.tsx`
+Add explicit `px-0 py-0` to both image and video `DialogContent` classes to guarantee the base `px-6` padding is overridden. This ensures the black background fills edge-to-edge.
 
-Pattern (same in all three):
-```tsx
-const touchStartY = useRef<number>(0);
+### 2. Unify media into one swipeable lightbox (Feed)
+**File:** `src/components/feed/PostCard.tsx`
 
-// onTouchStart: also record Y
-touchStartY.current = e.touches[0].clientY;
+- Replace `imageUrls` with `visualMedia` (already computed at line 249 — includes both images and videos) as the lightbox data source.
+- Remove the separate `videoLightboxUrl` state and its dedicated video `Dialog`.
+- Update `lightboxIndex` to index into `visualMedia` instead of `imageUrls`.
+- In the lightbox, check `getMediaType(visualMedia[lightboxIndex])`:
+  - If `image` → render `<img>` (as now)
+  - If `video` → render `<video controls autoPlay>` inline
+- Both image and video elements get the same swipe/touch handlers, so swiping works seamlessly across media types.
+- Update `MediaItem`'s `onVideoClick` to call the same `setLightboxIndex` (finding the video's index in `visualMedia`) instead of opening a separate dialog.
+- Navigation arrows and counter use `visualMedia.length` instead of `imageUrls.length`.
 
-// onTouchEnd: check vertical swipe first
-const deltaX = touchStartX - e.changedTouches[0].clientX;
-const deltaY = e.changedTouches[0].clientY - touchStartY; // positive = swipe down
-if (deltaY > 80 && Math.abs(deltaX) < 50) { close(); return; }
-// ...existing horizontal logic
-```
+### 3. Add swipe gestures to video elements in ProfileView
+**File:** `src/pages/ProfileView.tsx`
 
-This applies to:
-- Feed image lightbox `img` element
-- Albums lightbox `img` element  
-- ProfileView lightbox `img` element
-
-### 2. Center the profile photo lightbox content vertically
-
-**File:** `src/pages/ProfileView.tsx` (line ~390)
-
-The `DialogContent` already has `flex flex-col items-center justify-center`. The issue is the caption/action area at the bottom pushes content upward. Change the layout so the image sits in a centered flex-grow area and the bottom caption uses absolute positioning (already partly does). Ensure `min-h-0` on the image container so flexbox centering works properly on mobile.
-
-### 3. Crop fridge pin images to square on the board
-
-**File:** `src/components/fridge/FridgeBoard.tsx`
-
-The board thumbnails already use `aspect-square object-cover` (line 209) so images are cropped square on the board. The video thumbnails at line 196-212 also handle this. No change needed for board thumbnails — they're already cropped.
-
-For the **enlarged pin dialog** (the polaroid popup), images currently show at natural aspect (`w-full`). To maintain consistency with the board's square crop, add `aspect-square object-cover` to the enlarged image (line 386-390) and video (line 373-377) — but **exclude campfire** pins since those already have their own layout. This ensures what you see on the board matches what you see when you tap it.
+The profile lightbox already supports both images and videos in one gallery, but the `<video>` element (line 419-424) lacks touch handlers. Add the same `onTouchStart`/`onTouchEnd` swipe+dismiss handlers to the video element.
 
 ## Files to modify
 
-| File | Changes |
-|------|---------|
-| `src/components/feed/PostCard.tsx` | Add `touchStartY` ref, swipe-down-to-close on image lightbox |
-| `src/pages/Albums.tsx` | Add `touchStartY` ref, swipe-down-to-close on album lightbox |
-| `src/pages/ProfileView.tsx` | Add `touchStartY` ref, swipe-down-to-close, center lightbox content |
-| `src/components/fridge/FridgeBoard.tsx` | Add `aspect-square object-cover` to enlarged pin image/video |
+| File | Change |
+|------|--------|
+| `src/components/feed/PostCard.tsx` | Add `px-0 py-0` to DialogContent; merge image+video into single lightbox using `visualMedia`; remove separate video dialog |
+| `src/pages/ProfileView.tsx` | Add `px-0 py-0` to DialogContent; add swipe handlers to video element |
 
