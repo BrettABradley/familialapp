@@ -631,6 +631,12 @@ const Albums = () => {
                       src={enlargedPhoto.photo_url}
                       alt={enlargedPhoto.caption || "Photo"}
                       className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
+                      onTouchStart={(e) => { touchStartXRef.current = e.touches[0].clientX; }}
+                      onTouchEnd={(e) => {
+                        const delta = touchStartXRef.current - e.changedTouches[0].clientX;
+                        if (delta > 50 && currentIndex < photos.length - 1) setEnlargedPhoto(photos[currentIndex + 1]);
+                        else if (delta < -50 && currentIndex > 0) setEnlargedPhoto(photos[currentIndex - 1]);
+                      }}
                     />
 
                     {/* Left arrow */}
