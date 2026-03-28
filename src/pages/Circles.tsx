@@ -156,7 +156,7 @@ const MemberRow = ({ member, isOwner: isCircleOwner, currentUserId, circleId, on
 
 const Circles = () => {
   const { user } = useAuth();
-  const { circles, isLoading: contextLoading, refetchCircles, profile, setSelectedCircle: setContextCircle } = useCircleContext();
+  const { circles, isLoading: contextLoading, refetchCircles, profile, setSelectedCircle: setContextCircle, userPlan } = useCircleContext();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
