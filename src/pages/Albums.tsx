@@ -588,17 +588,19 @@ const Albums = () => {
 
           {/* Enlarged photo dialog with navigation */}
           <Dialog open={!!enlargedPhoto} onOpenChange={(open) => !open && setEnlargedPhoto(null)}>
-            <DialogContent className="max-w-[95vw] w-fit p-2 sm:p-4 [&>button:last-child]:hidden">
+            <DialogContent className="inset-0 max-h-none overflow-hidden bg-black/95 border-none p-0 flex flex-col items-center justify-center sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-[95vw] sm:w-fit sm:max-h-[95vh] sm:rounded-lg sm:bg-black/95 sm:p-2 [&>button:last-child]:hidden">
               <DialogTitle className="sr-only">{enlargedPhoto?.caption || "Photo"}</DialogTitle>
               {enlargedPhoto && (() => {
                 const currentIndex = photos.findIndex(p => p.id === enlargedPhoto.id);
                 return (
-                  <div className="flex flex-col items-center">
-                    <div className="flex items-center justify-end gap-2 w-full mb-2 pt-2 pr-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                  <>
+                    {/* Top control bar */}
+                    <div
+                      className="absolute top-0 right-0 z-20 flex items-center gap-2 pr-4"
+                      style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 3.25rem)" }}
+                    >
+                      <button
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
                         onClick={() => {
                           fetch(enlargedPhoto.photo_url)
                             .then(r => r.blob())
@@ -615,55 +617,65 @@ const Albums = () => {
                         aria-label="Download"
                       >
                         <Download className="h-5 w-5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                      </button>
+                      <button
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
                         onClick={() => setEnlargedPhoto(null)}
                         aria-label="Close"
                       >
                         <X className="h-5 w-5" />
-                      </Button>
+                      </button>
                     </div>
-                    <div className="relative group w-full flex items-center justify-center">
-                      {photos.length > 1 && (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="absolute left-2 z-10 bg-background/80 hover:bg-background"
-                          disabled={currentIndex === 0}
-                          onClick={() => setEnlargedPhoto(photos[currentIndex - 1])}
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <img
-                        src={enlargedPhoto.photo_url}
-                        alt={enlargedPhoto.caption || "Photo"}
-                        className="max-h-[90vh] w-auto rounded-md object-contain"
-                      />
-                      {photos.length > 1 && (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="absolute right-2 z-10 bg-background/80 hover:bg-background"
-                          disabled={currentIndex === photos.length - 1}
-                          onClick={() => setEnlargedPhoto(photos[currentIndex + 1])}
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+
+                    {/* Centered image */}
+                    <img
+                      src={enlargedPhoto.photo_url}
+                      alt={enlargedPhoto.caption || "Photo"}
+                      className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
+                    />
+
+                    {/* Left arrow */}
+                    {photos.length > 1 && currentIndex > 0 && (
+                      <button
+                        className="absolute left-2 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+                        onClick={() => setEnlargedPhoto(photos[currentIndex - 1])}
+                        aria-label="Previous photo"
+                      >
+                        <ChevronLeft className="h-6 w-6" />
+                      </button>
+                    )}
+
+                    {/* Right arrow */}
+                    {photos.length > 1 && currentIndex < photos.length - 1 && (
+                      <button
+                        className="absolute right-2 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+                        onClick={() => setEnlargedPhoto(photos[currentIndex + 1])}
+                        aria-label="Next photo"
+                      >
+                        <ChevronRight className="h-6 w-6" />
+                      </button>
+                    )}
+
+                    {/* Image counter */}
                     {photos.length > 1 && (
-                      <div className="flex items-center gap-3 mt-3">
-                        <span className="text-sm text-muted-foreground">{currentIndex + 1} / {photos.length}</span>
+                      <div
+                        className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full bg-black/50 backdrop-blur-sm text-white text-sm"
+                        style={{ marginBottom: "max(env(safe-area-inset-bottom, 0px), 1rem)" }}
+                      >
+                        {currentIndex + 1} / {photos.length}
                       </div>
                     )}
+
+                    {/* Caption */}
                     {enlargedPhoto.caption && (
-                      <p className="mt-2 text-sm text-muted-foreground">{enlargedPhoto.caption}</p>
+                      <div
+                        className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 text-center px-4 text-sm text-white/80"
+                        style={{ marginBottom: photos.length > 1 ? "max(env(safe-area-inset-bottom, 0px), 3rem)" : "max(env(safe-area-inset-bottom, 0px), 1rem)" }}
+                      >
+                        {enlargedPhoto.caption}
+                      </div>
                     )}
-                  </div>
+                  </>
                 );
               })()}
             </DialogContent>
