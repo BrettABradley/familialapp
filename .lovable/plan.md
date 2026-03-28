@@ -1,65 +1,42 @@
 
 
-# Fix Upgrade Flows and Add Extra Members Purchasing
+# Fix Upgrade Button UI, Circle Limit Logic, Extra Members, and Profile Cleanup
 
-## Problems Identified
+## Summary
 
-1. **Dashboard upgrade error** — The Pricing component's "Upgrade" button for existing paid users calls `preview-upgrade` edge function, which fails with "Edge Function returned a non-2xx status code." This is likely because the user is on Family plan trying to upgrade to Extended, and the Stripe API call is failing (possibly due to API version or invoice preview params).
+1. **Upgrade button on Circles page**: Change from "Upgrade" text + icon to just the ArrowUp icon. Grey it out when user is on Extended (highest tier). Re-enable if they downgrade.
 
-2. **Mobile app upgrade redirects to homepage** — Links like `/#pricing` and `navigate("/#pricing")` redirect to `/circles` on native platforms (Capacitor) because the Index page immediately redirects native users away. The `UpgradePlanDialog` uses `window.open(data.url, "_blank")` for checkout which may not work on mobile/Capacitor.
+2. **Create Circle button**: Grey out when `circleCount >= circleLimit`. This already dynamically updates since `circleCount` and `circleLimit` are re-fetched when `circles` changes, so deleting a circle will automatically un-grey it.
 
-3. **No "Upgrade" button on Circles page** — Only a small arrow icon next to member count for circle owners; no prominent upgrade button.
+3. **Remove ArrowUp upgrade button from ProfileView**: Remove the upgrade icon button next to settings on the profile page.
 
-4. **No upgrade button on ProfileView page** — Missing entirely.
+4. **Fix extra members not being applied to the circle**: The issue is a **race condition** — both `verify-checkout` and `stripe-webhook` try to add extra members. The `verify-checkout` runs first (client calls it immediately after redirect), adds +7 to the circle. Then the webhook fires and also adds +7, resulting in +14 for one purchase. OR the opposite: the webhook fires but the `verify-checkout` also runs and they conflict. **The real fix**: Make `verify-checkout` NOT update extra members — let the webhook handle it authoritatively. The `verify-checkout` should just check the session status and return the result type without modifying the database for extra members.
 
-5. **Extra members pack not accessible from Members dialog** — Currently only available through the UpgradePlanDialog, not directly when viewing members.
+   Wait — actually looking more carefully, the problem might be the **opposite**: the webhook's RLS update on `circles` table fails because the webhook uses service role but the `restrict_circle_member_update` trigger checks `auth.uid()` which is NULL for service role calls. Let me re-check... The trigger function `restrict_circle_member_update` checks `OLD.owner_id = auth.uid()` — for service role, `auth.uid()` is NULL, so ownership check fails, and the trigger would raise an exception since `extra_members` is being changed by a non-owner.
 
-6. **Anyone in circle should be able to buy extra members** — Currently only shown to owners.
+   **This is the bug.** The trigger blocks the webhook from updating `extra_members` because `auth.uid()` is NULL when using service role. The `verify-checkout` also uses service role, so it has the same problem.
 
-## Plan
+   **Fix**: Update the `restrict_circle_member_update` trigger to allow updates when called via service role (i.e., when `auth.uid()` IS NULL, skip the restriction since it's a server-side operation).
 
-### 1. Fix the `preview-upgrade` edge function error
+5. **Fix past purchases**: Run the `sync-stripe-purchases` function after the trigger fix to retroactively apply extra members for past purchases.
 
-Check and fix the `preview-upgrade` function. The `stripe.invoices.createPreview` API may require different params for the Stripe API version `2025-08-27.basil`. Update the function to use the correct Stripe API for previewing prorated upgrades. Also add better error handling.
+## Technical Details
 
-Similarly verify `upgrade-subscription` function works correctly.
+### Files to Modify
 
-### 2. Create an in-app Upgrade page at `/upgrade`
+**`src/pages/Circles.tsx`**:
+- Line 772: Add `disabled` and opacity styling to Create Circle button when `circleCount >= circleLimit`
+- Lines 791-793: Change Upgrade button from `<ArrowUp + "Upgrade">` to just `<ArrowUp>` icon-only button, with `size="icon"`. Add disabled state when user plan is "extended" or "founder". Need to fetch user plan — can reuse `user_plans` query.
 
-Instead of relying on `/#pricing` (which doesn't work on mobile), create a dedicated `/upgrade` route that renders the Pricing component's plan selection logic in an authenticated context. This works on both web and mobile.
+**`src/pages/ProfileView.tsx`**:
+- Lines 321-323: Remove the ArrowUp upgrade button entirely from the profile header.
 
-- Extract the pricing/plan selection UI into a reusable component or create a new `Upgrade` page
-- Replace all `navigate("/#pricing")` and `href="/#pricing"` links with `navigate("/upgrade")`
-- On the landing page, keep the existing Pricing section as-is
+**Database migration**:
+- Update `restrict_circle_member_update` trigger function to skip restrictions when `auth.uid() IS NULL` (service role context).
 
-### 3. Add "Upgrade" button on Circles page
+### Implementation Notes
 
-Next to the "Create Circle" button, add an "Upgrade" button that navigates to `/upgrade`. Show it when the user is on free or family plan.
-
-### 4. Add "Upgrade Membership" button on ProfileView page
-
-For own profile, add a button (similar to Settings button) that navigates to `/upgrade`.
-
-### 5. Fix SubscriptionCard upgrade navigation
-
-Change `navigate("/#pricing")` to `navigate("/upgrade")` in `SubscriptionCard.tsx`.
-
-### 6. Add "Add Members" option in Members dialog
-
-In the Members dialog on the Circles page, add an "Add 7 Extra Members — $5" button at the bottom. This should be available to **any circle member**, not just the owner. When clicked, it triggers the `create-checkout` edge function with the extra members price ID and the circle ID, opening Stripe checkout.
-
-### 7. Fix mobile checkout flow
-
-Replace `window.open(data.url, "_blank")` with `window.location.href = data.url` for Capacitor/mobile to ensure checkout actually opens in the same window rather than trying to open a new tab (which fails on mobile apps).
-
-## Files to Create/Modify
-
-- **New**: `src/pages/Upgrade.tsx` — Dedicated upgrade page using Pricing logic
-- **Modify**: `src/App.tsx` — Add `/upgrade` route
-- **Modify**: `src/pages/Circles.tsx` — Add Upgrade button next to Create Circle; add "Add Members" button in Members dialog
-- **Modify**: `src/pages/ProfileView.tsx` — Add Upgrade button for own profile
-- **Modify**: `src/components/settings/SubscriptionCard.tsx` — Fix navigation to `/upgrade`
-- **Modify**: `src/components/circles/UpgradePlanDialog.tsx` — Fix mobile checkout (use `window.location.href` on Capacitor)
-- **Modify**: `supabase/functions/preview-upgrade/index.ts` — Fix Stripe API call if needed
-- **Modify**: `src/components/circles/ReadOnlyBanner.tsx` — Fix upgrade link
+- For the Circles page, we need the user's current plan to grey out the upgrade button. We can fetch it from `user_plans` alongside the existing `circleCount`/`circleLimit` queries.
+- The Create Circle button disabling is straightforward: `disabled={circleCount >= circleLimit}` with reduced opacity.
+- The trigger fix is critical — without it, no extra member purchase actually works via webhook or verify-checkout.
 
