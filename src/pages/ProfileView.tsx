@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, MapPin, ImagePlus, Trash2, Play, Download, Pencil, X } from "lucide-react";
+import { Settings, MapPin, ImagePlus, Trash2, Play, Download, Pencil, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { getMediaType } from "@/lib/mediaUtils";
 import { Textarea } from "@/components/ui/textarea";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
