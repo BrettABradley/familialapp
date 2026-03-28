@@ -356,16 +356,17 @@ export const PostCard = ({
           </div>
         )}
 
-        {/* Image Lightbox */}
+        {/* Image Lightbox — fullscreen on mobile, centered modal on desktop */}
         <Dialog open={lightboxIndex !== null} onOpenChange={(open) => !open && setLightboxIndex(null)}>
-          <DialogContent className="max-w-[95vw] w-fit p-2 bg-background/95 [&>button:last-child]:hidden">
+          <DialogContent className="max-w-[95vw] w-fit p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
             {lightboxIndex !== null && imageUrls[lightboxIndex] && (
-              <div className="flex flex-col items-center">
-                <div className="flex items-center justify-end gap-2 w-full mb-2 pt-2 pr-1">
+              <>
+                {/* Top control bar — safe area aware on mobile */}
+                <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-end gap-2 px-4" style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 3.25rem)" }}>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                    className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
                     onClick={() => onDownloadImage(imageUrls[lightboxIndex])}
                     aria-label="Download"
                   >
@@ -374,56 +375,64 @@ export const PostCard = ({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                    className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
                     onClick={() => setLightboxIndex(null)}
                     aria-label="Close"
                   >
                     <X className="h-5 w-5" />
                   </Button>
                 </div>
+
+                {/* Centered image */}
                 <img
                   src={imageUrls[lightboxIndex]}
                   alt={`Post image ${lightboxIndex + 1}`}
-                  className="max-h-[90vh] w-auto object-contain rounded-lg"
+                  className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
                 />
+
+                {/* Left/right navigation arrows for multi-image posts */}
                 {imageUrls.length > 1 && (
-                  <div className="flex items-center gap-4 mt-3">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      disabled={lightboxIndex === 0}
-                      onClick={() => setLightboxIndex((prev) => (prev !== null ? prev - 1 : null))}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
+                  <>
+                    {lightboxIndex > 0 && (
+                      <button
+                        className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+                        onClick={() => setLightboxIndex((prev) => (prev !== null ? prev - 1 : null))}
+                        aria-label="Previous image"
+                      >
+                        <ChevronLeft className="h-6 w-6" />
+                      </button>
+                    )}
+                    {lightboxIndex < imageUrls.length - 1 && (
+                      <button
+                        className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+                        onClick={() => setLightboxIndex((prev) => (prev !== null ? prev + 1 : null))}
+                        aria-label="Next image"
+                      >
+                        <ChevronRight className="h-6 w-6" />
+                      </button>
+                    )}
+                    {/* Image counter */}
+                    <div className="absolute bottom-6 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 bg-black/50 backdrop-blur-sm text-white text-sm px-3 py-1 rounded-full" style={{ marginBottom: "max(env(safe-area-inset-bottom, 0px), 0px)" }}>
                       {lightboxIndex + 1} / {imageUrls.length}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      disabled={lightboxIndex === imageUrls.length - 1}
-                      onClick={() => setLightboxIndex((prev) => (prev !== null ? prev + 1 : null))}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
+                    </div>
+                  </>
                 )}
-              </div>
+              </>
             )}
           </DialogContent>
         </Dialog>
 
-        {/* Video Lightbox */}
+        {/* Video Lightbox — fullscreen on mobile */}
         <Dialog open={videoLightboxUrl !== null} onOpenChange={(open) => !open && setVideoLightboxUrl(null)}>
-          <DialogContent className="max-w-[95vw] w-fit p-2 bg-background/95 [&>button:last-child]:hidden">
+          <DialogContent className="max-w-[95vw] w-fit p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
             {videoLightboxUrl && (
-              <div className="flex flex-col items-center">
-                <div className="flex items-center justify-end gap-2 w-full mb-2 pt-2 pr-1">
+              <>
+                {/* Close button — safe area aware */}
+                <div className="absolute top-0 right-0 z-20 px-4" style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 3.25rem)" }}>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                    className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
                     onClick={() => setVideoLightboxUrl(null)}
                     aria-label="Close"
                   >
@@ -433,7 +442,7 @@ export const PostCard = ({
                 <video
                   controls
                   autoPlay
-                  className="max-h-[90vh] w-auto object-contain rounded-lg"
+                  className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain"
                   preload="metadata"
                   playsInline
                 >
@@ -441,7 +450,7 @@ export const PostCard = ({
                   <source src={videoLightboxUrl} type="video/quicktime" />
                   <source src={videoLightboxUrl} />
                 </video>
-              </div>
+              </>
             )}
           </DialogContent>
         </Dialog>
