@@ -362,7 +362,7 @@ export const PostCard = ({
             {lightboxIndex !== null && imageUrls[lightboxIndex] && (
               <>
                 {/* Top control bar — safe area aware on mobile */}
-                <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-end gap-2 px-4" style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 3.25rem)" }}>
+                <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-end gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -428,7 +428,7 @@ export const PostCard = ({
             {videoLightboxUrl && (
               <>
                 {/* Close button — safe area aware */}
-                <div className="absolute top-0 right-0 z-20 px-4" style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 3.25rem)" }}>
+                <div className="absolute top-0 right-0 z-20 px-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
                   <Button
                     variant="ghost"
                     size="icon"
