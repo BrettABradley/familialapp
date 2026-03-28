@@ -58,6 +58,7 @@ const Fridge = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isLoadingPins, setIsLoadingPins] = useState(true);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (circles.length > 0) {
