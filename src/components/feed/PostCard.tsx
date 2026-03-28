@@ -228,6 +228,7 @@ export const PostCard = ({
   const [editContent, setEditContent] = useState(post.content || "");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const touchStartX = useRef<number>(0);
   const [videoLightboxUrl, setVideoLightboxUrl] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
@@ -388,6 +389,12 @@ export const PostCard = ({
                   src={imageUrls[lightboxIndex]}
                   alt={`Post image ${lightboxIndex + 1}`}
                   className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
+                  onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+                  onTouchEnd={(e) => {
+                    const delta = touchStartX.current - e.changedTouches[0].clientX;
+                    if (delta > 50 && lightboxIndex < imageUrls.length - 1) setLightboxIndex(lightboxIndex + 1);
+                    else if (delta < -50 && lightboxIndex > 0) setLightboxIndex(lightboxIndex - 1);
+                  }}
                 />
 
                 {/* Left/right navigation arrows for multi-image posts */}
