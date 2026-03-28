@@ -993,8 +993,33 @@ const Circles = () => {
               ))
             )}
           </div>
-          {selectedCircle && isOwner(selectedCircle) && memberships.filter(m => m.user_id !== user?.id).length > 0 && (
+          {/* Add Members button - available to all circle members */}
+          {selectedCircle && (
             <div className="mt-4 pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                className="w-full mb-2"
+                onClick={async () => {
+                  setIsMembersOpen(false);
+                  try {
+                    const { data, error } = await supabase.functions.invoke("create-checkout", {
+                      body: { priceId: "price_1T3N5zCiWDzualH52rsDSBlu", mode: "payment", circleId: selectedCircle.id },
+                    });
+                    if (error) throw error;
+                    if (data?.url) {
+                      window.location.href = data.url;
+                    }
+                  } catch (err: any) {
+                    toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });
+                  }
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />Add 7 Extra Members — $5
+              </Button>
+            </div>
+          )}
+          {selectedCircle && isOwner(selectedCircle) && memberships.filter(m => m.user_id !== user?.id).length > 0 && (
+            <div className="pt-2">
               <Button variant="outline" className="w-full" onClick={() => { setIsMembersOpen(false); handleTransferBlock(selectedCircle); }}>
                 <ArrowRightLeft className="w-4 h-4 mr-2" />Put on Transfer Block
               </Button>
