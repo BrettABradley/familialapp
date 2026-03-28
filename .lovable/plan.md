@@ -1,40 +1,27 @@
 
 
-# Fix Grey Strip & Unified Media Swipe in Lightboxes
+# Fix Campfire Safe Area & Notification Button Overlap
 
-## Problems
-1. **Grey strip on right side** of feed and profile lightboxes — caused by Tailwind CSS specificity: the dialog base class applies `px-6` which isn't overridden by `p-0` (both generate equal-specificity rules, and `px-*` appears later in the Tailwind stylesheet).
-2. **Videos missing from swipe navigation** in feed lightbox — images and videos use separate lightbox dialogs, so swiping only cycles through images and skips videos entirely.
+## 2 issues, 2 files
 
-## Changes
+### 1. Campfire dialog content sits behind the camera island
+**File:** `src/components/fridge/CampfireDialog.tsx`
 
-### 1. Fix grey strip (Feed + Profile lightboxes)
-**Files:** `src/components/feed/PostCard.tsx`, `src/pages/ProfileView.tsx`
+The campfire hero section starts at `pt-6` (line 159) with no safe-area padding. The close button uses `top-[max(env(safe-area-inset-top,0px),0.75rem)]` but the content itself (fire, stars) doesn't account for the notch.
 
-Add explicit `px-0 py-0` to both image and video `DialogContent` classes to guarantee the base `px-6` padding is overridden. This ensures the black background fills edge-to-edge.
+**Fix:** Add `pt-[max(env(safe-area-inset-top,0px),1.5rem)]` to the hero `div` (line 159) so the entire campfire scene shifts below the Dynamic Island. Also adjust the stars' `top` positions to be relative to the new padding.
 
-### 2. Unify media into one swipeable lightbox (Feed)
-**File:** `src/components/feed/PostCard.tsx`
+### 2. Notification sheet: "Clear all" button overlaps with the Sheet's built-in X button
+**File:** `src/components/layout/CircleHeader.tsx`
 
-- Replace `imageUrls` with `visualMedia` (already computed at line 249 — includes both images and videos) as the lightbox data source.
-- Remove the separate `videoLightboxUrl` state and its dedicated video `Dialog`.
-- Update `lightboxIndex` to index into `visualMedia` instead of `imageUrls`.
-- In the lightbox, check `getMediaType(visualMedia[lightboxIndex])`:
-  - If `image` → render `<img>` (as now)
-  - If `video` → render `<video controls autoPlay>` inline
-- Both image and video elements get the same swipe/touch handlers, so swiping works seamlessly across media types.
-- Update `MediaItem`'s `onVideoClick` to call the same `setLightboxIndex` (finding the video's index in `visualMedia`) instead of opening a separate dialog.
-- Navigation arrows and counter use `visualMedia.length` instead of `imageUrls.length`.
+The mobile notification Sheet (line 173) renders a `SheetHeader` with action buttons (Mark read, Clear all) in a row. The Sheet component automatically appends an X close button at `right-4 top-[max(env(safe-area-inset-top,0px),1.5rem)]`. Since the action buttons sit at the right side of the header, they collide with this X.
 
-### 3. Add swipe gestures to video elements in ProfileView
-**File:** `src/pages/ProfileView.tsx`
-
-The profile lightbox already supports both images and videos in one gallery, but the `<video>` element (line 419-424) lacks touch handlers. Add the same `onTouchStart`/`onTouchEnd` swipe+dismiss handlers to the video element.
+**Fix:** Add `pr-12` (right padding) to the `SheetHeader` (line 174) to reserve space for the close button, preventing the overlap.
 
 ## Files to modify
 
 | File | Change |
 |------|--------|
-| `src/components/feed/PostCard.tsx` | Add `px-0 py-0` to DialogContent; merge image+video into single lightbox using `visualMedia`; remove separate video dialog |
-| `src/pages/ProfileView.tsx` | Add `px-0 py-0` to DialogContent; add swipe handlers to video element |
+| `src/components/fridge/CampfireDialog.tsx` | Add safe-area top padding to campfire hero div |
+| `src/components/layout/CircleHeader.tsx` | Add `pr-12` to notification SheetHeader |
 
