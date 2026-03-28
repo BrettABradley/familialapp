@@ -1,25 +1,46 @@
 
 
-# Fix Lightbox Controls Position on Web
+# Add Swipe Gesture Support to Feed & Album Lightboxes
 
 ## Problem
-The download and close buttons in the image/video lightbox are pushed too far down on desktop because of the mobile-specific `paddingTop: "max(env(safe-area-inset-top, 0px), 3.25rem)"` safe-area styling. On web, they should sit cleanly in the top-right corner of the image dialog.
+On mobile, users must tap small arrow buttons to navigate between images in lightboxes. Swiping left/right is the expected mobile interaction pattern.
+
+## Approach
+Add touch event handlers (`onTouchStart`, `onTouchEnd`) directly to the lightbox image elements in both files. No new dependencies needed — simple vanilla touch tracking with a swipe threshold.
 
 ## Changes
 
-**File: `src/components/feed/PostCard.tsx`**
+### 1. `src/components/feed/PostCard.tsx` — Feed image lightbox
+- Add `touchStartX` ref to track swipe start position
+- Attach `onTouchStart` and `onTouchEnd` handlers to the lightbox `img` element
+- On swipe left (delta > 50px): advance to next image if available
+- On swipe right (delta > 50px): go to previous image if available
 
-### Image lightbox top control bar (line 365)
-- Replace inline `style={{ paddingTop: "max(...)" }}` with responsive classes
-- Mobile: keep safe-area padding via inline style or `pt-[max(env(safe-area-inset-top,0px),3.25rem)]`
-- Desktop (`sm:`): override to a simple `sm:pt-3 sm:pr-3` so the buttons sit neatly in the top-right corner of the dialog
+### 2. `src/pages/Albums.tsx` — Album photo lightbox
+- Same touch handler pattern on the enlarged photo `img` element
+- Navigate through `photos` array using `setEnlargedPhoto`
 
-### Video lightbox close button (line 431)
-- Same fix: responsive padding so desktop gets `sm:pt-3 sm:pr-3` instead of the large safe-area offset
+## Technical detail
 
-### Also apply to Albums lightbox (`src/pages/Albums.tsx`)
-- Same responsive padding fix for the top control bar so it's consistent across the app
+Both lightboxes will use the same pattern:
 
-## Result
-On mobile: buttons remain safely below the notch/Dynamic Island. On web: buttons sit tightly in the top-right corner of the lightbox dialog.
+```tsx
+const touchStartX = useRef<number>(0);
+
+// On the img element:
+onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+onTouchEnd={(e) => {
+  const delta = touchStartX.current - e.changedTouches[0].clientX;
+  if (delta > 50 && canGoNext) goNext();
+  else if (delta < -50 && canGoPrev) goPrev();
+}}
+```
+
+50px threshold prevents accidental swipes. No CSS changes needed.
+
+## Files to modify
+| File | Change |
+|------|--------|
+| `src/components/feed/PostCard.tsx` | Add touch swipe handlers to lightbox image |
+| `src/pages/Albums.tsx` | Add touch swipe handlers to lightbox image |
 
