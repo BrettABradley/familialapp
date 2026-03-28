@@ -1,54 +1,62 @@
 
 
-# Enhanced Account Deletion: 3-Step Confirmation + Complete Data Cleanup + Transfer Block
+# Harden Account Deletion for Other Users' Experience
 
-## Overview
+## Problem
+When a user deletes their account, their data is removed. But other users who interacted with them could experience issues:
+- Profile joins returning `null` in feed comments/reactions (already partially handled with `?.` fallbacks)
+- DMs being deleted on BOTH sides (the other person loses their conversation history)
+- Group chat messages disappearing mid-conversation
+- Foreign key join queries failing silently
 
-Upgrade the account deletion flow with a 3-step "Are you sure?" confirmation, comprehensive billing cancellation, full user data cleanup, and automatic transfer block for owned circles that still have members. Also reposition the Delete Account button below Sign Out and make it smaller/less prominent.
+## Current State
+The UI already uses optional chaining (`post.profiles?.display_name || "Unknown"`) in PostCard, which prevents crashes. However, there are gaps.
 
 ## Changes
 
-### 1. Settings UI (`src/pages/Settings.tsx`)
+### 1. Edge Function: Stop deleting other people's DM history
+**File: `supabase/functions/delete-account/index.ts`**
 
-**Layout change**: Move the Delete Account card *below* the Sign Out button. Make the delete button smaller (`size="sm"`, `variant="ghost"` with destructive text) so it's clearly secondary to Sign Out.
+Currently the function deletes `private_messages` where `sender_id = userId` AND separately where `recipient_id = userId`. This wipes the other person's conversation too.
 
-**3-Step confirmation dialog**:
-- **Step 1 — Warning** (1/3): "This will permanently delete your account." Lists consequences: all data removed, subscriptions canceled, owned circles transferred or deleted. Buttons: Cancel / "I understand, continue"
-- **Step 2 — What gets deleted** (2/3): Specific list — posts, comments, messages, photos, fridge pins, memberships. Notes that owned circles with members will be placed on transfer block. Buttons: Back / "Continue to final step"  
-- **Step 3 — Type DELETE** (3/3): Final confirmation with text input. Buttons: Back / "Delete Forever"
+Instead: only delete messages where the user is the sender. For messages where they are the recipient, leave them intact so the other person keeps their sent message history. Or better: anonymize by keeping the messages but the profile is already gone — the other user just sees "Deleted User."
 
-State: replace `deleteDialogOpen` boolean with `deleteStep` (0 = closed, 1–3).
+Actually the simplest safe approach: **don't delete DMs at all** — just let the profile deletion naturally make the sender show as "Unknown." The messages stay for the other person. Remove these two lines:
+- `delete().eq("sender_id", userId)` 
+- `delete().eq("recipient_id", userId)`
 
-### 2. Edge Function (`supabase/functions/delete-account/index.ts`)
+### 2. Edge Function: Keep group chat messages
+Similarly, don't delete `group_chat_messages` where `sender_id = userId`. Other group members should still see the conversation flow — the sender will just show as "Deleted User."
 
-**Billing cleanup expansion**:
-- Query Stripe subscriptions with `status=active&status=trialing&status=past_due` (currently only `active`)
+### 3. UI: Add null-safe profile handling everywhere
 
-**Transfer block for owned circles with members**:
-- Before deleting owned circles, check each for remaining members
-- If a circle has other members: set `transfer_block = true` and skip deletion (leave circle intact for members to claim)
-- If a circle has no other members: delete it and all its data (existing logic)
+**File: `src/pages/Messages.tsx`**
+- In `fetchConversations`, handle case where a profile lookup returns no results for a user_id (deleted user)
+- In group chat message rendering, handle missing profiles gracefully with "Deleted User" fallback
 
-**Global user data cleanup** (content authored in circles they don't own):
-- Delete user's posts in any circle → cascade comments/reactions on those posts
-- Delete user's comments, reactions, fridge pins, campfire stories, event RSVPs
-- Delete user's album photos
-- Delete user's group chat messages
-- Clean up storage files (avatars bucket: `{userId}/` prefix)
+**File: `src/components/feed/PostCard.tsx`**  
+- Already handles null profiles with `?.` — no changes needed
 
-**Order of operations**:
-1. Cancel Stripe subscriptions (active, trialing, past_due)
-2. Handle owned circles: transfer-block those with members, delete empty ones
-3. Delete user-authored content globally (posts, comments, reactions, pins, stories, RSVPs, album photos, group chat messages)
-4. Remove circle memberships
-5. Delete user-specific records (notifications, DMs, push tokens, profile images, user plans, aliases, store offers, profiles)
-6. Clean up storage files
-7. Delete auth user
+**File: `src/hooks/useFeedPosts.ts`**
+- The Supabase join query will return `null` for the `profiles` relation when the profile is deleted — this is already safe since PostCard handles it
 
-### Files to modify
+### 4. Messages page: Handle deleted conversation partners
+**File: `src/pages/Messages.tsx`**
+- When building conversation list, if a profile is not found for a user_id, show "Deleted User" with a default avatar instead of crashing or hiding the conversation
+- When viewing a DM thread, if `selectedUser` profile is missing, show "Deleted User" header
 
-| Action | File |
-|--------|------|
-| Modify | `src/pages/Settings.tsx` — 3-step dialog, reposition delete below sign out, smaller button |
-| Modify | `supabase/functions/delete-account/index.ts` — transfer block logic, expanded billing + data cleanup |
+## Summary of edge function changes
+
+| Current behavior | New behavior |
+|---|---|
+| Deletes all DMs (both sender and recipient) | Keep DMs intact — profile deletion makes sender show as "Deleted User" |
+| Deletes group chat messages | Keep group messages — sender shows as "Deleted User" |
+| Everything else | Same — posts, comments, reactions by deleted user are still removed globally |
+
+## Files to modify
+
+| File | Change |
+|------|--------|
+| `supabase/functions/delete-account/index.ts` | Remove DM and group message deletion lines |
+| `src/pages/Messages.tsx` | Add null-safe profile handling for deleted users in conversations and group chats |
 
