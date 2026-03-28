@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Camera, Save, ArrowLeft, LogOut, Trash2, Loader2 } from "lucide-react";
+import { Camera, Save, ArrowLeft, LogOut, Trash2, Loader2, AlertTriangle, ChevronRight } from "lucide-react";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
@@ -45,8 +45,8 @@ const Settings = () => {
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
-  // Delete account state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  // Delete account state — 0 = closed, 1–3 = step number
+  const [deleteStep, setDeleteStep] = useState(0);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -66,7 +66,6 @@ const Settings = () => {
       const file = await convertHeicToJpeg(result.file);
       setPendingFile(file);
 
-      // Re-read as data URL after potential HEIC conversion
       const reader = new FileReader();
       reader.onload = () => setCropImageSrc(reader.result as string);
       reader.readAsDataURL(file);
@@ -154,6 +153,11 @@ const Settings = () => {
       });
       setIsDeleting(false);
     }
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteStep(0);
+    setDeleteConfirmText("");
   };
 
   if (contextLoading) {
@@ -246,30 +250,8 @@ const Settings = () => {
       <SubscriptionCard />
       <ReceiptHistory />
 
-      {/* Delete Account */}
-      <Card className="mt-6 border-destructive/30">
-        <CardHeader>
-          <CardTitle className="font-serif text-lg text-destructive flex items-center gap-2">
-            <Trash2 className="h-4 w-4" />
-            Delete Account
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Permanently delete your account and all associated data. This action cannot be undone.
-          </p>
-          <Button
-            variant="destructive"
-            onClick={() => setDeleteDialogOpen(true)}
-            className="w-full"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete Account
-          </Button>
-        </CardContent>
-      </Card>
-
-      <div className="mt-6 pb-24">
+      {/* Sign Out — primary action */}
+      <div className="mt-6">
         <Button
           variant="outline"
           onClick={async () => { await signOut(); window.location.href = "/auth"; }}
@@ -280,50 +262,141 @@ const Settings = () => {
         </Button>
       </div>
 
-      {/* Delete Account Confirmation */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
-        if (!open) {
-          setDeleteDialogOpen(false);
-          setDeleteConfirmText("");
-        }
-      }}>
+      {/* Delete Account — smaller, below sign out */}
+      <div className="mt-4 pb-24 flex justify-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setDeleteStep(1)}
+          className="text-muted-foreground hover:text-destructive text-xs"
+        >
+          <Trash2 className="w-3 h-3 mr-1" />
+          Delete Account
+        </Button>
+      </div>
+
+      {/* 3-Step Delete Account Confirmation */}
+      <AlertDialog open={deleteStep > 0} onOpenChange={(open) => { if (!open) closeDeleteDialog(); }}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>
-                  This will <strong>permanently delete</strong> your account, all your circles, posts, messages, and data. Any active subscription will be canceled immediately.
-                </p>
-                <p className="font-medium text-foreground">
-                  This action cannot be undone.
-                </p>
-                <div className="space-y-2 pt-2">
-                  <Label htmlFor="deleteConfirm" className="text-sm">
-                    Type <strong>DELETE</strong> to confirm
-                  </Label>
-                  <Input
-                    id="deleteConfirm"
-                    value={deleteConfirmText}
-                    onChange={(e) => setDeleteConfirmText(e.target.value)}
-                    placeholder="DELETE"
-                    autoComplete="off"
-                  />
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteAccount}
-              disabled={deleteConfirmText !== "DELETE" || isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
-              Delete Forever
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          {/* Step indicator */}
+          <div className="flex items-center justify-center gap-1.5 mb-2">
+            {[1, 2, 3].map((s) => (
+              <div
+                key={s}
+                className={`h-1.5 rounded-full transition-all ${
+                  s === deleteStep ? "w-6 bg-destructive" : s < deleteStep ? "w-4 bg-destructive/40" : "w-4 bg-muted"
+                }`}
+              />
+            ))}
+          </div>
+
+          {deleteStep === 1 && (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                  Delete your account?
+                </AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-3">
+                    <p>This will <strong className="text-foreground">permanently delete</strong> your account. Here's what will happen:</p>
+                    <ul className="list-disc pl-5 space-y-1 text-sm">
+                      <li>All your data will be permanently removed</li>
+                      <li>Any active subscription will be canceled immediately</li>
+                      <li>Circles you own with members will be placed on transfer block for others to claim</li>
+                      <li>Empty circles you own will be deleted</li>
+                    </ul>
+                    <p className="font-medium text-foreground">This action cannot be undone.</p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={closeDeleteDialog}>Cancel</AlertDialogCancel>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeleteStep(2)}
+                >
+                  I understand, continue
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </AlertDialogFooter>
+            </>
+          )}
+
+          {deleteStep === 2 && (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>What gets deleted (2/3)</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-3">
+                    <p>The following will be <strong className="text-foreground">permanently erased</strong> across all circles:</p>
+                    <ul className="list-disc pl-5 space-y-1 text-sm">
+                      <li>Posts, comments, and reactions</li>
+                      <li>Direct and group messages</li>
+                      <li>Photos, albums, and fridge pins</li>
+                      <li>Family tree entries you created</li>
+                      <li>Event RSVPs and campfire stories</li>
+                      <li>All circle memberships</li>
+                      <li>Your profile and avatar</li>
+                    </ul>
+                    <p className="text-sm text-muted-foreground">
+                      Circles you own that still have members will be placed on <strong className="text-foreground">transfer block</strong> so a member can claim ownership.
+                    </p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <Button variant="outline" size="sm" onClick={() => setDeleteStep(1)}>Back</Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeleteStep(3)}
+                >
+                  Continue to final step
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </AlertDialogFooter>
+            </>
+          )}
+
+          {deleteStep === 3 && (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Final confirmation (3/3)</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-3">
+                    <p>
+                      This is your <strong className="text-foreground">last chance</strong>. Once you proceed, your account and all data will be gone forever.
+                    </p>
+                    <div className="space-y-2 pt-2">
+                      <Label htmlFor="deleteConfirm" className="text-sm">
+                        Type <strong>DELETE</strong> to confirm
+                      </Label>
+                      <Input
+                        id="deleteConfirm"
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        placeholder="DELETE"
+                        autoComplete="off"
+                      />
+                    </div>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <Button variant="outline" size="sm" onClick={() => setDeleteStep(2)}>Back</Button>
+                <AlertDialogAction
+                  onClick={handleDeleteAccount}
+                  disabled={deleteConfirmText !== "DELETE" || isDeleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                  Delete Forever
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
         </AlertDialogContent>
       </AlertDialog>
     </main>
