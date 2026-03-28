@@ -73,19 +73,50 @@ serve(async (req) => {
     const subscriptionItemId = subscription.items.data[0].id;
     logStep("Found subscription", { subscriptionId: subscription.id });
 
-    // Create preview invoice to see prorated amount
-    const preview = await stripe.invoices.createPreview({
-      customer: customerId,
-      subscription: subscription.id,
-      subscription_items: [{
-        id: subscriptionItemId,
-        price: priceId,
-      }],
-      subscription_proration_behavior: "always_invoice",
-    });
+    // Use upcoming invoice instead of createPreview to avoid API compatibility issues
+    let proratedAmount = 0;
+    try {
+      const upcomingInvoice = await stripe.invoices.retrieveUpcoming({
+        customer: customerId,
+        subscription: subscription.id,
+        subscription_items: [{
+          id: subscriptionItemId,
+          price: priceId,
+        }],
+        subscription_proration_behavior: "always_invoice",
+      });
+      proratedAmount = upcomingInvoice.amount_due;
+    } catch (invoiceErr: any) {
+      logStep("retrieveUpcoming failed, trying createPreview", { error: invoiceErr.message });
+      // Fallback: try createPreview
+      try {
+        const preview = await stripe.invoices.createPreview({
+          customer: customerId,
+          subscription: subscription.id,
+          subscription_items: [{
+            id: subscriptionItemId,
+            price: priceId,
+          }],
+          subscription_proration_behavior: "always_invoice",
+        });
+        proratedAmount = preview.amount_due;
+      } catch (previewErr: any) {
+        logStep("createPreview also failed", { error: previewErr.message });
+        // Calculate approximate proration manually
+        const currentPrice = subscription.items.data[0].price;
+        const currentAmount = currentPrice.unit_amount ?? 0;
+        const newAmount = PLAN_MONTHLY[priceId] ?? 0;
+        const now = Math.floor(Date.now() / 1000);
+        const periodEnd = subscription.current_period_end;
+        const periodStart = subscription.current_period_start;
+        const totalPeriod = periodEnd - periodStart;
+        const remaining = periodEnd - now;
+        const ratio = totalPeriod > 0 ? remaining / totalPeriod : 0;
+        proratedAmount = Math.round((newAmount - currentAmount) * ratio);
+        logStep("Calculated approximate proration", { proratedAmount });
+      }
+    }
 
-    // The amount_due is the prorated charge
-    const proratedAmount = preview.amount_due;
     const nextBillingDate = new Date(subscription.current_period_end * 1000).toISOString();
     const newMonthlyPrice = PLAN_MONTHLY[priceId] ?? 0;
 
