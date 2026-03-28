@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "cap:sync:ios": "npx cap sync ios && sh scripts/ios-post-sync.sh"
   },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
