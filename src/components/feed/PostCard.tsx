@@ -359,7 +359,7 @@ export const PostCard = ({
 
         {/* Image Lightbox — fullscreen on mobile, centered modal on desktop */}
         <Dialog open={lightboxIndex !== null} onOpenChange={(open) => !open && setLightboxIndex(null)}>
-          <DialogContent className="max-w-[95vw] w-fit p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
+          <DialogContent className="max-w-[95vw] sm:w-fit p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
             {lightboxIndex !== null && imageUrls[lightboxIndex] && (
               <>
                 {/* Top control bar — safe area aware on mobile */}
@@ -431,7 +431,7 @@ export const PostCard = ({
 
         {/* Video Lightbox — fullscreen on mobile */}
         <Dialog open={videoLightboxUrl !== null} onOpenChange={(open) => !open && setVideoLightboxUrl(null)}>
-          <DialogContent className="max-w-[95vw] w-fit p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
+          <DialogContent className="max-w-[95vw] sm:w-fit p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
             {videoLightboxUrl && (
               <>
                 {/* Close button — safe area aware */}

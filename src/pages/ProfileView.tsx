@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, MapPin, ImagePlus, Trash2, Play, Download, Pencil, X } from "lucide-react";
+import { Settings, MapPin, ImagePlus, Trash2, Play, Download, Pencil, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { getMediaType } from "@/lib/mediaUtils";
 import { Textarea } from "@/components/ui/textarea";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
@@ -37,6 +37,7 @@ const ProfileView = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  const touchStartX = useRef<number>(0);
   useKeyboardDismissOnScroll(mainRef);
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
@@ -384,77 +385,122 @@ const ProfileView = () => {
         </CardContent>
       </Card>
 
-      {/* Image Lightbox */}
+      {/* Image Lightbox — fullscreen on mobile, centered modal on desktop */}
       <Dialog open={!!enlargedImage} onOpenChange={(open) => !open && setEnlargedImage(null)}>
-        <DialogContent className="max-w-[95vw] w-fit p-2 bg-background/95 [&>button:last-child]:hidden">
-          {enlargedImage && (
-            <div className="flex flex-col items-center">
-              <div className="flex items-center justify-end gap-2 w-full mb-2 pt-[max(env(safe-area-inset-top,0px),0.5rem)] pr-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
-                  onClick={() => handleDownload(enlargedImage.image_url)}
-                  aria-label="Download"
-                >
-                  <Download className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
-                  onClick={() => setEnlargedImage(null)}
-                  aria-label="Close"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-              <div className="relative">
+        <DialogContent className="max-w-[95vw] sm:w-fit p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
+          {enlargedImage && (() => {
+            const currentIndex = images.findIndex((i) => i.id === enlargedImage.id);
+            return (
+              <>
+                {/* Top control bar — safe area aware on mobile */}
+                <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-end gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                    onClick={() => handleDownload(enlargedImage.image_url)}
+                    aria-label="Download"
+                  >
+                    <Download className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                    onClick={() => setEnlargedImage(null)}
+                    aria-label="Close"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+
+                {/* Centered media */}
                 {getMediaType(enlargedImage.image_url) === 'video' ? (
                   <video
                     src={enlargedImage.image_url}
                     controls
                     autoPlay
-                    className="max-h-[90vh] w-auto rounded-lg"
+                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
                   />
                 ) : (
                   <img
                     src={enlargedImage.image_url}
                     alt={enlargedImage.caption || "Profile photo"}
-                    className="max-h-[90vh] w-auto object-contain rounded-lg"
+                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
+                    onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+                    onTouchEnd={(e) => {
+                      const delta = touchStartX.current - e.changedTouches[0].clientX;
+                      if (delta > 50 && currentIndex < images.length - 1) setEnlargedImage(images[currentIndex + 1]);
+                      else if (delta < -50 && currentIndex > 0) setEnlargedImage(images[currentIndex - 1]);
+                    }}
                   />
                 )}
-              </div>
-              {(profileData?.display_name || enlargedImage.caption) && (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  {profileData?.display_name && (
-                    <span className="font-semibold text-foreground">{profileData.display_name}: </span>
-                  )}
-                  {enlargedImage.caption}
-                </p>
-              )}
-              {isOwnProfile && (
-                <div className="flex gap-2 mt-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleStartEdit(enlargedImage)}
-                  >
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleDeleteImage(enlargedImage)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
+
+                {/* Navigation arrows */}
+                {images.length > 1 && (
+                  <>
+                    {currentIndex > 0 && (
+                      <button
+                        className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+                        onClick={() => setEnlargedImage(images[currentIndex - 1])}
+                        aria-label="Previous image"
+                      >
+                        <ChevronLeft className="h-6 w-6" />
+                      </button>
+                    )}
+                    {currentIndex < images.length - 1 && (
+                      <button
+                        className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+                        onClick={() => setEnlargedImage(images[currentIndex + 1])}
+                        aria-label="Next image"
+                      >
+                        <ChevronRight className="h-6 w-6" />
+                      </button>
+                    )}
+                    {/* Image counter */}
+                    <div className="absolute bottom-6 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 bg-black/50 backdrop-blur-sm text-white text-sm px-3 py-1 rounded-full" style={{ marginBottom: "max(env(safe-area-inset-bottom, 0px), 0px)" }}>
+                      {currentIndex + 1} / {images.length}
+                    </div>
+                  </>
+                )}
+
+                {/* Caption & actions */}
+                {(profileData?.display_name || enlargedImage.caption || isOwnProfile) && (
+                  <div className="absolute bottom-14 sm:bottom-auto sm:relative sm:mt-3 z-10 flex flex-col items-center px-4">
+                    {(profileData?.display_name || enlargedImage.caption) && (
+                      <p className="text-sm text-white/80 sm:text-muted-foreground text-center">
+                        {profileData?.display_name && (
+                          <span className="font-semibold text-white sm:text-foreground">{profileData.display_name}: </span>
+                        )}
+                        {enlargedImage.caption}
+                      </p>
+                    )}
+                    {isOwnProfile && (
+                      <div className="flex gap-2 mt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-black/40 border-white/20 text-white hover:bg-black/60 hover:text-white sm:bg-background sm:border-input sm:text-foreground sm:hover:bg-accent sm:hover:text-accent-foreground"
+                          onClick={() => handleStartEdit(enlargedImage)}
+                        >
+                          <Pencil className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteImage(enlargedImage)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
