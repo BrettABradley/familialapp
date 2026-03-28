@@ -92,9 +92,25 @@ const Fridge = () => {
     if (!file) return;
     file = await convertHeicToJpeg(file);
 
+    if (pinType === 'voice_note') {
+      // Voice notes skip cropping
+      setSelectedImage(file);
+      const url = URL.createObjectURL(file);
+      setImagePreview(url);
+    } else {
+      // Show crop dialog for images
+      const url = URL.createObjectURL(file);
+      setCropSrc(url);
+    }
+  };
+
+  const handleCropComplete = (croppedBlob: Blob) => {
+    const file = new File([croppedBlob], `cropped-${Date.now()}.jpg`, { type: "image/jpeg" });
     setSelectedImage(file);
-    const url = URL.createObjectURL(file);
-    setImagePreview(url);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(URL.createObjectURL(file));
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
   };
 
   const handleCreatePin = async () => {
