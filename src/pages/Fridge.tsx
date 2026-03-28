@@ -483,6 +483,20 @@ const Fridge = () => {
         />
       )}
     </main>
+    {cropSrc && (
+      <AvatarCropDialog
+        open={!!cropSrc}
+        imageSrc={cropSrc}
+        onClose={() => {
+          URL.revokeObjectURL(cropSrc);
+          setCropSrc(null);
+        }}
+        onCropComplete={handleCropComplete}
+        aspect={1}
+        cropShape="rect"
+        title="Crop Image"
+      />
+    )}
     </PullToRefreshWrapper>
   );
 };
