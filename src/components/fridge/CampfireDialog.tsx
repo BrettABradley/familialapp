@@ -156,7 +156,7 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
         <DialogTitle className="sr-only">{pinTitle}</DialogTitle>
 
         {/* Campsite hero */}
-        <div className="relative bg-gradient-to-b from-[#0a0a2e] via-[#121240] to-[#1a1a3e] px-6 pt-[max(env(safe-area-inset-top,0px),1.5rem)] pb-4 flex flex-col items-center text-center overflow-hidden">
+        <div className="relative bg-gradient-to-b from-[#0a0a2e] via-[#121240] to-[#1a1a3e] px-6 pt-[max(env(safe-area-inset-top,0px),3rem)] pb-4 flex flex-col items-center text-center overflow-hidden">
           {/* Custom mobile close button */}
           <button
             onClick={() => onOpenChange(false)}
@@ -167,9 +167,9 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
           </button>
 
           {/* Stars */}
-          <div className="absolute top-3 left-[20%] w-1 h-1 bg-white/60 rounded-none animate-[campfire-spark_2s_ease-in-out_infinite]" />
-          <div className="absolute top-5 right-[25%] w-1 h-1 bg-white/40 rounded-none animate-[campfire-spark_3s_ease-in-out_infinite_1s]" />
-          <div className="absolute top-2 right-[15%] w-0.5 h-0.5 bg-white/50 rounded-none" />
+          <div className="absolute top-12 left-[20%] w-1 h-1 bg-white/60 rounded-none animate-[campfire-spark_2s_ease-in-out_infinite]" />
+          <div className="absolute top-14 right-[25%] w-1 h-1 bg-white/40 rounded-none animate-[campfire-spark_3s_ease-in-out_infinite_1s]" />
+          <div className="absolute top-10 right-[15%] w-0.5 h-0.5 bg-white/50 rounded-none" />
 
           <PixelCampfire size="lg" storyCount={stories.length} />
 

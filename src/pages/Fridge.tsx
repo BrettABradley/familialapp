@@ -19,6 +19,7 @@ import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
+import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 
 interface Circle {
   id: string;

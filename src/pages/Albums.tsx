@@ -589,7 +589,7 @@ const Albums = () => {
 
           {/* Enlarged photo dialog with navigation */}
           <Dialog open={!!enlargedPhoto} onOpenChange={(open) => !open && setEnlargedPhoto(null)}>
-            <DialogContent className="inset-0 max-h-none overflow-hidden bg-black/95 border-none p-0 flex flex-col items-center justify-center sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-[95vw] sm:w-fit sm:max-h-[95vh] sm:rounded-lg sm:bg-black/95 sm:p-2 [&>button:last-child]:hidden">
+            <DialogContent className="inset-0 max-h-none overflow-hidden bg-black/95 border-none px-0 py-0 p-0 max-w-none flex flex-col items-center justify-center sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-[95vw] sm:w-fit sm:max-h-[95vh] sm:rounded-lg sm:bg-black/95 sm:p-2 [&>button:last-child]:hidden">
               <DialogTitle className="sr-only">{enlargedPhoto?.caption || "Photo"}</DialogTitle>
               {enlargedPhoto && (() => {
                 const currentIndex = photos.findIndex(p => p.id === enlargedPhoto.id);
