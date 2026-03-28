@@ -1,5 +1,6 @@
 import Header from "@/components/landing/Header";
 import Footer from "@/components/landing/Footer";
+import SEO from "@/components/shared/SEO";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Newspaper, Calendar, Image, MessageSquare, Pin, Mail, Phone } from "lucide-react";
 
@@ -72,6 +73,7 @@ const features = [
 const Support = () => {
   return (
     <div className="min-h-screen bg-background">
+      <SEO title="Support & How-To Guide - Familial" description="Everything you need to get the most out of Familial — guides for Circles, Feed, Events, Albums, Messages, and more." path="/support" />
       <Header />
       <main className="container mx-auto px-4 py-24 max-w-4xl">
         <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-4 text-center">

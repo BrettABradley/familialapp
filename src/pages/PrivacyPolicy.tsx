@@ -1,9 +1,11 @@
 import Header from "@/components/landing/Header";
 import Footer from "@/components/landing/Footer";
+import SEO from "@/components/shared/SEO";
 
 const PrivacyPolicy = () => {
   return (
     <div className="min-h-screen bg-background">
+      <SEO title="Privacy Policy - Familial" description="Read Familial's privacy policy — how we protect your family's data and respect your privacy." path="/privacy" />
       <Header />
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 max-w-4xl">
         <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground mb-2">Privacy Policy</h1>

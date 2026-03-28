@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import SEO from "@/components/shared/SEO";
 import { useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
 import { useAuth } from "@/hooks/useAuth";
@@ -35,6 +36,19 @@ const Index = () => {
   }
   return (
     <div className="min-h-screen bg-background">
+      <SEO
+        title="Familial - Private Social Network for Families"
+        description="A private social space for the people who matter most. Share moments, plan events, and stay close — without the noise of public social media."
+        path="/"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: "Familial",
+          url: "https://familialapp.lovable.app",
+          logo: "https://familialapp.lovable.app/og-image.jpg",
+          description: "A private social space for the people who matter most.",
+        }}
+      />
       <Header />
       <main>
         <Hero />
