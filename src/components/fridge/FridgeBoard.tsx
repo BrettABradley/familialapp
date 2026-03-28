@@ -373,7 +373,7 @@ export function FridgeBoard({
                   <video
                     src={enlargedPin.image_url}
                     controls
-                    className="w-full rounded-none bg-zinc-200"
+                    className="w-full aspect-square object-cover rounded-none bg-zinc-200"
                   />
                 ) : getMediaType(enlargedPin.image_url) === 'audio' ? (
                   <div className="flex aspect-square items-center justify-center bg-zinc-100 flex-col gap-3 p-4">
@@ -386,7 +386,7 @@ export function FridgeBoard({
                   <img
                     src={enlargedPin.image_url}
                     alt={enlargedPin.title}
-                    className="w-full rounded-none bg-zinc-200"
+                    className="w-full aspect-square object-cover rounded-none bg-zinc-200"
                   />
                 )
               ) : (
