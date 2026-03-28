@@ -186,6 +186,10 @@ const Fridge = () => {
       URL.revokeObjectURL(imagePreview);
     }
     setImagePreview(null);
+    if (cropSrc) {
+      URL.revokeObjectURL(cropSrc);
+    }
+    setCropSrc(null);
   };
 
   const handleDeletePin = async (pin: FridgePin) => {
