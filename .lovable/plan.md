@@ -1,33 +1,54 @@
 
 
-# Fix Fridge Lightbox: Controls & Safe-Area Positioning
+# Swipe Gestures, Profile Centering & Fridge Cropping
 
-## Problem
-1. The close (X) and download buttons sit at `top-2 right-2` of the polaroid frame, which on mobile can land behind/under the Dynamic Island, making them unreachable.
-2. The entire enlarged pin content (image + campfire) doesn't account for the notch/camera area, so content is partially obscured.
+## 3 changes across 4 files
 
-## Changes
+### 1. Add swipe-down-to-close on all lightboxes (Feed, Albums, ProfileView)
 
-**File: `src/components/fridge/FridgeBoard.tsx`**
+Currently all three lightboxes track `touchStartX` for horizontal swipe. Add a companion `touchStartY` ref and on `onTouchEnd`, if the vertical delta exceeds 80px downward (and horizontal delta is small), close the lightbox.
 
-### 1. Move action buttons outside the polaroid frame
-- Move the download + X buttons from inside the polaroid `div` (line 363) to a separate top control bar above the polaroid, positioned absolutely within the `DialogContent`.
-- Add safe-area padding: `pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3` so buttons clear the Dynamic Island on mobile.
-- Use `justify-end` to keep them right-aligned with proper spacing.
+**Files:** `src/components/feed/PostCard.tsx`, `src/pages/Albums.tsx`, `src/pages/ProfileView.tsx`
 
-### 2. Push polaroid content below the notch
-- Change `DialogContent` from transparent centered layout to a fullscreen mobile layout (`fixed inset-0 bg-black/90 flex flex-col items-center justify-center`) with `sm:` overrides for desktop.
-- The top control bar with safe-area padding naturally pushes the polaroid below the camera.
+Pattern (same in all three):
+```tsx
+const touchStartY = useRef<number>(0);
 
-### Structure after fix
-```text
-DialogContent (fullscreen on mobile)
-├── Top bar (safe-area padded) ── [Download] [X]
-├── Polaroid frame (centered, below notch)
-│   ├── Magnet
-│   ├── Image/content
-│   └── Caption
+// onTouchStart: also record Y
+touchStartY.current = e.touches[0].clientY;
+
+// onTouchEnd: check vertical swipe first
+const deltaX = touchStartX - e.changedTouches[0].clientX;
+const deltaY = e.changedTouches[0].clientY - touchStartY; // positive = swipe down
+if (deltaY > 80 && Math.abs(deltaX) < 50) { close(); return; }
+// ...existing horizontal logic
 ```
 
-One file changed, same visual style preserved.
+This applies to:
+- Feed image lightbox `img` element
+- Albums lightbox `img` element  
+- ProfileView lightbox `img` element
+
+### 2. Center the profile photo lightbox content vertically
+
+**File:** `src/pages/ProfileView.tsx` (line ~390)
+
+The `DialogContent` already has `flex flex-col items-center justify-center`. The issue is the caption/action area at the bottom pushes content upward. Change the layout so the image sits in a centered flex-grow area and the bottom caption uses absolute positioning (already partly does). Ensure `min-h-0` on the image container so flexbox centering works properly on mobile.
+
+### 3. Crop fridge pin images to square on the board
+
+**File:** `src/components/fridge/FridgeBoard.tsx`
+
+The board thumbnails already use `aspect-square object-cover` (line 209) so images are cropped square on the board. The video thumbnails at line 196-212 also handle this. No change needed for board thumbnails — they're already cropped.
+
+For the **enlarged pin dialog** (the polaroid popup), images currently show at natural aspect (`w-full`). To maintain consistency with the board's square crop, add `aspect-square object-cover` to the enlarged image (line 386-390) and video (line 373-377) — but **exclude campfire** pins since those already have their own layout. This ensures what you see on the board matches what you see when you tap it.
+
+## Files to modify
+
+| File | Changes |
+|------|---------|
+| `src/components/feed/PostCard.tsx` | Add `touchStartY` ref, swipe-down-to-close on image lightbox |
+| `src/pages/Albums.tsx` | Add `touchStartY` ref, swipe-down-to-close on album lightbox |
+| `src/pages/ProfileView.tsx` | Add `touchStartY` ref, swipe-down-to-close, center lightbox content |
+| `src/components/fridge/FridgeBoard.tsx` | Add `aspect-square object-cover` to enlarged pin image/video |
 
