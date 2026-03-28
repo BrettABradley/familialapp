@@ -1,27 +1,40 @@
 
 
-# Fix Campfire Safe Area & Notification Button Overlap
+# Fix Grey Bar, Fridge Cropping & Campfire Layout
 
-## 2 issues, 2 files
+## 3 issues across 5 files
 
-### 1. Campfire dialog content sits behind the camera island
+### 1. Grey bar on right side of all lightboxes
+
+**Root cause:** In `PostCard.tsx` and `ProfileView.tsx`, the lightbox `DialogContent` uses `max-w-[95vw]` which applies on mobile too. Combined with `inset-0` (full-screen), this limits width to 95% of viewport, leaving a 5% gap on the right. In `Albums.tsx`, the lightbox uses `p-0` but doesn't override the base `px-6` padding (tailwind-merge keeps `px-6` over `p-0` since longhand beats shorthand).
+
+**Fix:**
+- `PostCard.tsx` and `ProfileView.tsx`: Change `max-w-[95vw]` → `max-w-none sm:max-w-[95vw]` so mobile gets full width
+- `Albums.tsx`: Add `px-0 py-0` and `max-w-none sm:max-w-[95vw]` to the enlarged photo DialogContent
+
+### 2. Fridge image cropping
+
+**Current:** When uploading an image for a fridge pin, the file goes straight to upload with no cropping step.
+
+**Fix:** After the user selects an image file, show the `AvatarCropDialog` (already used for profile photos) with `cropShape="rect"` and `aspect={1}` (square, matching the fridge's square pin display). The cropped blob replaces `selectedImage` and updates the preview. This mirrors the profile photo flow.
+
+**File:** `src/pages/Fridge.tsx` — import `AvatarCropDialog`, add state for `cropSrc`, show crop dialog after file selection, use cropped result as `selectedImage`.
+
+### 3. Campfire scene cut off at top
+
+**Current:** The campfire hero div uses `pt-[max(env(safe-area-inset-top,0px),1.5rem)]` but the stars use absolute `top-2/3/5` positioning that sits behind the notch. The scene is top-heavy with empty space below.
+
+**Fix:** Increase the hero's top padding to `pt-[max(env(safe-area-inset-top,0px),3rem)]` to push the whole scene down below the camera island. Shift star positions down accordingly (e.g. `top-3` → `top-12`). This centers the content better within the dialog.
+
 **File:** `src/components/fridge/CampfireDialog.tsx`
-
-The campfire hero section starts at `pt-6` (line 159) with no safe-area padding. The close button uses `top-[max(env(safe-area-inset-top,0px),0.75rem)]` but the content itself (fire, stars) doesn't account for the notch.
-
-**Fix:** Add `pt-[max(env(safe-area-inset-top,0px),1.5rem)]` to the hero `div` (line 159) so the entire campfire scene shifts below the Dynamic Island. Also adjust the stars' `top` positions to be relative to the new padding.
-
-### 2. Notification sheet: "Clear all" button overlaps with the Sheet's built-in X button
-**File:** `src/components/layout/CircleHeader.tsx`
-
-The mobile notification Sheet (line 173) renders a `SheetHeader` with action buttons (Mark read, Clear all) in a row. The Sheet component automatically appends an X close button at `right-4 top-[max(env(safe-area-inset-top,0px),1.5rem)]`. Since the action buttons sit at the right side of the header, they collide with this X.
-
-**Fix:** Add `pr-12` (right padding) to the `SheetHeader` (line 174) to reserve space for the close button, preventing the overlap.
 
 ## Files to modify
 
 | File | Change |
 |------|--------|
-| `src/components/fridge/CampfireDialog.tsx` | Add safe-area top padding to campfire hero div |
-| `src/components/layout/CircleHeader.tsx` | Add `pr-12` to notification SheetHeader |
+| `src/components/feed/PostCard.tsx` | `max-w-none sm:max-w-[95vw]` on lightbox |
+| `src/pages/ProfileView.tsx` | `max-w-none sm:max-w-[95vw]` on lightbox |
+| `src/pages/Albums.tsx` | Add `px-0 py-0 max-w-none sm:max-w-[95vw]` to photo lightbox |
+| `src/pages/Fridge.tsx` | Add crop dialog for image pins using `AvatarCropDialog` |
+| `src/components/fridge/CampfireDialog.tsx` | Increase hero top padding, shift stars down |
 
