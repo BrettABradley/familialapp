@@ -358,7 +358,7 @@ export const PostCard = ({
 
         {/* Image Lightbox */}
         <Dialog open={lightboxIndex !== null} onOpenChange={(open) => !open && setLightboxIndex(null)}>
-          <DialogContent className="max-w-4xl p-2 bg-background/95 [&>button:last-child]:hidden">
+          <DialogContent className="max-w-[95vw] w-fit p-2 bg-background/95 [&>button:last-child]:hidden">
             {lightboxIndex !== null && imageUrls[lightboxIndex] && (
               <div className="flex flex-col items-center">
                 <div className="flex items-center justify-end gap-2 w-full mb-2 pt-2 pr-1">
@@ -384,7 +384,7 @@ export const PostCard = ({
                 <img
                   src={imageUrls[lightboxIndex]}
                   alt={`Post image ${lightboxIndex + 1}`}
-                  className="max-h-[75vh] w-auto object-contain rounded-lg"
+                  className="max-h-[90vh] w-auto object-contain rounded-lg"
                 />
                 {imageUrls.length > 1 && (
                   <div className="flex items-center gap-4 mt-3">
@@ -416,7 +416,7 @@ export const PostCard = ({
 
         {/* Video Lightbox */}
         <Dialog open={videoLightboxUrl !== null} onOpenChange={(open) => !open && setVideoLightboxUrl(null)}>
-          <DialogContent className="max-w-4xl p-2 bg-background/95 [&>button:last-child]:hidden">
+          <DialogContent className="max-w-[95vw] w-fit p-2 bg-background/95 [&>button:last-child]:hidden">
             {videoLightboxUrl && (
               <div className="flex flex-col items-center">
                 <div className="flex items-center justify-end gap-2 w-full mb-2 pt-2 pr-1">
@@ -433,7 +433,7 @@ export const PostCard = ({
                 <video
                   controls
                   autoPlay
-                  className="max-h-[75vh] w-auto object-contain rounded-lg"
+                  className="max-h-[90vh] w-auto object-contain rounded-lg"
                   preload="metadata"
                   playsInline
                 >
