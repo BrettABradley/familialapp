@@ -312,11 +312,16 @@ const ProfileView = () => {
                   {profileData.display_name || "Unknown"}
                 </h1>
                 {isOwnProfile && (
-                  <Link to="/settings">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                      <Settings className="h-4 w-4" />
+                  <div className="flex items-center gap-1">
+                    <Link to="/settings">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => navigate("/upgrade")} title="Upgrade Membership">
+                      <ArrowUp className="h-4 w-4" />
                     </Button>
-                  </Link>
+                  </div>
                 )}
               </div>
               {profileData.location && (
