@@ -596,8 +596,7 @@ const Albums = () => {
                   <>
                     {/* Top control bar */}
                     <div
-                      className="absolute top-0 right-0 z-20 flex items-center gap-2 pr-4"
-                      style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 3.25rem)" }}
+                      className="absolute top-0 right-0 z-20 flex items-center gap-2 pr-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4"
                     >
                       <button
                         className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
