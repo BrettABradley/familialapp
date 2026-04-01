@@ -6,6 +6,7 @@ import { CircleHeader } from "@/components/layout/CircleHeader";
 import { CircleHeaderSkeleton } from "@/components/layout/CircleHeaderSkeleton";
 import { MobileNavigation } from "@/components/layout/MobileNavigation";
 import TransferBlockBanner from "@/components/circles/TransferBlockBanner";
+import { TermsAcceptanceGate } from "@/components/shared/TermsAcceptanceGate";
 
 function AppLayoutContent() {
   const { user, loading: authLoading, signOut } = useAuth();
