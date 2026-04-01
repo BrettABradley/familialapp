@@ -56,26 +56,28 @@ function AppLayoutContent() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 md:pb-0">
-      {circlesLoading ? (
-        <CircleHeaderSkeleton />
-      ) : (
-        <CircleHeader
-          circles={circles}
-          selectedCircle={selectedCircle}
-          onCircleChange={setSelectedCircle}
-          onSignOut={handleSignOut}
-          overrideLabel={isProfileRoute ? "All Circles" : undefined}
-        />
-      )}
-      <main key={location.pathname} className="animate-page-fade-in">
-        <div className="container mx-auto px-4 mt-4">
-          <TransferBlockBanner />
-        </div>
-        <Outlet />
-      </main>
-      <MobileNavigation />
-    </div>
+    <TermsAcceptanceGate>
+      <div className="min-h-screen bg-background pb-20 md:pb-0">
+        {circlesLoading ? (
+          <CircleHeaderSkeleton />
+        ) : (
+          <CircleHeader
+            circles={circles}
+            selectedCircle={selectedCircle}
+            onCircleChange={setSelectedCircle}
+            onSignOut={handleSignOut}
+            overrideLabel={isProfileRoute ? "All Circles" : undefined}
+          />
+        )}
+        <main key={location.pathname} className="animate-page-fade-in">
+          <div className="container mx-auto px-4 mt-4">
+            <TransferBlockBanner />
+          </div>
+          <Outlet />
+        </main>
+        <MobileNavigation />
+      </div>
+    </TermsAcceptanceGate>
   );
 }
 
