@@ -325,6 +325,30 @@ const ProfileView = () => {
                     </Link>
                   </div>
                 )}
+                {!isOwnProfile && userId && (
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setReportOpen(true)} title="Report">
+                      <Flag className="h-4 w-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Block user">
+                          <Ban className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Block {profileData.display_name || "this user"}?</AlertDialogTitle>
+                          <AlertDialogDescription>You won't see their posts, comments, or messages anymore. This also reports them to our team.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => { blockUser(userId); navigate("/feed"); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Block</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                )}
               </div>
               {profileData.location && (
                 <p className="text-sm text-muted-foreground flex items-center justify-center gap-1">
