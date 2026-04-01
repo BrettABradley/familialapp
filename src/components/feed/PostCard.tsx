@@ -275,34 +275,58 @@ export const PostCard = ({
               {post.circles?.name} • {new Date(post.created_at).toLocaleDateString()}
             </p>
           </div>
-          {(isOwnPost || canDelete) && (
-            <div className="flex items-center gap-1">
-              {isOwnPost && onEdit && !isEditing && (
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => { setEditContent(post.content || ""); setIsEditing(true); }}>
-                  <Pencil className="h-4 w-4" />
+          <div className="flex items-center gap-1">
+            {!isOwnPost && (
+              <>
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => setReportOpen(true)} title="Report">
+                  <Flag className="h-4 w-4" />
                 </Button>
-              )}
-              {canDelete && onDelete && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete post?</AlertDialogTitle>
-                  <AlertDialogDescription>This action cannot be undone. This post and its comments will be permanently removed.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onDelete(post.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-              )}
-            </div>
-          )}
+                {onBlockUser && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8" title="Block user">
+                        <Ban className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Block {post.profiles?.display_name || "this user"}?</AlertDialogTitle>
+                        <AlertDialogDescription>You won't see their posts, comments, or messages anymore. This also reports them to our team for review.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onBlockUser(post.author_id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Block</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </>
+            )}
+            {isOwnPost && onEdit && !isEditing && (
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => { setEditContent(post.content || ""); setIsEditing(true); }}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+            {canDelete && onDelete && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete post?</AlertDialogTitle>
+                    <AlertDialogDescription>This action cannot be undone. This post and its comments will be permanently removed.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => onDelete(post.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
