@@ -12,20 +12,19 @@ export const isIOSNative = () =>
 
 /**
  * Purchase a subscription via Apple IAP.
- * Uses the Capacitor In-App Purchase plugin.
- * After purchase, validates receipt server-side.
+ * Requires @capawesome/capacitor-in-app-purchases to be installed natively.
+ * Uses dynamic require to avoid build errors when the plugin isn't available.
  */
 export const purchaseSubscription = async (productId: string): Promise<boolean> => {
   if (!isIOSNative()) return false;
 
   try {
-    // Dynamically import to avoid issues on web
-    const { InAppPurchases } = await import("@capawesome/capacitor-in-app-purchases");
+    // Dynamic import — plugin is only available in native iOS builds
+    const mod = await (Function('return import("@capawesome/capacitor-in-app-purchases")')() as Promise<any>);
+    const InAppPurchases = mod.InAppPurchases;
 
-    // Connect to App Store
     await InAppPurchases.initialize();
 
-    // Get product info
     const { products } = await InAppPurchases.getProducts({
       productIdentifiers: [productId],
     });
@@ -34,13 +33,11 @@ export const purchaseSubscription = async (productId: string): Promise<boolean> 
       throw new Error("Product not found");
     }
 
-    // Start purchase
     const result = await InAppPurchases.purchaseProduct({
       productIdentifier: productId,
     });
 
     if (result?.transactionId) {
-      // Validate receipt server-side
       const { error } = await supabase.functions.invoke("validate-apple-receipt", {
         body: {
           transactionId: result.transactionId,
@@ -50,7 +47,6 @@ export const purchaseSubscription = async (productId: string): Promise<boolean> 
 
       if (error) throw error;
 
-      // Finish the transaction
       await InAppPurchases.finishTransaction({
         transactionIdentifier: result.transactionId,
       });
@@ -60,7 +56,6 @@ export const purchaseSubscription = async (productId: string): Promise<boolean> 
 
     return false;
   } catch (err: any) {
-    // User cancelled
     if (err?.code === "USER_CANCELLED" || err?.message?.includes("cancel")) {
       return false;
     }
@@ -75,11 +70,11 @@ export const restorePurchases = async (): Promise<boolean> => {
   if (!isIOSNative()) return false;
 
   try {
-    const { InAppPurchases } = await import("@capawesome/capacitor-in-app-purchases");
+    const mod = await (Function('return import("@capawesome/capacitor-in-app-purchases")')() as Promise<any>);
+    const InAppPurchases = mod.InAppPurchases;
     await InAppPurchases.initialize();
     await InAppPurchases.restorePurchases();
 
-    // Re-validate with server
     const { error } = await supabase.functions.invoke("validate-apple-receipt", {
       body: { restore: true },
     });
