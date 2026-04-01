@@ -62,6 +62,8 @@ const ProfileView = () => {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const isOwnProfile = user?.id === userId;
+  const { blockUser, isBlocked } = useBlockedUsers();
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
