@@ -20,6 +20,7 @@ const Feed = () => {
   const mainRef = useRef<HTMLElement>(null);
   useKeyboardDismissOnScroll(mainRef);
   const adminStatus = isCircleAdmin(selectedCircle);
+  const { blockUser, isBlocked } = useBlockedUsers();
   const circleMembers = useCircleMembers();
   const [searchParams] = useSearchParams();
   const highlightPostId = searchParams.get("post");
