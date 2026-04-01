@@ -129,7 +129,7 @@ const Feed = () => {
           </Card>
         )}
 
-        {posts.map((post) => (
+        {posts.filter(post => !isBlocked(post.author_id)).map((post) => (
           <div key={post.id} id={`post-${post.id}`}>
             <PostCard
               post={post}
@@ -149,6 +149,7 @@ const Feed = () => {
               onDelete={handleDeletePost}
               onEdit={handleEditPost}
               onDeleteComment={handleDeleteComment}
+              onBlockUser={blockUser}
             />
           </div>
         ))}
