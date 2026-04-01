@@ -13,6 +13,7 @@ import { LinkifiedText } from "@/components/shared/LinkifiedText";
 import { LinkPreviewCard } from "@/components/feed/LinkPreviewCard";
 import { getMediaType } from "@/lib/mediaUtils";
 import type { Post } from "@/hooks/useFeedPosts";
+import { ReportDialog } from "@/components/shared/ReportDialog";
 
 interface CircleMemberRef {
   user_id: string;
