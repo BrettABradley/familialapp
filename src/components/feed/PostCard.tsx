@@ -223,6 +223,7 @@ export const PostCard = ({
   onDelete,
   onEdit,
   onDeleteComment,
+  onBlockUser,
 }: PostCardProps) => {
   const canDelete = isOwnPost || isAdmin;
   const { profile } = useCircleContext();
