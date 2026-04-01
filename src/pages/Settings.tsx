@@ -249,6 +249,13 @@ const Settings = () => {
       </Card>
 
       <SubscriptionCard />
+      {isIOSNative() && (
+        <div className="mt-4">
+          <Button variant="outline" className="w-full" onClick={openAppleSubscriptionManagement}>
+            Manage Subscription (Apple)
+          </Button>
+        </div>
+      )}
       <ReceiptHistory />
 
       {/* Sign Out — primary action */}

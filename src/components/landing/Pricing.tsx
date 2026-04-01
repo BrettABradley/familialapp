@@ -560,7 +560,28 @@ const Pricing = () => {
           ))}
         </div>
 
-        {/* Custom Plans */}
+        {/* Restore Purchases — iOS only */}
+        {isIOSNative() && user && (
+          <div className="text-center mb-8">
+            <Button
+              variant="link"
+              className="text-muted-foreground"
+              onClick={async () => {
+                const success = await restorePurchases();
+                if (success) {
+                  const { data } = await supabase.from("user_plans").select("plan, cancel_at_period_end, current_period_end, pending_plan").eq("user_id", user.id).single();
+                  if (data) { setCurrentPlan(data.plan); setCancelAtPeriodEnd(data.cancel_at_period_end); setCurrentPeriodEnd(data.current_period_end); setPendingPlan((data as any)?.pending_plan ?? null); }
+                  toast({ title: "Purchases restored" });
+                } else {
+                  toast({ title: "No purchases found", variant: "destructive" });
+                }
+              }}
+            >
+              Restore Purchases
+            </Button>
+          </div>
+        )}
+
         <div className="max-w-xl mx-auto mb-8">
           <Card className="bg-secondary/50 border-border">
             <CardContent className="flex flex-col items-center gap-4 py-8">
