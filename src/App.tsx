@@ -59,7 +59,7 @@ const App = () => {
             <Route path="/support" element={<Support />} />
             
             {/* Authenticated routes with persistent layout */}
-            <Route element={<TermsAcceptanceGate><AppLayout /></TermsAcceptanceGate>}>
+            <Route element={<AppLayout />}>
               <Route path="/feed" element={<Feed />} />
               <Route path="/circles" element={<Circles />} />
               <Route path="/profile" element={<Profile />} />
