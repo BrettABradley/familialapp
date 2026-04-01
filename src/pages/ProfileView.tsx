@@ -630,6 +630,14 @@ const ProfileView = () => {
           title="Re-crop Photo"
         />
       )}
+
+      {userId && !isOwnProfile && (
+        <ReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          reportedUserId={userId}
+        />
+      )}
     </main>
   );
 };
