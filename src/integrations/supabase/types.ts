@@ -49,6 +49,27 @@ export type Database = {
           },
         ]
       }
+      blocked_users: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       campfire_stories: {
         Row: {
           audio_url: string | null
@@ -324,6 +345,57 @@ export type Database = {
           },
           {
             foreignKeyName: "comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_reports: {
+        Row: {
+          comment_id: string | null
+          created_at: string
+          details: string | null
+          id: string
+          post_id: string | null
+          reason: string
+          reported_user_id: string | null
+          reporter_id: string
+          status: string
+        }
+        Insert: {
+          comment_id?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          post_id?: string | null
+          reason: string
+          reported_user_id?: string | null
+          reporter_id: string
+          status?: string
+        }
+        Update: {
+          comment_id?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          post_id?: string | null
+          reason?: string
+          reported_user_id?: string | null
+          reporter_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_reports_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_reports_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "posts"
@@ -938,6 +1010,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          accepted_terms_at: string | null
           avatar_url: string | null
           bio: string | null
           created_at: string
@@ -948,6 +1021,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          accepted_terms_at?: string | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
@@ -958,6 +1032,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          accepted_terms_at?: string | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
@@ -1082,6 +1157,7 @@ export type Database = {
       }
       user_plans: {
         Row: {
+          apple_original_transaction_id: string | null
           cancel_at_period_end: boolean
           created_at: string
           current_period_end: string | null
@@ -1094,6 +1170,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          apple_original_transaction_id?: string | null
           cancel_at_period_end?: boolean
           created_at?: string
           current_period_end?: string | null
@@ -1106,6 +1183,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          apple_original_transaction_id?: string | null
           cancel_at_period_end?: boolean
           created_at?: string
           current_period_end?: string | null
