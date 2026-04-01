@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Plus, Loader2 } from "lucide-react";
 import { useFeedPosts } from "@/hooks/useFeedPosts";
+import { useBlockedUsers } from "@/hooks/useBlockedUsers";
 import { CreatePostForm } from "@/components/feed/CreatePostForm";
 import { PostCard } from "@/components/feed/PostCard";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
@@ -19,6 +20,7 @@ const Feed = () => {
   const mainRef = useRef<HTMLElement>(null);
   useKeyboardDismissOnScroll(mainRef);
   const adminStatus = isCircleAdmin(selectedCircle);
+  const { blockUser, isBlocked } = useBlockedUsers();
   const circleMembers = useCircleMembers();
   const [searchParams] = useSearchParams();
   const highlightPostId = searchParams.get("post");
@@ -127,7 +129,7 @@ const Feed = () => {
           </Card>
         )}
 
-        {posts.map((post) => (
+        {posts.filter(post => !isBlocked(post.author_id)).map((post) => (
           <div key={post.id} id={`post-${post.id}`}>
             <PostCard
               post={post}
@@ -147,6 +149,7 @@ const Feed = () => {
               onDelete={handleDeletePost}
               onEdit={handleEditPost}
               onDeleteComment={handleDeleteComment}
+              onBlockUser={blockUser}
             />
           </div>
         ))}

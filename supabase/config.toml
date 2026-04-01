@@ -39,3 +39,7 @@ project_id = "qxkwxolssapayqyfdwqc"
     verify_jwt = false
   [functions.send-push-notification]
     verify_jwt = false
+  [functions.handle-block]
+    verify_jwt = false
+  [functions.validate-apple-receipt]
+    verify_jwt = false

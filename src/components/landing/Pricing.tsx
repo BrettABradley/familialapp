@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Phone, Mail, ArrowRight, Loader2, Camera, Calendar, MessageCircle, Smartphone, Users, Bell, Shield, Image, Video, Settings, Globe, StickyNote } from "lucide-react";
 import { openExternalUrl } from "@/lib/externalUrl";
+import { isIOSNative, purchaseSubscription, restorePurchases, APPLE_PRODUCTS } from "@/lib/iapPurchase";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -227,11 +228,35 @@ const Pricing = () => {
     const currentRank = PLAN_RANK[currentPlan || "free"] ?? 0;
     const targetRank = PLAN_RANK[plan] ?? 0;
 
+    // iOS native: use Apple IAP
+    if (isIOSNative()) {
+      const appleProductId = APPLE_PRODUCTS[plan as keyof typeof APPLE_PRODUCTS];
+      if (!appleProductId) return;
+      setLoadingPlan(plan);
+      try {
+        const success = await purchaseSubscription(appleProductId);
+        if (success) {
+          // Refetch plan
+          const { data } = await supabase.from("user_plans").select("plan, cancel_at_period_end, current_period_end, pending_plan").eq("user_id", user.id).single();
+          if (data) {
+            setCurrentPlan(data.plan);
+            setCancelAtPeriodEnd(data.cancel_at_period_end);
+            setCurrentPeriodEnd(data.current_period_end);
+            setPendingPlan((data as any)?.pending_plan ?? null);
+          }
+          toast({ title: "Plan upgraded!", description: `You're now on the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan.` });
+        }
+      } catch (err: any) {
+        toast({ title: "Error", description: err.message || "Purchase failed.", variant: "destructive" });
+      } finally {
+        setLoadingPlan(null);
+      }
+      return;
+    }
+
     if (currentPlan && currentPlan !== "free" && targetRank > currentRank) {
-      // Show preview before upgrading
       await handleUpgradePreview(plan, priceId);
     } else {
-      // New subscription from free — use checkout
       setLoadingPlan(plan);
       try {
         const { data, error } = await supabase.functions.invoke("create-checkout", {
@@ -535,7 +560,28 @@ const Pricing = () => {
           ))}
         </div>
 
-        {/* Custom Plans */}
+        {/* Restore Purchases — iOS only */}
+        {isIOSNative() && user && (
+          <div className="text-center mb-8">
+            <Button
+              variant="link"
+              className="text-muted-foreground"
+              onClick={async () => {
+                const success = await restorePurchases();
+                if (success) {
+                  const { data } = await supabase.from("user_plans").select("plan, cancel_at_period_end, current_period_end, pending_plan").eq("user_id", user.id).single();
+                  if (data) { setCurrentPlan(data.plan); setCancelAtPeriodEnd(data.cancel_at_period_end); setCurrentPeriodEnd(data.current_period_end); setPendingPlan((data as any)?.pending_plan ?? null); }
+                  toast({ title: "Purchases restored" });
+                } else {
+                  toast({ title: "No purchases found", variant: "destructive" });
+                }
+              }}
+            >
+              Restore Purchases
+            </Button>
+          </div>
+        )}
+
         <div className="max-w-xl mx-auto mb-8">
           <Card className="bg-secondary/50 border-border">
             <CardContent className="flex flex-col items-center gap-4 py-8">

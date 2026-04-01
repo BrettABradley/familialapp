@@ -5,12 +5,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, MapPin, ImagePlus, Trash2, Play, Download, Pencil, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Settings, MapPin, ImagePlus, Trash2, Play, Download, Pencil, X, ChevronLeft, ChevronRight, Ban, Flag } from "lucide-react";
 import { getMediaType } from "@/lib/mediaUtils";
+import { useBlockedUsers } from "@/hooks/useBlockedUsers";
+import { ReportDialog } from "@/components/shared/ReportDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
@@ -60,6 +63,8 @@ const ProfileView = () => {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const isOwnProfile = user?.id === userId;
+  const { blockUser, isBlocked } = useBlockedUsers();
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -319,6 +324,30 @@ const ProfileView = () => {
                         <Settings className="h-4 w-4" />
                       </Button>
                     </Link>
+                  </div>
+                )}
+                {!isOwnProfile && userId && (
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setReportOpen(true)} title="Report">
+                      <Flag className="h-4 w-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Block user">
+                          <Ban className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Block {profileData.display_name || "this user"}?</AlertDialogTitle>
+                          <AlertDialogDescription>You won't see their posts, comments, or messages anymore. This also reports them to our team.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => { blockUser(userId); navigate("/feed"); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Block</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 )}
               </div>
@@ -599,6 +628,14 @@ const ProfileView = () => {
           aspect={1}
           cropShape="rect"
           title="Re-crop Photo"
+        />
+      )}
+
+      {userId && !isOwnProfile && (
+        <ReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          reportedUserId={userId}
         />
       )}
     </main>

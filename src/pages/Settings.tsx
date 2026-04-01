@@ -17,6 +17,7 @@ import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
 import SubscriptionCard from "@/components/settings/SubscriptionCard";
+import { isIOSNative, openAppleSubscriptionManagement } from "@/lib/iapPurchase";
 import ReceiptHistory from "@/components/settings/ReceiptHistory";
 import {
   AlertDialog,
@@ -248,6 +249,13 @@ const Settings = () => {
       </Card>
 
       <SubscriptionCard />
+      {isIOSNative() && (
+        <div className="mt-4">
+          <Button variant="outline" className="w-full" onClick={openAppleSubscriptionManagement}>
+            Manage Subscription (Apple)
+          </Button>
+        </div>
+      )}
       <ReceiptHistory />
 
       {/* Sign Out — primary action */}

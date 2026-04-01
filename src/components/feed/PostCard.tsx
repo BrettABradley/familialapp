@@ -7,12 +7,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp, Trash2, Pencil, Check, X, ChevronLeft, ChevronRight, Play } from "lucide-react";
+import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp, Trash2, Pencil, Check, X, ChevronLeft, ChevronRight, Play, Flag, Ban } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { LinkifiedText } from "@/components/shared/LinkifiedText";
 import { LinkPreviewCard } from "@/components/feed/LinkPreviewCard";
 import { getMediaType } from "@/lib/mediaUtils";
 import type { Post } from "@/hooks/useFeedPosts";
+import { ReportDialog } from "@/components/shared/ReportDialog";
 
 interface CircleMemberRef {
   user_id: string;
@@ -37,6 +38,7 @@ interface PostCardProps {
   onDelete?: (postId: string) => void;
   onEdit?: (postId: string, newContent: string) => Promise<void>;
   onDeleteComment?: (postId: string, commentId: string) => void;
+  onBlockUser?: (userId: string) => void;
 }
 
 const VideoPlayer = ({ url }: { url: string }) => {
@@ -221,6 +223,7 @@ export const PostCard = ({
   onDelete,
   onEdit,
   onDeleteComment,
+  onBlockUser,
 }: PostCardProps) => {
   const canDelete = isOwnPost || isAdmin;
   const { profile } = useCircleContext();
@@ -231,6 +234,7 @@ export const PostCard = ({
   const touchStartX = useRef<number>(0);
   const touchStartY = useRef<number>(0);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const handleSaveEdit = async () => {
     if (!onEdit) return;
@@ -271,34 +275,58 @@ export const PostCard = ({
               {post.circles?.name} • {new Date(post.created_at).toLocaleDateString()}
             </p>
           </div>
-          {(isOwnPost || canDelete) && (
-            <div className="flex items-center gap-1">
-              {isOwnPost && onEdit && !isEditing && (
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => { setEditContent(post.content || ""); setIsEditing(true); }}>
-                  <Pencil className="h-4 w-4" />
+          <div className="flex items-center gap-1">
+            {!isOwnPost && (
+              <>
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => setReportOpen(true)} title="Report">
+                  <Flag className="h-4 w-4" />
                 </Button>
-              )}
-              {canDelete && onDelete && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete post?</AlertDialogTitle>
-                  <AlertDialogDescription>This action cannot be undone. This post and its comments will be permanently removed.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onDelete(post.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-              )}
-            </div>
-          )}
+                {onBlockUser && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8" title="Block user">
+                        <Ban className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Block {post.profiles?.display_name || "this user"}?</AlertDialogTitle>
+                        <AlertDialogDescription>You won't see their posts, comments, or messages anymore. This also reports them to our team for review.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => onBlockUser(post.author_id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Block</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </>
+            )}
+            {isOwnPost && onEdit && !isEditing && (
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => { setEditContent(post.content || ""); setIsEditing(true); }}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+            {canDelete && onDelete && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete post?</AlertDialogTitle>
+                    <AlertDialogDescription>This action cannot be undone. This post and its comments will be permanently removed.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => onDelete(post.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
@@ -628,6 +656,13 @@ export const PostCard = ({
           );
         })()}
       </CardContent>
+
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        postId={post.id}
+        reportedUserId={post.author_id}
+      />
     </Card>
   );
 };
