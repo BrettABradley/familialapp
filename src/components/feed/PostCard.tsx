@@ -38,6 +38,7 @@ interface PostCardProps {
   onDelete?: (postId: string) => void;
   onEdit?: (postId: string, newContent: string) => Promise<void>;
   onDeleteComment?: (postId: string, commentId: string) => void;
+  onBlockUser?: (userId: string) => void;
 }
 
 const VideoPlayer = ({ url }: { url: string }) => {
