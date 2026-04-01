@@ -234,6 +234,7 @@ export const PostCard = ({
   const touchStartX = useRef<number>(0);
   const touchStartY = useRef<number>(0);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const handleSaveEdit = async () => {
     if (!onEdit) return;
