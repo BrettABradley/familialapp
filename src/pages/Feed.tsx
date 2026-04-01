@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Plus, Loader2 } from "lucide-react";
 import { useFeedPosts } from "@/hooks/useFeedPosts";
+import { useBlockedUsers } from "@/hooks/useBlockedUsers";
 import { CreatePostForm } from "@/components/feed/CreatePostForm";
 import { PostCard } from "@/components/feed/PostCard";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
