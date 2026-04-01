@@ -228,11 +228,35 @@ const Pricing = () => {
     const currentRank = PLAN_RANK[currentPlan || "free"] ?? 0;
     const targetRank = PLAN_RANK[plan] ?? 0;
 
+    // iOS native: use Apple IAP
+    if (isIOSNative()) {
+      const appleProductId = APPLE_PRODUCTS[plan as keyof typeof APPLE_PRODUCTS];
+      if (!appleProductId) return;
+      setLoadingPlan(plan);
+      try {
+        const success = await purchaseSubscription(appleProductId);
+        if (success) {
+          // Refetch plan
+          const { data } = await supabase.from("user_plans").select("plan, cancel_at_period_end, current_period_end, pending_plan").eq("user_id", user.id).single();
+          if (data) {
+            setCurrentPlan(data.plan);
+            setCancelAtPeriodEnd(data.cancel_at_period_end);
+            setCurrentPeriodEnd(data.current_period_end);
+            setPendingPlan((data as any)?.pending_plan ?? null);
+          }
+          toast({ title: "Plan upgraded!", description: `You're now on the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan.` });
+        }
+      } catch (err: any) {
+        toast({ title: "Error", description: err.message || "Purchase failed.", variant: "destructive" });
+      } finally {
+        setLoadingPlan(null);
+      }
+      return;
+    }
+
     if (currentPlan && currentPlan !== "free" && targetRank > currentRank) {
-      // Show preview before upgrading
       await handleUpgradePreview(plan, priceId);
     } else {
-      // New subscription from free — use checkout
       setLoadingPlan(plan);
       try {
         const { data, error } = await supabase.functions.invoke("create-checkout", {
