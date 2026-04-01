@@ -656,6 +656,13 @@ export const PostCard = ({
           );
         })()}
       </CardContent>
+
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        postId={post.id}
+        reportedUserId={post.author_id}
+      />
     </Card>
   );
 };
