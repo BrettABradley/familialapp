@@ -17,6 +17,7 @@ import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
 import SubscriptionCard from "@/components/settings/SubscriptionCard";
+import { isIOSNative, openAppleSubscriptionManagement } from "@/lib/iapPurchase";
 import ReceiptHistory from "@/components/settings/ReceiptHistory";
 import {
   AlertDialog,
