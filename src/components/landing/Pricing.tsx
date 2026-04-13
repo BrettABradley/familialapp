@@ -228,30 +228,35 @@ const Pricing = () => {
     const currentRank = PLAN_RANK[currentPlan || "free"] ?? 0;
     const targetRank = PLAN_RANK[plan] ?? 0;
 
-    // iOS native: use Apple IAP
+    // iOS native: try Apple IAP first, fall back to Stripe checkout via in-app browser
     if (isIOSNative()) {
       const appleProductId = APPLE_PRODUCTS[plan as keyof typeof APPLE_PRODUCTS];
-      if (!appleProductId) return;
-      setLoadingPlan(plan);
-      try {
-        const success = await purchaseSubscription(appleProductId);
-        if (success) {
-          // Refetch plan
-          const { data } = await supabase.from("user_plans").select("plan, cancel_at_period_end, current_period_end, pending_plan").eq("user_id", user.id).single();
-          if (data) {
-            setCurrentPlan(data.plan);
-            setCancelAtPeriodEnd(data.cancel_at_period_end);
-            setCurrentPeriodEnd(data.current_period_end);
-            setPendingPlan((data as any)?.pending_plan ?? null);
+      if (appleProductId) {
+        setLoadingPlan(plan);
+        try {
+          const success = await purchaseSubscription(appleProductId);
+          if (success) {
+            const { data } = await supabase.from("user_plans").select("plan, cancel_at_period_end, current_period_end, pending_plan").eq("user_id", user.id).single();
+            if (data) {
+              setCurrentPlan(data.plan);
+              setCancelAtPeriodEnd(data.cancel_at_period_end);
+              setCurrentPeriodEnd(data.current_period_end);
+              setPendingPlan((data as any)?.pending_plan ?? null);
+            }
+            toast({ title: "Plan upgraded!", description: `You're now on the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan.` });
+            setLoadingPlan(null);
+            return;
           }
-          toast({ title: "Plan upgraded!", description: `You're now on the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan.` });
+          // User cancelled IAP - don't fall through
+          setLoadingPlan(null);
+          return;
+        } catch (err: any) {
+          // IAP plugin not available or failed - fall through to Stripe checkout
+          console.log("IAP not available, falling back to Stripe checkout:", err.message);
+          setLoadingPlan(null);
         }
-      } catch (err: any) {
-        toast({ title: "Error", description: err.message || "Purchase failed.", variant: "destructive" });
-      } finally {
-        setLoadingPlan(null);
       }
-      return;
+      // Fall through to Stripe checkout below
     }
 
     if (currentPlan && currentPlan !== "free" && targetRank > currentRank) {
