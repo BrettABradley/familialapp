@@ -1,79 +1,112 @@
 
 
-# Content Moderation + Admin Actions + Signup UX
+# Priority Implementation: Platform Hardening & UX Improvements
 
-## Overview
-
-Three additions: (1) email notification to support on content reports, (2) admin moderation actions triggered from support email, and (3) improved signup UX when an account already exists.
-
----
-
-## Part 1 — Notify support on content reports
-
-**New edge function: `notify-content-report`**
-- Receives report details (reason, details, post/comment/user IDs, reporter ID)
-- Fetches reporter and reported user display names from `profiles`
-- Sends formatted email to `support@familialmedia.com` via Resend (same pattern as `handle-block`)
-- Includes an action link pointing to a new admin moderation function
-
-**Update `ReportDialog.tsx`**
-- After successful insert into `content_reports`, fire-and-forget call to `notify-content-report`
-
-**Update `supabase/config.toml`**
-- Add `[functions.notify-content-report]` with `verify_jwt = false`
+## Priority Order & Rationale
+1. **Global Error Boundary** — prevents white screens (critical UX)
+2. **Auth Rate Limiting** — security (brute-force protection)
+3. **Admin Dashboard + Audit Logging** — operational necessity for moderation
+4. **Guided Onboarding Flow** — user activation/retention
+5. **Download My Data (GDPR/CCPA)** — legal compliance
+6. **Accessibility Pass** — inclusivity for elderly/impaired users
+7. **Offline/Poor Connection Handling** — resilience
 
 ---
 
-## Part 2 — Admin moderation edge function: `moderate-reported-user`
+## 1. Global Error Boundary
 
-**New database table: `banned_emails`**
-- Columns: `id`, `email`, `banned_at`, `reason`, `report_id` (nullable reference)
-- RLS: no public access (service-role only)
-
-**New edge function: `moderate-reported-user`**
-- Secured with a shared admin secret (not public-facing)
-- Accepts: `report_id`, `action` (`ban_user`)
-- On ban:
-  1. Looks up the reported user from `content_reports`
-  2. Fetches their email from `auth.users` (via service role)
-  3. Removes the user from all `circle_memberships`
-  4. For any circles they own: sets `transfer_block = true` (puts them on the trade block)
-  5. Inserts their email into `banned_emails`
-  6. Deletes the reported content (post or comment)
-  7. Updates `content_reports.status` to `'resolved'`
-  8. Optionally disables the user's auth account via `supabase.auth.admin.updateUserById(id, { ban_duration: 'forever' })`
-
-**The report notification email** will include a one-click "Ban & Remove" link that calls this function with a pre-signed admin token.
+Create `src/components/shared/ErrorBoundary.tsx` — a React class component that catches runtime errors and shows a friendly fallback UI with a "Refresh" button and Familial branding. Wrap `<App />` in `main.tsx` with it.
 
 ---
 
-## Part 3 — Block banned emails on signup
+## 2. Auth Rate Limiting
 
-**Update `handle_new_user` trigger** (or add a new `before insert` trigger on auth)
-- Before allowing signup, check if the email exists in `banned_emails`
-- If found, raise an exception to block account creation
-
-Alternatively, add a check in the Auth page's `signUp` flow that calls an edge function to verify the email isn't banned before attempting signup.
-
----
-
-## Part 4 — Signup UX: "Already have an account?"
-
-The Auth page already handles this — when `signUp` returns "User already registered", it shows a toast and auto-switches to the login form. This is already implemented at line 146-152 of `Auth.tsx`. No changes needed here.
+Add client-side throttling in `Auth.tsx`:
+- Track failed login attempts in component state
+- After 5 failures within 5 minutes, disable the form with a countdown timer
+- Reset on successful login
+- Show a warning message after 3 failures
 
 ---
 
-## Technical details
+## 3. Admin Dashboard + Audit Logging
 
-| Change | File(s) |
-|---|---|
-| New edge function | `supabase/functions/notify-content-report/index.ts` |
-| New edge function | `supabase/functions/moderate-reported-user/index.ts` |
-| New DB table | `banned_emails` (via migration) |
-| Add UPDATE RLS on `content_reports` | Migration for service-role update policy |
-| Config update | `supabase/config.toml` — two new function entries |
-| Component update | `src/components/shared/ReportDialog.tsx` — invoke notification |
-| DB trigger update | Add banned-email check to signup flow |
+**Database changes (migration):**
+- Create `admin_actions` table: `id`, `admin_email`, `action_type`, `target_user_id`, `target_content_id`, `details`, `created_at`
+- No RLS policies (service-role only access)
+- Update `moderate-reported-user` edge function to log actions to this table
 
-No changes needed for the "already have an account" signup UX — it's already working.
+**New page: `src/pages/Admin.tsx`**
+- Protected route at `/admin` — checks if user email matches `brettbradley007@gmail.com` (founder)
+- Tabs: Reports (pending/resolved), Banned Users, Audit Log
+- Fetches data via a new `admin-dashboard` edge function (validates founder email server-side)
+- Actions: Dismiss report, Ban user directly from dashboard (reuses `moderate-reported-user` logic)
+
+**Route:** Add `/admin` as a public route in `App.tsx` (auth checked inside the component)
+
+---
+
+## 4. Guided Onboarding Flow
+
+Create `src/components/shared/OnboardingFlow.tsx`:
+- A multi-step modal shown to new users (detected by: no circles, no avatar, no bio)
+- Step 1: Upload profile photo
+- Step 2: Set display name and bio
+- Step 3: Create or join first circle
+- Persists completion in a `localStorage` flag + checks profile completeness
+- Rendered inside `AppLayout` after auth, before main content
+
+---
+
+## 5. Download My Data
+
+**New edge function: `download-my-data`**
+- Authenticated endpoint that collects all user data: profile, posts, comments, messages, events, photos, fridge pins, family tree entries
+- Returns a JSON file with all data
+- No media files (just URLs) to keep response manageable
+
+**Settings page update:**
+- Add a "Download My Data" button in `Settings.tsx` below the profile section
+- Shows loading state while generating, then triggers file download
+
+---
+
+## 6. Accessibility Pass
+
+- Add `aria-label` attributes to all icon-only buttons across layout components (`MobileNavigation`, `CircleHeader`, camera buttons, etc.)
+- Add `role="navigation"` to nav elements
+- Ensure all form inputs have associated labels (already mostly done)
+- Add keyboard focus indicators where missing
+- Add `aria-live="polite"` regions for toast/notification areas
+
+---
+
+## 7. Offline/Poor Connection Handling
+
+Create `src/components/shared/OfflineBanner.tsx`:
+- Listens to `navigator.onLine` and `online`/`offline` events
+- Shows a dismissible banner at top of screen when offline: "You're offline. Some features may be unavailable."
+- Render in `AppLayout` above the main content
+
+---
+
+## Files Changed Summary
+
+| Type | File |
+|------|------|
+| New component | `src/components/shared/ErrorBoundary.tsx` |
+| New component | `src/components/shared/OnboardingFlow.tsx` |
+| New component | `src/components/shared/OfflineBanner.tsx` |
+| New page | `src/pages/Admin.tsx` |
+| New edge function | `supabase/functions/admin-dashboard/index.ts` |
+| New edge function | `supabase/functions/download-my-data/index.ts` |
+| New migration | `admin_actions` table |
+| Updated | `src/main.tsx` — wrap with ErrorBoundary |
+| Updated | `src/App.tsx` — add /admin route |
+| Updated | `src/pages/Auth.tsx` — rate limiting |
+| Updated | `src/pages/Settings.tsx` — Download My Data button |
+| Updated | `src/components/layout/AppLayout.tsx` — onboarding + offline banner |
+| Updated | `src/components/layout/MobileNavigation.tsx` — aria-labels |
+| Updated | `src/components/layout/CircleHeader.tsx` — aria-labels |
+| Updated | `supabase/functions/moderate-reported-user/index.ts` — audit logging |
 
