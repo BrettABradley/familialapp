@@ -309,9 +309,11 @@ const Auth = () => {
             </>
           ) : (
             <>
-              {showMfaChallenge ? (
+              {showEmailChallenge ? (
                 <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground text-center">Enter the 6-digit code from your authenticator app.</p>
+                  <p className="text-sm text-muted-foreground text-center">
+                    We've sent a 6-digit verification code to your email. Enter it below to sign in.
+                  </p>
                   <Input
                     type="text"
                     inputMode="numeric"
@@ -325,20 +327,15 @@ const Auth = () => {
                     className="w-full"
                     disabled={mfaCode.length !== 6 || isLoading}
                     onClick={async () => {
-                      if (!mfaFactorId) return;
                       setIsLoading(true);
-                      const { data: challenge, error: cErr } = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
-                      if (cErr || !challenge) {
-                        toast({ title: "MFA error", description: cErr?.message || "Failed to create challenge", variant: "destructive" });
-                        setIsLoading(false);
-                        return;
-                      }
-                      const { error: vErr } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: challenge.id, code: mfaCode });
-                      if (vErr) {
-                        toast({ title: "Invalid code", description: "Please check your authenticator and try again.", variant: "destructive" });
+                      const { data, error } = await supabase.functions.invoke("verify-2fa-code", {
+                        body: { code: mfaCode },
+                      });
+                      if (error || !data?.success) {
+                        toast({ title: "Invalid code", description: data?.error || "Please check your email and try again.", variant: "destructive" });
                       } else {
                         toast({ title: "Welcome back!", description: "You've successfully signed in." });
-                        setShowMfaChallenge(false);
+                        setShowEmailChallenge(false);
                       }
                       setIsLoading(false);
                     }}
@@ -347,7 +344,22 @@ const Auth = () => {
                   </Button>
                   <button
                     type="button"
-                    onClick={() => { setShowMfaChallenge(false); setMfaCode(""); supabase.auth.signOut(); }}
+                    onClick={async () => {
+                      setShowEmailChallenge(false);
+                      setMfaCode("");
+                      const { data, error } = await supabase.functions.invoke("send-2fa-code");
+                      if (!error && data?.success) {
+                        toast({ title: "New code sent", description: "Check your email for a new verification code." });
+                        setShowEmailChallenge(true);
+                      }
+                    }}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors w-full text-center"
+                  >
+                    Resend code
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowEmailChallenge(false); setMfaCode(""); supabase.auth.signOut(); }}
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors w-full text-center"
                   >
                     Cancel
