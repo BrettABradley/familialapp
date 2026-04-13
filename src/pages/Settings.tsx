@@ -346,7 +346,7 @@ const Settings = () => {
         </CardContent>
       </Card>
 
-      {/* Two-Factor Authentication */}
+      {/* Two-Factor Authentication (Email-Based) */}
       <Card className="mt-4">
         <CardHeader>
           <CardTitle className="font-serif text-lg flex items-center gap-2">
@@ -354,27 +354,28 @@ const Settings = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {mfaEnabled ? (
+          {mfaEnabled && !mfaEnrolling ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm">
-                <ShieldCheck className="w-4 h-4 text-green-600" />
-                <span className="text-green-700 font-medium">2FA is enabled</span>
+                <ShieldCheck className="w-4 h-4 text-primary" />
+                <span className="font-medium text-primary">2FA is enabled (email verification)</span>
               </div>
+              <p className="text-sm text-muted-foreground">
+                A verification code will be sent to your email each time you sign in.
+              </p>
               <Button
                 variant="outline"
                 size="sm"
                 disabled={mfaLoading}
                 onClick={async () => {
-                  if (!mfaFactorId) return;
                   setMfaLoading(true);
-                  const { error } = await supabase.auth.mfa.unenroll({ factorId: mfaFactorId });
-                  if (error) {
-                    toast({ title: "Error", description: error.message, variant: "destructive" });
-                  } else {
-                    setMfaEnabled(false);
-                    setMfaFactorId(null);
-                    toast({ title: "2FA disabled" });
-                  }
+                  await supabase
+                    .from("profiles")
+                    .update({ two_factor_enabled: false } as any)
+                    .eq("user_id", user!.id);
+                  setMfaEnabled(false);
+                  refetchProfile();
+                  toast({ title: "2FA disabled" });
                   setMfaLoading(false);
                 }}
                 className="text-destructive"
@@ -382,19 +383,13 @@ const Settings = () => {
                 Disable 2FA
               </Button>
             </div>
-          ) : mfaEnrolling && mfaQrCode ? (
+          ) : mfaEnrolling ? (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Scan this QR code with your authenticator app:</p>
-              <div className="flex justify-center">
-                <img src={mfaQrCode} alt="MFA QR Code" className="w-48 h-48 border rounded-lg" />
-              </div>
-              {mfaSecret && (
-                <p className="text-xs text-muted-foreground text-center break-all">
-                  Manual key: <code className="bg-muted px-1 rounded">{mfaSecret}</code>
-                </p>
-              )}
+              <p className="text-sm text-muted-foreground">
+                We've sent a 6-digit verification code to <strong>{user?.email}</strong>. Enter it below to enable 2FA.
+              </p>
               <div className="space-y-2">
-                <Label htmlFor="mfa-code">Enter verification code</Label>
+                <Label htmlFor="mfa-code">Verification code</Label>
                 <Input
                   id="mfa-code"
                   type="text"
@@ -407,29 +402,27 @@ const Settings = () => {
                 />
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => { setMfaEnrolling(false); setMfaQrCode(null); setMfaSecret(null); setMfaVerifyCode(""); }}>Cancel</Button>
+                <Button variant="outline" size="sm" onClick={() => { setMfaEnrolling(false); setMfaVerifyCode(""); }}>Cancel</Button>
                 <Button
                   size="sm"
                   disabled={mfaVerifyCode.length !== 6 || mfaLoading}
                   onClick={async () => {
-                    if (!mfaFactorId) return;
                     setMfaLoading(true);
-                    const { data: challenge, error: cErr } = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
-                    if (cErr || !challenge) {
-                      toast({ title: "Error", description: cErr?.message || "Challenge failed", variant: "destructive" });
-                      setMfaLoading(false);
-                      return;
-                    }
-                    const { error: vErr } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: challenge.id, code: mfaVerifyCode });
-                    if (vErr) {
-                      toast({ title: "Invalid code", description: "Check your authenticator and try again.", variant: "destructive" });
+                    const { data, error } = await supabase.functions.invoke("verify-2fa-code", {
+                      body: { code: mfaVerifyCode },
+                    });
+                    if (error || !data?.success) {
+                      toast({ title: "Invalid code", description: data?.error || "Please check your email and try again.", variant: "destructive" });
                     } else {
+                      await supabase
+                        .from("profiles")
+                        .update({ two_factor_enabled: true } as any)
+                        .eq("user_id", user!.id);
                       setMfaEnabled(true);
                       setMfaEnrolling(false);
-                      setMfaQrCode(null);
-                      setMfaSecret(null);
                       setMfaVerifyCode("");
-                      toast({ title: "2FA enabled!", description: "Your account is now protected with two-factor authentication." });
+                      refetchProfile();
+                      toast({ title: "2FA enabled!", description: "Your account is now protected with email-based two-factor authentication." });
                     }
                     setMfaLoading(false);
                   }}
@@ -440,23 +433,23 @@ const Settings = () => {
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">Add an extra layer of security to your account with a TOTP authenticator app.</p>
+              <p className="text-sm text-muted-foreground">
+                Add an extra layer of security. When enabled, you'll receive a verification code via email each time you sign in.
+              </p>
               <Button
                 size="sm"
                 disabled={mfaLoading}
                 onClick={async () => {
                   setMfaLoading(true);
-                  const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: "Familial" });
-                  if (error || !data) {
-                    toast({ title: "Error", description: error?.message || "Failed to enroll", variant: "destructive" });
+                  const { data, error } = await supabase.functions.invoke("send-2fa-code");
+                  if (error || !data?.success) {
+                    toast({ title: "Error", description: data?.error || "Failed to send verification code.", variant: "destructive" });
                     setMfaLoading(false);
                     return;
                   }
-                  setMfaFactorId(data.id);
-                  setMfaQrCode(data.totp.qr_code);
-                  setMfaSecret(data.totp.secret);
                   setMfaEnrolling(true);
                   setMfaLoading(false);
+                  toast({ title: "Code sent!", description: "Check your email for the verification code." });
                 }}
               >
                 <Shield className="w-4 h-4 mr-2" />
