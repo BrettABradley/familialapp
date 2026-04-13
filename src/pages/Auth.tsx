@@ -316,8 +316,15 @@ const Auth = () => {
                     </button>
                   </div>
                 )}
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading
+                {isLockedOut && (
+                  <p className="text-sm text-destructive text-center">
+                    Too many failed attempts. Try again in {Math.floor(lockoutRemaining / 60)}:{String(lockoutRemaining % 60).padStart(2, "0")}
+                  </p>
+                )}
+                <Button type="submit" className="w-full" disabled={isLoading || isLockedOut}>
+                  {isLockedOut
+                    ? "Locked"
+                    : isLoading
                     ? "Loading..."
                     : isLogin
                     ? "Sign In"
