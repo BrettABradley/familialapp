@@ -12,29 +12,28 @@ export const isIOSNative = () =>
 
 /**
  * Purchase a subscription via Apple IAP.
- * Requires @capawesome/capacitor-in-app-purchases to be installed natively.
- * Uses dynamic require to avoid build errors when the plugin isn't available.
+ * Uses @capgo/capacitor-native-purchases (free, open-source StoreKit 2 plugin).
+ * Dynamic import avoids build errors when the plugin isn't available in web builds.
  */
 export const purchaseSubscription = async (productId: string): Promise<boolean> => {
   if (!isIOSNative()) return false;
 
   try {
-    // Dynamic import — plugin is only available in native iOS builds
-    const mod = await (Function('return import("@capawesome/capacitor-in-app-purchases")')() as Promise<any>);
-    const InAppPurchases = mod.InAppPurchases;
+    const mod = await (Function('return import("@capgo/native-purchases")')() as Promise<any>);
+    const { NativePurchases, PURCHASE_TYPE } = mod;
 
-    await InAppPurchases.initialize();
-
-    const { products } = await InAppPurchases.getProducts({
+    const { products } = await NativePurchases.getProducts({
       productIdentifiers: [productId],
+      productType: PURCHASE_TYPE.SUBS,
     });
 
     if (!products || products.length === 0) {
       throw new Error("Product not found");
     }
 
-    const result = await InAppPurchases.purchaseProduct({
+    const result = await NativePurchases.purchaseProduct({
       productIdentifier: productId,
+      productType: PURCHASE_TYPE.SUBS,
     });
 
     if (result?.transactionId) {
@@ -47,7 +46,7 @@ export const purchaseSubscription = async (productId: string): Promise<boolean> 
 
       if (error) throw error;
 
-      await InAppPurchases.finishTransaction({
+      await NativePurchases.finishTransaction({
         transactionIdentifier: result.transactionId,
       });
 
@@ -70,10 +69,10 @@ export const restorePurchases = async (): Promise<boolean> => {
   if (!isIOSNative()) return false;
 
   try {
-    const mod = await (Function('return import("@capawesome/capacitor-in-app-purchases")')() as Promise<any>);
-    const InAppPurchases = mod.InAppPurchases;
-    await InAppPurchases.initialize();
-    await InAppPurchases.restorePurchases();
+    const mod = await (Function('return import("@capgo/native-purchases")')() as Promise<any>);
+    const { NativePurchases } = mod;
+
+    await NativePurchases.getPurchases();
 
     const { error } = await supabase.functions.invoke("validate-apple-receipt", {
       body: { restore: true },
