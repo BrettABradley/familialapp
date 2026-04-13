@@ -1,40 +1,36 @@
 
 
-# Replace TOTP 2FA with Email-Based 2FA
+# Switch to Free IAP Plugin (@capgo/capacitor-native-purchases)
 
-## Problem
-TOTP (authenticator app) 2FA forces mobile users to switch apps to get a code, which is clunky and often breaks the flow. Email-based 2FA lets users receive a code in their inbox and enter it on the same device.
+## What Changes
+Replace the paid `@capawesome/capacitor-in-app-purchases` plugin with the free, open-source `@capgo/capacitor-native-purchases` plugin. Same StoreKit 2 functionality, zero cost.
 
-## Approach
-Since Supabase MFA only supports TOTP natively, we'll build a custom email OTP flow:
+## Steps
 
-1. **New Edge Function: `send-2fa-code`** — generates a 6-digit code, stores it in a `two_factor_codes` table (with 5-minute expiry), and emails it via Resend.
+### 1. Install the free plugin
+Add `@capgo/capacitor-native-purchases` as a dependency (it's on the public npm registry).
 
-2. **New Edge Function: `verify-2fa-code`** — validates the code against the table, marks it used, and returns success/failure.
+### 2. Rewrite `src/lib/iapPurchase.ts`
+Update all dynamic imports and API calls to use the new plugin's API:
 
-3. **New DB table: `two_factor_codes`** — stores `user_id`, `code`, `expires_at`, `used`. No RLS needed (only accessed by edge functions via service role).
+- `NativePurchases.isBillingSupported()` to check availability
+- `NativePurchases.getProducts()` with `productType: PURCHASE_TYPE.SUBS`
+- `NativePurchases.purchaseProduct()` for purchasing
+- `NativePurchases.getPurchases()` for restore
+- `NativePurchases.finishTransaction()` to complete
 
-4. **Add `two_factor_enabled` column to `profiles`** — boolean flag users toggle in Settings.
+The dynamic import pattern stays the same (avoids web build errors), just targeting `@capgo/native-purchases` instead.
 
-5. **Update `Auth.tsx`** — after successful password login, check if `two_factor_enabled` is true on the user's profile. If so, call `send-2fa-code`, then show the 6-digit input. On submit, call `verify-2fa-code`. Only proceed to the app on success.
+### 3. No other files change
+`Pricing.tsx`, `validate-apple-receipt`, and everything else stays the same — they only call `purchaseSubscription()` and `restorePurchases()` from `iapPurchase.ts`.
 
-6. **Update `Settings.tsx`** — replace the TOTP QR code enrollment with a simple toggle. When enabling, send a verification code to confirm the user's email first. Remove all `supabase.auth.mfa.*` calls.
-
-7. **Clean up** — remove Supabase MFA factor checks from Auth.tsx, remove QR code UI from Settings.tsx.
-
-## Security Details
-- Codes expire after 5 minutes
-- Max 3 active codes per user (rate limit in edge function)
-- Codes are single-use (marked `used = true` after verification)
-- Edge functions use service role to access the codes table (no client-side RLS)
+### Local Setup (unchanged)
+After pulling, the user still needs to run `npx cap sync ios` to register the native plugin.
 
 ## Files Changed
 
 | Type | File |
 |------|------|
-| Migration | Create `two_factor_codes` table; add `two_factor_enabled` to `profiles` |
-| New | `supabase/functions/send-2fa-code/index.ts` |
-| New | `supabase/functions/verify-2fa-code/index.ts` |
-| Updated | `src/pages/Settings.tsx` — replace TOTP with email 2FA toggle |
-| Updated | `src/pages/Auth.tsx` — replace TOTP challenge with email code challenge |
+| Updated | `src/lib/iapPurchase.ts` — swap plugin import and API calls |
+| Updated | `package.json` — add `@capgo/capacitor-native-purchases` |
 
