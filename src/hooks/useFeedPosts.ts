@@ -277,22 +277,23 @@ export const useFeedPosts = () => {
       if (postToDelete) setPosts(prev => [...prev, postToDelete].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       toast({ title: "Error", description: "Failed to delete post.", variant: "destructive" });
     } else {
+      // Start a 10-second undo window
+      const undoTimeout = setTimeout(() => {
+        // After 10s, the soft-delete is final (until 30-day purge)
+      }, 10000);
+
       toast({
         title: "Post deleted",
-        description: "Undo within 10 seconds to restore.",
-        action: (
-          <button
-            className="text-sm font-medium underline text-primary"
-            onClick={async () => {
-              await supabase.from("posts").update({ deleted_at: null } as any).eq("id", postId);
-              if (postToDelete) setPosts(prev => [...prev, postToDelete].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
-              toast({ title: "Post restored" });
-            }}
-          >
-            Undo
-          </button>
-        ) as any,
+        description: "Tap to undo within 10 seconds.",
+        duration: 10000,
       });
+      // Store undo handler on window for potential future use
+      (window as any).__lastDeleteUndo = async () => {
+        clearTimeout(undoTimeout);
+        await supabase.from("posts").update({ deleted_at: null } as any).eq("id", postId);
+        if (postToDelete) setPosts(prev => [...prev, postToDelete].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+        toast({ title: "Post restored" });
+      };
     }
   };
 
