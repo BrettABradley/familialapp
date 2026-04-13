@@ -641,6 +641,7 @@ export const PostCard = ({
         onOpenChange={setReportOpen}
         postId={post.id}
         reportedUserId={post.author_id}
+        onBlockUser={onBlockUser}
       />
     </Card>
   );
