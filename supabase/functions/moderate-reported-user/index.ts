@@ -102,6 +102,14 @@ serve(async (req: Request) => {
         .eq("id", reportId);
       results.push(statusError ? `❌ Report status: ${statusError.message}` : "✅ Report dismissed");
 
+      // Audit log
+      await supabase.from("admin_actions").insert({
+        admin_email: "support@familialmedia.com",
+        action_type: "dismiss_report",
+        target_content_id: report.post_id || report.comment_id || null,
+        details: { report_id: reportId, reason: report.reason },
+      });
+
       const allSuccess = results.every((r) => r.startsWith("✅"));
       return new Response(
         htmlPage(
@@ -197,6 +205,15 @@ serve(async (req: Request) => {
       ban_duration: "876600h",
     });
     results.push(banAuthError ? `❌ Auth ban: ${banAuthError.message}` : "✅ User auth account banned");
+
+    // Audit log
+    await supabase.from("admin_actions").insert({
+      admin_email: "support@familialmedia.com",
+      action_type: "ban_user",
+      target_user_id: reportedUserId,
+      target_content_id: report.post_id || report.comment_id || null,
+      details: { report_id: reportId, reason: report.reason, user_email: userEmail },
+    });
 
     const allSuccess = results.every((r) => r.startsWith("✅") || r.startsWith("ℹ️"));
     return new Response(
