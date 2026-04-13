@@ -14,6 +14,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link } from "react-router-dom";
 
+const CURRENT_TERMS_VERSION = "2026-04-13";
+
 export const TermsAcceptanceGate = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   const [needsAcceptance, setNeedsAcceptance] = useState(false);
@@ -27,11 +29,11 @@ export const TermsAcceptanceGate = ({ children }: { children: React.ReactNode })
     const checkTerms = async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("accepted_terms_at")
+        .select("accepted_terms_at, accepted_terms_version")
         .eq("user_id", user.id)
         .single();
 
-      if (data && !(data as any).accepted_terms_at) {
+      if (data && (!(data as any).accepted_terms_at || (data as any).accepted_terms_version !== CURRENT_TERMS_VERSION)) {
         setNeedsAcceptance(true);
       }
       setLoaded(true);
@@ -46,7 +48,10 @@ export const TermsAcceptanceGate = ({ children }: { children: React.ReactNode })
 
     await supabase
       .from("profiles")
-      .update({ accepted_terms_at: new Date().toISOString() } as any)
+      .update({
+        accepted_terms_at: new Date().toISOString(),
+        accepted_terms_version: CURRENT_TERMS_VERSION,
+      } as any)
       .eq("user_id", user.id);
 
     setNeedsAcceptance(false);

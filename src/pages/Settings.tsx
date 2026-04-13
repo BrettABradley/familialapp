@@ -12,7 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Camera, Save, ArrowLeft, LogOut, Trash2, Loader2, AlertTriangle, ChevronRight, Download } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Camera, Save, ArrowLeft, LogOut, Trash2, Loader2, AlertTriangle, ChevronRight, Download, Shield, ShieldCheck, Smartphone, Bell, BellOff } from "lucide-react";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
@@ -52,6 +53,24 @@ const Settings = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Notification preferences
+  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [mutedTypes, setMutedTypes] = useState<string[]>([]);
+  const [notifPrefsLoaded, setNotifPrefsLoaded] = useState(false);
+
+  // 2FA/MFA state
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaEnrolling, setMfaEnrolling] = useState(false);
+  const [mfaQrCode, setMfaQrCode] = useState<string | null>(null);
+  const [mfaSecret, setMfaSecret] = useState<string | null>(null);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaVerifyCode, setMfaVerifyCode] = useState("");
+  const [mfaLoading, setMfaLoading] = useState(false);
+
+  // Session management
+  const [signingOutOthers, setSigningOutOthers] = useState(false);
+
   useEffect(() => {
     if (profile) {
       setDisplayName(profile.display_name || "");
@@ -59,6 +78,55 @@ const Settings = () => {
       setLocation(profile.location || "");
     }
   }, [profile]);
+
+  // Load notification preferences
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("notification_preferences")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (data) {
+        setEmailEnabled((data as any).email_enabled ?? true);
+        setPushEnabled((data as any).push_enabled ?? true);
+        setMutedTypes((data as any).muted_types ?? []);
+      }
+      setNotifPrefsLoaded(true);
+    })();
+  }, [user]);
+
+  // Load MFA status
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase.auth.mfa.listFactors();
+      const totp = data?.totp?.[0];
+      if (totp && totp.status === "verified") {
+        setMfaEnabled(true);
+        setMfaFactorId(totp.id);
+      }
+    })();
+  }, [user]);
+
+  const saveNotifPrefs = async (updates: { email_enabled?: boolean; push_enabled?: boolean; muted_types?: string[] }) => {
+    if (!user) return;
+    const payload = {
+      user_id: user.id,
+      email_enabled: updates.email_enabled ?? emailEnabled,
+      push_enabled: updates.push_enabled ?? pushEnabled,
+      muted_types: updates.muted_types ?? mutedTypes,
+      updated_at: new Date().toISOString(),
+    };
+    await supabase.from("notification_preferences").upsert(payload as any, { onConflict: "user_id" });
+  };
+
+  const toggleMutedType = async (type: string) => {
+    const newMuted = mutedTypes.includes(type) ? mutedTypes.filter(t => t !== type) : [...mutedTypes, type];
+    setMutedTypes(newMuted);
+    await saveNotifPrefs({ muted_types: newMuted });
+  };
 
   const handlePickImage = async () => {
     try {
@@ -258,6 +326,187 @@ const Settings = () => {
         </div>
       )}
       <ReceiptHistory />
+
+      {/* Notification Preferences */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="font-serif text-lg flex items-center gap-2">
+            <Bell className="w-5 h-5" /> Notification Preferences
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="email-notifs">Email notifications</Label>
+            <Switch id="email-notifs" checked={emailEnabled} onCheckedChange={async (v) => { setEmailEnabled(v); await saveNotifPrefs({ email_enabled: v }); }} />
+          </div>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="push-notifs">Push notifications</Label>
+            <Switch id="push-notifs" checked={pushEnabled} onCheckedChange={async (v) => { setPushEnabled(v); await saveNotifPrefs({ push_enabled: v }); }} />
+          </div>
+          <div className="border-t pt-3">
+            <p className="text-sm text-muted-foreground mb-3">Mute specific notification types:</p>
+            {["comments", "mentions", "events", "fridge_pins", "direct_messages", "campfire_stories"].map(type => (
+              <div key={type} className="flex items-center justify-between py-1.5">
+                <span className="text-sm capitalize">{type.replace(/_/g, " ")}</span>
+                <Switch checked={mutedTypes.includes(type)} onCheckedChange={() => toggleMutedType(type)} />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Two-Factor Authentication */}
+      <Card className="mt-4">
+        <CardHeader>
+          <CardTitle className="font-serif text-lg flex items-center gap-2">
+            <Shield className="w-5 h-5" /> Two-Factor Authentication
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {mfaEnabled ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm">
+                <ShieldCheck className="w-4 h-4 text-green-600" />
+                <span className="text-green-700 font-medium">2FA is enabled</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={mfaLoading}
+                onClick={async () => {
+                  if (!mfaFactorId) return;
+                  setMfaLoading(true);
+                  const { error } = await supabase.auth.mfa.unenroll({ factorId: mfaFactorId });
+                  if (error) {
+                    toast({ title: "Error", description: error.message, variant: "destructive" });
+                  } else {
+                    setMfaEnabled(false);
+                    setMfaFactorId(null);
+                    toast({ title: "2FA disabled" });
+                  }
+                  setMfaLoading(false);
+                }}
+                className="text-destructive"
+              >
+                Disable 2FA
+              </Button>
+            </div>
+          ) : mfaEnrolling && mfaQrCode ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">Scan this QR code with your authenticator app:</p>
+              <div className="flex justify-center">
+                <img src={mfaQrCode} alt="MFA QR Code" className="w-48 h-48 border rounded-lg" />
+              </div>
+              {mfaSecret && (
+                <p className="text-xs text-muted-foreground text-center break-all">
+                  Manual key: <code className="bg-muted px-1 rounded">{mfaSecret}</code>
+                </p>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="mfa-code">Enter verification code</Label>
+                <Input
+                  id="mfa-code"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={mfaVerifyCode}
+                  onChange={(e) => setMfaVerifyCode(e.target.value.replace(/\D/g, ""))}
+                  className="text-center text-lg tracking-widest"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => { setMfaEnrolling(false); setMfaQrCode(null); setMfaSecret(null); setMfaVerifyCode(""); }}>Cancel</Button>
+                <Button
+                  size="sm"
+                  disabled={mfaVerifyCode.length !== 6 || mfaLoading}
+                  onClick={async () => {
+                    if (!mfaFactorId) return;
+                    setMfaLoading(true);
+                    const { data: challenge, error: cErr } = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
+                    if (cErr || !challenge) {
+                      toast({ title: "Error", description: cErr?.message || "Challenge failed", variant: "destructive" });
+                      setMfaLoading(false);
+                      return;
+                    }
+                    const { error: vErr } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: challenge.id, code: mfaVerifyCode });
+                    if (vErr) {
+                      toast({ title: "Invalid code", description: "Check your authenticator and try again.", variant: "destructive" });
+                    } else {
+                      setMfaEnabled(true);
+                      setMfaEnrolling(false);
+                      setMfaQrCode(null);
+                      setMfaSecret(null);
+                      setMfaVerifyCode("");
+                      toast({ title: "2FA enabled!", description: "Your account is now protected with two-factor authentication." });
+                    }
+                    setMfaLoading(false);
+                  }}
+                >
+                  {mfaLoading ? "Verifying..." : "Verify & Enable"}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Add an extra layer of security to your account with a TOTP authenticator app.</p>
+              <Button
+                size="sm"
+                disabled={mfaLoading}
+                onClick={async () => {
+                  setMfaLoading(true);
+                  const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: "Familial" });
+                  if (error || !data) {
+                    toast({ title: "Error", description: error?.message || "Failed to enroll", variant: "destructive" });
+                    setMfaLoading(false);
+                    return;
+                  }
+                  setMfaFactorId(data.id);
+                  setMfaQrCode(data.totp.qr_code);
+                  setMfaSecret(data.totp.secret);
+                  setMfaEnrolling(true);
+                  setMfaLoading(false);
+                }}
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Enable 2FA
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Session Management */}
+      <Card className="mt-4">
+        <CardHeader>
+          <CardTitle className="font-serif text-lg flex items-center gap-2">
+            <Smartphone className="w-5 h-5" /> Active Sessions
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Last sign-in: {user?.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : "Unknown"}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={signingOutOthers}
+            onClick={async () => {
+              setSigningOutOthers(true);
+              const { error } = await supabase.auth.signOut({ scope: "others" });
+              if (error) {
+                toast({ title: "Error", description: error.message, variant: "destructive" });
+              } else {
+                toast({ title: "Done", description: "All other sessions have been signed out." });
+              }
+              setSigningOutOthers(false);
+            }}
+          >
+            {signingOutOthers ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LogOut className="w-4 h-4 mr-2" />}
+            Sign Out All Other Devices
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Sign Out — primary action */}
       <div className="mt-6">

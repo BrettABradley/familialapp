@@ -34,17 +34,17 @@ serve(async (req: Request) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(
+    const { data: userData, error: userError } = await supabaseUser.auth.getUser(
       authHeader.replace("Bearer ", "")
     );
-    if (claimsError || !claimsData?.claims) {
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userEmail = claimsData.claims.email;
+    const userEmail = userData.user.email;
     if (userEmail !== FOUNDER_EMAIL) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
@@ -87,6 +87,89 @@ serve(async (req: Request) => {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(100);
+
+      return new Response(JSON.stringify({ data, error: error?.message }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (tab === "metrics") {
+      // Total users
+      const { count: totalUsers } = await supabaseAdmin
+        .from("profiles")
+        .select("*", { count: "exact", head: true });
+
+      // New signups last 7 days
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { count: newSignups } = await supabaseAdmin
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", weekAgo);
+
+      // Total posts
+      const { count: totalPosts } = await supabaseAdmin
+        .from("posts")
+        .select("*", { count: "exact", head: true })
+        .is("deleted_at", null);
+
+      // Posts today
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const { count: postsToday } = await supabaseAdmin
+        .from("posts")
+        .select("*", { count: "exact", head: true })
+        .is("deleted_at", null)
+        .gte("created_at", todayStart.toISOString());
+
+      // Posts this week
+      const { count: postsThisWeek } = await supabaseAdmin
+        .from("posts")
+        .select("*", { count: "exact", head: true })
+        .is("deleted_at", null)
+        .gte("created_at", weekAgo);
+
+      // Active users last 7 days (users who posted)
+      const { data: activePosters } = await supabaseAdmin
+        .from("posts")
+        .select("author_id")
+        .is("deleted_at", null)
+        .gte("created_at", weekAgo);
+      const activeUserIds = new Set(activePosters?.map((p: any) => p.author_id) || []);
+
+      // Pending reports
+      const { count: pendingReports } = await supabaseAdmin
+        .from("content_reports")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
+
+      // Banned users
+      const { count: bannedCount } = await supabaseAdmin
+        .from("banned_emails")
+        .select("*", { count: "exact", head: true });
+
+      return new Response(JSON.stringify({
+        data: {
+          totalUsers: totalUsers || 0,
+          newSignups: newSignups || 0,
+          totalPosts: totalPosts || 0,
+          postsToday: postsToday || 0,
+          postsThisWeek: postsThisWeek || 0,
+          activeUsersWeek: activeUserIds.size,
+          pendingReports: pendingReports || 0,
+          bannedCount: bannedCount || 0,
+        },
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (tab === "deleted") {
+      const { data, error } = await supabaseAdmin
+        .from("posts")
+        .select("id, content, author_id, circle_id, deleted_at, created_at")
+        .not("deleted_at", "is", null)
+        .order("deleted_at", { ascending: false })
+        .limit(50);
 
       return new Response(JSON.stringify({ data, error: error?.message }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
