@@ -7,10 +7,12 @@ import { CircleHeaderSkeleton } from "@/components/layout/CircleHeaderSkeleton";
 import { MobileNavigation } from "@/components/layout/MobileNavigation";
 import TransferBlockBanner from "@/components/circles/TransferBlockBanner";
 import { TermsAcceptanceGate } from "@/components/shared/TermsAcceptanceGate";
+import { OfflineBanner } from "@/components/shared/OfflineBanner";
+import { OnboardingFlow } from "@/components/shared/OnboardingFlow";
 
 function AppLayoutContent() {
   const { user, loading: authLoading, signOut } = useAuth();
-  const { circles, selectedCircle, setSelectedCircle, isLoading: circlesLoading } = useCircleContext();
+  const { circles, selectedCircle, setSelectedCircle, isLoading: circlesLoading, profile } = useCircleContext();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -58,6 +60,7 @@ function AppLayoutContent() {
   return (
     <TermsAcceptanceGate>
       <div className="min-h-screen bg-background pb-20 md:pb-0">
+        <OfflineBanner />
         {circlesLoading ? (
           <CircleHeaderSkeleton />
         ) : (
@@ -76,6 +79,13 @@ function AppLayoutContent() {
           <Outlet />
         </main>
         <MobileNavigation />
+        {!circlesLoading && profile && (
+          <OnboardingFlow
+            hasAvatar={!!profile.avatar_url}
+            hasBio={!!profile.bio}
+            hasCircles={circles.length > 0}
+          />
+        )}
       </div>
     </TermsAcceptanceGate>
   );
