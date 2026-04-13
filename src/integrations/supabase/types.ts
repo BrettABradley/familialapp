@@ -370,6 +370,7 @@ export type Database = {
           author_id: string
           content: string
           created_at: string
+          deleted_at: string | null
           id: string
           is_hidden: boolean
           parent_comment_id: string | null
@@ -379,6 +380,7 @@ export type Database = {
           author_id: string
           content: string
           created_at?: string
+          deleted_at?: string | null
           id?: string
           is_hidden?: boolean
           parent_comment_id?: string | null
@@ -388,6 +390,7 @@ export type Database = {
           author_id?: string
           content?: string
           created_at?: string
+          deleted_at?: string | null
           id?: string
           is_hidden?: boolean
           parent_comment_id?: string | null
@@ -834,6 +837,30 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          email_enabled: boolean
+          muted_types: string[]
+          push_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          email_enabled?: boolean
+          muted_types?: string[]
+          push_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          email_enabled?: boolean
+          muted_types?: string[]
+          push_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -980,6 +1007,7 @@ export type Database = {
           circle_id: string
           content: string | null
           created_at: string
+          deleted_at: string | null
           id: string
           is_hidden: boolean
           media_urls: string[] | null
@@ -990,6 +1018,7 @@ export type Database = {
           circle_id: string
           content?: string | null
           created_at?: string
+          deleted_at?: string | null
           id?: string
           is_hidden?: boolean
           media_urls?: string[] | null
@@ -1000,6 +1029,7 @@ export type Database = {
           circle_id?: string
           content?: string | null
           created_at?: string
+          deleted_at?: string | null
           id?: string
           is_hidden?: boolean
           media_urls?: string[] | null
@@ -1079,9 +1109,11 @@ export type Database = {
       profiles: {
         Row: {
           accepted_terms_at: string | null
+          accepted_terms_version: string | null
           avatar_url: string | null
           bio: string | null
           created_at: string
+          date_of_birth: string | null
           display_name: string | null
           id: string
           location: string | null
@@ -1090,9 +1122,11 @@ export type Database = {
         }
         Insert: {
           accepted_terms_at?: string | null
+          accepted_terms_version?: string | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          date_of_birth?: string | null
           display_name?: string | null
           id?: string
           location?: string | null
@@ -1101,9 +1135,11 @@ export type Database = {
         }
         Update: {
           accepted_terms_at?: string | null
+          accepted_terms_version?: string | null
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          date_of_birth?: string | null
           display_name?: string | null
           id?: string
           location?: string | null
