@@ -1,0 +1,1 @@
+ALTER TABLE public.two_factor_codes ENABLE ROW LEVEL SECURITY;
