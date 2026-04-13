@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ShieldAlert, ShieldCheck, FileText } from "lucide-react";
+import { Loader2, ShieldAlert, ShieldCheck, FileText, BarChart3, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const FOUNDER_EMAIL = "brettbradley007@gmail.com";
@@ -16,6 +16,7 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState("reports");
   const [reportStatus, setReportStatus] = useState("pending");
   const [data, setData] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -26,11 +27,6 @@ const Admin = () => {
     try {
       const params = new URLSearchParams({ tab });
       if (status) params.set("status", status);
-      const { data: result, error } = await supabase.functions.invoke("admin-dashboard", {
-        body: null,
-        headers: {},
-      });
-      // Use query params approach
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-dashboard?${params.toString()}`,
         {
@@ -42,7 +38,11 @@ const Admin = () => {
         }
       );
       const json = await response.json();
-      setData(json.data || []);
+      if (tab === "metrics") {
+        setMetrics(json.data || null);
+      } else {
+        setData(json.data || []);
+      }
     } catch {
       toast({ title: "Failed to load data", variant: "destructive" });
     } finally {
@@ -108,8 +108,10 @@ const Admin = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="reports">Reports</TabsTrigger>
-          <TabsTrigger value="banned">Banned Users</TabsTrigger>
-          <TabsTrigger value="audit">Audit Log</TabsTrigger>
+          <TabsTrigger value="banned">Banned</TabsTrigger>
+          <TabsTrigger value="audit">Audit</TabsTrigger>
+          <TabsTrigger value="metrics">Metrics</TabsTrigger>
+          <TabsTrigger value="deleted">Deleted</TabsTrigger>
         </TabsList>
 
         <TabsContent value="reports" className="space-y-4">
@@ -221,6 +223,82 @@ const Admin = () => {
                   <p className="text-xs text-muted-foreground">
                     {new Date(entry.created_at).toLocaleString()}
                   </p>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="metrics" className="space-y-4">
+          {isLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>
+          ) : metrics ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+              {[
+                { label: "Total Users", value: metrics.totalUsers },
+                { label: "New Signups (7d)", value: metrics.newSignups },
+                { label: "Active Users (7d)", value: metrics.activeUsersWeek },
+                { label: "Total Posts", value: metrics.totalPosts },
+                { label: "Posts Today", value: metrics.postsToday },
+                { label: "Posts This Week", value: metrics.postsThisWeek },
+                { label: "Pending Reports", value: metrics.pendingReports },
+                { label: "Banned Users", value: metrics.bannedCount },
+              ].map((stat) => (
+                <Card key={stat.label}>
+                  <CardContent className="pt-4 text-center">
+                    <p className="text-2xl font-bold">{stat.value}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm py-8 text-center">No metrics available.</p>
+          )}
+        </TabsContent>
+
+        <TabsContent value="deleted" className="space-y-4">
+          {isLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>
+          ) : data.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-8 text-center">No deleted posts.</p>
+          ) : (
+            data.map((post: any) => (
+              <Card key={post.id}>
+                <CardContent className="pt-4 text-sm space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Trash2 className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-medium line-clamp-1">{post.content || "(media only)"}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Author: {post.author_id}</p>
+                  <p className="text-xs text-muted-foreground">Deleted: {new Date(post.deleted_at).toLocaleString()}</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      const response = await fetch(
+                        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/posts?id=eq.${post.id}`,
+                        {
+                          method: "PATCH",
+                          headers: {
+                            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+                            "Content-Type": "application/json",
+                            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                            Prefer: "return=minimal",
+                          },
+                          body: JSON.stringify({ deleted_at: null }),
+                        }
+                      );
+                      if (response.ok) {
+                        toast({ title: "Post restored" });
+                        fetchData("deleted");
+                      } else {
+                        toast({ title: "Restore failed", variant: "destructive" });
+                      }
+                    }}
+                  >
+                    Restore
+                  </Button>
                 </CardContent>
               </Card>
             ))
