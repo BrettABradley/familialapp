@@ -15,27 +15,43 @@ serve(async (req: Request) => {
   }
 
   try {
-    // This function is called by a database webhook trigger.
-    // It receives the new notification row as the payload.
     const { record } = await req.json();
 
     if (!record || !record.user_id) {
       return new Response(
         JSON.stringify({ error: "Missing notification record" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
     const { user_id, title, message, link, type } = record;
 
-    // Use service role to read push_tokens (bypasses RLS)
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
+
+    // Check notification preferences
+    const { data: prefs } = await supabase
+      .from("notification_preferences")
+      .select("push_enabled, muted_types")
+      .eq("user_id", user_id)
+      .maybeSingle();
+
+    if (prefs) {
+      if (!prefs.push_enabled) {
+        return new Response(
+          JSON.stringify({ skipped: true, reason: "Push notifications disabled by user" }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+      if (prefs.muted_types && Array.isArray(prefs.muted_types) && type && prefs.muted_types.includes(type)) {
+        return new Response(
+          JSON.stringify({ skipped: true, reason: `Notification type "${type}" is muted` }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+    }
 
     // Get all Expo push tokens for this user
     const { data: tokens, error: tokenError } = await supabase
@@ -47,37 +63,25 @@ serve(async (req: Request) => {
       console.error("Error fetching tokens:", tokenError);
       return new Response(
         JSON.stringify({ error: "Failed to fetch push tokens" }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
     if (!tokens || tokens.length === 0) {
-      // User has no registered push tokens — nothing to send
       return new Response(
         JSON.stringify({ skipped: true, reason: "No push tokens registered" }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    // Build Expo push messages
     const messages = tokens.map((t: { expo_token: string }) => ({
       to: t.expo_token,
       sound: "default",
       title: title || "Familial",
       body: message || "",
-      data: {
-        type: type || "general",
-        link: link || null,
-      },
+      data: { type: type || "general", link: link || null },
     }));
 
-    // Send to Expo Push API (supports batch)
     const expoResponse = await fetch(EXPO_PUSH_URL, {
       method: "POST",
       headers: {
@@ -94,22 +98,16 @@ serve(async (req: Request) => {
       console.error("Expo push error:", expoResult);
       return new Response(
         JSON.stringify({ error: "Expo push failed", details: expoResult }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        }
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    // Clean up invalid tokens (DeviceNotRegistered)
+    // Clean up invalid tokens
     if (expoResult.data) {
       const invalidTokens: string[] = [];
       expoResult.data.forEach(
         (result: { status: string; details?: { error?: string } }, index: number) => {
-          if (
-            result.status === "error" &&
-            result.details?.error === "DeviceNotRegistered"
-          ) {
+          if (result.status === "error" && result.details?.error === "DeviceNotRegistered") {
             invalidTokens.push(tokens[index].expo_token);
           }
         }
@@ -121,20 +119,13 @@ serve(async (req: Request) => {
           .delete()
           .eq("user_id", user_id)
           .in("expo_token", invalidTokens);
-
         console.log(`Cleaned up ${invalidTokens.length} invalid token(s)`);
       }
     }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        sent: messages.length,
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
+      JSON.stringify({ success: true, sent: messages.length }),
+      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Unknown error";
