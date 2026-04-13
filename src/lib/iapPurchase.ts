@@ -19,7 +19,7 @@ export const purchaseSubscription = async (productId: string): Promise<boolean> 
   if (!isIOSNative()) return false;
 
   try {
-    const mod = await (Function('return import("@capgo/capacitor-native-purchases")')() as Promise<any>);
+    const mod = await (Function('return import("@capgo/native-purchases")')() as Promise<any>);
     const { NativePurchases, PURCHASE_TYPE } = mod;
 
     const { products } = await NativePurchases.getProducts({
@@ -69,7 +69,7 @@ export const restorePurchases = async (): Promise<boolean> => {
   if (!isIOSNative()) return false;
 
   try {
-    const mod = await (Function('return import("@capgo/capacitor-native-purchases")')() as Promise<any>);
+    const mod = await (Function('return import("@capgo/native-purchases")')() as Promise<any>);
     const { NativePurchases } = mod;
 
     await NativePurchases.getPurchases();
