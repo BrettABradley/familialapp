@@ -54,6 +54,20 @@ export const ReportDialog = ({ open, onOpenChange, postId, commentId, reportedUs
       toast({ title: "Error", description: "Failed to submit report.", variant: "destructive" });
     } else {
       toast({ title: "Report submitted", description: "Thank you. We'll review this within 24 hours." });
+
+      // Fire-and-forget: notify support via email
+      supabase.functions.invoke("notify-content-report", {
+        body: {
+          reportId: crypto.randomUUID(),
+          reason,
+          details: details.trim() || null,
+          postId: postId || null,
+          commentId: commentId || null,
+          reportedUserId: reportedUserId || null,
+          reporterId: user.id,
+        },
+      }).catch(() => {});
+
       onOpenChange(false);
       setReason("");
       setDetails("");
