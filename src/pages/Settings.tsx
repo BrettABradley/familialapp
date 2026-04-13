@@ -12,7 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Camera, Save, ArrowLeft, LogOut, Trash2, Loader2, AlertTriangle, ChevronRight, Download } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Camera, Save, ArrowLeft, LogOut, Trash2, Loader2, AlertTriangle, ChevronRight, Download, Shield, ShieldCheck, Smartphone, Bell, BellOff } from "lucide-react";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
@@ -52,6 +53,24 @@ const Settings = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Notification preferences
+  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [mutedTypes, setMutedTypes] = useState<string[]>([]);
+  const [notifPrefsLoaded, setNotifPrefsLoaded] = useState(false);
+
+  // 2FA/MFA state
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaEnrolling, setMfaEnrolling] = useState(false);
+  const [mfaQrCode, setMfaQrCode] = useState<string | null>(null);
+  const [mfaSecret, setMfaSecret] = useState<string | null>(null);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaVerifyCode, setMfaVerifyCode] = useState("");
+  const [mfaLoading, setMfaLoading] = useState(false);
+
+  // Session management
+  const [signingOutOthers, setSigningOutOthers] = useState(false);
+
   useEffect(() => {
     if (profile) {
       setDisplayName(profile.display_name || "");
@@ -59,6 +78,55 @@ const Settings = () => {
       setLocation(profile.location || "");
     }
   }, [profile]);
+
+  // Load notification preferences
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("notification_preferences")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (data) {
+        setEmailEnabled((data as any).email_enabled ?? true);
+        setPushEnabled((data as any).push_enabled ?? true);
+        setMutedTypes((data as any).muted_types ?? []);
+      }
+      setNotifPrefsLoaded(true);
+    })();
+  }, [user]);
+
+  // Load MFA status
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase.auth.mfa.listFactors();
+      const totp = data?.totp?.[0];
+      if (totp && totp.status === "verified") {
+        setMfaEnabled(true);
+        setMfaFactorId(totp.id);
+      }
+    })();
+  }, [user]);
+
+  const saveNotifPrefs = async (updates: { email_enabled?: boolean; push_enabled?: boolean; muted_types?: string[] }) => {
+    if (!user) return;
+    const payload = {
+      user_id: user.id,
+      email_enabled: updates.email_enabled ?? emailEnabled,
+      push_enabled: updates.push_enabled ?? pushEnabled,
+      muted_types: updates.muted_types ?? mutedTypes,
+      updated_at: new Date().toISOString(),
+    };
+    await supabase.from("notification_preferences").upsert(payload as any, { onConflict: "user_id" });
+  };
+
+  const toggleMutedType = async (type: string) => {
+    const newMuted = mutedTypes.includes(type) ? mutedTypes.filter(t => t !== type) : [...mutedTypes, type];
+    setMutedTypes(newMuted);
+    await saveNotifPrefs({ muted_types: newMuted });
+  };
 
   const handlePickImage = async () => {
     try {
