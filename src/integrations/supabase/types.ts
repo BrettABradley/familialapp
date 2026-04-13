@@ -49,6 +49,38 @@ export type Database = {
           },
         ]
       }
+      banned_emails: {
+        Row: {
+          banned_at: string
+          email: string
+          id: string
+          reason: string | null
+          report_id: string | null
+        }
+        Insert: {
+          banned_at?: string
+          email: string
+          id?: string
+          reason?: string | null
+          report_id?: string | null
+        }
+        Update: {
+          banned_at?: string
+          email?: string
+          id?: string
+          reason?: string | null
+          report_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banned_emails_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "content_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blocked_users: {
         Row: {
           blocked_id: string
