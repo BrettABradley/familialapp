@@ -28,11 +28,32 @@ const Auth = () => {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const checkoutTriggered = useRef(false);
 
+  // Rate limiting state
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+  const [lockoutRemaining, setLockoutRemaining] = useState(0);
+
   const { signIn, signUp, user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const planParam = searchParams.get("plan");
+
+  // Lockout countdown timer
+  useEffect(() => {
+    if (!lockoutUntil) return;
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((lockoutUntil - Date.now()) / 1000));
+      setLockoutRemaining(remaining);
+      if (remaining <= 0) {
+        setLockoutUntil(null);
+        setFailedAttempts(0);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockoutUntil]);
+
+  const isLockedOut = lockoutUntil !== null && Date.now() < lockoutUntil;
 
   // After login, if there's a plan param, trigger checkout
   useEffect(() => {
@@ -121,24 +142,24 @@ const Auth = () => {
       if (isLogin) {
         const { error } = await signIn(email, password);
         if (error) {
-          if (error.message.includes("Invalid login credentials")) {
+          const newAttempts = failedAttempts + 1;
+          setFailedAttempts(newAttempts);
+          if (newAttempts >= 5) {
+            setLockoutUntil(Date.now() + 5 * 60 * 1000);
+            toast({ title: "Too many attempts", description: "Account locked for 5 minutes.", variant: "destructive" });
+          } else if (error.message.includes("Invalid login credentials")) {
             toast({
               title: "Login failed",
-              description: "Invalid email or password. Please try again.",
+              description: `Invalid email or password.${newAttempts >= 3 ? ` ${5 - newAttempts} attempts remaining.` : ""}`,
               variant: "destructive",
             });
           } else {
-            toast({
-              title: "Login failed",
-              description: error.message,
-              variant: "destructive",
-            });
+            toast({ title: "Login failed", description: error.message, variant: "destructive" });
           }
         } else {
-          toast({
-            title: "Welcome back!",
-            description: "You've successfully signed in.",
-          });
+          setFailedAttempts(0);
+          setLockoutUntil(null);
+          toast({ title: "Welcome back!", description: "You've successfully signed in." });
         }
       } else {
         const { error } = await signUp(email, password, displayName);
