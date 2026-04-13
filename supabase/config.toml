@@ -47,3 +47,7 @@ project_id = "qxkwxolssapayqyfdwqc"
     verify_jwt = false
   [functions.moderate-reported-user]
     verify_jwt = false
+  [functions.admin-dashboard]
+    verify_jwt = false
+  [functions.download-my-data]
+    verify_jwt = false
