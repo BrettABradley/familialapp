@@ -27,9 +27,8 @@ const Auth = () => {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; dob?: string }>({});
-  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [showEmailChallenge, setShowEmailChallenge] = useState(false);
   const [mfaCode, setMfaCode] = useState("");
-  const [showMfaChallenge, setShowMfaChallenge] = useState(false);
   const checkoutTriggered = useRef(false);
 
   // Rate limiting state
@@ -163,17 +162,23 @@ const Auth = () => {
         } else {
           setFailedAttempts(0);
           setLockoutUntil(null);
-          // Check MFA requirement
-          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-          if (aal?.currentLevel === "aal1" && aal?.nextLevel === "aal2") {
-            const { data: factors } = await supabase.auth.mfa.listFactors();
-            const totpFactor = factors?.totp?.[0];
-            if (totpFactor) {
-              setMfaFactorId(totpFactor.id);
-              setShowMfaChallenge(true);
+          // Check if email-based 2FA is enabled
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("two_factor_enabled")
+            .eq("user_id", (await supabase.auth.getUser()).data.user?.id || "")
+            .maybeSingle();
+          if ((profileData as any)?.two_factor_enabled) {
+            // Send 2FA code
+            const { data: sendData, error: sendErr } = await supabase.functions.invoke("send-2fa-code");
+            if (sendErr || !sendData?.success) {
+              toast({ title: "Error", description: "Failed to send verification code.", variant: "destructive" });
               setIsLoading(false);
               return;
             }
+            setShowEmailChallenge(true);
+            setIsLoading(false);
+            return;
           }
           toast({ title: "Welcome back!", description: "You've successfully signed in." });
         }
