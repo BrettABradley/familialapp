@@ -1117,6 +1117,7 @@ export type Database = {
           display_name: string | null
           id: string
           location: string | null
+          two_factor_enabled: boolean
           updated_at: string
           user_id: string
         }
@@ -1130,6 +1131,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           location?: string | null
+          two_factor_enabled?: boolean
           updated_at?: string
           user_id: string
         }
@@ -1143,6 +1145,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           location?: string | null
+          two_factor_enabled?: boolean
           updated_at?: string
           user_id?: string
         }
@@ -1256,6 +1259,33 @@ export type Database = {
           submitted_by?: string | null
           target_locations?: string[] | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      two_factor_codes: {
+        Row: {
+          code: string
+          created_at: string
+          expires_at: string
+          id: string
+          used: boolean
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          used?: boolean
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          used?: boolean
+          user_id?: string
         }
         Relationships: []
       }
