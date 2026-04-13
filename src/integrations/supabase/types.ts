@@ -341,6 +341,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          is_hidden: boolean
           parent_comment_id: string | null
           post_id: string
         }
@@ -349,6 +350,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          is_hidden?: boolean
           parent_comment_id?: string | null
           post_id: string
         }
@@ -357,6 +359,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          is_hidden?: boolean
           parent_comment_id?: string | null
           post_id?: string
         }
@@ -948,6 +951,7 @@ export type Database = {
           content: string | null
           created_at: string
           id: string
+          is_hidden: boolean
           media_urls: string[] | null
           updated_at: string
         }
@@ -957,6 +961,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: string
+          is_hidden?: boolean
           media_urls?: string[] | null
           updated_at?: string
         }
@@ -966,6 +971,7 @@ export type Database = {
           content?: string | null
           created_at?: string
           id?: string
+          is_hidden?: boolean
           media_urls?: string[] | null
           updated_at?: string
         }
