@@ -83,14 +83,16 @@ serve(async (req: Request) => {
 
     const safe = (v: string) => escapeHtml(v || "");
 
-    // Build the one-click ban link
+    // Build action links
     const banUrl = `${SUPABASE_URL}/functions/v1/moderate-reported-user?report_id=${reportId}&action=ban_user&secret=${ADMIN_SECRET}`;
+    const dismissUrl = `${SUPABASE_URL}/functions/v1/moderate-reported-user?report_id=${reportId}&action=dismiss&secret=${ADMIN_SECRET}`;
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5;">
 <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
 <div style="background-color: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
   <h1 style="color: #dc2626; font-size: 24px; margin: 0 0 20px 0;">🚩 Content Report</h1>
+  <p style="color: #666; font-size: 14px; margin: 0 0 20px 0;">The reported content has been <strong>automatically hidden</strong> from the circle pending your review.</p>
   <table style="width: 100%; border-collapse: collapse; font-size: 15px; color: #333;">
     <tr><td style="padding: 8px 0; font-weight: 600; width: 140px;">Report ID</td><td style="padding: 8px 0; font-family: monospace; font-size: 13px;">${safe(reportId)}</td></tr>
     <tr><td style="padding: 8px 0; font-weight: 600;">Reporter</td><td style="padding: 8px 0;">${safe(reporterProfile?.display_name || "Unknown")}</td></tr>
@@ -100,10 +102,11 @@ serve(async (req: Request) => {
     <tr><td style="padding: 8px 0; font-weight: 600;">Post ID</td><td style="padding: 8px 0; font-family: monospace; font-size: 13px;">${safe(postId) || "N/A"}</td></tr>
     <tr><td style="padding: 8px 0; font-weight: 600;">Comment ID</td><td style="padding: 8px 0; font-family: monospace; font-size: 13px;">${safe(commentId) || "N/A"}</td></tr>
   </table>
-  <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+  <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; display: flex; gap: 12px;">
     <a href="${banUrl}" style="display: inline-block; background-color: #dc2626; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">🚫 Ban & Remove User</a>
-    <p style="color: #888; font-size: 12px; margin-top: 12px;">Clicking this will ban the user, remove them from all circles, and delete the reported content.</p>
+    <a href="${dismissUrl}" style="display: inline-block; background-color: #16a34a; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px;">✅ Dismiss Report</a>
   </div>
+  <p style="color: #888; font-size: 12px; margin-top: 12px;"><strong>Ban & Remove</strong>: Permanently bans the user, removes from all circles, and deletes the content.<br/><strong>Dismiss</strong>: Restores the hidden content and closes the report.</p>
 </div></div></body></html>`;
 
     const emailResponse = await fetch("https://api.resend.com/emails", {

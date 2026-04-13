@@ -53,7 +53,15 @@ export const ReportDialog = ({ open, onOpenChange, postId, commentId, reportedUs
     if (error) {
       toast({ title: "Error", description: "Failed to submit report.", variant: "destructive" });
     } else {
-      toast({ title: "Report submitted", description: "Thank you. We'll review this within 24 hours." });
+      // Hide the reported content immediately
+      if (postId) {
+        await supabase.from("posts").update({ is_hidden: true } as any).eq("id", postId);
+      }
+      if (commentId) {
+        await supabase.from("comments").update({ is_hidden: true } as any).eq("id", commentId);
+      }
+
+      toast({ title: "Report submitted", description: "Thank you. The content has been hidden pending review." });
 
       // Fire-and-forget: notify support via email
       supabase.functions.invoke("notify-content-report", {
