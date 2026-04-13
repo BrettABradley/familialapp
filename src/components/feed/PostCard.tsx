@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp, Trash2, Pencil, Check, X, ChevronLeft, ChevronRight, Play, Flag, Ban } from "lucide-react";
+import { Heart, MessageCircle, Send, Download, ChevronDown, ChevronUp, Trash2, Pencil, Check, X, ChevronLeft, ChevronRight, Play, Flag } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { LinkifiedText } from "@/components/shared/LinkifiedText";
 import { LinkPreviewCard } from "@/components/feed/LinkPreviewCard";
@@ -277,30 +277,9 @@ export const PostCard = ({
           </div>
           <div className="flex items-center gap-1">
             {!isOwnPost && (
-              <>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => setReportOpen(true)} title="Report">
-                  <Flag className="h-4 w-4" />
-                </Button>
-                {onBlockUser && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8" title="Block user">
-                        <Ban className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Block {post.profiles?.display_name || "this user"}?</AlertDialogTitle>
-                        <AlertDialogDescription>You won't see their posts, comments, or messages anymore. This also reports them to our team for review.</AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => onBlockUser(post.author_id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Block</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-              </>
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => setReportOpen(true)} title="Report">
+                <Flag className="h-4 w-4" />
+              </Button>
             )}
             {isOwnPost && onEdit && !isEditing && (
               <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8" onClick={() => { setEditContent(post.content || ""); setIsEditing(true); }}>
