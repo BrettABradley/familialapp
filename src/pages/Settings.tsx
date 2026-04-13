@@ -59,12 +59,9 @@ const Settings = () => {
   const [mutedTypes, setMutedTypes] = useState<string[]>([]);
   const [notifPrefsLoaded, setNotifPrefsLoaded] = useState(false);
 
-  // 2FA/MFA state
+  // 2FA/MFA state (email-based)
   const [mfaEnabled, setMfaEnabled] = useState(false);
   const [mfaEnrolling, setMfaEnrolling] = useState(false);
-  const [mfaQrCode, setMfaQrCode] = useState<string | null>(null);
-  const [mfaSecret, setMfaSecret] = useState<string | null>(null);
-  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [mfaVerifyCode, setMfaVerifyCode] = useState("");
   const [mfaLoading, setMfaLoading] = useState(false);
 
@@ -97,18 +94,12 @@ const Settings = () => {
     })();
   }, [user]);
 
-  // Load MFA status
+  // Load 2FA status from profile
   useEffect(() => {
-    if (!user) return;
-    (async () => {
-      const { data } = await supabase.auth.mfa.listFactors();
-      const totp = data?.totp?.[0];
-      if (totp && totp.status === "verified") {
-        setMfaEnabled(true);
-        setMfaFactorId(totp.id);
-      }
-    })();
-  }, [user]);
+    if (profile) {
+      setMfaEnabled((profile as any).two_factor_enabled ?? false);
+    }
+  }, [profile]);
 
   const saveNotifPrefs = async (updates: { email_enabled?: boolean; push_enabled?: boolean; muted_types?: string[] }) => {
     if (!user) return;
