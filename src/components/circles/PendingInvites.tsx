@@ -193,6 +193,14 @@ const PendingInvites = ({ compact = false, onCountChange }: PendingInvitesProps)
                         {invite.circles.description}
                       </p>
                     )}
+                    {(() => {
+                      const msLeft = new Date(invite.expires_at).getTime() - Date.now();
+                      if (msLeft <= 0) return <p className="text-xs text-destructive mt-1">Expired</p>;
+                      const hoursLeft = msLeft / (1000 * 60 * 60);
+                      const daysLeft = Math.floor(hoursLeft / 24);
+                      const label = daysLeft >= 1 ? `Expires in ${daysLeft} day${daysLeft > 1 ? "s" : ""}` : hoursLeft < 1 ? "Expires soon" : `Expires in ${Math.floor(hoursLeft)} hour${Math.floor(hoursLeft) > 1 ? "s" : ""}`;
+                      return <span className={`inline-block text-xs mt-1 px-2 py-0.5 rounded-full ${hoursLeft < 24 ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"}`}>{label}</span>;
+                    })()}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button

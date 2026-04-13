@@ -24,8 +24,12 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; dob?: string }>({});
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [showMfaChallenge, setShowMfaChallenge] = useState(false);
   const checkoutTriggered = useRef(false);
 
   // Rate limiting state
@@ -159,10 +163,40 @@ const Auth = () => {
         } else {
           setFailedAttempts(0);
           setLockoutUntil(null);
+          // Check MFA requirement
+          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          if (aal?.currentLevel === "aal1" && aal?.nextLevel === "aal2") {
+            const { data: factors } = await supabase.auth.mfa.listFactors();
+            const totpFactor = factors?.totp?.[0];
+            if (totpFactor) {
+              setMfaFactorId(totpFactor.id);
+              setShowMfaChallenge(true);
+              setIsLoading(false);
+              return;
+            }
+          }
           toast({ title: "Welcome back!", description: "You've successfully signed in." });
         }
       } else {
-        const { error } = await signUp(email, password, displayName);
+        // Age gate check
+        if (dateOfBirth) {
+          const dob = new Date(dateOfBirth);
+          const today = new Date();
+          let age = today.getFullYear() - dob.getFullYear();
+          const m = today.getMonth() - dob.getMonth();
+          if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+          if (age < 13) {
+            setErrors({ dob: "You must be 13 or older to use Familial." });
+            setIsLoading(false);
+            return;
+          }
+        } else {
+          setErrors({ dob: "Date of birth is required." });
+          setIsLoading(false);
+          return;
+        }
+
+        const { error, data: signUpData } = await signUp(email, password, displayName);
         if (error) {
           if (error.message.includes("User already registered")) {
             toast({
@@ -179,6 +213,14 @@ const Auth = () => {
             });
           }
         } else {
+          // Save DOB to profile
+          const userId = signUpData?.user?.id;
+          if (userId && dateOfBirth) {
+            await supabase
+              .from("profiles")
+              .update({ date_of_birth: dateOfBirth } as any)
+              .eq("user_id", userId);
+          }
           toast({
             title: "Account created!",
             description: "Welcome to Familial. Let's set up your first circle.",
@@ -258,8 +300,55 @@ const Auth = () => {
             </>
           ) : (
             <>
+              {showMfaChallenge ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground text-center">Enter the 6-digit code from your authenticator app.</p>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="000000"
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
+                    className="text-center text-2xl tracking-widest"
+                  />
+                  <Button
+                    className="w-full"
+                    disabled={mfaCode.length !== 6 || isLoading}
+                    onClick={async () => {
+                      if (!mfaFactorId) return;
+                      setIsLoading(true);
+                      const { data: challenge, error: cErr } = await supabase.auth.mfa.challenge({ factorId: mfaFactorId });
+                      if (cErr || !challenge) {
+                        toast({ title: "MFA error", description: cErr?.message || "Failed to create challenge", variant: "destructive" });
+                        setIsLoading(false);
+                        return;
+                      }
+                      const { error: vErr } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: challenge.id, code: mfaCode });
+                      if (vErr) {
+                        toast({ title: "Invalid code", description: "Please check your authenticator and try again.", variant: "destructive" });
+                      } else {
+                        toast({ title: "Welcome back!", description: "You've successfully signed in." });
+                        setShowMfaChallenge(false);
+                      }
+                      setIsLoading(false);
+                    }}
+                  >
+                    {isLoading ? "Verifying..." : "Verify"}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowMfaChallenge(false); setMfaCode(""); supabase.auth.signOut(); }}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors w-full text-center"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+              <>
               <form onSubmit={handleSubmit} className="space-y-4">
                 {!isLogin && (
+                  <>
                   <div className="space-y-2">
                     <Label htmlFor="displayName">Display Name</Label>
                     <Input
@@ -270,6 +359,24 @@ const Auth = () => {
                       onChange={(e) => setDisplayName(e.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dob">Date of Birth</Label>
+                    <Input
+                      id="dob"
+                      type="date"
+                      value={dateOfBirth}
+                      onChange={(e) => {
+                        setDateOfBirth(e.target.value);
+                        setErrors((prev) => ({ ...prev, dob: undefined }));
+                      }}
+                      max={new Date().toISOString().split("T")[0]}
+                      className={errors.dob ? "border-destructive" : ""}
+                    />
+                    {errors.dob && (
+                      <p className="text-sm text-destructive">{errors.dob}</p>
+                    )}
+                  </div>
+                  </>
                 )}
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -337,6 +444,7 @@ const Auth = () => {
                   onClick={() => {
                     setIsLogin(!isLogin);
                     setErrors({});
+                    setDateOfBirth("");
                   }}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
@@ -346,6 +454,8 @@ const Auth = () => {
                 </button>
               </div>
             </>
+              )}
+          </>
           )}
         </CardContent>
       </Card>

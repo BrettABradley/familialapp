@@ -271,12 +271,28 @@ export const useFeedPosts = () => {
 
     setPosts(prev => prev.filter(p => p.id !== postId));
 
-    const { error } = await supabase.from("posts").delete().eq("id", postId);
+    // Soft-delete: set deleted_at instead of hard delete
+    const { error } = await supabase.from("posts").update({ deleted_at: new Date().toISOString() } as any).eq("id", postId);
     if (error) {
       if (postToDelete) setPosts(prev => [...prev, postToDelete].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       toast({ title: "Error", description: "Failed to delete post.", variant: "destructive" });
     } else {
-      toast({ title: "Deleted", description: "Post removed." });
+      toast({
+        title: "Post deleted",
+        description: "Undo within 10 seconds to restore.",
+        action: (
+          <button
+            className="text-sm font-medium underline text-primary"
+            onClick={async () => {
+              await supabase.from("posts").update({ deleted_at: null } as any).eq("id", postId);
+              if (postToDelete) setPosts(prev => [...prev, postToDelete].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+              toast({ title: "Post restored" });
+            }}
+          >
+            Undo
+          </button>
+        ) as any,
+      });
     }
   };
 
