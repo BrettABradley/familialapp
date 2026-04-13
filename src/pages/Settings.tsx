@@ -524,13 +524,17 @@ const Settings = () => {
                   },
                 }
               );
+              if (!res.ok) throw new Error("Download failed");
               const blob = await res.blob();
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
               a.href = url;
               a.download = `familial-data-${new Date().toISOString().split("T")[0]}.json`;
+              a.style.display = "none";
+              document.body.appendChild(a);
               a.click();
-              URL.revokeObjectURL(url);
+              document.body.removeChild(a);
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
               toast({ title: "Download started", description: "Your data export is downloading." });
             } catch {
               toast({ title: "Download failed", variant: "destructive" });
