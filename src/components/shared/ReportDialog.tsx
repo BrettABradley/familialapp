@@ -41,19 +41,33 @@ export const ReportDialog = ({ open, onOpenChange, postId, commentId, reportedUs
     if (!user || !reason) return;
     setSubmitting(true);
 
-    const { error } = await supabase.from("content_reports" as any).insert({
+    const { data: insertedReport, error } = await supabase.from("content_reports" as any).insert({
       reporter_id: user.id,
       post_id: postId || null,
       comment_id: commentId || null,
       reported_user_id: reportedUserId || null,
       reason,
       details: details.trim() || null,
-    });
+    }).select("id").single();
 
     if (error) {
       toast({ title: "Error", description: "Failed to submit report.", variant: "destructive" });
     } else {
       toast({ title: "Report submitted", description: "Thank you. We'll review this within 24 hours." });
+
+      // Fire-and-forget: notify support via email
+      supabase.functions.invoke("notify-content-report", {
+        body: {
+          reportId: (insertedReport as any)?.id,
+          reason,
+          details: details.trim() || null,
+          postId: postId || null,
+          commentId: commentId || null,
+          reportedUserId: reportedUserId || null,
+          reporterId: user.id,
+        },
+      }).catch(() => {});
+
       onOpenChange(false);
       setReason("");
       setDetails("");
