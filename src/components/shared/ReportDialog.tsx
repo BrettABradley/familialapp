@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 
 const REASONS = [
@@ -28,13 +29,15 @@ interface ReportDialogProps {
   postId?: string;
   commentId?: string;
   reportedUserId?: string;
+  onBlockUser?: (userId: string) => void;
 }
 
-export const ReportDialog = ({ open, onOpenChange, postId, commentId, reportedUserId }: ReportDialogProps) => {
+export const ReportDialog = ({ open, onOpenChange, postId, commentId, reportedUserId, onBlockUser }: ReportDialogProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [reason, setReason] = useState("");
   const [details, setDetails] = useState("");
+  const [blockToo, setBlockToo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
@@ -61,7 +64,17 @@ export const ReportDialog = ({ open, onOpenChange, postId, commentId, reportedUs
         await supabase.from("comments").update({ is_hidden: true } as any).eq("id", commentId);
       }
 
-      toast({ title: "Report submitted", description: "Thank you. The content has been hidden pending review." });
+      // Block the user if checkbox was checked
+      if (blockToo && reportedUserId && onBlockUser) {
+        onBlockUser(reportedUserId);
+      }
+
+      toast({
+        title: "Report submitted",
+        description: blockToo && reportedUserId
+          ? "Thank you. The content has been hidden and the user has been blocked."
+          : "Thank you. The content has been hidden pending review.",
+      });
 
       // Fire-and-forget: notify support via email
       supabase.functions.invoke("notify-content-report", {
@@ -79,6 +92,7 @@ export const ReportDialog = ({ open, onOpenChange, postId, commentId, reportedUs
       onOpenChange(false);
       setReason("");
       setDetails("");
+      setBlockToo(false);
     }
     setSubmitting(false);
   };
@@ -110,6 +124,19 @@ export const ReportDialog = ({ open, onOpenChange, postId, commentId, reportedUs
           rows={3}
           maxLength={1000}
         />
+
+        {reportedUserId && onBlockUser && (
+          <div className="flex items-center gap-2 pt-1">
+            <Checkbox
+              id="block-user-too"
+              checked={blockToo}
+              onCheckedChange={(checked) => setBlockToo(checked === true)}
+            />
+            <Label htmlFor="block-user-too" className="text-sm cursor-pointer">
+              Also block this user
+            </Label>
+          </div>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
