@@ -196,7 +196,7 @@ const Auth = () => {
           return;
         }
 
-        const { error, data: signUpData } = await signUp(email, password, displayName);
+        const { error } = await signUp(email, password, displayName);
         if (error) {
           if (error.message.includes("User already registered")) {
             toast({
@@ -213,13 +213,17 @@ const Auth = () => {
             });
           }
         } else {
-          // Save DOB to profile
-          const userId = signUpData?.user?.id;
-          if (userId && dateOfBirth) {
-            await supabase
-              .from("profiles")
-              .update({ date_of_birth: dateOfBirth } as any)
-              .eq("user_id", userId);
+          // Save DOB to profile after signup — user may not be set yet via listener,
+          // so fetch the session directly
+          if (dateOfBirth) {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const userId = sessionData.session?.user?.id;
+            if (userId) {
+              await supabase
+                .from("profiles")
+                .update({ date_of_birth: dateOfBirth } as any)
+                .eq("user_id", userId);
+            }
           }
           toast({
             title: "Account created!",
