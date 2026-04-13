@@ -24,6 +24,7 @@ import Messages from "./pages/Messages";
 import ResetPassword from "./pages/ResetPassword";
 import Upgrade from "./pages/Upgrade";
 import NotFound from "./pages/NotFound";
+import Admin from "./pages/Admin";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import CookiePolicy from "./pages/CookiePolicy";
@@ -57,6 +58,7 @@ const App = () => {
             <Route path="/careers" element={<Careers />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/support" element={<Support />} />
+            <Route path="/admin" element={<Admin />} />
             
             {/* Authenticated routes with persistent layout */}
             <Route element={<AppLayout />}>

@@ -20,19 +20,20 @@ export function MobileNavigation() {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border keyboard-hide" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <nav role="navigation" aria-label="Main navigation" className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border keyboard-hide" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="flex items-center justify-around h-16">
         {navItems.map((item) => (
           <Link
             key={item.to}
             to={item.to}
+            aria-label={item.label}
             className={`flex flex-col items-center justify-center w-full h-full min-h-[44px] min-w-[44px] transition-colors ${
               isActive(item.to)
                 ? "text-primary"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <item.icon className="w-5 h-5" />
+            <item.icon className="w-5 h-5" aria-hidden="true" />
             <span className="text-xs mt-1">{item.label}</span>
           </Link>
         ))}

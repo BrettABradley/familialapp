@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Camera, Save, ArrowLeft, LogOut, Trash2, Loader2, AlertTriangle, ChevronRight } from "lucide-react";
+import { Camera, Save, ArrowLeft, LogOut, Trash2, Loader2, AlertTriangle, ChevronRight, Download } from "lucide-react";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
@@ -50,6 +50,7 @@ const Settings = () => {
   const [deleteStep, setDeleteStep] = useState(0);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -270,8 +271,45 @@ const Settings = () => {
         </Button>
       </div>
 
-      {/* Delete Account — smaller, below sign out */}
-      <div className="mt-4 pb-24 flex justify-center">
+      {/* Data & Account */}
+      <div className="mt-4 pb-24 flex flex-col items-center gap-3">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={isDownloading}
+          onClick={async () => {
+            setIsDownloading(true);
+            try {
+              const { data: sessionData } = await supabase.auth.getSession();
+              const token = sessionData.session?.access_token;
+              const res = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-my-data`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                  },
+                }
+              );
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `familial-data-${new Date().toISOString().split("T")[0]}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+              toast({ title: "Download started", description: "Your data export is downloading." });
+            } catch {
+              toast({ title: "Download failed", variant: "destructive" });
+            } finally {
+              setIsDownloading(false);
+            }
+          }}
+          className="text-xs"
+        >
+          {isDownloading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
+          Download My Data
+        </Button>
         <Button
           variant="ghost"
           size="sm"
