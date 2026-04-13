@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string, displayName?: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -51,6 +51,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     });
+
+    // Supabase returns a fake user with empty identities for duplicate emails
+    // when email confirmation is disabled
+    if (!error && data?.user && (!data.user.identities || data.user.identities.length === 0)) {
+      return { error: new Error("User already registered") };
+    }
+
     return { error: error as Error | null };
   };
 
