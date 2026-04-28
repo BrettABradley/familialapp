@@ -53,17 +53,39 @@ const ReceiptHistory = () => {
 
       if (error) throw error;
 
-      // data is a Blob when Content-Type is application/pdf
       const blob = data instanceof Blob ? data : new Blob([data], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Familial-Receipt-${new Date(receipt.date).toLocaleDateString("en-US").replace(/\//g, "-")}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const filename = `Familial-Receipt-${new Date(receipt.date).toLocaleDateString("en-US").replace(/\//g, "-")}.pdf`;
+
+      const { Capacitor } = await import("@capacitor/core");
+      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios") {
+        // iOS WKWebView: write to filesystem and open native share sheet
+        const arrayBuf = await blob.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+        const { Filesystem, Directory } = await import("@capacitor/filesystem");
+        const { Share } = await import("@capacitor/share");
+        const writeRes = await Filesystem.writeFile({
+          path: filename,
+          data: base64,
+          directory: Directory.Cache,
+        });
+        await Share.share({
+          title: "Familial Receipt",
+          url: writeRes.uri,
+          dialogTitle: "Save your receipt",
+        });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
     } catch (err: any) {
+      const msg = String(err?.message ?? "").toLowerCase();
+      if (msg.includes("cancel")) return;
       console.error("Generate receipt error:", err);
       toast({
         title: "Error",
