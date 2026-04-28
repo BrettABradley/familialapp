@@ -50,11 +50,8 @@ export const purchaseSubscription = async (productId: string): Promise<boolean> 
 
     if (error) throw error;
 
-    try {
-      await NativePurchases.finishTransaction({ transactionIdentifier: transactionId });
-    } catch {
-      // non-fatal — Apple may have already finished the transaction
-    }
+    // @capgo/native-purchases auto-acknowledges purchases by default,
+    // so no explicit finishTransaction call is required.
 
     return true;
   } catch (err: any) {
