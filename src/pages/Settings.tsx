@@ -525,18 +525,41 @@ const Settings = () => {
                 }
               );
               if (!res.ok) throw new Error("Download failed");
-              const blob = await res.blob();
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `familial-data-${new Date().toISOString().split("T")[0]}.json`;
-              a.style.display = "none";
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              setTimeout(() => URL.revokeObjectURL(url), 1000);
-              toast({ title: "Download started", description: "Your data export is downloading." });
-            } catch {
+              const text = await res.text();
+              const filename = `familial-data-${new Date().toISOString().split("T")[0]}.json`;
+
+              if (isIOSNative()) {
+                // iOS WKWebView blocks <a download> — use Filesystem + Share sheet
+                const { Filesystem, Directory, Encoding } = await import("@capacitor/filesystem");
+                const { Share } = await import("@capacitor/share");
+                const writeRes = await Filesystem.writeFile({
+                  path: filename,
+                  data: text,
+                  directory: Directory.Cache,
+                  encoding: Encoding.UTF8,
+                });
+                await Share.share({
+                  title: "My Familial Data",
+                  url: writeRes.uri,
+                  dialogTitle: "Save your data export",
+                });
+                toast({ title: "Export ready", description: "Choose where to save your data." });
+              } else {
+                const blob = new Blob([text], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                a.style.display = "none";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                toast({ title: "Download started", description: "Your data export is downloading." });
+              }
+            } catch (err: any) {
+              const msg = String(err?.message ?? "").toLowerCase();
+              if (msg.includes("cancel")) return;
               toast({ title: "Download failed", variant: "destructive" });
             } finally {
               setIsDownloading(false);
