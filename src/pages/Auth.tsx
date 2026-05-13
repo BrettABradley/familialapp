@@ -25,9 +25,9 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; dob?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; age?: string }>({});
   const [showEmailChallenge, setShowEmailChallenge] = useState(false);
   const [mfaCode, setMfaCode] = useState("");
   const checkoutTriggered = useRef(false);
