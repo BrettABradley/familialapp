@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCard, ExternalLink, Loader2, RotateCcw } from "lucide-react";
 import { openExternalUrl } from "@/lib/externalUrl";
-import { isIOSNative, openAppleSubscriptionManagement } from "@/lib/iapPurchase";
+import { isIOSNative, openAppleSubscriptionManagement, restorePurchases } from "@/lib/iapPurchase";
 import {
   AlertDialog,
   AlertDialogAction,
