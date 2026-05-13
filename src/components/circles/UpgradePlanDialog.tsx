@@ -216,6 +216,23 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
         : handleCheckout(PRICES.extraMembers, "payment", "extra"),
     icon: <Plus className="w-4 h-4" />,
   });
+
+  return (
+    <>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Upgrade Your Circle
+            </DialogTitle>
+            <DialogDescription>
+              Hit your member limit or just want more room to grow? We've got you covered.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 mt-4">
+            <div className="flex items-center justify-between text-sm text-muted-foreground p-3 rounded-md bg-secondary/50">
               <span>Current plan</span>
               <Badge variant="secondary" className="capitalize">{currentPlan}</Badge>
             </div>
