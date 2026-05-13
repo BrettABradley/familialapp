@@ -380,23 +380,24 @@ const Auth = () => {
                       onChange={(e) => setDisplayName(e.target.value)}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="dob">Date of Birth</Label>
-                    <Input
-                      id="dob"
-                      type="date"
-                      value={dateOfBirth}
+                  <div className="flex items-start gap-2">
+                    <input
+                      id="age-confirm"
+                      type="checkbox"
+                      checked={ageConfirmed}
                       onChange={(e) => {
-                        setDateOfBirth(e.target.value);
-                        setErrors((prev) => ({ ...prev, dob: undefined }));
+                        setAgeConfirmed(e.target.checked);
+                        setErrors((prev) => ({ ...prev, age: undefined }));
                       }}
-                      max={new Date().toISOString().split("T")[0]}
-                      className={errors.dob ? "border-destructive" : ""}
+                      className="mt-1 h-4 w-4 accent-primary"
                     />
-                    {errors.dob && (
-                      <p className="text-sm text-destructive">{errors.dob}</p>
-                    )}
+                    <Label htmlFor="age-confirm" className="text-sm font-normal leading-snug cursor-pointer">
+                      I confirm I am at least 13 years old.
+                    </Label>
                   </div>
+                  {errors.age && (
+                    <p className="text-sm text-destructive">{errors.age}</p>
+                  )}
                   </>
                 )}
                 <div className="space-y-2">
