@@ -30,6 +30,23 @@ export const purchaseSubscription = async (
 
   const { NativePurchases, PURCHASE_TYPE } = await loadPlugin();
 
+  // Pre-fetch the product so StoreKit has it loaded before we attempt to buy.
+  // If this fails or returns nothing, surface a clear error rather than a
+  // silent purchase failure (the #1 cause of App Review IAP rejections).
+  try {
+    const products: any = await NativePurchases.getProducts({
+      productIdentifiers: [productId],
+    });
+    const list = Array.isArray(products) ? products : products?.products;
+    if (!list || list.length === 0) {
+      throw new Error("Subscription is temporarily unavailable. Please try again in a moment.");
+    }
+  } catch (err: any) {
+    // If getProducts itself isn't supported by the plugin version, continue —
+    // purchaseProduct will surface its own error.
+    if (err?.message?.includes("temporarily unavailable")) throw err;
+  }
+
   try {
     const result: any = await NativePurchases.purchaseProduct({
       productIdentifier: productId,
@@ -50,7 +67,9 @@ export const purchaseSubscription = async (
       },
     });
 
-    if (error) throw error;
+    // Don't fail the purchase UX if our backend validation hiccups —
+    // the StoreKit transaction is real and restorePurchases will reconcile.
+    if (error) console.warn("[IAP] validate-apple-receipt failed:", error);
     return true;
   } catch (err: any) {
     const msg = String(err?.message ?? err ?? "").toLowerCase();
