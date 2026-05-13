@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCard, ExternalLink, Loader2, RotateCcw } from "lucide-react";
 import { openExternalUrl } from "@/lib/externalUrl";
-import { isIOSNative, openAppleSubscriptionManagement } from "@/lib/iapPurchase";
+import { isIOSNative, openAppleSubscriptionManagement, restorePurchases } from "@/lib/iapPurchase";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -335,6 +335,24 @@ const SubscriptionCard = () => {
             {!isPaid && !isFounder && (
               <Button onClick={() => navigate("/upgrade")} className="w-full">
                 Upgrade Plan
+              </Button>
+            )}
+
+            {isIOSNative() && (
+              <Button
+                variant="ghost"
+                onClick={async () => {
+                  const ok = await restorePurchases();
+                  toast({
+                    title: ok ? "Purchases restored" : "Nothing to restore",
+                    description: ok
+                      ? "Your subscription has been restored."
+                      : "We couldn't find any previous purchases on this Apple ID.",
+                  });
+                }}
+                className="w-full"
+              >
+                Restore Purchases
               </Button>
             )}
           </div>

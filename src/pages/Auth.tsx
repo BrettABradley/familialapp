@@ -25,9 +25,9 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; dob?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; age?: string }>({});
   const [showEmailChallenge, setShowEmailChallenge] = useState(false);
   const [mfaCode, setMfaCode] = useState("");
   const checkoutTriggered = useRef(false);
@@ -206,20 +206,9 @@ const Auth = () => {
           toast({ title: "Welcome back!", description: "You've successfully signed in." });
         }
       } else {
-        // Age gate check
-        if (dateOfBirth) {
-          const dob = new Date(dateOfBirth);
-          const today = new Date();
-          let age = today.getFullYear() - dob.getFullYear();
-          const m = today.getMonth() - dob.getMonth();
-          if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
-          if (age < 13) {
-            setErrors({ dob: "You must be 13 or older to use Familial." });
-            setIsLoading(false);
-            return;
-          }
-        } else {
-          setErrors({ dob: "Date of birth is required." });
+        // Age confirmation (COPPA 13+)
+        if (!ageConfirmed) {
+          setErrors({ age: "Please confirm you are at least 13 years old." });
           setIsLoading(false);
           return;
         }
@@ -241,18 +230,6 @@ const Auth = () => {
             });
           }
         } else {
-          // Save DOB to profile after signup — user may not be set yet via listener,
-          // so fetch the session directly
-          if (dateOfBirth) {
-            const { data: sessionData } = await supabase.auth.getSession();
-            const userId = sessionData.session?.user?.id;
-            if (userId) {
-              await supabase
-                .from("profiles")
-                .update({ date_of_birth: dateOfBirth } as any)
-                .eq("user_id", userId);
-            }
-          }
           toast({
             title: "Account created!",
             description: "Welcome to Familial. Let's set up your first circle.",
@@ -403,23 +380,24 @@ const Auth = () => {
                       onChange={(e) => setDisplayName(e.target.value)}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="dob">Date of Birth</Label>
-                    <Input
-                      id="dob"
-                      type="date"
-                      value={dateOfBirth}
+                  <div className="flex items-start gap-2">
+                    <input
+                      id="age-confirm"
+                      type="checkbox"
+                      checked={ageConfirmed}
                       onChange={(e) => {
-                        setDateOfBirth(e.target.value);
-                        setErrors((prev) => ({ ...prev, dob: undefined }));
+                        setAgeConfirmed(e.target.checked);
+                        setErrors((prev) => ({ ...prev, age: undefined }));
                       }}
-                      max={new Date().toISOString().split("T")[0]}
-                      className={errors.dob ? "border-destructive" : ""}
+                      className="mt-1 h-4 w-4 accent-primary"
                     />
-                    {errors.dob && (
-                      <p className="text-sm text-destructive">{errors.dob}</p>
-                    )}
+                    <Label htmlFor="age-confirm" className="text-sm font-normal leading-snug cursor-pointer">
+                      I confirm I am at least 13 years old.
+                    </Label>
                   </div>
+                  {errors.age && (
+                    <p className="text-sm text-destructive">{errors.age}</p>
+                  )}
                   </>
                 )}
                 <div className="space-y-2">
@@ -488,7 +466,7 @@ const Auth = () => {
                   onClick={() => {
                     setIsLogin(!isLogin);
                     setErrors({});
-                    setDateOfBirth("");
+                    setAgeConfirmed(false);
                   }}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
