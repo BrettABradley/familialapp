@@ -57,11 +57,16 @@ const Index = () => {
         path="/"
         jsonLd={{
           "@context": "https://schema.org",
-          "@type": "Organization",
-          name: "Familial",
-          url: "https://familialapp.lovable.app",
-          logo: "https://familialapp.lovable.app/og-image.jpg",
-          description: "A private social space for the people who matter most.",
+          "@graph": [
+            {
+              "@type": "Organization",
+              name: "Familial",
+              url: "https://www.familialmedia.com",
+              logo: "https://www.familialmedia.com/og-image.jpg",
+              description: "A private social space for the people who matter most.",
+            },
+            faqJsonLd,
+          ],
         }}
       />
       <Header />
