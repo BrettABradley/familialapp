@@ -261,6 +261,7 @@ const Pricing = () => {
       // No matching Apple product — show error rather than falling back to Stripe
       toast({ title: "Unavailable", description: "This plan isn't available for purchase in the iOS app.", variant: "destructive" });
       return;
+    }
 
     if (currentPlan && currentPlan !== "free" && targetRank > currentRank) {
       await handleUpgradePreview(plan, priceId);
