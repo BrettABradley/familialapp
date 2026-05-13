@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { isIOSNative, purchaseSubscription, APPLE_PRODUCTS } from "@/lib/iapPurchase";
 
 const PRICES: Record<string, { priceId: string; name: string; price: string }> = {
   family: { priceId: "price_1T3N5bCiWDzualH5Cf7G7VsM", name: "Family", price: "$7/mo" },
@@ -90,9 +91,20 @@ const CircleRescueDialog = ({ circleId, open, onOpenChange }: CircleRescueDialog
     setCheckoutLoading(true);
 
     try {
-      // Determine which plan is needed — at minimum Family
-      const plan = PRICES.family;
+      // iOS native: Apple IAP only (App Store guideline 3.1.1)
+      if (isIOSNative()) {
+        const success = await purchaseSubscription(APPLE_PRODUCTS.family, {
+          rescue_circle_id: offer.circle_id,
+        });
+        if (success) {
+          toast({ title: "Circle claimed!", description: "Ownership has been transferred." });
+          onOpenChange(false);
+        }
+        setCheckoutLoading(false);
+        return;
+      }
 
+      const plan = PRICES.family;
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {
           priceId: plan.priceId,
@@ -104,7 +116,6 @@ const CircleRescueDialog = ({ circleId, open, onOpenChange }: CircleRescueDialog
 
       if (error) throw error;
       if (data?.url) {
-        // Let the webhook handle marking as claimed after payment confirmation
         window.location.href = data.url;
       }
     } catch (err: any) {

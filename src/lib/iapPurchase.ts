@@ -5,27 +5,27 @@ import { supabase } from "@/integrations/supabase/client";
 export const APPLE_PRODUCTS = {
   family: "com.familialmedia.familial.family.monthly",
   extended: "com.familialmedia.familial.extended.monthly",
+  extraMembers: "com.familialmedia.familial.extramembers",
 };
 
 export const isIOSNative = () =>
   Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 
-/**
- * Lazy-load the @capgo/native-purchases plugin only on native iOS.
- * Using a normal dynamic import (Vite resolves it at build time) — the
- * previous Function('return import(...)') trick was being blocked by the
- * WKWebView CSP, which is why purchases silently failed on device.
- */
 const loadPlugin = async () => {
-  // @vite-ignore — the plugin is installed but only registered on native
+  // @vite-ignore
   const mod = await import("@capgo/native-purchases");
   return mod;
 };
 
 /**
  * Purchase a subscription via Apple IAP.
+ * Optional `extras` are forwarded to validate-apple-receipt for circle
+ * rescue / membership transfer flows.
  */
-export const purchaseSubscription = async (productId: string): Promise<boolean> => {
+export const purchaseSubscription = async (
+  productId: string,
+  extras?: { circleId?: string; rescue_circle_id?: string }
+): Promise<boolean> => {
   if (!isIOSNative()) return false;
 
   const { NativePurchases, PURCHASE_TYPE } = await loadPlugin();
@@ -41,18 +41,58 @@ export const purchaseSubscription = async (productId: string): Promise<boolean> 
 
     const { error } = await supabase.functions.invoke("validate-apple-receipt", {
       body: {
+        kind: "subscription",
         transactionId,
         productId,
+        receipt: result?.receipt ?? null,
+        jwsRepresentation: result?.jwsRepresentation ?? null,
+        ...(extras ?? {}),
+      },
+    });
+
+    if (error) throw error;
+    return true;
+  } catch (err: any) {
+    const msg = String(err?.message ?? err ?? "").toLowerCase();
+    if (err?.code === "USER_CANCELLED" || msg.includes("cancel")) {
+      return false;
+    }
+    throw err;
+  }
+};
+
+/**
+ * Purchase a one-time consumable via Apple IAP (e.g. extra member seats).
+ */
+export const purchaseConsumable = async (
+  productId: string,
+  extras: { circleId: string; kind: "extra_members" }
+): Promise<boolean> => {
+  if (!isIOSNative()) return false;
+
+  const { NativePurchases, PURCHASE_TYPE } = await loadPlugin();
+
+  try {
+    const result: any = await NativePurchases.purchaseProduct({
+      productIdentifier: productId,
+      productType: PURCHASE_TYPE.INAPP,
+    });
+
+    const transactionId = result?.transactionId;
+    if (!transactionId) return false;
+
+    const { error } = await supabase.functions.invoke("validate-apple-receipt", {
+      body: {
+        kind: extras.kind,
+        transactionId,
+        productId,
+        circleId: extras.circleId,
         receipt: result?.receipt ?? null,
         jwsRepresentation: result?.jwsRepresentation ?? null,
       },
     });
 
     if (error) throw error;
-
-    // @capgo/native-purchases auto-acknowledges purchases by default,
-    // so no explicit finishTransaction call is required.
-
     return true;
   } catch (err: any) {
     const msg = String(err?.message ?? err ?? "").toLowerCase();

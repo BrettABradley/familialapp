@@ -1300,6 +1300,7 @@ export type Database = {
           max_members_per_circle: number
           pending_plan: string | null
           plan: string
+          source: string
           updated_at: string
           user_id: string
         }
@@ -1313,6 +1314,7 @@ export type Database = {
           max_members_per_circle?: number
           pending_plan?: string | null
           plan?: string
+          source?: string
           updated_at?: string
           user_id: string
         }
@@ -1326,6 +1328,7 @@ export type Database = {
           max_members_per_circle?: number
           pending_plan?: string | null
           plan?: string
+          source?: string
           updated_at?: string
           user_id?: string
         }

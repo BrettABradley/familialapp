@@ -251,12 +251,16 @@ const Pricing = () => {
           setLoadingPlan(null);
           return;
         } catch (err: any) {
-          // IAP plugin not available or failed - fall through to Stripe checkout
-          console.log("IAP not available, falling back to Stripe checkout:", err.message);
+          // iOS native must NEVER fall back to Stripe (App Store guideline 3.1.1)
+          console.error("IAP failed:", err?.message);
+          toast({ title: "Purchase failed", description: err?.message || "Could not complete purchase. Please try again.", variant: "destructive" });
           setLoadingPlan(null);
+          return;
         }
       }
-      // Fall through to Stripe checkout below
+      // No matching Apple product — show error rather than falling back to Stripe
+      toast({ title: "Unavailable", description: "This plan isn't available for purchase in the iOS app.", variant: "destructive" });
+      return;
     }
 
     if (currentPlan && currentPlan !== "free" && targetRank > currentRank) {
