@@ -14,14 +14,15 @@ export async function pickImage(): Promise<PickedImage | null> {
   if (Capacitor.isNativePlatform()) {
     try {
       const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+      // Use Photos source on iOS to avoid the iPad popover-anchor crash that
+      // CameraSource.Prompt triggers (action sheets must be presented as
+      // popovers on iPad). Users can take a new photo from inside the
+      // native photo picker via the camera button there.
       const photo = await Camera.getPhoto({
         quality: 90,
         allowEditing: false,
         resultType: CameraResultType.DataUrl,
-        source: CameraSource.Prompt,
-        promptLabelHeader: 'Choose Photo',
-        promptLabelPhoto: 'From Gallery',
-        promptLabelPicture: 'Take Photo',
+        source: CameraSource.Photos,
       });
 
       if (!photo.dataUrl) return null;
