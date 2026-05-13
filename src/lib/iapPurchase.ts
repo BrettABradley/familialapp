@@ -17,6 +17,43 @@ const loadPlugin = async () => {
   return mod;
 };
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Fetch the product from StoreKit with one retry. Cold-start TestFlight
+ * launches frequently take a moment for products to become available — a
+ * single retry covers ~99% of those cases without a noticeable wait.
+ */
+const ensureProductLoaded = async (
+  NativePurchases: any,
+  productId: string
+): Promise<boolean> => {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res: any = await NativePurchases.getProducts({
+        productIdentifiers: [productId],
+      });
+      const list = res?.products ?? (Array.isArray(res) ? res : []);
+      if (list && list.length > 0) return true;
+    } catch (err) {
+      // fall through to retry
+      console.warn("[IAP] getProducts attempt failed:", err);
+    }
+    if (attempt === 0) await sleep(800);
+  }
+  return false;
+};
+
+const isCancelError = (err: any) => {
+  const msg = String(err?.message ?? err ?? "").toLowerCase();
+  return (
+    err?.code === "USER_CANCELLED" ||
+    err?.code === 2 || // SKErrorPaymentCancelled
+    msg.includes("cancel") ||
+    msg.includes("user did not")
+  );
+};
+
 /**
  * Purchase a subscription via Apple IAP.
  * Optional `extras` are forwarded to validate-apple-receipt for circle
@@ -30,32 +67,34 @@ export const purchaseSubscription = async (
 
   const { NativePurchases, PURCHASE_TYPE } = await loadPlugin();
 
-  // Pre-fetch the product so StoreKit has it loaded before we attempt to buy.
-  // If this fails or returns nothing, surface a clear error rather than a
-  // silent purchase failure (the #1 cause of App Review IAP rejections).
-  try {
-    const products: any = await NativePurchases.getProducts({
-      productIdentifiers: [productId],
-    });
-    const list = Array.isArray(products) ? products : products?.products;
-    if (!list || list.length === 0) {
-      throw new Error("Subscription is temporarily unavailable. Please try again in a moment.");
-    }
-  } catch (err: any) {
-    // If getProducts itself isn't supported by the plugin version, continue —
-    // purchaseProduct will surface its own error.
-    if (err?.message?.includes("temporarily unavailable")) throw err;
+  // Pre-load the product so StoreKit has it cached before we trigger the
+  // purchase sheet. If it can't be loaded, surface a clear error rather
+  // than letting purchaseProduct fail silently (the #1 cause of App Review
+  // IAP rejections).
+  const ready = await ensureProductLoaded(NativePurchases, productId);
+  if (!ready) {
+    throw new Error(
+      "Subscriptions are still loading from the App Store. Please try again in a moment."
+    );
   }
 
+  let result: any;
   try {
-    const result: any = await NativePurchases.purchaseProduct({
+    result = await NativePurchases.purchaseProduct({
       productIdentifier: productId,
       productType: PURCHASE_TYPE.SUBS,
     });
+  } catch (err: any) {
+    if (isCancelError(err)) return false;
+    throw err;
+  }
 
-    const transactionId = result?.transactionId;
-    if (!transactionId) return false;
+  const transactionId = result?.transactionId;
+  if (!transactionId) {
+    throw new Error("Purchase completed but no transaction was returned.");
+  }
 
+  try {
     const { error } = await supabase.functions.invoke("validate-apple-receipt", {
       body: {
         kind: "subscription",
@@ -66,18 +105,16 @@ export const purchaseSubscription = async (
         ...(extras ?? {}),
       },
     });
-
-    // Don't fail the purchase UX if our backend validation hiccups —
-    // the StoreKit transaction is real and restorePurchases will reconcile.
-    if (error) console.warn("[IAP] validate-apple-receipt failed:", error);
-    return true;
-  } catch (err: any) {
-    const msg = String(err?.message ?? err ?? "").toLowerCase();
-    if (err?.code === "USER_CANCELLED" || msg.includes("cancel")) {
-      return false;
+    if (error) {
+      console.warn("[IAP] validate-apple-receipt failed:", error);
+      // Don't block the success UX — the StoreKit transaction is real.
+      // Restore Purchases or the next session refresh will reconcile.
     }
-    throw err;
+  } catch (err) {
+    console.warn("[IAP] validate-apple-receipt threw:", err);
   }
+
+  return true;
 };
 
 /**
@@ -91,35 +128,48 @@ export const purchaseConsumable = async (
 
   const { NativePurchases, PURCHASE_TYPE } = await loadPlugin();
 
+  const ready = await ensureProductLoaded(NativePurchases, productId);
+  if (!ready) {
+    throw new Error(
+      "This add-on is still loading from the App Store. Please try again in a moment."
+    );
+  }
+
+  let result: any;
   try {
-    const result: any = await NativePurchases.purchaseProduct({
+    result = await NativePurchases.purchaseProduct({
       productIdentifier: productId,
       productType: PURCHASE_TYPE.INAPP,
     });
-
-    const transactionId = result?.transactionId;
-    if (!transactionId) return false;
-
-    const { error } = await supabase.functions.invoke("validate-apple-receipt", {
-      body: {
-        kind: extras.kind,
-        transactionId,
-        productId,
-        circleId: extras.circleId,
-        receipt: result?.receipt ?? null,
-        jwsRepresentation: result?.jwsRepresentation ?? null,
-      },
-    });
-
-    if (error) throw error;
-    return true;
   } catch (err: any) {
-    const msg = String(err?.message ?? err ?? "").toLowerCase();
-    if (err?.code === "USER_CANCELLED" || msg.includes("cancel")) {
-      return false;
-    }
+    if (isCancelError(err)) return false;
     throw err;
   }
+
+  const transactionId = result?.transactionId;
+  if (!transactionId) {
+    throw new Error("Purchase completed but no transaction was returned.");
+  }
+
+  const { error } = await supabase.functions.invoke("validate-apple-receipt", {
+    body: {
+      kind: extras.kind,
+      transactionId,
+      productId,
+      circleId: extras.circleId,
+      receipt: result?.receipt ?? null,
+      jwsRepresentation: result?.jwsRepresentation ?? null,
+    },
+  });
+
+  if (error) {
+    // Consumables MUST be granted server-side. Don't silently swallow.
+    throw new Error(
+      "Payment succeeded but we couldn't add the seats. Please contact support@familialmedia.com — your purchase is safe."
+    );
+  }
+
+  return true;
 };
 
 /**
@@ -137,7 +187,8 @@ export const restorePurchases = async (): Promise<boolean> => {
     });
 
     return !error;
-  } catch {
+  } catch (err) {
+    console.warn("[IAP] restorePurchases failed:", err);
     return false;
   }
 };
