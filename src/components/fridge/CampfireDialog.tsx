@@ -239,7 +239,7 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
             </div>
           )}
 
-          <p className="text-xs text-zinc-400 mt-2">
+          <p className="text-xs text-muted-foreground mt-2">
             {stories.length} {stories.length === 1 ? "story" : "stories"} shared
           </p>
         </div>
