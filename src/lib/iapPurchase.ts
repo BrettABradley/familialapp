@@ -75,7 +75,7 @@ export const purchaseConsumable = async (
   try {
     const result: any = await NativePurchases.purchaseProduct({
       productIdentifier: productId,
-      productType: PURCHASE_TYPE.CONSUMABLE,
+      productType: PURCHASE_TYPE.INAPP,
     });
 
     const transactionId = result?.transactionId;
