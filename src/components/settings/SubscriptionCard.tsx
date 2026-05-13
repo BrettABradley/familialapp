@@ -296,31 +296,37 @@ const SubscriptionCard = () => {
             {isPaid && (
               <Button variant="outline" onClick={handleManageBilling} disabled={portalLoading} className="w-full">
                 {portalLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ExternalLink className="w-4 h-4 mr-2" />}
-                Manage Billing
+                {isApple ? "Manage in App Store" : "Manage Billing"}
               </Button>
             )}
 
-            {isExtended && !planData.cancel_at_period_end && !planData.pending_plan && (
+            {isApple && isPaid && (
+              <p className="text-xs text-muted-foreground text-center px-2">
+                Your subscription is managed by Apple. To change or cancel your plan, use the App Store subscription settings.
+              </p>
+            )}
+
+            {!isApple && isExtended && !planData.cancel_at_period_end && !planData.pending_plan && (
               <Button variant="outline" onClick={() => openConfirmDialog("downgrade")} disabled={downgradeLoading} className="w-full">
                 Downgrade to Family
               </Button>
             )}
 
-            {planData.pending_plan && !planData.cancel_at_period_end && (
+            {!isApple && planData.pending_plan && !planData.cancel_at_period_end && (
               <Button variant="default" onClick={() => setCancelDowngradeDialog(true)} disabled={cancelDowngradeLoading} className="w-full">
                 {cancelDowngradeLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RotateCcw className="w-4 h-4 mr-2" />}
                 Cancel Downgrade
               </Button>
             )}
 
-            {isPaid && planData.cancel_at_period_end && (
+            {!isApple && isPaid && planData.cancel_at_period_end && (
               <Button variant="default" onClick={handleReactivate} disabled={reactivateLoading} className="w-full">
                 {reactivateLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RotateCcw className="w-4 h-4 mr-2" />}
                 Reactivate Subscription
               </Button>
             )}
 
-            {isPaid && !planData.cancel_at_period_end && (
+            {!isApple && isPaid && !planData.cancel_at_period_end && (
               <Button variant="outline" onClick={() => openConfirmDialog("cancel")} disabled={cancelLoading} className="w-full text-destructive hover:text-destructive">
                 Cancel Membership
               </Button>
