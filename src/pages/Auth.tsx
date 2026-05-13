@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import logo from "@/assets/logo.png";
+import { isIOSNative, purchaseSubscription, APPLE_PRODUCTS } from "@/lib/iapPurchase";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -62,8 +63,30 @@ const Auth = () => {
   useEffect(() => {
     if (!loading && user && planParam && PLAN_PRICES[planParam] && !checkoutTriggered.current) {
       checkoutTriggered.current = true;
+
+      // iOS native: must use Apple IAP (App Store guideline 3.1.1)
+      if (isIOSNative()) {
+        const appleProductId = APPLE_PRODUCTS[planParam as keyof typeof APPLE_PRODUCTS];
+        if (appleProductId) {
+          (async () => {
+            try {
+              const success = await purchaseSubscription(appleProductId);
+              if (success) {
+                toast({ title: "Plan activated!", description: `You're now on the ${planParam.charAt(0).toUpperCase() + planParam.slice(1)} plan.` });
+              }
+            } catch (err: any) {
+              toast({ title: "Purchase failed", description: err?.message || "Could not complete purchase.", variant: "destructive" });
+            } finally {
+              navigate("/circles");
+            }
+          })();
+        } else {
+          navigate("/circles");
+        }
+        return;
+      }
+
       const { priceId, mode } = PLAN_PRICES[planParam];
-      
       supabase.functions.invoke("create-checkout", {
         body: { priceId, mode },
       }).then(({ data, error }) => {

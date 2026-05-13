@@ -25,6 +25,7 @@ import PendingInvites from "@/components/circles/PendingInvites";
 import UpgradePlanDialog from "@/components/circles/UpgradePlanDialog";
 import CircleRescueDialog from "@/components/circles/CircleRescueDialog";
 import { checkCircleCapacity, getCircleMemberCount, getCircleMemberLimit } from "@/lib/circleLimits";
+import { isIOSNative, purchaseConsumable, APPLE_PRODUCTS } from "@/lib/iapPurchase";
 
 interface Circle {
   id: string;
@@ -1002,6 +1003,16 @@ const Circles = () => {
                 onClick={async () => {
                   setIsMembersOpen(false);
                   try {
+                    if (isIOSNative()) {
+                      const success = await purchaseConsumable(APPLE_PRODUCTS.extraMembers, {
+                        circleId: selectedCircle.id,
+                        kind: "extra_members",
+                      });
+                      if (success) {
+                        toast({ title: "Seats added!", description: "7 extra member slots added to this circle." });
+                      }
+                      return;
+                    }
                     const { data, error } = await supabase.functions.invoke("create-checkout", {
                       body: { priceId: "price_1T3N5zCiWDzualH52rsDSBlu", mode: "payment", circleId: selectedCircle.id },
                     });
