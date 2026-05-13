@@ -27,6 +27,7 @@ interface UserPlan {
   current_period_end: string | null;
   pending_plan: string | null;
   max_circles: number;
+  source?: string | null;
 }
 
 interface OwnedCircle {
