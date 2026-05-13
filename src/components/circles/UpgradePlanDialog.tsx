@@ -8,6 +8,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Users, ArrowUp, Plus, Loader2 } from "lucide-react";
 import { openExternalUrl } from "@/lib/externalUrl";
 import {
+  isIOSNative,
+  purchaseSubscription,
+  purchaseConsumable,
+  APPLE_PRODUCTS,
+} from "@/lib/iapPurchase";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
