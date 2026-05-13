@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://familialapp.lovable.app/sitemap.xml
+Sitemap: https://www.familialmedia.com/sitemap.xml

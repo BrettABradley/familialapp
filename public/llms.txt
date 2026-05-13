@@ -1,0 +1,20 @@
+# Familial
+
+> A private social network for families — share moments, plan events, and stay close without algorithms, ads, or tracking.
+
+Familial is built by Familial, LLC (Arizona, USA). It offers chronological feeds, private circles, shared family fridges, photo albums, events, and messaging — all without behavioral tracking or advertising.
+
+## Pages
+
+- [Home](/): Overview of Familial and how it works.
+- [About](/about): Our story, mission, and values.
+- [Support](/support): Help center and contact.
+- [Blog](/blog): Updates and family connection tips.
+- [Careers](/careers): Join the Familial team.
+- [Privacy Policy](/privacy): How we handle your data.
+- [Terms of Service](/terms): Terms governing use of Familial.
+- [Cookie Policy](/cookies): Our minimal cookie usage.
+
+## Optional
+
+- [Sign in or sign up](/auth): Account access.
