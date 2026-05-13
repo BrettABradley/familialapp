@@ -110,6 +110,11 @@ const SubscriptionCard = () => {
   };
 
   const handleManageBilling = async () => {
+    // iOS native: route to Apple's subscription management page (App Store guideline 3.1.1)
+    if (isIOSNative() || planData?.source === "apple") {
+      openAppleSubscriptionManagement();
+      return;
+    }
     setPortalLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("customer-portal");
