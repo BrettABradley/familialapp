@@ -206,20 +206,9 @@ const Auth = () => {
           toast({ title: "Welcome back!", description: "You've successfully signed in." });
         }
       } else {
-        // Age gate check
-        if (dateOfBirth) {
-          const dob = new Date(dateOfBirth);
-          const today = new Date();
-          let age = today.getFullYear() - dob.getFullYear();
-          const m = today.getMonth() - dob.getMonth();
-          if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
-          if (age < 13) {
-            setErrors({ dob: "You must be 13 or older to use Familial." });
-            setIsLoading(false);
-            return;
-          }
-        } else {
-          setErrors({ dob: "Date of birth is required." });
+        // Age confirmation (COPPA 13+)
+        if (!ageConfirmed) {
+          setErrors({ age: "Please confirm you are at least 13 years old." });
           setIsLoading(false);
           return;
         }
@@ -241,18 +230,6 @@ const Auth = () => {
             });
           }
         } else {
-          // Save DOB to profile after signup — user may not be set yet via listener,
-          // so fetch the session directly
-          if (dateOfBirth) {
-            const { data: sessionData } = await supabase.auth.getSession();
-            const userId = sessionData.session?.user?.id;
-            if (userId) {
-              await supabase
-                .from("profiles")
-                .update({ date_of_birth: dateOfBirth } as any)
-                .eq("user_id", userId);
-            }
-          }
           toast({
             title: "Account created!",
             description: "Welcome to Familial. Let's set up your first circle.",
