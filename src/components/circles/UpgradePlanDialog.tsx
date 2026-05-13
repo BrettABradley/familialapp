@@ -72,6 +72,45 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
     }
   };
 
+  const handleApplePlanPurchase = async (
+    plan: "family" | "extended",
+    optionKey: string
+  ) => {
+    setLoadingOption(optionKey);
+    try {
+      const success = await purchaseSubscription(APPLE_PRODUCTS[plan]);
+      if (success) {
+        toast({
+          title: "Plan upgraded!",
+          description: `You're now on the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan.`,
+        });
+        onClose();
+      }
+    } catch (err: any) {
+      toast({ title: "Purchase failed", description: err.message || "Could not complete purchase.", variant: "destructive" });
+    } finally {
+      setLoadingOption(null);
+    }
+  };
+
+  const handleAppleExtraMembers = async (optionKey: string) => {
+    setLoadingOption(optionKey);
+    try {
+      const success = await purchaseConsumable(APPLE_PRODUCTS.extraMembers, {
+        circleId,
+        kind: "extra_members",
+      });
+      if (success) {
+        toast({ title: "Seats added!", description: "7 extra member slots added to this circle." });
+        onClose();
+      }
+    } catch (err: any) {
+      toast({ title: "Purchase failed", description: err.message || "Could not complete purchase.", variant: "destructive" });
+    } finally {
+      setLoadingOption(null);
+    }
+  };
+
   const handleUpgradePreview = async (priceId: string, optionKey: string) => {
     setLoadingOption(optionKey);
     try {
@@ -123,6 +162,9 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
     return new Date(dateStr).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   };
 
+  // On iOS native, all paid actions must use Apple IAP (App Store guideline 3.1.1).
+  const onIOS = isIOSNative();
+
   const options = [];
 
   if (currentPlan === "free") {
@@ -131,7 +173,10 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
       title: "Family Plan",
       price: "$7/month",
       description: "Up to 20 members per circle, 2 circles",
-      action: () => handleCheckout(PRICES.family, "subscription", "family"),
+      action: () =>
+        onIOS
+          ? handleApplePlanPurchase("family", "family")
+          : handleCheckout(PRICES.family, "subscription", "family"),
       icon: <ArrowUp className="w-4 h-4" />,
     });
     options.push({
@@ -139,7 +184,10 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
       title: "Extended Plan",
       price: "$15/month",
       description: "Up to 35 members per circle, 3 circles",
-      action: () => handleCheckout(PRICES.extended, "subscription", "extended"),
+      action: () =>
+        onIOS
+          ? handleApplePlanPurchase("extended", "extended")
+          : handleCheckout(PRICES.extended, "subscription", "extended"),
       icon: <ArrowUp className="w-4 h-4" />,
     });
   } else if (currentPlan === "family") {
@@ -148,7 +196,10 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
       title: "Upgrade to Extended",
       price: "$15/month",
       description: "Up to 35 members per circle, 3 circles",
-      action: () => handleUpgradePreview(PRICES.extended, "extended"),
+      action: () =>
+        onIOS
+          ? handleApplePlanPurchase("extended", "extended")
+          : handleUpgradePreview(PRICES.extended, "extended"),
       icon: <ArrowUp className="w-4 h-4" />,
     });
   }
@@ -159,26 +210,12 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
     title: "Add 7 Extra Members",
     price: "$5 one-time",
     description: "Adds 7 more member slots to this circle",
-    action: () => handleCheckout(PRICES.extraMembers, "payment", "extra"),
+    action: () =>
+      onIOS
+        ? handleAppleExtraMembers("extra")
+        : handleCheckout(PRICES.extraMembers, "payment", "extra"),
     icon: <Plus className="w-4 h-4" />,
   });
-
-  return (
-    <>
-      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-serif flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Upgrade Your Circle
-            </DialogTitle>
-            <DialogDescription>
-              Hit your member limit or just want more room to grow? We've got you covered.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 mt-4">
-            <div className="flex items-center justify-between text-sm text-muted-foreground p-3 rounded-md bg-secondary/50">
               <span>Current plan</span>
               <Badge variant="secondary" className="capitalize">{currentPlan}</Badge>
             </div>
