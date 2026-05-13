@@ -11,6 +11,9 @@ const PRODUCT_TO_PLAN: Record<string, { plan: string; max_circles: number; max_m
   "com.familialmedia.familial.extended.monthly": { plan: "extended", max_circles: 3, max_members_per_circle: 35 },
 };
 
+const EXTRA_MEMBERS_PRODUCT = "com.familialmedia.familial.extramembers";
+const EXTRA_MEMBERS_INCREMENT = 7;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -34,10 +37,9 @@ serve(async (req) => {
     if (!user) throw new Error("Not authenticated");
 
     const body = await req.json();
-    const { transactionId, productId, restore } = body;
+    const { kind, transactionId, productId, restore, circleId, rescue_circle_id } = body;
 
     if (restore) {
-      // For restore, just check the current user_plans state
       return new Response(JSON.stringify({ success: true, restored: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -47,17 +49,40 @@ serve(async (req) => {
       throw new Error("transactionId and productId are required");
     }
 
+    // TODO: Validate transaction with Apple's App Store Server API v2
+    // (App Store Server API key required). For now we trust the client-supplied
+    // transactionId — the StoreKit purchase already happened on-device.
+
+    // === Extra Members consumable ===
+    if (kind === "extra_members" || productId === EXTRA_MEMBERS_PRODUCT) {
+      if (!circleId) throw new Error("circleId is required for extra_members");
+
+      // Verify caller owns the circle
+      const { data: circle, error: circleErr } = await serviceClient
+        .from("circles")
+        .select("id, owner_id, extra_members")
+        .eq("id", circleId)
+        .single();
+      if (circleErr || !circle) throw new Error("Circle not found");
+      if (circle.owner_id !== user.id) throw new Error("Only the circle owner can add seats");
+
+      const { error: updErr } = await serviceClient
+        .from("circles")
+        .update({ extra_members: (circle.extra_members ?? 0) + EXTRA_MEMBERS_INCREMENT })
+        .eq("id", circleId);
+      if (updErr) throw updErr;
+
+      return new Response(JSON.stringify({ success: true, kind: "extra_members", added: EXTRA_MEMBERS_INCREMENT }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // === Subscription ===
     const planConfig = PRODUCT_TO_PLAN[productId];
     if (!planConfig) {
       throw new Error("Unknown product ID");
     }
 
-    // TODO: Validate the transaction with Apple's App Store Server API v2
-    // For now, trust the client transaction and update the plan
-    // In production, you should verify with Apple's /inApps/v1/transactions/{transactionId}
-    // using the App Store Server API key
-
-    // Update user plan
     const { error: updateError } = await serviceClient
       .from("user_plans")
       .update({
@@ -67,15 +92,36 @@ serve(async (req) => {
         cancel_at_period_end: false,
         pending_plan: null,
         apple_original_transaction_id: transactionId,
+        source: "apple",
       })
       .eq("user_id", user.id);
 
     if (updateError) throw updateError;
 
+    // Optional: complete a circle rescue claim after a successful upgrade
+    if (rescue_circle_id) {
+      // Use a user-scoped client so claim_circle_ownership runs as the caller
+      const userClient = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { error: claimErr } = await userClient.rpc("claim_circle_ownership", {
+        _circle_id: rescue_circle_id,
+      });
+      if (claimErr) {
+        // Surface but don't roll back the plan change
+        return new Response(
+          JSON.stringify({ success: true, plan: planConfig.plan, rescue_error: claimErr.message }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, plan: planConfig.plan }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
