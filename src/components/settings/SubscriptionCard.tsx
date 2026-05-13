@@ -256,6 +256,8 @@ const SubscriptionCard = () => {
   const dialogAction = confirmDialog?.action;
   const targetPlanName = dialogAction === "cancel" ? "Free" : "Family";
 
+  const isApple = planData.source === "apple";
+
   return (
     <>
       <Card>
