@@ -337,6 +337,24 @@ const SubscriptionCard = () => {
                 Upgrade Plan
               </Button>
             )}
+
+            {isIOSNative() && (
+              <Button
+                variant="ghost"
+                onClick={async () => {
+                  const ok = await restorePurchases();
+                  toast({
+                    title: ok ? "Purchases restored" : "Nothing to restore",
+                    description: ok
+                      ? "Your subscription has been restored."
+                      : "We couldn't find any previous purchases on this Apple ID.",
+                  });
+                }}
+                className="w-full"
+              >
+                Restore Purchases
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
