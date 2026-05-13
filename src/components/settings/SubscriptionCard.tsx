@@ -57,7 +57,7 @@ const SubscriptionCard = () => {
     if (!user) return;
     supabase
       .from("user_plans")
-      .select("plan, cancel_at_period_end, current_period_end, pending_plan, max_circles")
+      .select("plan, cancel_at_period_end, current_period_end, pending_plan, max_circles, source")
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => {
