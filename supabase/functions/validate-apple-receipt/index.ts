@@ -13,6 +13,108 @@ const PRODUCT_TO_PLAN: Record<string, { plan: string; max_circles: number; max_m
 
 const EXTRA_MEMBERS_PRODUCT = "com.familialmedia.familial.extramembers";
 const EXTRA_MEMBERS_INCREMENT = 7;
+const BUNDLE_ID = "com.familialmedia.familial";
+
+// === Apple App Store Server API helpers ===
+function base64UrlEncode(data: Uint8Array | string): string {
+  const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlDecodeToBytes(b64url: string): Uint8Array {
+  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (b64url.length % 4)) % 4);
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function pemToPkcs8(pem: string): Uint8Array {
+  const body = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
+    .replace(/-----END PRIVATE KEY-----/g, "")
+    .replace(/\s+/g, "");
+  const bin = atob(body);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+async function generateAppleJWT(): Promise<string> {
+  const issuerId = Deno.env.get("APPLE_ISSUER_ID");
+  const keyId = Deno.env.get("APPLE_KEY_ID");
+  const privateKeyPem = Deno.env.get("APPLE_PRIVATE_KEY");
+  if (!issuerId || !keyId || !privateKeyPem) {
+    throw new Error("Apple App Store credentials are not configured");
+  }
+
+  const header = { alg: "ES256", kid: keyId, typ: "JWT" };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iss: issuerId,
+    iat: now,
+    exp: now + 60 * 20,
+    aud: "appstoreconnect-v1",
+    bid: BUNDLE_ID,
+  };
+
+  const encodedHeader = base64UrlEncode(JSON.stringify(header));
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+  const keyData = pemToPkcs8(privateKeyPem);
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    keyData,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"]
+  );
+  const sigBuf = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    cryptoKey,
+    new TextEncoder().encode(signingInput)
+  );
+  const signature = base64UrlEncode(new Uint8Array(sigBuf));
+  return `${signingInput}.${signature}`;
+}
+
+function decodeJwsPayload(jws: string): any {
+  const parts = jws.split(".");
+  if (parts.length !== 3) throw new Error("Invalid JWS");
+  const bytes = base64UrlDecodeToBytes(parts[1]);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+/**
+ * Calls Apple's App Store Server API to fetch + verify a transaction.
+ * Tries production first, falls back to sandbox (TestFlight & sandbox tester accounts).
+ * Returns the decoded JWS payload (transaction info).
+ */
+async function fetchAppleTransaction(transactionId: string): Promise<any> {
+  const jwt = await generateAppleJWT();
+  const headers = { Authorization: `Bearer ${jwt}` };
+
+  const endpoints = [
+    `https://api.storekit.itunes.apple.com/inApps/v1/transactions/${transactionId}`,
+    `https://api.storekit-sandbox.itunes.apple.com/inApps/v1/transactions/${transactionId}`,
+  ];
+
+  let lastError = "";
+  for (const url of endpoints) {
+    const res = await fetch(url, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      if (!data?.signedTransactionInfo) throw new Error("Apple response missing signedTransactionInfo");
+      return decodeJwsPayload(data.signedTransactionInfo);
+    }
+    lastError = `${res.status} ${await res.text()}`;
+    // 404 on prod is expected for sandbox transactions; try next endpoint.
+  }
+  throw new Error(`Apple transaction lookup failed: ${lastError}`);
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -49,9 +151,22 @@ serve(async (req) => {
       throw new Error("transactionId and productId are required");
     }
 
-    // TODO: Validate transaction with Apple's App Store Server API v2
-    // (App Store Server API key required). For now we trust the client-supplied
-    // transactionId — the StoreKit purchase already happened on-device.
+    // === Verify with Apple's App Store Server API ===
+    const txn = await fetchAppleTransaction(String(transactionId));
+
+    if (txn.bundleId !== BUNDLE_ID) {
+      throw new Error(`Bundle ID mismatch: ${txn.bundleId}`);
+    }
+    if (txn.productId !== productId) {
+      throw new Error(`Product ID mismatch: expected ${productId}, got ${txn.productId}`);
+    }
+    if (txn.revocationDate) {
+      throw new Error("Transaction has been revoked by Apple");
+    }
+    // Subscriptions: ensure not expired
+    if (txn.type === "Auto-Renewable Subscription" && txn.expiresDate && txn.expiresDate < Date.now()) {
+      throw new Error("Subscription has expired");
+    }
 
     // === Extra Members consumable ===
     if (kind === "extra_members" || productId === EXTRA_MEMBERS_PRODUCT) {
@@ -91,7 +206,7 @@ serve(async (req) => {
         max_members_per_circle: planConfig.max_members_per_circle,
         cancel_at_period_end: false,
         pending_plan: null,
-        apple_original_transaction_id: transactionId,
+        apple_original_transaction_id: txn.originalTransactionId ?? transactionId,
         source: "apple",
       })
       .eq("user_id", user.id);
@@ -100,7 +215,6 @@ serve(async (req) => {
 
     // Optional: complete a circle rescue claim after a successful upgrade
     if (rescue_circle_id) {
-      // Use a user-scoped client so claim_circle_ownership runs as the caller
       const userClient = createClient(
         Deno.env.get("SUPABASE_URL") ?? "",
         Deno.env.get("SUPABASE_ANON_KEY") ?? "",
@@ -110,7 +224,6 @@ serve(async (req) => {
         _circle_id: rescue_circle_id,
       });
       if (claimErr) {
-        // Surface but don't roll back the plan change
         return new Response(
           JSON.stringify({ success: true, plan: planConfig.plan, rescue_error: claimErr.message }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
