@@ -6,7 +6,24 @@ import { Mail, Phone, Shield, Eye, Heart, Users } from "lucide-react";
 const About = () => {
   return (
     <div className="min-h-screen bg-background">
-      <SEO title="About Familial - Our Story & Mission" description="Learn about Familial — the private social network built for families, not advertisers. Our story, mission, and values." path="/about" />
+      <SEO
+        title="About Familial - Our Story & Mission"
+        description="Learn about Familial — the private social network built for families, not advertisers. Our story, mission, and values."
+        path="/about"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "LocalBusiness",
+          name: "Familial, LLC",
+          url: "https://www.familialmedia.com/about",
+          email: "support@familialmedia.com",
+          telephone: "+1-480-648-9596",
+          address: {
+            "@type": "PostalAddress",
+            addressRegion: "AZ",
+            addressCountry: "US",
+          },
+        }}
+      />
       <Header />
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 max-w-4xl">
         <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground mb-4">About Familial</h1>
