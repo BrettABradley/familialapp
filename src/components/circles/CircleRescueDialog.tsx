@@ -12,7 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { isIOSNative, purchaseSubscription, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import { isIOSNative, purchaseSubscription, prewarmProducts, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import SubscriptionDisclosure from "@/components/shared/SubscriptionDisclosure";
 
 const PRICES: Record<string, { priceId: string; name: string; price: string }> = {
   family: { priceId: "price_1T3N5bCiWDzualH5Cf7G7VsM", name: "Family", price: "$7/mo" },
