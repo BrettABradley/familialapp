@@ -19,27 +19,105 @@ const loadPlugin = async () => {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Module-level cache of StoreKit Product objects, keyed by productIdentifier.
+// Populated by prewarmProducts() so subsequent purchase attempts hit a warm
+// cache and the UI can render Apple-validated localized prices.
+const productCache: Record<string, any> = {};
+
+const RETRY_DELAYS_MS = [800, 1500];
+
+const parseProductList = (res: any): any[] => {
+  if (!res) return [];
+  if (Array.isArray(res)) return res;
+  if (Array.isArray(res?.products)) return res.products;
+  return [];
+};
+
 /**
- * Fetch the product from StoreKit with one retry. Cold-start TestFlight
- * launches frequently take a moment for products to become available — a
- * single retry covers ~99% of those cases without a noticeable wait.
+ * Pre-warm StoreKit by fetching all known product IDs once. Call on mount
+ * of any screen that may trigger a purchase (Pricing page, Upgrade dialog,
+ * Rescue dialog) so by the time the user taps Buy, the product is cached.
+ *
+ * Required by App Store guideline 2.1(b) — reviewers were hitting "Cannot
+ * find product" because StoreKit hadn't finished loading on cold start.
+ *
+ * Returns the list of loaded products (empty if iOS not native or load failed).
+ */
+export const prewarmProducts = async (): Promise<any[]> => {
+  if (!isIOSNative()) return [];
+
+  const productIds = [
+    APPLE_PRODUCTS.family,
+    APPLE_PRODUCTS.extended,
+    APPLE_PRODUCTS.extraMembers,
+  ];
+
+  try {
+    const { NativePurchases } = await loadPlugin();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res: any = await NativePurchases.getProducts({ productIdentifiers: productIds });
+        const list = parseProductList(res);
+        console.log("[IAP][diag] prewarmProducts", {
+          platform: "ios",
+          attempt: attempt + 1,
+          requested: productIds,
+          returned: list.map((p: any) => p?.identifier ?? p?.productIdentifier),
+        });
+        if (list.length > 0) {
+          for (const p of list) {
+            const id = p?.identifier ?? p?.productIdentifier;
+            if (id) productCache[id] = p;
+          }
+          return list;
+        }
+      } catch (err) {
+        console.warn("[IAP][diag] prewarm attempt failed:", attempt + 1, err);
+      }
+      if (attempt < 2) await sleep(RETRY_DELAYS_MS[attempt] ?? 1500);
+    }
+  } catch (err) {
+    console.warn("[IAP][diag] prewarm plugin load failed:", err);
+  }
+  return [];
+};
+
+export const getCachedProducts = (): Record<string, any> => productCache;
+
+/**
+ * Fetch the product from StoreKit with up to 3 attempts and incremental
+ * backoff. App Review's sandbox cold start sometimes takes >1s to surface
+ * products, so we retry generously to avoid spurious 2.1(b) rejections.
  */
 const ensureProductLoaded = async (
   NativePurchases: any,
   productId: string
 ): Promise<boolean> => {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  if (productCache[productId]) return true;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res: any = await NativePurchases.getProducts({
         productIdentifiers: [productId],
       });
-      const list = res?.products ?? (Array.isArray(res) ? res : []);
-      if (list && list.length > 0) return true;
+      const list = parseProductList(res);
+      console.log("[IAP][diag] ensureProductLoaded", {
+        platform: "ios",
+        productId,
+        attempt: attempt + 1,
+        returned: list.map((p: any) => p?.identifier ?? p?.productIdentifier),
+      });
+      if (list.length > 0) {
+        for (const p of list) {
+          const id = p?.identifier ?? p?.productIdentifier;
+          if (id) productCache[id] = p;
+        }
+        return true;
+      }
     } catch (err) {
-      // fall through to retry
-      console.warn("[IAP] getProducts attempt failed:", err);
+      console.warn("[IAP][diag] getProducts attempt failed:", attempt + 1, err);
     }
-    if (attempt === 0) await sleep(800);
+    if (attempt < 2) await sleep(RETRY_DELAYS_MS[attempt] ?? 1500);
   }
   return false;
 };
@@ -74,7 +152,7 @@ export const purchaseSubscription = async (
   const ready = await ensureProductLoaded(NativePurchases, productId);
   if (!ready) {
     throw new Error(
-      "Subscriptions are still loading from the App Store. Please try again in a moment."
+      "This subscription isn't available from the App Store right now. Make sure you're signed in with a valid Apple ID, then try again."
     );
   }
 
@@ -131,7 +209,7 @@ export const purchaseConsumable = async (
   const ready = await ensureProductLoaded(NativePurchases, productId);
   if (!ready) {
     throw new Error(
-      "This add-on is still loading from the App Store. Please try again in a moment."
+      "This add-on isn't available from the App Store right now. Make sure you're signed in with a valid Apple ID, then try again."
     );
   }
 

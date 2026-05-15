@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Phone, Mail, ArrowRight, Loader2, Camera, Calendar, MessageCircle, Smartphone, Users, Bell, Shield, Image, Video, Settings, Globe, StickyNote } from "lucide-react";
 import { openExternalUrl } from "@/lib/externalUrl";
-import { isIOSNative, purchaseSubscription, restorePurchases, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import { isIOSNative, purchaseSubscription, restorePurchases, prewarmProducts, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import SubscriptionDisclosure from "@/components/shared/SubscriptionDisclosure";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -106,6 +107,24 @@ const Pricing = () => {
   } | null>(null);
   const [upgrading, setUpgrading] = useState(false);
   const [affectedCircles, setAffectedCircles] = useState<OwnedCircle[]>([]);
+  const [livePrices, setLivePrices] = useState<Record<string, string>>({});
+
+  // Pre-warm StoreKit on iOS so products are cached before the user taps Buy.
+  // Also captures live localized prices to render in the tier cards (App Store
+  // guideline 3.1.2(c) requires displaying the actual price at point of purchase).
+  useEffect(() => {
+    if (!isIOSNative()) return;
+    prewarmProducts().then((products) => {
+      const map: Record<string, string> = {};
+      for (const p of products) {
+        const id = p?.identifier ?? p?.productIdentifier;
+        const price = p?.priceString ?? p?.localizedPrice ?? p?.price;
+        if (id === APPLE_PRODUCTS.family && price) map.family = String(price);
+        if (id === APPLE_PRODUCTS.extended && price) map.extended = String(price);
+      }
+      if (Object.keys(map).length > 0) setLivePrices(map);
+    });
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -523,6 +542,10 @@ const Pricing = () => {
           Choose your plan
         </p>
 
+        <div className="max-w-3xl mx-auto mb-8">
+          <SubscriptionDisclosure variant="full" />
+        </div>
+
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-16">
           {tiers.map((tier) => (
             <Card
@@ -538,8 +561,17 @@ const Pricing = () => {
                 <CardTitle className="font-serif text-2xl">{tier.name}</CardTitle>
                 <CardDescription className="text-muted-foreground">{tier.description}</CardDescription>
                 <div className="mt-4">
-                  <span className="text-4xl font-serif font-bold text-foreground">{tier.price}</span>
-                  <span className="text-muted-foreground">{tier.period}</span>
+                  {livePrices[tier.plan] ? (
+                    <>
+                      <span className="text-4xl font-serif font-bold text-foreground">{livePrices[tier.plan]}</span>
+                      <span className="text-muted-foreground">{tier.period}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-4xl font-serif font-bold text-foreground">{tier.price}</span>
+                      <span className="text-muted-foreground">{tier.period}</span>
+                    </>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -563,6 +595,9 @@ const Pricing = () => {
                 </ul>
                 <div className="pt-4">
                   {getButtonForTier(tier.plan, tier.popular, tier.cta)}
+                  {isIOSNative() && tier.plan !== "free" && (
+                    <SubscriptionDisclosure variant="compact" className="mt-3 text-center" />
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,8 +11,10 @@ import {
   isIOSNative,
   purchaseSubscription,
   purchaseConsumable,
+  prewarmProducts,
   APPLE_PRODUCTS,
 } from "@/lib/iapPurchase";
+import SubscriptionDisclosure from "@/components/shared/SubscriptionDisclosure";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +55,15 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
   const [loadingOption, setLoadingOption] = useState<string | null>(null);
   const [upgradePreview, setUpgradePreview] = useState<UpgradePreview | null>(null);
   const [upgrading, setUpgrading] = useState(false);
+
+  // Pre-warm StoreKit when dialog opens (iOS only) so products are ready
+  // before the user taps a Buy/Upgrade button. Avoids 2.1(b) "Cannot find
+  // product" rejections from App Review on cold-start sandboxes.
+  useEffect(() => {
+    if (isOpen && isIOSNative()) {
+      prewarmProducts();
+    }
+  }, [isOpen]);
 
   const handleCheckout = async (priceId: string, mode: "subscription" | "payment", optionKey: string) => {
     setLoadingOption(optionKey);
@@ -256,6 +267,9 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
                       </Button>
                     </div>
                   </div>
+                  {isIOSNative() && option.key !== "extra" && (
+                    <SubscriptionDisclosure variant="compact" className="mt-3" />
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -264,6 +278,10 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
               <p className="text-sm text-muted-foreground text-center py-4">
                 Contact support for additional member capacity.
               </p>
+            )}
+
+            {isIOSNative() && (
+              <SubscriptionDisclosure variant="full" className="mt-2" />
             )}
           </div>
         </DialogContent>

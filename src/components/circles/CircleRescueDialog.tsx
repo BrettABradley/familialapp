@@ -12,7 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { isIOSNative, purchaseSubscription, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import { isIOSNative, purchaseSubscription, prewarmProducts, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import SubscriptionDisclosure from "@/components/shared/SubscriptionDisclosure";
 
 const PRICES: Record<string, { priceId: string; name: string; price: string }> = {
   family: { priceId: "price_1T3N5bCiWDzualH5Cf7G7VsM", name: "Family", price: "$7/mo" },
@@ -43,6 +44,11 @@ const CircleRescueDialog = ({ circleId, open, onOpenChange }: CircleRescueDialog
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   useEffect(() => {
+    if (open && isIOSNative()) {
+      // Pre-warm StoreKit so the Take Over → Apple IAP sheet has the
+      // product cached. Required to avoid 2.1(b) "Cannot find product".
+      prewarmProducts();
+    }
     if (!circleId || !open) return;
     setLoading(true);
 
@@ -161,15 +167,20 @@ const CircleRescueDialog = ({ circleId, open, onOpenChange }: CircleRescueDialog
           </DialogDescription>
         </DialogHeader>
         {offer && !isExpired && !isOwner && !loading && (
-          <DialogFooter className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Not Now
-            </Button>
-            <Button onClick={handleTakeOver} disabled={checkoutLoading}>
-              {checkoutLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Take Over — {PRICES.family.price}
-            </Button>
-          </DialogFooter>
+          <>
+            {isIOSNative() && (
+              <SubscriptionDisclosure variant="compact" className="px-1" />
+            )}
+            <DialogFooter className="flex flex-col gap-2 sm:flex-row">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Not Now
+              </Button>
+              <Button onClick={handleTakeOver} disabled={checkoutLoading}>
+                {checkoutLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Take Over — {PRICES.family.price}
+              </Button>
+            </DialogFooter>
+          </>
         )}
       </DialogContent>
     </Dialog>
