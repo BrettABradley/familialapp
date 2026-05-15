@@ -542,6 +542,10 @@ const Pricing = () => {
           Choose your plan
         </p>
 
+        <div className="max-w-3xl mx-auto mb-8">
+          <SubscriptionDisclosure variant="full" />
+        </div>
+
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto mb-16">
           {tiers.map((tier) => (
             <Card
