@@ -337,6 +337,7 @@ export type Database = {
           name: string
           owner_id: string
           transfer_block: boolean
+          transfer_block_started_at: string | null
           updated_at: string
         }
         Insert: {
@@ -349,6 +350,7 @@ export type Database = {
           name: string
           owner_id: string
           transfer_block?: boolean
+          transfer_block_started_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -361,6 +363,7 @@ export type Database = {
           name?: string
           owner_id?: string
           transfer_block?: boolean
+          transfer_block_started_at?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1419,6 +1422,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      forfeit_stale_transfer_blocks: { Args: never; Returns: number }
       get_circle_count: { Args: never; Returns: number }
       get_circle_limit: { Args: never; Returns: number }
       has_circle_role: {
