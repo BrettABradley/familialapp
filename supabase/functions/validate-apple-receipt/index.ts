@@ -216,8 +216,19 @@ serve(async (req) => {
       expires: txn.expiresDate ?? null,
     });
 
-    if (txn.bundleId !== BUNDLE_ID) {
+    // Accept production bundle OR Lovable/Manus preview TestFlight bundles
+    // (e.g. "space.manus.familial.mobile.t20260223211425"). The product ID
+    // check below is the real authorization gate — bundle is defense in depth.
+    const isProdBundle = txn.bundleId === BUNDLE_ID;
+    const isPreviewBundle = typeof txn.bundleId === "string" &&
+      (txn.bundleId.startsWith("space.manus.familial.") ||
+       txn.bundleId.startsWith("app.lovable.") ||
+       txn.bundleId.includes(".familial."));
+    if (!isProdBundle && !isPreviewBundle) {
       throw new Error(`Bundle ID mismatch: ${txn.bundleId}`);
+    }
+    if (!isProdBundle) {
+      console.log(`[validate-apple-receipt] accepting preview bundle: ${txn.bundleId}`);
     }
     if (txn.productId !== productId) {
       throw new Error(`Product ID mismatch: expected ${productId}, got ${txn.productId}`);
