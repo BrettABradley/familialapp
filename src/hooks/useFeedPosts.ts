@@ -271,11 +271,28 @@ export const useFeedPosts = () => {
 
     setPosts(prev => prev.filter(p => p.id !== postId));
 
+    // Refresh session before write (mobile/Capacitor sometimes has stale token)
+    await supabase.auth.getSession();
+
     // Soft-delete: set deleted_at instead of hard delete
-    const { error } = await supabase.from("posts").update({ deleted_at: new Date().toISOString() } as any).eq("id", postId);
+    let { error } = await supabase
+      .from("posts")
+      .update({ deleted_at: new Date().toISOString() } as any)
+      .eq("id", postId)
+      .eq("author_id", user.id);
+
+    // Fallback: if soft-delete failed (e.g. admin deleting someone else's post),
+    // try a hard delete which has its own RLS policy allowing authors + admins.
     if (error) {
+      console.error("Soft-delete failed, attempting hard delete:", error);
+      const hard = await supabase.from("posts").delete().eq("id", postId);
+      error = hard.error ?? null;
+    }
+
+    if (error) {
+      console.error("Delete post failed:", error);
       if (postToDelete) setPosts(prev => [...prev, postToDelete].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
-      toast({ title: "Error", description: "Failed to delete post.", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to delete post.", variant: "destructive" });
     } else {
       // Start a 10-second undo window
       const undoTimeout = setTimeout(() => {
