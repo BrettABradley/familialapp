@@ -276,6 +276,10 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
                 Contact support for additional member capacity.
               </p>
             )}
+
+            {isIOSNative() && (
+              <SubscriptionDisclosure variant="full" className="mt-2" />
+            )}
           </div>
         </DialogContent>
       </Dialog>
