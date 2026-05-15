@@ -557,8 +557,17 @@ const Pricing = () => {
                 <CardTitle className="font-serif text-2xl">{tier.name}</CardTitle>
                 <CardDescription className="text-muted-foreground">{tier.description}</CardDescription>
                 <div className="mt-4">
-                  <span className="text-4xl font-serif font-bold text-foreground">{tier.price}</span>
-                  <span className="text-muted-foreground">{tier.period}</span>
+                  {livePrices[tier.plan] ? (
+                    <>
+                      <span className="text-4xl font-serif font-bold text-foreground">{livePrices[tier.plan]}</span>
+                      <span className="text-muted-foreground">{tier.period}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-4xl font-serif font-bold text-foreground">{tier.price}</span>
+                      <span className="text-muted-foreground">{tier.period}</span>
+                    </>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
