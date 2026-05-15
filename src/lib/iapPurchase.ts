@@ -152,7 +152,7 @@ export const purchaseSubscription = async (
   const ready = await ensureProductLoaded(NativePurchases, productId);
   if (!ready) {
     throw new Error(
-      "Subscriptions are still loading from the App Store. Please try again in a moment."
+      "This subscription isn't available from the App Store right now. Make sure you're signed in with a valid Apple ID, then try again."
     );
   }
 
