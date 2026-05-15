@@ -747,6 +747,7 @@ const Circles = () => {
   }
 
   return (
+    <PullToRefreshWrapper onRefresh={async () => { await refetchCircles(); await refetchUserPlan(); await fetchMemberInfo(); }}>
     <main className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
@@ -1163,6 +1164,7 @@ const Circles = () => {
         />
       )}
     </main>
+    </PullToRefreshWrapper>
   );
 };
 
