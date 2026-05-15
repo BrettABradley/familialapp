@@ -209,7 +209,7 @@ export const purchaseConsumable = async (
   const ready = await ensureProductLoaded(NativePurchases, productId);
   if (!ready) {
     throw new Error(
-      "This add-on is still loading from the App Store. Please try again in a moment."
+      "This add-on isn't available from the App Store right now. Make sure you're signed in with a valid Apple ID, then try again."
     );
   }
 
