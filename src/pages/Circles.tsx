@@ -1010,6 +1010,7 @@ const Circles = () => {
                         kind: "extra_members",
                       });
                       if (success) {
+                        await Promise.all([refetchCircles(), refetchUserPlan(), fetchMemberInfo()]);
                         toast({ title: "Seats added!", description: "7 extra member slots added to this circle." });
                       }
                       return;
@@ -1137,6 +1138,7 @@ const Circles = () => {
         currentCount={upgradeInfo.currentCount}
         limit={upgradeInfo.limit}
         circleId={upgradeInfo.circleId}
+        onPurchaseSuccess={fetchMemberInfo}
       />
 
       {/* Circle Rescue Dialog */}
