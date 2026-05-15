@@ -281,6 +281,12 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
               <Badge variant="secondary" className="capitalize">{currentPlan}</Badge>
             </div>
 
+            {crossPlatformWarning && (
+              <div className="text-sm p-3 rounded-md border border-amber-500/40 bg-amber-500/10 text-foreground">
+                ⚠️ {crossPlatformWarning}
+              </div>
+            )}
+
             {options.map((option) => (
               <Card key={option.key} className="border-primary/20 hover:border-primary/40 transition-colors">
                 <CardContent className="py-4">
