@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,8 +11,10 @@ import {
   isIOSNative,
   purchaseSubscription,
   purchaseConsumable,
+  prewarmProducts,
   APPLE_PRODUCTS,
 } from "@/lib/iapPurchase";
+import SubscriptionDisclosure from "@/components/shared/SubscriptionDisclosure";
 import {
   AlertDialog,
   AlertDialogAction,
