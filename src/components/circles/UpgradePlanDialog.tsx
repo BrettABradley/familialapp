@@ -56,6 +56,15 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
   const [upgradePreview, setUpgradePreview] = useState<UpgradePreview | null>(null);
   const [upgrading, setUpgrading] = useState(false);
 
+  // Pre-warm StoreKit when dialog opens (iOS only) so products are ready
+  // before the user taps a Buy/Upgrade button. Avoids 2.1(b) "Cannot find
+  // product" rejections from App Review on cold-start sandboxes.
+  useEffect(() => {
+    if (isOpen && isIOSNative()) {
+      prewarmProducts();
+    }
+  }, [isOpen]);
+
   const handleCheckout = async (priceId: string, mode: "subscription" | "payment", optionKey: string) => {
     setLoadingOption(optionKey);
     try {
