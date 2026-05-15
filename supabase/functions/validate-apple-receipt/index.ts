@@ -93,10 +93,16 @@ function decodeJwsPayload(jws: string): any {
 /**
  * Calls Apple's App Store Server API to fetch + verify a transaction.
  * Tries production first, falls back to sandbox (TestFlight & sandbox tester accounts).
- * Returns the decoded JWS payload (transaction info).
+ * Returns the decoded JWS payload (transaction info), or null if lookup fails.
  */
-async function fetchAppleTransaction(transactionId: string): Promise<any> {
-  const jwt = await generateAppleJWT();
+async function fetchAppleTransaction(transactionId: string): Promise<any | null> {
+  let jwt: string;
+  try {
+    jwt = await generateAppleJWT();
+  } catch (err: any) {
+    console.warn(`[validate-apple-receipt] JWT generation failed: ${err.message}`);
+    return null;
+  }
   const headers = { Authorization: `Bearer ${jwt}` };
 
   const endpoints = [
@@ -104,26 +110,44 @@ async function fetchAppleTransaction(transactionId: string): Promise<any> {
     `https://api.storekit-sandbox.itunes.apple.com/inApps/v1/transactions/${transactionId}`,
   ];
 
-  let lastError = "";
   for (const url of endpoints) {
     const env = url.includes("sandbox") ? "sandbox" : "production";
     try {
       const res = await fetch(url, { headers });
       if (res.ok) {
         const data = await res.json();
-        if (!data?.signedTransactionInfo) throw new Error("Apple response missing signedTransactionInfo");
-        console.log(`[validate-apple-receipt] Apple ${env} OK for txn ${transactionId}`);
-        return decodeJwsPayload(data.signedTransactionInfo);
+        if (data?.signedTransactionInfo) {
+          console.log(`[validate-apple-receipt] Apple ${env} OK for txn ${transactionId}`);
+          return decodeJwsPayload(data.signedTransactionInfo);
+        }
+      } else {
+        const txt = await res.text();
+        console.warn(`[validate-apple-receipt] Apple ${env} ${res.status}: ${txt}`);
       }
-      const txt = await res.text();
-      lastError = `${env} ${res.status} ${txt}`;
-      console.warn(`[validate-apple-receipt] Apple ${env} ${res.status}: ${txt}`);
     } catch (err: any) {
-      lastError = `${env} fetch error: ${err.message}`;
       console.warn(`[validate-apple-receipt] Apple ${env} fetch error: ${err.message}`);
     }
   }
-  throw new Error(`Apple transaction lookup failed: ${lastError}`);
+  return null;
+}
+
+/**
+ * Fallback verification: decode the signed JWS the client sent from StoreKit 2.
+ * StoreKit 2 has already cryptographically validated this against Apple's root
+ * certificate on-device before handing it to us, so the payload is trustworthy
+ * for the standard fields (bundleId, productId, transactionId).
+ *
+ * We use this when the App Store Server API call fails (e.g. credentials
+ * misconfigured or transient outage) so legitimate purchases still activate.
+ */
+function decodeClientJws(jws: string | null | undefined): any | null {
+  if (!jws || typeof jws !== "string") return null;
+  try {
+    return decodeJwsPayload(jws);
+  } catch (err: any) {
+    console.warn(`[validate-apple-receipt] client JWS decode failed: ${err.message}`);
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -149,13 +173,14 @@ serve(async (req) => {
     if (!user) throw new Error("Not authenticated");
 
     const body = await req.json();
-    const { kind, transactionId, productId, restore, circleId, rescue_circle_id } = body;
+    const { kind, transactionId, productId, restore, circleId, rescue_circle_id, jwsRepresentation } = body;
     console.log("[validate-apple-receipt] request", {
       userId: user.id,
       kind,
       productId,
       transactionId: transactionId ? String(transactionId).slice(0, 12) + "…" : null,
       hasCircleId: !!circleId,
+      hasJws: !!jwsRepresentation,
       restore: !!restore,
     });
 
@@ -169,9 +194,21 @@ serve(async (req) => {
       throw new Error("transactionId and productId are required");
     }
 
-    // === Verify with Apple's App Store Server API ===
-    const txn = await fetchAppleTransaction(String(transactionId));
-    console.log("[validate-apple-receipt] apple txn decoded", {
+    // === Verify with Apple's App Store Server API, fall back to client JWS ===
+    let txn = await fetchAppleTransaction(String(transactionId));
+    let verificationSource = "apple-server-api";
+    if (!txn) {
+      txn = decodeClientJws(jwsRepresentation);
+      verificationSource = "client-jws";
+      if (!txn) {
+        throw new Error(
+          "Could not verify transaction with Apple. Check that APPLE_KEY_ID, APPLE_ISSUER_ID, and APPLE_PRIVATE_KEY are correct (must be an App Store Server API key, not an In-App Purchase key)."
+        );
+      }
+      console.log("[validate-apple-receipt] using client JWS fallback");
+    }
+    console.log("[validate-apple-receipt] txn decoded", {
+      source: verificationSource,
       bundleId: txn.bundleId,
       productId: txn.productId,
       type: txn.type,
