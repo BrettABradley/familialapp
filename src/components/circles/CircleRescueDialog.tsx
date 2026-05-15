@@ -167,15 +167,20 @@ const CircleRescueDialog = ({ circleId, open, onOpenChange }: CircleRescueDialog
           </DialogDescription>
         </DialogHeader>
         {offer && !isExpired && !isOwner && !loading && (
-          <DialogFooter className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Not Now
-            </Button>
-            <Button onClick={handleTakeOver} disabled={checkoutLoading}>
-              {checkoutLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Take Over — {PRICES.family.price}
-            </Button>
-          </DialogFooter>
+          <>
+            {isIOSNative() && (
+              <SubscriptionDisclosure variant="compact" className="px-1" />
+            )}
+            <DialogFooter className="flex flex-col gap-2 sm:flex-row">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Not Now
+              </Button>
+              <Button onClick={handleTakeOver} disabled={checkoutLoading}>
+                {checkoutLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Take Over — {PRICES.family.price}
+              </Button>
+            </DialogFooter>
+          </>
         )}
       </DialogContent>
     </Dialog>
