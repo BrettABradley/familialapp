@@ -260,7 +260,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("[validate-apple-receipt] ERROR:", error?.message ?? error, error?.stack ?? "");
+    return new Response(JSON.stringify({ error: error?.message ?? String(error) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
