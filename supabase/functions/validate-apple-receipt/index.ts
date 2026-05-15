@@ -32,7 +32,9 @@ function base64UrlDecodeToBytes(b64url: string): Uint8Array {
 }
 
 function pemToPkcs8(pem: string): Uint8Array {
-  const body = pem
+  // Tolerate keys pasted with literal \n sequences (common when stored in env vars).
+  const normalized = pem.replace(/\\n/g, "\n");
+  const body = normalized
     .replace(/-----BEGIN PRIVATE KEY-----/g, "")
     .replace(/-----END PRIVATE KEY-----/g, "")
     .replace(/\s+/g, "");
