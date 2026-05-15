@@ -150,6 +150,14 @@ serve(async (req) => {
 
     const body = await req.json();
     const { kind, transactionId, productId, restore, circleId, rescue_circle_id } = body;
+    console.log("[validate-apple-receipt] request", {
+      userId: user.id,
+      kind,
+      productId,
+      transactionId: transactionId ? String(transactionId).slice(0, 12) + "…" : null,
+      hasCircleId: !!circleId,
+      restore: !!restore,
+    });
 
     if (restore) {
       return new Response(JSON.stringify({ success: true, restored: true }), {
@@ -163,6 +171,13 @@ serve(async (req) => {
 
     // === Verify with Apple's App Store Server API ===
     const txn = await fetchAppleTransaction(String(transactionId));
+    console.log("[validate-apple-receipt] apple txn decoded", {
+      bundleId: txn.bundleId,
+      productId: txn.productId,
+      type: txn.type,
+      revoked: !!txn.revocationDate,
+      expires: txn.expiresDate ?? null,
+    });
 
     if (txn.bundleId !== BUNDLE_ID) {
       throw new Error(`Bundle ID mismatch: ${txn.bundleId}`);
