@@ -58,6 +58,7 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
   const [loadingOption, setLoadingOption] = useState<string | null>(null);
   const [upgradePreview, setUpgradePreview] = useState<UpgradePreview | null>(null);
   const [upgrading, setUpgrading] = useState(false);
+  const [planSource, setPlanSource] = useState<string | null>(null);
 
   // Pre-warm StoreKit when dialog opens (iOS only) so products are ready
   // before the user taps a Buy/Upgrade button. Avoids 2.1(b) "Cannot find
@@ -67,6 +68,30 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
       prewarmProducts();
     }
   }, [isOpen]);
+
+  // Detect existing subscription source so we can warn about cross-platform double-billing
+  useEffect(() => {
+    if (!isOpen) return;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("user_plans")
+        .select("source, plan")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (data && data.plan !== "free") setPlanSource(data.source ?? "stripe");
+      else setPlanSource(null);
+    })();
+  }, [isOpen]);
+
+  const onIOSPlatform = isIOSNative();
+  const crossPlatformWarning =
+    planSource === "apple" && !onIOSPlatform
+      ? "You already have an active subscription through the App Store. Manage or change your plan in your iPhone's Settings → Apple ID → Subscriptions to avoid being billed twice."
+      : planSource === "stripe" && onIOSPlatform
+      ? "You already have an active subscription billed on the web. Manage or change your plan from familialmedia.com to avoid being billed twice."
+      : null;
 
   const handleCheckout = async (priceId: string, mode: "subscription" | "payment", optionKey: string) => {
     setLoadingOption(optionKey);
