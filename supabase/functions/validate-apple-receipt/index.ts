@@ -106,14 +106,22 @@ async function fetchAppleTransaction(transactionId: string): Promise<any> {
 
   let lastError = "";
   for (const url of endpoints) {
-    const res = await fetch(url, { headers });
-    if (res.ok) {
-      const data = await res.json();
-      if (!data?.signedTransactionInfo) throw new Error("Apple response missing signedTransactionInfo");
-      return decodeJwsPayload(data.signedTransactionInfo);
+    const env = url.includes("sandbox") ? "sandbox" : "production";
+    try {
+      const res = await fetch(url, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (!data?.signedTransactionInfo) throw new Error("Apple response missing signedTransactionInfo");
+        console.log(`[validate-apple-receipt] Apple ${env} OK for txn ${transactionId}`);
+        return decodeJwsPayload(data.signedTransactionInfo);
+      }
+      const txt = await res.text();
+      lastError = `${env} ${res.status} ${txt}`;
+      console.warn(`[validate-apple-receipt] Apple ${env} ${res.status}: ${txt}`);
+    } catch (err: any) {
+      lastError = `${env} fetch error: ${err.message}`;
+      console.warn(`[validate-apple-receipt] Apple ${env} fetch error: ${err.message}`);
     }
-    lastError = `${res.status} ${await res.text()}`;
-    // 404 on prod is expected for sandbox transactions; try next endpoint.
   }
   throw new Error(`Apple transaction lookup failed: ${lastError}`);
 }
