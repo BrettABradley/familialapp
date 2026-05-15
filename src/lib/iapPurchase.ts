@@ -172,26 +172,28 @@ export const purchaseSubscription = async (
     throw new Error("Purchase completed but no transaction was returned.");
   }
 
-  try {
-    const { error } = await supabase.functions.invoke("validate-apple-receipt", {
-      body: {
-        kind: "subscription",
-        transactionId,
-        productId,
-        receipt: result?.receipt ?? null,
-        jwsRepresentation: result?.jwsRepresentation ?? null,
-        ...(extras ?? {}),
-      },
-    });
-    if (error) {
-      console.warn("[IAP] validate-apple-receipt failed:", error);
-      // Don't block the success UX — the StoreKit transaction is real.
-      // Restore Purchases or the next session refresh will reconcile.
-    }
-  } catch (err) {
-    console.warn("[IAP] validate-apple-receipt threw:", err);
-  }
+  // Server-side validation MUST succeed for the plan to be applied.
+  // Previously this was best-effort and silently swallowed errors, which
+  // caused users to see "Plan upgraded!" while user_plans stayed on free.
+  const { data, error } = await supabase.functions.invoke("validate-apple-receipt", {
+    body: {
+      kind: "subscription",
+      transactionId,
+      productId,
+      receipt: result?.receipt ?? null,
+      jwsRepresentation: result?.jwsRepresentation ?? null,
+      ...(extras ?? {}),
+    },
+  });
 
+  if (error || (data as any)?.error) {
+    const detail = (data as any)?.error || error?.message || "Unknown validation error";
+    console.error("[IAP] validate-apple-receipt failed:", detail, { data, error });
+    throw new Error(
+      `Payment went through, but we couldn't activate your plan automatically. ` +
+      `Please tap "Restore Purchases" or contact support@familialmedia.com — your purchase is safe. (${detail})`
+    );
+  }
   return true;
 };
 
