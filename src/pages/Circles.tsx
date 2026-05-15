@@ -26,6 +26,7 @@ import UpgradePlanDialog from "@/components/circles/UpgradePlanDialog";
 import CircleRescueDialog from "@/components/circles/CircleRescueDialog";
 import { checkCircleCapacity, getCircleMemberCount, getCircleMemberLimit } from "@/lib/circleLimits";
 import { isIOSNative, purchaseConsumable, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 
 interface Circle {
   id: string;
@@ -157,7 +158,7 @@ const MemberRow = ({ member, isOwner: isCircleOwner, currentUserId, circleId, on
 
 const Circles = () => {
   const { user } = useAuth();
-  const { circles, isLoading: contextLoading, refetchCircles, profile, setSelectedCircle: setContextCircle, userPlan } = useCircleContext();
+  const { circles, isLoading: contextLoading, refetchCircles, profile, setSelectedCircle: setContextCircle, userPlan, refetchUserPlan } = useCircleContext();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
