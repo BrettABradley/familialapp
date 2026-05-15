@@ -595,6 +595,9 @@ const Pricing = () => {
                 </ul>
                 <div className="pt-4">
                   {getButtonForTier(tier.plan, tier.popular, tier.cta)}
+                  {isIOSNative() && tier.plan !== "free" && (
+                    <SubscriptionDisclosure variant="compact" className="mt-3 text-center" />
+                  )}
                 </div>
               </CardContent>
             </Card>
