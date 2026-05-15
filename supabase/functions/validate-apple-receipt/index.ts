@@ -32,7 +32,9 @@ function base64UrlDecodeToBytes(b64url: string): Uint8Array {
 }
 
 function pemToPkcs8(pem: string): Uint8Array {
-  const body = pem
+  // Tolerate keys pasted with literal \n sequences (common when stored in env vars).
+  const normalized = pem.replace(/\\n/g, "\n");
+  const body = normalized
     .replace(/-----BEGIN PRIVATE KEY-----/g, "")
     .replace(/-----END PRIVATE KEY-----/g, "")
     .replace(/\s+/g, "");
@@ -104,14 +106,22 @@ async function fetchAppleTransaction(transactionId: string): Promise<any> {
 
   let lastError = "";
   for (const url of endpoints) {
-    const res = await fetch(url, { headers });
-    if (res.ok) {
-      const data = await res.json();
-      if (!data?.signedTransactionInfo) throw new Error("Apple response missing signedTransactionInfo");
-      return decodeJwsPayload(data.signedTransactionInfo);
+    const env = url.includes("sandbox") ? "sandbox" : "production";
+    try {
+      const res = await fetch(url, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (!data?.signedTransactionInfo) throw new Error("Apple response missing signedTransactionInfo");
+        console.log(`[validate-apple-receipt] Apple ${env} OK for txn ${transactionId}`);
+        return decodeJwsPayload(data.signedTransactionInfo);
+      }
+      const txt = await res.text();
+      lastError = `${env} ${res.status} ${txt}`;
+      console.warn(`[validate-apple-receipt] Apple ${env} ${res.status}: ${txt}`);
+    } catch (err: any) {
+      lastError = `${env} fetch error: ${err.message}`;
+      console.warn(`[validate-apple-receipt] Apple ${env} fetch error: ${err.message}`);
     }
-    lastError = `${res.status} ${await res.text()}`;
-    // 404 on prod is expected for sandbox transactions; try next endpoint.
   }
   throw new Error(`Apple transaction lookup failed: ${lastError}`);
 }
@@ -140,6 +150,14 @@ serve(async (req) => {
 
     const body = await req.json();
     const { kind, transactionId, productId, restore, circleId, rescue_circle_id } = body;
+    console.log("[validate-apple-receipt] request", {
+      userId: user.id,
+      kind,
+      productId,
+      transactionId: transactionId ? String(transactionId).slice(0, 12) + "…" : null,
+      hasCircleId: !!circleId,
+      restore: !!restore,
+    });
 
     if (restore) {
       return new Response(JSON.stringify({ success: true, restored: true }), {
@@ -153,6 +171,13 @@ serve(async (req) => {
 
     // === Verify with Apple's App Store Server API ===
     const txn = await fetchAppleTransaction(String(transactionId));
+    console.log("[validate-apple-receipt] apple txn decoded", {
+      bundleId: txn.bundleId,
+      productId: txn.productId,
+      type: txn.type,
+      revoked: !!txn.revocationDate,
+      expires: txn.expiresDate ?? null,
+    });
 
     if (txn.bundleId !== BUNDLE_ID) {
       throw new Error(`Bundle ID mismatch: ${txn.bundleId}`);
@@ -235,7 +260,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("[validate-apple-receipt] ERROR:", error?.message ?? error, error?.stack ?? "");
+    return new Response(JSON.stringify({ error: error?.message ?? String(error) }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
