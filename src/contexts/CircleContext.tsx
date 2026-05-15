@@ -40,6 +40,7 @@ interface CircleContextType {
   isLoading: boolean;
   refetchCircles: () => Promise<void>;
   refetchProfile: () => Promise<void>;
+  refetchUserPlan: () => Promise<void>;
   isCircleReadOnly: (circleId: string) => boolean;
   isCircleAdmin: (circleId: string) => boolean;
 }
@@ -228,6 +229,7 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
         isLoading,
         refetchCircles: fetchCircles,
         refetchProfile: fetchProfile,
+        refetchUserPlan: fetchUserPlan,
         isCircleReadOnly,
         isCircleAdmin,
       }}

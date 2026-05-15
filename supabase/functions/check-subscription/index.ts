@@ -40,16 +40,24 @@ serve(async (req) => {
     const user = userData.user;
     log("Authenticated", { userId: user.id, email: user.email });
 
-    // Founder plan is manually assigned — never overwrite it from Stripe
+    // Founder plan is manually assigned — never overwrite it from Stripe.
+    // Apple-sourced plans are managed by the App Store; never overwrite from Stripe.
     const { data: currentPlanCheck } = await supabaseAdmin
       .from("user_plans")
-      .select("plan")
+      .select("plan, source")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (currentPlanCheck?.plan === "founder") {
       log("Founder plan detected — skipping Stripe sync", { userId: user.id });
       return new Response(JSON.stringify({ synced: true, plan: "founder" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (currentPlanCheck?.source === "apple") {
+      log("Apple-sourced plan detected — skipping Stripe sync", { userId: user.id, plan: currentPlanCheck?.plan });
+      return new Response(JSON.stringify({ synced: true, plan: currentPlanCheck?.plan, source: "apple" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

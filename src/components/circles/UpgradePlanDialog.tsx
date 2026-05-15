@@ -15,6 +15,7 @@ import {
   APPLE_PRODUCTS,
 } from "@/lib/iapPurchase";
 import SubscriptionDisclosure from "@/components/shared/SubscriptionDisclosure";
+import { useCircleContext } from "@/contexts/CircleContext";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +41,7 @@ interface UpgradePlanDialogProps {
   currentCount: number;
   limit: number;
   circleId: string;
+  onPurchaseSuccess?: () => void | Promise<void>;
 }
 
 interface UpgradePreview {
@@ -50,8 +52,9 @@ interface UpgradePreview {
   nextBillingDate: string;
 }
 
-const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, circleId }: UpgradePlanDialogProps) => {
+const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, circleId, onPurchaseSuccess }: UpgradePlanDialogProps) => {
   const { toast } = useToast();
+  const { refetchUserPlan, refetchCircles } = useCircleContext();
   const [loadingOption, setLoadingOption] = useState<string | null>(null);
   const [upgradePreview, setUpgradePreview] = useState<UpgradePreview | null>(null);
   const [upgrading, setUpgrading] = useState(false);
@@ -91,6 +94,9 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
     try {
       const success = await purchaseSubscription(APPLE_PRODUCTS[plan]);
       if (success) {
+        // Refresh plan + circles so the UI reflects the new tier (e.g. Extended → 35 members)
+        await Promise.all([refetchUserPlan(), refetchCircles()]);
+        await onPurchaseSuccess?.();
         toast({
           title: "Plan upgraded!",
           description: `You're now on the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan.`,
@@ -112,6 +118,8 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
         kind: "extra_members",
       });
       if (success) {
+        await Promise.all([refetchUserPlan(), refetchCircles()]);
+        await onPurchaseSuccess?.();
         toast({ title: "Seats added!", description: "7 extra member slots added to this circle." });
         onClose();
       }

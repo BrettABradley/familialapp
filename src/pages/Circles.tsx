@@ -26,6 +26,7 @@ import UpgradePlanDialog from "@/components/circles/UpgradePlanDialog";
 import CircleRescueDialog from "@/components/circles/CircleRescueDialog";
 import { checkCircleCapacity, getCircleMemberCount, getCircleMemberLimit } from "@/lib/circleLimits";
 import { isIOSNative, purchaseConsumable, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 
 interface Circle {
   id: string;
@@ -157,7 +158,7 @@ const MemberRow = ({ member, isOwner: isCircleOwner, currentUserId, circleId, on
 
 const Circles = () => {
   const { user } = useAuth();
-  const { circles, isLoading: contextLoading, refetchCircles, profile, setSelectedCircle: setContextCircle, userPlan } = useCircleContext();
+  const { circles, isLoading: contextLoading, refetchCircles, profile, setSelectedCircle: setContextCircle, userPlan, refetchUserPlan } = useCircleContext();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
@@ -746,6 +747,7 @@ const Circles = () => {
   }
 
   return (
+    <PullToRefreshWrapper onRefresh={async () => { await refetchCircles(); await refetchUserPlan(); await fetchMemberInfo(); }}>
     <main className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
@@ -1009,6 +1011,7 @@ const Circles = () => {
                         kind: "extra_members",
                       });
                       if (success) {
+                        await Promise.all([refetchCircles(), refetchUserPlan(), fetchMemberInfo()]);
                         toast({ title: "Seats added!", description: "7 extra member slots added to this circle." });
                       }
                       return;
@@ -1136,6 +1139,7 @@ const Circles = () => {
         currentCount={upgradeInfo.currentCount}
         limit={upgradeInfo.limit}
         circleId={upgradeInfo.circleId}
+        onPurchaseSuccess={fetchMemberInfo}
       />
 
       {/* Circle Rescue Dialog */}
@@ -1160,6 +1164,7 @@ const Circles = () => {
         />
       )}
     </main>
+    </PullToRefreshWrapper>
   );
 };
 
