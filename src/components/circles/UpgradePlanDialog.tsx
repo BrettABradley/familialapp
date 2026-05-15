@@ -267,6 +267,9 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
                       </Button>
                     </div>
                   </div>
+                  {isIOSNative() && option.key !== "extra" && (
+                    <SubscriptionDisclosure variant="compact" className="mt-3" />
+                  )}
                 </CardContent>
               </Card>
             ))}
