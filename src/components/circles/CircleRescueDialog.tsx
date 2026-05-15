@@ -44,6 +44,11 @@ const CircleRescueDialog = ({ circleId, open, onOpenChange }: CircleRescueDialog
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   useEffect(() => {
+    if (open && isIOSNative()) {
+      // Pre-warm StoreKit so the Take Over → Apple IAP sheet has the
+      // product cached. Required to avoid 2.1(b) "Cannot find product".
+      prewarmProducts();
+    }
     if (!circleId || !open) return;
     setLoading(true);
 
