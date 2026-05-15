@@ -10,6 +10,7 @@ interface Circle {
   created_at: string;
   invite_code: string;
   transfer_block: boolean;
+  transfer_block_started_at: string | null;
   avatar_url: string | null;
 }
 
