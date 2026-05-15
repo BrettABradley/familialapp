@@ -1,88 +1,61 @@
-# Final Apple Resubmission Plan — v1.0.4 (build 44)
+# Apple Resubmission Fixes (Build 49 → 50)
 
-Two rejections to clear: **3.1.2(c)** (missing subscription disclosures + EULA/Privacy links at point of purchase) and **2.1(b)** ("Cannot find product" on iPad). Code fixes below; manual App Store Connect steps at the bottom — both halves must ship together or the rejection will repeat.
-
----
-
-## Part A — Subscription disclosures (3.1.2(c))
-
-Create one shared component so every IAP entry point shows identical, reviewer-proof copy.
-
-**New file: `src/components/shared/SubscriptionDisclosure.tsx`**
-- Reusable block, two variants via prop: `variant="full"` (used on Pricing page) and `variant="compact"` (used inline under each Buy/Upgrade button in dialogs).
-- Full variant content:
-  - Heading: "Auto-renewable subscriptions"
-  - Family — $7.00 USD / month, renews monthly until canceled
-  - Extended — $15.00 USD / month, renews monthly until canceled
-  - Length of subscription: 1 month
-  - "Payment is charged to your Apple ID at confirmation. Subscriptions automatically renew unless auto-renew is turned off at least 24 hours before the end of the current period. Manage or cancel anytime in your Apple ID Settings → Subscriptions."
-  - Two `<Link>`s (react-router-dom): **Terms of Use (EULA)** → `/terms-of-service`, **Privacy Policy** → `/privacy-policy`.
-- Compact variant: single line — "Auto-renews monthly until canceled. " + EULA + Privacy links. Used inline.
-- Monochrome `text-muted-foreground text-xs`, no decoration that breaks the brand.
-
-**Wire it in three places:**
-1. `src/components/landing/Pricing.tsx` — render `<SubscriptionDisclosure variant="full" />` directly above the pricing card grid (not in a collapsed accordion — must be visible without scrolling on iPad).
-2. `src/components/circles/UpgradePlanDialog.tsx` — render `<SubscriptionDisclosure variant="full" />` at the bottom of the `DialogContent`, after the options list.
-3. `src/components/circles/CircleRescueDialog.tsx` — render `<SubscriptionDisclosure variant="compact" />` inside the `DialogFooter` area, under the Take Over button.
-
-Also add the compact variant under each per-tier upgrade button on iOS in `UpgradePlanDialog` (visible at the literal moment of tap).
+Two issues to address. One is a code fix; the other is App Store Connect metadata you'll handle yourself. (The duplicate IAP promo image issue you'll handle separately on your side.)
 
 ---
 
-## Part B — Harden IAP product loading (2.1(b))
+## 1. Guideline 2.1(a) — App crashed on "Take Photo or Video → Video" (CODE FIX)
 
-**`src/lib/iapPurchase.ts`**
-- Add exported `prewarmProducts()` — calls `NativePurchases.getProducts({ productIdentifiers: [family, extended, extraMembers] })` once, returns the parsed product list, and caches it in module scope so subsequent calls are instant.
-- Add exported `getCachedProducts()` returning the cached list (or null).
-- Bump `ensureProductLoaded` to **3 attempts** with **800 ms → 1500 ms** backoff (currently 2 attempts / 800 ms).
-- Improve thrown error: when getProducts returns empty after all retries, throw "This subscription isn't available from the App Store right now. Make sure you're signed in with a valid Apple ID, then try again." (instead of generic "still loading").
-- Add a `console.log("[IAP][diag]", { platform, productIds, attempt, rawResponse })` on each attempt so the device console (and App Review logs) leave a paper trail.
+**Root cause:** When the user picks "Take Photo or Video" from the iOS file-input action sheet and chooses **Video**, iOS opens the system camera in video-recording mode. Recording video activates the microphone, and iOS will **hard-crash any app that doesn't declare `NSMicrophoneUsageDescription` in Info.plist**. We currently declare camera + photo library, but not microphone.
 
-**Pre-warm on mount in three places** — call `prewarmProducts()` inside a `useEffect` (iOS-only via `isIOSNative()`):
-1. `Pricing.tsx`
-2. `UpgradePlanDialog.tsx` (when `isOpen` becomes true)
-3. `CircleRescueDialog.tsx` (when `open` becomes true)
+The in-app `VoiceRecorder` component (mic access via `getUserMedia`) has the same requirement on native iOS — so this fix covers that too.
 
-**Render live StoreKit prices on iOS.** When pre-warm returns products, store them in local state and substitute `product.localizedPrice` / `product.priceString` into the tier card price line in place of the hard-coded "$7/month" / "$15/month". On web (non-iOS) keep the hard-coded strings. This both:
-- Proves to the reviewer that StoreKit successfully returned products (kills 2.1(b) cold).
-- Satisfies the 3.1.2(c) requirement to display Apple-validated localized prices at point of purchase.
+**Fix:** Add `NSMicrophoneUsageDescription` to `scripts/ios-post-sync.sh` so it's injected into `ios/App/App/Info.plist` on every `cap sync`.
 
----
+```bash
+# Microphone permission (required for video recording + voice notes)
+$PB -c "Delete :NSMicrophoneUsageDescription" "$PLIST" 2>/dev/null
+$PB -c "Add :NSMicrophoneUsageDescription string 'Familial needs access to your microphone to record video with sound and voice notes for your family circle.'" "$PLIST"
+```
 
-## Part C — What you need to do in App Store Connect (manual, blocking)
+Then rerun `npx cap sync ios && bash scripts/ios-post-sync.sh`, rebuild in Xcode, bump build number, and resubmit.
 
-These are non-negotiable. If any one is missing the IAP rejection returns regardless of code:
-
-1. **Paid Apps Agreement → Active.** App Store Connect → Business → Agreements, Tax, and Banking. Status must read **Active**, not Pending. (This is the single most common cause of "Cannot find product".)
-2. **All 3 IAPs attached to build 44.** Open the 1.0.4 version page → scroll to **In-App Purchases and Subscriptions** → click the **+** → add all three:
-   - `com.familialmedia.familial.family.monthly`
-   - `com.familialmedia.familial.extended.monthly`
-   - `com.familialmedia.familial.extramembers`
-   Each must show status **Ready to Submit** (yellow dot is fine — they get reviewed alongside the binary).
-3. **EULA.** App Information → **License Agreement** → either keep Apple's standard EULA (default) or paste your custom one. If keeping the default, also reference it in the App Description footer: "Terms of Use: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
-4. **Privacy Policy URL.** App Information → Privacy Policy URL → `https://familialmedia.com/privacy-policy`
-5. **App Review notes** — paste verbatim into the Notes field on the version page:
-   > Subscription disclosures (length, price, auto-renewal terms) and functional Terms of Use (EULA) + Privacy Policy links are now visible on the Pricing page and inside both upgrade dialogs (UpgradePlanDialog and CircleRescueDialog). Live App Store-validated prices render automatically once StoreKit returns products. All 3 IAP products are attached to this build.
-6. **Verify on iPad before submitting.** Install the TestFlight build on an iPad signed into a Sandbox tester account, open Pricing, confirm prices render as "$7.00" / "$15.00" (not "loading…"), tap Upgrade, confirm the Apple sheet appears. If the sheet shows "Cannot connect to iTunes Store" → Paid Apps Agreement is still pending; do not resubmit.
+**Verification:** On a real device after rebuild, tap Add Media → Take Photo or Video → Video. iOS should now show the mic permission prompt instead of crashing.
 
 ---
 
-## Files touched
+## 2. Guideline 3.1.2(c) — EULA link missing in App Store metadata (METADATA, you do this)
 
-- **New:** `src/components/shared/SubscriptionDisclosure.tsx`
-- **Edit:** `src/lib/iapPurchase.ts` (prewarm, cache, retry, diagnostics, better error)
-- **Edit:** `src/components/landing/Pricing.tsx` (disclosure block + iOS prewarm + live prices)
-- **Edit:** `src/components/circles/UpgradePlanDialog.tsx` (disclosure + prewarm + live prices)
-- **Edit:** `src/components/circles/CircleRescueDialog.tsx` (compact disclosure + prewarm)
+The in-app disclosure is already correct (the `SubscriptionDisclosure` component renders Terms of Use (EULA) + Privacy links at every IAP point of purchase). Apple is asking for the link in the **App Store Connect metadata**, not in the app itself.
 
-No backend, schema, or edge function changes. No new dependencies.
+**You need to do one of these in App Store Connect:**
+
+**Option A (easiest — use Apple's standard EULA):**
+- Go to App Store Connect → Your App → App Information → **App Description**
+- At the bottom of the description, add this exact line:
+
+  ```
+  Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+  Privacy Policy: https://www.familialmedia.com/privacy-policy
+  ```
+
+**Option B (use your custom EULA):**
+- App Store Connect → App Information → **License Agreement** → Custom EULA → paste your Terms of Service text. Then no link is needed in the description.
+
+I recommend **Option A** — it's faster and Apple accepts it.
+
+Also paste this same line into **App Review Information → Notes** so the reviewer sees it without hunting.
 
 ---
 
-## Order of operations on resubmission day
+## Order of operations
 
-1. Approve this plan → I ship the code.
-2. You bump version to **1.0.4 / build 44**, run `npx cap sync ios --legacy-peer-deps`, archive in Xcode, upload.
-3. While the build processes (~30 min), you complete the 6 App Store Connect items above.
-4. Attach build 44, paste the review notes, submit.
-5. Optional but recommended: TestFlight smoke test on iPad first (step 6 above).
+1. I implement the microphone Info.plist fix (one file change, ~3 lines).
+2. You rebuild in Xcode (bump build to 50), upload to App Store Connect.
+3. While that's processing, you:
+   - Add the EULA + Privacy line to the App Description (and App Review Notes).
+   - Handle the duplicate IAP promo images on your side.
+4. Submit the screen-recording reply Apple asked for, demonstrating the disclosure block on the Pricing / Upgrade screens.
+5. Resubmit for review.
+
+Approve the plan and I'll make the code change.
