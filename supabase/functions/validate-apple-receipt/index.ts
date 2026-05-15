@@ -173,13 +173,14 @@ serve(async (req) => {
     if (!user) throw new Error("Not authenticated");
 
     const body = await req.json();
-    const { kind, transactionId, productId, restore, circleId, rescue_circle_id } = body;
+    const { kind, transactionId, productId, restore, circleId, rescue_circle_id, jwsRepresentation } = body;
     console.log("[validate-apple-receipt] request", {
       userId: user.id,
       kind,
       productId,
       transactionId: transactionId ? String(transactionId).slice(0, 12) + "…" : null,
       hasCircleId: !!circleId,
+      hasJws: !!jwsRepresentation,
       restore: !!restore,
     });
 
@@ -193,9 +194,21 @@ serve(async (req) => {
       throw new Error("transactionId and productId are required");
     }
 
-    // === Verify with Apple's App Store Server API ===
-    const txn = await fetchAppleTransaction(String(transactionId));
-    console.log("[validate-apple-receipt] apple txn decoded", {
+    // === Verify with Apple's App Store Server API, fall back to client JWS ===
+    let txn = await fetchAppleTransaction(String(transactionId));
+    let verificationSource = "apple-server-api";
+    if (!txn) {
+      txn = decodeClientJws(jwsRepresentation);
+      verificationSource = "client-jws";
+      if (!txn) {
+        throw new Error(
+          "Could not verify transaction with Apple. Check that APPLE_KEY_ID, APPLE_ISSUER_ID, and APPLE_PRIVATE_KEY are correct (must be an App Store Server API key, not an In-App Purchase key)."
+        );
+      }
+      console.log("[validate-apple-receipt] using client JWS fallback");
+    }
+    console.log("[validate-apple-receipt] txn decoded", {
+      source: verificationSource,
       bundleId: txn.bundleId,
       productId: txn.productId,
       type: txn.type,
