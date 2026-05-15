@@ -107,6 +107,24 @@ const Pricing = () => {
   } | null>(null);
   const [upgrading, setUpgrading] = useState(false);
   const [affectedCircles, setAffectedCircles] = useState<OwnedCircle[]>([]);
+  const [livePrices, setLivePrices] = useState<Record<string, string>>({});
+
+  // Pre-warm StoreKit on iOS so products are cached before the user taps Buy.
+  // Also captures live localized prices to render in the tier cards (App Store
+  // guideline 3.1.2(c) requires displaying the actual price at point of purchase).
+  useEffect(() => {
+    if (!isIOSNative()) return;
+    prewarmProducts().then((products) => {
+      const map: Record<string, string> = {};
+      for (const p of products) {
+        const id = p?.identifier ?? p?.productIdentifier;
+        const price = p?.priceString ?? p?.localizedPrice ?? p?.price;
+        if (id === APPLE_PRODUCTS.family && price) map.family = String(price);
+        if (id === APPLE_PRODUCTS.extended && price) map.extended = String(price);
+      }
+      if (Object.keys(map).length > 0) setLivePrices(map);
+    });
+  }, []);
 
   useEffect(() => {
     if (!user) {
