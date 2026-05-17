@@ -70,7 +70,7 @@ export const ZoomableImage = ({
         wheel={{ step: 0.2, activationKeys: ["Control", "Meta"] }}
         pinch={{ step: 5 }}
         panning={{ disabled: scale <= 1.05 }}
-        onTransformed={(ref) => setScale(ref.state.scale)}
+        onTransform={(ref) => setScale(ref.state.scale)}
       >
         <TransformComponent
           wrapperStyle={{ width: "100%", height: "100%" }}
