@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
+import Unsubscribe from "./pages/Unsubscribe";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
 import Circles from "./pages/Circles";
@@ -53,6 +54,7 @@ const App = () => {
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/cookies" element={<CookiePolicy />} />
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/store" element={<Store />} />
             <Route path="/about" element={<About />} />
             <Route path="/careers" element={<Careers />} />

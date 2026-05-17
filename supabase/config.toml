@@ -51,3 +51,5 @@ project_id = "qxkwxolssapayqyfdwqc"
     verify_jwt = false
   [functions.download-my-data]
     verify_jwt = false
+  [functions.handle-unsubscribe]
+    verify_jwt = false

@@ -171,6 +171,34 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
+    // Check if the recipient previously unsubscribed
+    const { data: unsub } = await supabaseAdmin
+      .from("email_unsubscribes")
+      .select("email")
+      .eq("email", email.toLowerCase())
+      .maybeSingle();
+
+    if (unsub) {
+      return new Response(JSON.stringify({ error: "This email address has unsubscribed from Familial invites." }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    // Generate HMAC-signed unsubscribe token (matches handle-unsubscribe edge function)
+    const unsubKey = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    const sigBuf = await crypto.subtle.sign("HMAC", unsubKey, new TextEncoder().encode(email.toLowerCase().trim()));
+    const unsubToken = btoa(String.fromCharCode(...new Uint8Array(sigBuf)))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const unsubUrl = `https://familialmedia.com/unsubscribe?email=${encodeURIComponent(email)}&token=${unsubToken}`;
+    const fnUnsubUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/handle-unsubscribe?email=${encodeURIComponent(email)}&token=${unsubToken}`;
+
     const safeCircleName = escapeHtml(circleName);
     const safeInviterName = escapeHtml(inviterName || "A family member");
     const safeEmail = escapeHtml(email);
@@ -197,11 +225,11 @@ const handler = async (req: Request): Promise<Response> => {
         reply_to: "support@familialmedia.com",
         subject: `You're invited to join ${safeCircleName} on Familial`,
         headers: {
-          "List-Unsubscribe": "<mailto:support@familialmedia.com?subject=unsubscribe>, <https://familialmedia.com/unsubscribe>",
+          "List-Unsubscribe": `<${fnUnsubUrl}>, <${unsubUrl}>, <mailto:support@familialmedia.com?subject=unsubscribe>`,
           "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         },
-        text: `You're invited to join ${circleName} on Familial\n\n${inviterName || "A family member"} has invited you to join their family circle "${circleName}" on Familial.\n\nFamilial is a private space for families to share photos, events, messages, and memories together.\n\nJoin here: https://familialmedia.com/auth\n\nOnce you sign up with this email address (${email}), you'll automatically be connected to the circle.\n\nIf you weren't expecting this invitation, you can safely ignore this email.\n\n© Familial — Connecting families everywhere`,
-        html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5;"><div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;"><div style="background-color: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"><h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 20px 0; font-weight: 600;">You're invited</h1><p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;"><strong>${safeInviterName}</strong> has invited you to join their family circle <strong>"${safeCircleName}"</strong> on Familial.</p><p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Familial is a private space for families to share photos, events, messages, and memories together.</p><div style="text-align: center; margin: 30px 0;"><a href="https://familialmedia.com/auth" style="display: inline-block; background-color: #1a1a1a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Join Familial</a></div><p style="color: #888; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0; border-top: 1px solid #eee; padding-top: 20px;">Once you sign up with this email address (${safeEmail}), you'll automatically be connected to the circle.</p><p style="color: #999; font-size: 12px; line-height: 1.5; margin: 16px 0 0 0;">If you weren't expecting this invitation, you can safely ignore this email.</p></div><p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">© Familial — Connecting families everywhere</p></div></body></html>`,
+        text: `You're invited to join ${circleName} on Familial\n\n${inviterName || "A family member"} has invited you to join their family circle "${circleName}" on Familial.\n\nFamilial is a private space for families to share photos, events, messages, and memories together.\n\nJoin here: https://familialmedia.com/auth\n\nOnce you sign up with this email address (${email}), you'll automatically be connected to the circle.\n\nIf you weren't expecting this invitation, you can safely ignore this email.\n\nUnsubscribe: ${unsubUrl}\n\n© Familial — Connecting families everywhere`,
+        html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5;"><div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;"><div style="background-color: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"><h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 20px 0; font-weight: 600;">You're invited</h1><p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;"><strong>${safeInviterName}</strong> has invited you to join their family circle <strong>"${safeCircleName}"</strong> on Familial.</p><p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Familial is a private space for families to share photos, events, messages, and memories together.</p><div style="text-align: center; margin: 30px 0;"><a href="https://familialmedia.com/auth" style="display: inline-block; background-color: #1a1a1a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Join Familial</a></div><p style="color: #888; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0; border-top: 1px solid #eee; padding-top: 20px;">Once you sign up with this email address (${safeEmail}), you'll automatically be connected to the circle.</p><p style="color: #999; font-size: 12px; line-height: 1.5; margin: 16px 0 0 0;">If you weren't expecting this invitation, you can safely ignore this email.</p></div><p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">© Familial — Connecting families everywhere · <a href="${unsubUrl}" style="color: #999; text-decoration: underline;">Unsubscribe</a></p></div></body></html>`,
       }),
     });
 
