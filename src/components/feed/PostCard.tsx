@@ -259,6 +259,18 @@ export const PostCard = ({
   // Extract first URL from post content for link preview
   const firstUrl = post.content?.match(/(https?:\/\/[^\s]+)/)?.[0] || null;
 
+  // Preload neighbors when lightbox is open for instant swipes
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    [lightboxIndex - 1, lightboxIndex + 1].forEach((i) => {
+      const u = visualMedia[i];
+      if (u && getMediaType(u) === "image") {
+        const img = new Image();
+        img.src = presetImage(u, "full");
+      }
+    });
+  }, [lightboxIndex, visualMedia]);
+
   return (
     <Card>
       <CardHeader className="pb-4">
