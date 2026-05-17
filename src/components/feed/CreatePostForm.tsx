@@ -84,8 +84,8 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   };
 
   const handleVoiceRecording = (blob: Blob) => {
-    if (selectedFiles.length >= 4) {
-      toast({ title: "Too many files", description: "You can upload up to 4 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
+    if (selectedFiles.length >= 5) {
+      toast({ title: "Too many files", description: "You can upload up to 5 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
       return;
     }
     const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
