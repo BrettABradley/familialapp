@@ -17,6 +17,7 @@ import { ReportDialog } from "@/components/shared/ReportDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
+import { VideoThumbnail } from "@/components/shared/VideoThumbnail";
 
 interface ProfileData {
   user_id: string;
@@ -397,22 +398,7 @@ const ProfileView = () => {
                     onClick={() => setEnlargedImage(img)}
                   >
                     {mediaType === 'video' ? (
-                      <>
-                        <video
-                          src={`${img.image_url}#t=0.1`}
-                          className="w-full h-full object-cover"
-                          muted
-                          playsInline
-                          preload="metadata"
-                          // @ts-ignore iOS WKWebView hint
-                          webkit-playsinline="true"
-                          disableRemotePlayback
-                          tabIndex={-1}
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                          <Play className="h-8 w-8 text-white fill-white" />
-                        </div>
-                      </>
+                      <VideoThumbnail src={img.image_url} />
                     ) : (
                       <img src={img.image_url} alt={img.caption || "Profile photo"} className="w-full h-full object-cover" />
                     )}
