@@ -21,6 +21,7 @@ import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import JSZip from "jszip";
 import { SmartImage } from "@/components/shared/SmartImage";
 import { presetImage } from "@/lib/imageUrl";
+import { ZoomableImage } from "@/components/shared/ZoomableImage";
 
 interface Circle {
   id: string;
