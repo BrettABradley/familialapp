@@ -545,6 +545,7 @@ const Auth = () => {
                     setIsLogin(!isLogin);
                     setErrors({});
                     setAgeConfirmed(false);
+                    setDuplicateAccount(false);
                   }}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
