@@ -41,6 +41,15 @@ const Auth = () => {
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
 
+  // Password visibility
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Duplicate-account inline message (signup)
+  const [duplicateAccount, setDuplicateAccount] = useState(false);
+
+  // Password reset cooldown
+  const [resetCooldown, setResetCooldown] = useState(0);
+
   const { signIn, signUp, user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
