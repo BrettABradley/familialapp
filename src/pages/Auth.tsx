@@ -264,13 +264,12 @@ const Auth = () => {
 
         const { error } = await signUp(email, password, displayName);
         if (error) {
-          if (error.message.includes("User already registered")) {
-            toast({
-              title: "Account exists",
-              description: "This email is already registered. Please sign in instead.",
-              variant: "destructive",
-            });
-            setIsLogin(true);
+          const dup =
+            error.message.includes("User already registered") ||
+            error.message.toLowerCase().includes("already") ||
+            error.message.toLowerCase().includes("identities");
+          if (dup) {
+            setDuplicateAccount(true);
           } else {
             toast({
               title: "Sign up failed",
