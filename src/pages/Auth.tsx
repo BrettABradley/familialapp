@@ -462,6 +462,7 @@ const Auth = () => {
                     onChange={(e) => {
                       setEmail(e.target.value);
                       setErrors((prev) => ({ ...prev, email: undefined }));
+                      setDuplicateAccount(false);
                     }}
                     className={errors.email ? "border-destructive" : ""}
                   />
