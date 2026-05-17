@@ -474,6 +474,27 @@ export type Database = {
           },
         ]
       }
+      email_unsubscribes: {
+        Row: {
+          email: string
+          id: string
+          source: string | null
+          unsubscribed_at: string
+        }
+        Insert: {
+          email: string
+          id?: string
+          source?: string | null
+          unsubscribed_at?: string
+        }
+        Update: {
+          email?: string
+          id?: string
+          source?: string | null
+          unsubscribed_at?: string
+        }
+        Relationships: []
+      }
       event_rsvps: {
         Row: {
           created_at: string
