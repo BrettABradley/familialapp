@@ -81,6 +81,8 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     files.forEach(file => {
       setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]);
     });
+    // Reset input so the same file (or another single file on Safari) can be picked again
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleVoiceRecording = (blob: Blob) => {
