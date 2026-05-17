@@ -21,6 +21,6 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     include: ["@tanstack/react-query", "react-helmet-async"],
-    exclude: ["@capacitor/keyboard", "@capacitor/status-bar", "@capacitor/core"],
+    exclude: ["@capacitor/keyboard", "@capacitor/status-bar", "@capacitor/core", "@capacitor/push-notifications"],
   },
 }));
