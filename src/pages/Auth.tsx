@@ -341,8 +341,12 @@ const Auth = () => {
                     <p className="text-sm text-destructive">{errors.email}</p>
                   )}
                 </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Sending..." : "Send Reset Link"}
+                <Button type="submit" className="w-full" disabled={isLoading || resetCooldown > 0}>
+                  {isLoading
+                    ? "Sending..."
+                    : resetCooldown > 0
+                    ? `Resend available in ${resetCooldown}s`
+                    : "Send Reset Link"}
                 </Button>
               </form>
               <div className="mt-6 text-center">
