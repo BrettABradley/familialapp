@@ -72,6 +72,22 @@ const Auth = () => {
 
   const isLockedOut = lockoutUntil !== null && Date.now() < lockoutUntil;
 
+  // Initialize reset cooldown from sessionStorage
+  useEffect(() => {
+    const last = Number(sessionStorage.getItem(RESET_COOLDOWN_KEY) || 0);
+    if (last) {
+      const remaining = Math.ceil((last + RESET_COOLDOWN_SECONDS * 1000 - Date.now()) / 1000);
+      if (remaining > 0) setResetCooldown(remaining);
+    }
+  }, []);
+
+  // Reset cooldown countdown
+  useEffect(() => {
+    if (resetCooldown <= 0) return;
+    const t = setInterval(() => setResetCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [resetCooldown]);
+
   // After login, if there's a plan param, trigger checkout
   useEffect(() => {
     if (!loading && user && planParam && PLAN_PRICES[planParam] && !checkoutTriggered.current) {
