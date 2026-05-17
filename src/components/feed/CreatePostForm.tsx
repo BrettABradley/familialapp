@@ -62,8 +62,8 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let files = Array.from(e.target.files || []);
-    if (files.length + selectedFiles.length > 4) {
-      toast({ title: "Too many files", description: "You can upload up to 4 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
+    if (files.length + selectedFiles.length > 5) {
+      toast({ title: "Too many files", description: "You can upload up to 5 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
       return;
     }
 
