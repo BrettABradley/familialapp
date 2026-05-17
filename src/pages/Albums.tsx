@@ -645,21 +645,20 @@ const Albums = () => {
                     </div>
 
                     {/* Centered image */}
-                    <SmartImage
-                      src={enlargedPhoto.photo_url}
-                      preset="full"
-                      priority
-                      alt={enlargedPhoto.caption || "Photo"}
-                      className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none bg-transparent"
-                      onTouchStart={(e) => { touchStartXRef.current = e.touches[0].clientX; (touchStartXRef as any).__y = e.touches[0].clientY; }}
-                      onTouchEnd={(e) => {
-                        const deltaX = touchStartXRef.current - e.changedTouches[0].clientX;
-                        const deltaY = e.changedTouches[0].clientY - ((touchStartXRef as any).__y || 0);
-                        if (deltaY > 80 && Math.abs(deltaX) < 50) { setEnlargedPhoto(null); return; }
-                        if (deltaX > 50 && currentIndex < photos.length - 1) setEnlargedPhoto(photos[currentIndex + 1]);
-                        else if (deltaX < -50 && currentIndex > 0) setEnlargedPhoto(photos[currentIndex - 1]);
-                      }}
-                    />
+                    <ZoomableImage
+                      className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto flex items-center justify-center"
+                      onSwipeLeft={() => currentIndex < photos.length - 1 && setEnlargedPhoto(photos[currentIndex + 1])}
+                      onSwipeRight={() => currentIndex > 0 && setEnlargedPhoto(photos[currentIndex - 1])}
+                      onSwipeDown={() => setEnlargedPhoto(null)}
+                    >
+                      <SmartImage
+                        src={enlargedPhoto.photo_url}
+                        preset="full"
+                        priority
+                        alt={enlargedPhoto.caption || "Photo"}
+                        className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none bg-transparent"
+                      />
+                    </ZoomableImage>
 
                     {/* Left arrow */}
                     {photos.length > 1 && currentIndex > 0 && (
