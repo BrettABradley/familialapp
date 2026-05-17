@@ -10,6 +10,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import logo from "@/assets/logo.png";
 import { isIOSNative, purchaseSubscription, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import { Eye, EyeOff } from "lucide-react";
+
+const RESET_COOLDOWN_SECONDS = 60;
+const RESET_COOLDOWN_KEY = "lastPasswordResetAt";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
