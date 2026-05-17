@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { VideoThumbnail } from "@/components/shared/VideoThumbnail";
+import { ZoomableImage } from "@/components/shared/ZoomableImage";
 
 interface ProfileData {
   user_id: string;
