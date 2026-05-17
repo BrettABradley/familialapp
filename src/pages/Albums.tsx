@@ -62,6 +62,19 @@ const Albums = () => {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [enlargedPhoto, setEnlargedPhoto] = useState<AlbumPhoto | null>(null);
   const touchStartXRef = useRef<number>(0);
+
+  // Preload neighbor photos in lightbox for snappy swipes
+  useEffect(() => {
+    if (!enlargedPhoto) return;
+    const idx = photos.findIndex(p => p.id === enlargedPhoto.id);
+    [idx - 1, idx + 1].forEach((i) => {
+      const p = photos[i];
+      if (p?.photo_url) {
+        const img = new Image();
+        img.src = presetImage(p.photo_url, "full");
+      }
+    });
+  }, [enlargedPhoto, photos]);
   
   const [albums, setAlbums] = useState<Album[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
