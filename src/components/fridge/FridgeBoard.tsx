@@ -6,6 +6,7 @@ import { Trash2, Mic, X, Download } from "lucide-react";
 import { getMediaType } from "@/lib/mediaUtils";
 import { PixelCampfire } from "./PixelCampfire";
 import { CampfireDialog } from "./CampfireDialog";
+import { SmartImage } from "@/components/shared/SmartImage";
 
 export interface FridgeBoardPin {
   id: string;
@@ -202,10 +203,10 @@ export function FridgeBoard({
                           </audio>
                         </div>
                       ) : (
-                        <img
+                        <SmartImage
                           src={pin.image_url}
+                          preset="thumb"
                           alt={pin.title}
-                          loading="lazy"
                           className="block w-full aspect-square object-cover bg-zinc-200 cursor-pointer"
                           style={{ imageRendering: "auto" }}
                           onClick={() => setEnlargedPin(pin)}
@@ -383,8 +384,10 @@ export function FridgeBoard({
                     </audio>
                   </div>
                 ) : (
-                  <img
+                  <SmartImage
                     src={enlargedPin.image_url}
+                    preset="full"
+                    priority
                     alt={enlargedPin.title}
                     className="w-full aspect-square object-cover rounded-none bg-zinc-200"
                   />

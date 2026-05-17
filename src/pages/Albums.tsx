@@ -19,6 +19,8 @@ import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { convertHeicToJpeg, convertHeicFiles } from "@/lib/heicConverter";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import JSZip from "jszip";
+import { SmartImage } from "@/components/shared/SmartImage";
+import { presetImage } from "@/lib/imageUrl";
 
 interface Circle {
   id: string;
@@ -64,6 +66,19 @@ const Albums = () => {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
   const [photos, setPhotos] = useState<AlbumPhoto[]>([]);
+
+  // Preload neighbor photos in lightbox for snappy swipes
+  useEffect(() => {
+    if (!enlargedPhoto) return;
+    const idx = photos.findIndex(p => p.id === enlargedPhoto.id);
+    [idx - 1, idx + 1].forEach((i) => {
+      const p = photos[i];
+      if (p?.photo_url) {
+        const img = new window.Image();
+        img.src = presetImage(p.photo_url, "full");
+      }
+    });
+  }, [enlargedPhoto, photos]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -552,8 +567,10 @@ const Albums = () => {
           {/* Cover Photo Preview */}
           {selectedAlbum.cover_photo_url && (
             <div className="mb-6 rounded-lg overflow-hidden aspect-[3/1] relative">
-              <img
+              <SmartImage
                 src={selectedAlbum.cover_photo_url}
+                preset="card"
+                priority
                 alt={`${selectedAlbum.name} cover`}
                 className="w-full h-full object-cover"
               />
@@ -571,8 +588,8 @@ const Albums = () => {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {photos.map((photo) => (
-                <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer" onClick={() => setEnlargedPhoto(photo)}>
-                  <img src={photo.photo_url} alt={photo.caption || "Photo"} className="w-full h-full object-cover" />
+                <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer" style={{ contentVisibility: "auto", containIntrinsicSize: "300px 300px" }} onClick={() => setEnlargedPhoto(photo)}>
+                  <SmartImage src={photo.photo_url} preset="thumb" alt={photo.caption || "Photo"} className="w-full h-full object-cover" />
                   {user && photo.uploaded_by === user.id && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo); }}
@@ -628,10 +645,12 @@ const Albums = () => {
                     </div>
 
                     {/* Centered image */}
-                    <img
+                    <SmartImage
                       src={enlargedPhoto.photo_url}
+                      preset="full"
+                      priority
                       alt={enlargedPhoto.caption || "Photo"}
-                      className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
+                      className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none bg-transparent"
                       onTouchStart={(e) => { touchStartXRef.current = e.touches[0].clientX; (touchStartXRef as any).__y = e.touches[0].clientY; }}
                       onTouchEnd={(e) => {
                         const deltaX = touchStartXRef.current - e.changedTouches[0].clientX;
@@ -769,7 +788,7 @@ const Albums = () => {
                   )}
                   <div className="aspect-video bg-secondary relative overflow-hidden">
                     {album.cover_photo_url ? (
-                      <img src={album.cover_photo_url} alt={album.name} className="w-full h-full object-cover" />
+                      <SmartImage src={album.cover_photo_url} preset="card" alt={album.name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Image className="w-12 h-12 text-muted-foreground" />
