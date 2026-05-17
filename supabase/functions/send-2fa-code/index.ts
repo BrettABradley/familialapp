@@ -88,7 +88,7 @@ serve(async (req) => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "Familial <support@familialmedia.com>",
+        from: "Familial <support@support.familialmedia.com>",
         to: [user.email],
         subject: "Your Familial verification code",
         html: `

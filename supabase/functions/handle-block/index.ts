@@ -50,7 +50,7 @@ serve(async (req) => {
           Authorization: `Bearer ${resendKey}`,
         },
         body: JSON.stringify({
-          from: "Familial <support@familialmedia.com>",
+          from: "Familial <support@support.familialmedia.com>",
           to: ["support@familialmedia.com"],
           subject: `[Block Report] User blocked on Familial`,
           html: `

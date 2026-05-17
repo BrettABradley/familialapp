@@ -64,7 +64,7 @@ async function sendDowngradeEmail(toEmail: string, currentPlan: string, newPlan:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Familial <support@familialmedia.com>",
+        from: "Familial <support@support.familialmedia.com>",
         to: [toEmail],
         subject,
         html,
