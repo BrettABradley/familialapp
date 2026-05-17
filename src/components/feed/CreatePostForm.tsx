@@ -277,6 +277,28 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
                 {renderPreview(url, index)}
               </div>
             ))}
+            {selectedFiles.length < 5 && (
+              <div className="flex-[0_0_85%] snap-center">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isPosting}
+                  className="w-full aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary hover:bg-secondary/50 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground"
+                  aria-label="Add more media"
+                >
+                  <Paperclip className="w-6 h-6" />
+                  <span className="text-sm font-medium">Add more</span>
+                  <span className="text-xs">{5 - selectedFiles.length} left</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {previewUrls.length === 1 && selectedFiles.length < 5 && (
+          <div className="mb-2">
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isPosting}>
+              <Paperclip className="w-4 h-4 mr-2" />Add more
+            </Button>
           </div>
         )}
         {uploadProgress !== null && (
