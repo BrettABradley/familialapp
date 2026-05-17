@@ -7,7 +7,91 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+const APNS_HOST = "https://api.push.apple.com"; // production
+const APNS_TOPIC = "com.familialmedia.familial";
+
+// ---------- ES256 JWT for APNs (cached ~50 min) ----------
+let cachedJwt: { token: string; exp: number } | null = null;
+
+function b64url(input: ArrayBuffer | string): string {
+  const bytes = typeof input === "string"
+    ? new TextEncoder().encode(input)
+    : new Uint8Array(input);
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+function pemToPkcs8(pem: string): ArrayBuffer {
+  const body = pem
+    .replace(/-----BEGIN [^-]+-----/g, "")
+    .replace(/-----END [^-]+-----/g, "")
+    .replace(/\s+/g, "");
+  const bin = atob(body);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf.buffer;
+}
+
+async function getApnsJwt(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedJwt && cachedJwt.exp - 60 > now) return cachedJwt.token;
+
+  const keyId = Deno.env.get("APPLE_KEY_ID");
+  const teamId = Deno.env.get("APPLE_ISSUER_ID");
+  const privateKeyPem = Deno.env.get("APPLE_PRIVATE_KEY");
+  if (!keyId || !teamId || !privateKeyPem) {
+    throw new Error("Missing APPLE_KEY_ID / APPLE_ISSUER_ID / APPLE_PRIVATE_KEY");
+  }
+
+  const header = { alg: "ES256", kid: keyId };
+  const payload = { iss: teamId, iat: now };
+  const signingInput = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    pemToPkcs8(privateKeyPem),
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    cryptoKey,
+    new TextEncoder().encode(signingInput)
+  );
+
+  const token = `${signingInput}.${b64url(sig)}`;
+  cachedJwt = { token, exp: now + 50 * 60 };
+  return token;
+}
+
+async function sendApns(
+  deviceToken: string,
+  payload: Record<string, unknown>
+): Promise<{ ok: boolean; status: number; reason?: string }> {
+  const jwt = await getApnsJwt();
+  const res = await fetch(`${APNS_HOST}/3/device/${deviceToken}`, {
+    method: "POST",
+    headers: {
+      authorization: `bearer ${jwt}`,
+      "apns-topic": APNS_TOPIC,
+      "apns-push-type": "alert",
+      "apns-priority": "10",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (res.ok) return { ok: true, status: res.status };
+  let reason: string | undefined;
+  try {
+    const j = await res.json();
+    reason = j?.reason;
+  } catch {
+    /* ignore */
+  }
+  return { ok: false, status: res.status, reason };
+}
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -16,12 +100,11 @@ serve(async (req: Request) => {
 
   try {
     const { record } = await req.json();
-
     if (!record || !record.user_id) {
-      return new Response(
-        JSON.stringify({ error: "Missing notification record" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      return new Response(JSON.stringify({ error: "Missing notification record" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
 
     const { user_id, title, message, link, type } = record;
@@ -31,7 +114,7 @@ serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Check notification preferences
+    // Respect notification preferences
     const { data: prefs } = await supabase
       .from("notification_preferences")
       .select("push_enabled, muted_types")
@@ -40,96 +123,94 @@ serve(async (req: Request) => {
 
     if (prefs) {
       if (!prefs.push_enabled) {
-        return new Response(
-          JSON.stringify({ skipped: true, reason: "Push notifications disabled by user" }),
-          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
+        return new Response(JSON.stringify({ skipped: true, reason: "push disabled" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
       }
-      if (prefs.muted_types && Array.isArray(prefs.muted_types) && type && prefs.muted_types.includes(type)) {
-        return new Response(
-          JSON.stringify({ skipped: true, reason: `Notification type "${type}" is muted` }),
-          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
+      if (
+        prefs.muted_types &&
+        Array.isArray(prefs.muted_types) &&
+        type &&
+        prefs.muted_types.includes(type)
+      ) {
+        return new Response(JSON.stringify({ skipped: true, reason: `type "${type}" muted` }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
       }
     }
 
-    // Get all Expo push tokens for this user
+    // Note: column is named `expo_token` for legacy reasons but now stores APNs device tokens.
     const { data: tokens, error: tokenError } = await supabase
       .from("push_tokens")
       .select("expo_token")
       .eq("user_id", user_id);
 
     if (tokenError) {
-      console.error("Error fetching tokens:", tokenError);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch push tokens" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      console.error("fetch tokens error:", tokenError);
+      return new Response(JSON.stringify({ error: "Failed to fetch tokens" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
 
     if (!tokens || tokens.length === 0) {
-      return new Response(
-        JSON.stringify({ skipped: true, reason: "No push tokens registered" }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      return new Response(JSON.stringify({ skipped: true, reason: "no tokens" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
 
-    const messages = tokens.map((t: { expo_token: string }) => ({
-      to: t.expo_token,
-      sound: "default",
-      title: title || "Familial",
-      body: message || "",
-      data: { type: type || "general", link: link || null },
-    }));
-
-    const expoResponse = await fetch(EXPO_PUSH_URL, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Accept-Encoding": "gzip, deflate",
-        "Content-Type": "application/json",
+    const apnsPayload = {
+      aps: {
+        alert: { title: title || "Familial", body: message || "" },
+        sound: "default",
       },
-      body: JSON.stringify(messages),
-    });
+      type: type || "general",
+      link: link || null,
+    };
 
-    const expoResult = await expoResponse.json();
+    const invalidTokens: string[] = [];
+    let sent = 0;
 
-    if (!expoResponse.ok) {
-      console.error("Expo push error:", expoResult);
-      return new Response(
-        JSON.stringify({ error: "Expo push failed", details: expoResult }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
-    // Clean up invalid tokens
-    if (expoResult.data) {
-      const invalidTokens: string[] = [];
-      expoResult.data.forEach(
-        (result: { status: string; details?: { error?: string } }, index: number) => {
-          if (result.status === "error" && result.details?.error === "DeviceNotRegistered") {
-            invalidTokens.push(tokens[index].expo_token);
+    for (const t of tokens as { expo_token: string }[]) {
+      try {
+        const result = await sendApns(t.expo_token, apnsPayload);
+        if (result.ok) {
+          sent++;
+        } else {
+          console.warn(`APNs ${result.status} for token ${t.expo_token.slice(0, 8)}…: ${result.reason}`);
+          if (
+            result.status === 410 ||
+            result.reason === "BadDeviceToken" ||
+            result.reason === "Unregistered" ||
+            result.reason === "DeviceTokenNotForTopic"
+          ) {
+            invalidTokens.push(t.expo_token);
           }
         }
-      );
-
-      if (invalidTokens.length > 0) {
-        await supabase
-          .from("push_tokens")
-          .delete()
-          .eq("user_id", user_id)
-          .in("expo_token", invalidTokens);
-        console.log(`Cleaned up ${invalidTokens.length} invalid token(s)`);
+      } catch (e) {
+        console.error("APNs send threw:", e);
       }
     }
 
-    return new Response(
-      JSON.stringify({ success: true, sent: messages.length }),
-      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+    if (invalidTokens.length > 0) {
+      await supabase
+        .from("push_tokens")
+        .delete()
+        .eq("user_id", user_id)
+        .in("expo_token", invalidTokens);
+      console.log(`Cleaned ${invalidTokens.length} invalid token(s)`);
+    }
+
+    return new Response(JSON.stringify({ success: true, sent, cleaned: invalidTokens.length }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error:", error);
+    console.error("send-push-notification error:", error);
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { "Content-Type": "application/json", ...corsHeaders },
