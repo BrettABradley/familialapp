@@ -534,21 +534,20 @@ export const PostCard = ({
                     <source src={visualMedia[lightboxIndex]} />
                   </video>
                 ) : (
-                  <SmartImage
-                    src={visualMedia[lightboxIndex]}
-                    preset="full"
-                    priority
-                    alt={`Post media ${lightboxIndex + 1}`}
-                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none bg-transparent"
-                    onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; touchStartY.current = e.touches[0].clientY; }}
-                    onTouchEnd={(e) => {
-                      const deltaX = touchStartX.current - e.changedTouches[0].clientX;
-                      const deltaY = e.changedTouches[0].clientY - touchStartY.current;
-                      if (deltaY > 80 && Math.abs(deltaX) < 50) { setLightboxIndex(null); return; }
-                      if (deltaX > 50 && lightboxIndex < visualMedia.length - 1) setLightboxIndex(lightboxIndex + 1);
-                      else if (deltaX < -50 && lightboxIndex > 0) setLightboxIndex(lightboxIndex - 1);
-                    }}
-                  />
+                  <ZoomableImage
+                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto flex items-center justify-center"
+                    onSwipeLeft={() => lightboxIndex < visualMedia.length - 1 && setLightboxIndex(lightboxIndex + 1)}
+                    onSwipeRight={() => lightboxIndex > 0 && setLightboxIndex(lightboxIndex - 1)}
+                    onSwipeDown={() => setLightboxIndex(null)}
+                  >
+                    <SmartImage
+                      src={visualMedia[lightboxIndex]}
+                      preset="full"
+                      priority
+                      alt={`Post media ${lightboxIndex + 1}`}
+                      className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none bg-transparent"
+                    />
+                  </ZoomableImage>
                 )}
 
                 {/* Left/right navigation arrows */}
