@@ -482,7 +482,7 @@ export const PostCard = ({
                     {post.reactions!.map(r => (
                       <Link key={r.id} to={`/profile/${r.user_id}`} className="flex items-center gap-2 hover:bg-secondary rounded p-0.5 transition-colors">
                         <Avatar className="h-5 w-5">
-                          <AvatarImage src={r.profiles?.avatar_url || undefined} />
+                          <AvatarImage src={avatarUrl(r.profiles?.avatar_url) || undefined} />
                           <AvatarFallback className="text-[8px]">{r.profiles?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
                         </Avatar>
                         <span className="text-sm text-foreground truncate">{r.profiles?.display_name || "Unknown"}</span>
@@ -509,7 +509,7 @@ export const PostCard = ({
             <div key={comment.id} className={`flex gap-3 ${isReply ? "ml-10" : ""}`}>
               <Link to={`/profile/${comment.author_id}`}>
                 <Avatar className={`${isReply ? "h-6 w-6" : "h-8 w-8"} cursor-pointer hover:opacity-80 transition-opacity`}>
-                  <AvatarImage src={comment.profiles?.avatar_url || undefined} />
+                  <AvatarImage src={avatarUrl(comment.profiles?.avatar_url) || undefined} />
                   <AvatarFallback className="text-xs">{comment.profiles?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
                 </Avatar>
               </Link>
@@ -568,7 +568,7 @@ export const PostCard = ({
             return (
               <div className="flex gap-2 ml-10">
                 <Avatar className="h-6 w-6">
-                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarImage src={avatarUrl(profile?.avatar_url) || undefined} />
                   <AvatarFallback className="text-xs">{profile?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 flex gap-2">
@@ -616,7 +616,7 @@ export const PostCard = ({
               })}
               <div className="flex gap-2">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarImage src={avatarUrl(profile?.avatar_url) || undefined} />
                   <AvatarFallback className="text-xs">{profile?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 flex gap-2">
