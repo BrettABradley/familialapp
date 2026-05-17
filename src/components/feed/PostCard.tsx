@@ -209,7 +209,110 @@ const MediaItem = ({ url, index, onDownload, onImageClick, onVideoClick }: { url
   );
 };
 
-export const PostCard = ({
+// Instagram-style swipeable carousel for multi-media posts
+const PostMediaCarousel = ({
+  items,
+  onDownload,
+  onImageClick,
+  onVideoClick,
+}: {
+  items: string[];
+  onDownload: (url: string) => void;
+  onImageClick: (index: number) => void;
+  onVideoClick: (index: number) => void;
+}) => {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "start" });
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => setSelectedIndex(emblaApi.selectedScrollSnap());
+    emblaApi.on("select", onSelect);
+    onSelect();
+    return () => { emblaApi.off("select", onSelect); };
+  }, [emblaApi]);
+
+  return (
+    <div className="mb-4">
+      <div className="relative">
+        <div className="overflow-hidden rounded-lg bg-secondary" ref={emblaRef}>
+          <div className="flex">
+            {items.map((url, index) => {
+              const type = getMediaType(url);
+              return (
+                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-[4/5] relative bg-black">
+                  {type === "video" ? (
+                    <div className="w-full h-full" onClick={() => onVideoClick(index)}>
+                      <VideoThumbnail url={url} onClick={() => onVideoClick(index)} />
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="w-full h-full cursor-pointer"
+                      onClick={() => onImageClick(index)}
+                      aria-label={`Open image ${index + 1}`}
+                    >
+                      <SmartImage
+                        src={url}
+                        preset="card"
+                        alt={`Post media ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Counter */}
+        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full pointer-events-none">
+          {selectedIndex + 1} / {items.length}
+        </div>
+
+        {/* Desktop arrows */}
+        {selectedIndex > 0 && (
+          <button
+            type="button"
+            onClick={() => emblaApi?.scrollPrev()}
+            className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+            aria-label="Previous"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        )}
+        {selectedIndex < items.length - 1 && (
+          <button
+            type="button"
+            onClick={() => emblaApi?.scrollNext()}
+            className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+            aria-label="Next"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        )}
+      </div>
+
+      {/* Dot indicators */}
+      <div className="flex justify-center gap-1.5 mt-2">
+        {items.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => emblaApi?.scrollTo(i)}
+            className={`h-1.5 rounded-full transition-all ${
+              i === selectedIndex ? "w-4 bg-foreground" : "w-1.5 bg-muted-foreground/40"
+            }`}
+            aria-label={`Go to slide ${i + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+
   post,
   isExpanded,
   commentInput,
