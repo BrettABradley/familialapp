@@ -398,7 +398,17 @@ const ProfileView = () => {
                   >
                     {mediaType === 'video' ? (
                       <>
-                        <video src={img.image_url} className="w-full h-full object-cover" muted preload="metadata" />
+                        <video
+                          src={`${img.image_url}#t=0.1`}
+                          className="w-full h-full object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                          // @ts-ignore iOS WKWebView hint
+                          webkit-playsinline="true"
+                          disableRemotePlayback
+                          tabIndex={-1}
+                        />
                         <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                           <Play className="h-8 w-8 text-white fill-white" />
                         </div>
