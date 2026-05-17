@@ -41,7 +41,7 @@ function buildDowngradeEmailHtml(currentPlan: string, newPlan: string, switchDat
   <p style="color: #333; font-size: 15px; line-height: 1.6; margin: 0 0 16px 0;">You'll continue to enjoy your ${currentPlan} plan benefits until <strong>${switchDate}</strong>. After that date, your plan will switch to ${newPlan} and you'll be charged $7.00/month going forward.</p>
   <p style="color: #333; font-size: 15px; line-height: 1.6; margin: 0 0 16px 0;">No additional charges have been made for this change. Thank you for being part of the Familial community.</p>
   <p style="color: #888; font-size: 13px; line-height: 1.5; margin: 0 0 16px 0; padding-top: 16px; border-top: 1px solid #eee;"><strong>Refund Policy:</strong> All purchases are non-refundable.</p>
-  <p style="color: #888; font-size: 13px; margin: 0;">Questions? Contact us at <a href="mailto:support@support.familialmedia.com" style="color: #888;">support@support.familialmedia.com</a></p>
+  <p style="color: #888; font-size: 13px; margin: 0;">Questions? Contact us at <a href="mailto:support@familialmedia.com" style="color: #888;">support@familialmedia.com</a></p>
 </div></div></body></html>`;
 }
 

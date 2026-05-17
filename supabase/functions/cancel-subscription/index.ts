@@ -45,7 +45,7 @@ function buildCancelEmailHtml(planName: string, accessEndDate: string): string {
   <p style="color: #333; font-size: 15px; line-height: 1.6; margin: 0 0 16px 0;">If you change your mind, you can reactivate your plan at any time from the pricing page before your access ends.</p>
   <p style="color: #333; font-size: 15px; line-height: 1.6; margin: 0 0 16px 0;">Thank you for being part of the Familial community. We hope to see you again.</p>
   <p style="color: #888; font-size: 13px; line-height: 1.5; margin: 0 0 16px 0; padding-top: 16px; border-top: 1px solid #eee;"><strong>Refund Policy:</strong> All purchases are non-refundable.</p>
-  <p style="color: #888; font-size: 13px; margin: 0;">Questions? Contact us at <a href="mailto:support@support.familialmedia.com" style="color: #888;">support@support.familialmedia.com</a></p>
+  <p style="color: #888; font-size: 13px; margin: 0;">Questions? Contact us at <a href="mailto:support@familialmedia.com" style="color: #888;">support@familialmedia.com</a></p>
 </div></div></body></html>`;
 }
 
