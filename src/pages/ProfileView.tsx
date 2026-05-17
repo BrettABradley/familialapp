@@ -309,12 +309,20 @@ const ProfileView = () => {
       <Card>
         <CardContent className="py-8">
           <div className="flex flex-col items-center gap-4">
-            <Avatar className="h-28 w-28">
-              <AvatarImage src={profileData.avatar_url || undefined} />
-              <AvatarFallback className="text-3xl font-serif">
-                {profileData.display_name?.charAt(0)?.toUpperCase() || "U"}
-              </AvatarFallback>
-            </Avatar>
+            <button
+              type="button"
+              onClick={() => profileData.avatar_url && setAvatarZoomOpen(true)}
+              className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-label="View profile picture"
+              disabled={!profileData.avatar_url}
+            >
+              <Avatar className="h-28 w-28 cursor-pointer hover:opacity-90 transition-opacity">
+                <AvatarImage src={profileData.avatar_url || undefined} />
+                <AvatarFallback className="text-3xl font-serif">
+                  {profileData.display_name?.charAt(0)?.toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+            </button>
             <div className="text-center space-y-1">
               <div className="flex items-center justify-center gap-2">
                 <h1 className="font-serif text-2xl font-bold text-foreground">
