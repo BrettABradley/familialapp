@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SEO } from "@/components/shared/SEO";
+import SEO from "@/components/shared/SEO";
 
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/handle-unsubscribe`;
 
