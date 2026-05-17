@@ -1,63 +1,29 @@
-## Why images feel slow today
+# Fix grey video thumbnails in personal profile posts
 
-Every `<img>` in Feed, Albums, and the lightbox loads the **full-resolution original** from Supabase Storage (often 3–10 MB HEIC→JPEG conversions from iPhones). There's no:
+## Problem
+The current fix (`#t=0.1` URL hack with `preload="metadata"`) doesn't reliably paint a frame on iOS WKWebView. Many videos still show as grey tiles because:
+- WKWebView often refuses to decode frames until user gesture
+- Supabase Storage may not honor byte-range requests cleanly for `moov`-at-end MP4s
+- `preload="metadata"` is hinted, not enforced
 
-- `loading="lazy"` / `decoding="async"`
-- Width-appropriate resizing (a 4032px photo is rendered into a ~300px grid cell)
-- Format negotiation (WebP/AVIF)
-- Skeleton/placeholder while loading
-- Preload of above-the-fold media
+## Solution
+Build a small `VideoThumbnail` component that grabs a real still frame and shows it as an `<img>` (or CSS background). The `<video>` element is removed from the grid entirely — only used briefly to capture the frame.
 
-Result: each grid cell downloads megabytes, the main thread blocks decoding huge JPEGs, and iOS WebView feels especially sluggish.
+How it works:
+1. Mount a hidden `<video muted playsInline crossOrigin="anonymous" preload="auto">` off-screen
+2. On `loadeddata`, seek to ~0.1s
+3. On `seeked`, draw the current frame to a `<canvas>` and export as a blob URL
+4. Swap to `<img src={blobUrl}>` with the Play overlay
+5. Cache the blob URL per video URL in a module-level `Map` so we don't redo work across re-renders/scroll
+6. Cleanup blob URLs on unmount
 
-## Fix plan (no business-logic changes)
+Fallback: if the canvas read fails (CORS taint, decode error), fall back to a neutral placeholder with the Play icon — still better than the misleading grey "video" frame.
 
-### 1. Add a Supabase image transform helper
-New `src/lib/imageUrl.ts` exporting `transformedImage(url, { width, quality, resize })`. Supabase Storage supports on-the-fly transforms via `?width=&quality=&resize=cover` on the public/signed URL — it returns a smaller, WebP-encoded image and caches it on the CDN. Falls back to the original URL if the URL isn't a Supabase Storage URL (e.g., external avatars).
+## Files to change
+- **New** `src/components/shared/VideoThumbnail.tsx` — the component described above
+- **Edit** `src/pages/ProfileView.tsx` (lines ~399–415) — replace the inline `<video>` + Play overlay with `<VideoThumbnail src={img.image_url} />`
 
-Presets:
-- `thumb` — 400w, q70 (feed grid, album grid, fridge tiles)
-- `card` — 800w, q75 (single-image post)
-- `full` — 1600w, q80 (lightbox)
-- `avatar` — 128w, q75 (all `AvatarImage`)
-
-### 2. New `<SmartImage>` component
-`src/components/shared/SmartImage.tsx` — wraps `<img>` and adds:
-- `srcSet` with 1x / 2x using the transform helper
-- `loading="lazy"` + `decoding="async"` (override-able for LCP)
-- `fetchpriority="high"` for the first feed post / album cover
-- Width + height attributes (prevents CLS)
-- Tiny neutral background while decoding (no layout shift)
-- `onError` falls back to the untransformed URL
-
-### 3. Swap raw `<img>` usages
-Replace the raw `<img>` tags in:
-- `src/components/feed/PostCard.tsx` (grid tiles, single image, lightbox, video thumbs)
-- `src/pages/Albums.tsx` (album covers, photo grid, lightbox prev/next)
-- `src/components/fridge/FridgeBoard.tsx` (sticker tiles)
-- `src/components/profile/*` avatar previews
-- `AvatarImage` usages — pass transformed URL via a small `avatarUrl()` helper instead of rewriting the shadcn component
-
-Lightbox prev/next images get **preloaded** via `new Image()` so swiping feels instant.
-
-### 4. Defer offscreen album/feed media
-- Feed already paginates; add `loading="lazy"` so scrolled-past pages don't re-decode.
-- Album grid: render all tiles but rely on `loading="lazy"` + `content-visibility: auto` on the tile wrapper so iOS skips offscreen work.
-
-### 5. iOS-specific wins
-- Add `<link rel="preconnect" href="https://qxkwxolssapayqyfdwqc.supabase.co">` to `index.html` so the TLS handshake to Storage happens before the first image request.
-- Keep HEIC client-side conversion (already in place) but **also** downscale on upload to max 2400px long edge in `heicConverter.ts` — current uploads of 4032×3024 are wasteful for a feed that never shows >1600px.
-
-### 6. Verify
-- Open Feed on iOS + web, network panel: confirm requests now return WebP and < 200KB per thumbnail.
-- LCP image (first feed post) loads in < 1s on a warm cache.
-- Album grid of 100 photos: total transferred bytes should drop ~10× (rough target 5–10 MB instead of 50–100 MB).
-
-## Out of scope (can do later if needed)
-- Moving to a dedicated image CDN (Cloudflare Images, imgproxy) — Supabase's built-in transformer is good enough for now.
-- Blurhash placeholders — nice but adds DB columns; revisit if users still report perceived slowness after the above.
-
-## Files touched
-- new: `src/lib/imageUrl.ts`, `src/components/shared/SmartImage.tsx`
-- edits: `PostCard.tsx`, `Albums.tsx`, `FridgeBoard.tsx`, `heicConverter.ts`, `index.html`
-- no DB migration, no edge function changes, no new secrets
+## Notes
+- This is an OTA JS change — no native rebuild needed.
+- Supabase Storage already serves with permissive CORS, so `crossOrigin="anonymous"` + canvas export should work. If a specific bucket strips CORS, the fallback placeholder still hides the grey box.
+- Same component can later be reused in Albums and Feed grids if you want consistent thumbnails everywhere.
