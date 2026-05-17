@@ -463,20 +463,25 @@ export const PostCard = ({
           </div>
         )}
 
-        {/* Visual media grid (images + video thumbnails together) */}
-        {visualMedia.length > 0 && (
-          <div className={`grid gap-2 mb-4 ${visualMedia.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-            {visualMedia.map((url, index) => (
-              <MediaItem
-                key={index}
-                url={url}
-                index={index}
-                onDownload={onDownloadImage}
-                onImageClick={() => setLightboxIndex(index)}
-                onVideoClick={() => setLightboxIndex(index)}
-              />
-            ))}
+        {/* Visual media: carousel for 2+, single for 1 */}
+        {visualMedia.length === 1 && (
+          <div className="mb-4">
+            <MediaItem
+              url={visualMedia[0]}
+              index={0}
+              onDownload={onDownloadImage}
+              onImageClick={() => setLightboxIndex(0)}
+              onVideoClick={() => setLightboxIndex(0)}
+            />
           </div>
+        )}
+        {visualMedia.length > 1 && (
+          <PostMediaCarousel
+            items={visualMedia}
+            onDownload={onDownloadImage}
+            onImageClick={(i) => setLightboxIndex(i)}
+            onVideoClick={(i) => setLightboxIndex(i)}
+          />
         )}
 
         {/* Unified Media Lightbox — fullscreen on mobile, centered modal on desktop */}
