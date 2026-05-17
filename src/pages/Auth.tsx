@@ -173,15 +173,35 @@ const Auth = () => {
       setErrors({ email: "Please enter a valid email address" });
       return;
     }
+    if (resetCooldown > 0) return;
     setIsLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setIsLoading(false);
+    // Start cooldown regardless (prevents burning through server-side limit)
+    sessionStorage.setItem(RESET_COOLDOWN_KEY, String(Date.now()));
+    setResetCooldown(RESET_COOLDOWN_SECONDS);
+
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      const msg = (error.message || "").toLowerCase();
+      const isRateLimit =
+        msg.includes("rate limit") ||
+        msg.includes("over_email_send_rate_limit") ||
+        (error as any).status === 429;
+      if (isRateLimit) {
+        toast({
+          title: "Please wait a moment",
+          description:
+            "Too many reset requests. Check your inbox (and spam folder) for an earlier link, or try again in a minute.",
+          variant: "destructive",
+        });
+        setIsForgotPassword(false);
+      } else {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
     } else {
-      toast({ title: "Check your email", description: "We've sent you a password reset link." });
+      toast({ title: "Check your email", description: "We've sent you a password reset link. Check spam if you don't see it." });
       setIsForgotPassword(false);
     }
   };
