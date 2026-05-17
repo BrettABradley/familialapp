@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
+import Unsubscribe from "./pages/Unsubscribe";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
 import Circles from "./pages/Circles";
