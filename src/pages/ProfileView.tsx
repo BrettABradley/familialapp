@@ -67,6 +67,7 @@ const ProfileView = () => {
   const isOwnProfile = user?.id === userId;
   const { blockUser, isBlocked } = useBlockedUsers();
   const [reportOpen, setReportOpen] = useState(false);
+  const [avatarZoomOpen, setAvatarZoomOpen] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
