@@ -10,6 +10,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import logo from "@/assets/logo.png";
 import { isIOSNative, purchaseSubscription, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import { Eye, EyeOff } from "lucide-react";
+
+const RESET_COOLDOWN_SECONDS = 60;
+const RESET_COOLDOWN_KEY = "lastPasswordResetAt";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -37,6 +41,15 @@ const Auth = () => {
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
 
+  // Password visibility
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Duplicate-account inline message (signup)
+  const [duplicateAccount, setDuplicateAccount] = useState(false);
+
+  // Password reset cooldown
+  const [resetCooldown, setResetCooldown] = useState(0);
+
   const { signIn, signUp, user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -58,6 +71,22 @@ const Auth = () => {
   }, [lockoutUntil]);
 
   const isLockedOut = lockoutUntil !== null && Date.now() < lockoutUntil;
+
+  // Initialize reset cooldown from sessionStorage
+  useEffect(() => {
+    const last = Number(sessionStorage.getItem(RESET_COOLDOWN_KEY) || 0);
+    if (last) {
+      const remaining = Math.ceil((last + RESET_COOLDOWN_SECONDS * 1000 - Date.now()) / 1000);
+      if (remaining > 0) setResetCooldown(remaining);
+    }
+  }, []);
+
+  // Reset cooldown countdown
+  useEffect(() => {
+    if (resetCooldown <= 0) return;
+    const t = setInterval(() => setResetCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [resetCooldown]);
 
   // After login, if there's a plan param, trigger checkout
   useEffect(() => {
@@ -144,15 +173,35 @@ const Auth = () => {
       setErrors({ email: "Please enter a valid email address" });
       return;
     }
+    if (resetCooldown > 0) return;
     setIsLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setIsLoading(false);
+    // Start cooldown regardless (prevents burning through server-side limit)
+    sessionStorage.setItem(RESET_COOLDOWN_KEY, String(Date.now()));
+    setResetCooldown(RESET_COOLDOWN_SECONDS);
+
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      const msg = (error.message || "").toLowerCase();
+      const isRateLimit =
+        msg.includes("rate limit") ||
+        msg.includes("over_email_send_rate_limit") ||
+        (error as any).status === 429;
+      if (isRateLimit) {
+        toast({
+          title: "Please wait a moment",
+          description:
+            "Too many reset requests. Check your inbox (and spam folder) for an earlier link, or try again in a minute.",
+          variant: "destructive",
+        });
+        setIsForgotPassword(false);
+      } else {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
     } else {
-      toast({ title: "Check your email", description: "We've sent you a password reset link." });
+      toast({ title: "Check your email", description: "We've sent you a password reset link. Check spam if you don't see it." });
       setIsForgotPassword(false);
     }
   };
@@ -215,13 +264,12 @@ const Auth = () => {
 
         const { error } = await signUp(email, password, displayName);
         if (error) {
-          if (error.message.includes("User already registered")) {
-            toast({
-              title: "Account exists",
-              description: "This email is already registered. Please sign in instead.",
-              variant: "destructive",
-            });
-            setIsLogin(true);
+          const dup =
+            error.message.includes("User already registered") ||
+            error.message.toLowerCase().includes("already") ||
+            error.message.toLowerCase().includes("identities");
+          if (dup) {
+            setDuplicateAccount(true);
           } else {
             toast({
               title: "Sign up failed",
@@ -293,8 +341,12 @@ const Auth = () => {
                     <p className="text-sm text-destructive">{errors.email}</p>
                   )}
                 </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Sending..." : "Send Reset Link"}
+                <Button type="submit" className="w-full" disabled={isLoading || resetCooldown > 0}>
+                  {isLoading
+                    ? "Sending..."
+                    : resetCooldown > 0
+                    ? `Resend available in ${resetCooldown}s`
+                    : "Send Reset Link"}
                 </Button>
               </form>
               <div className="mt-6 text-center">
@@ -410,6 +462,7 @@ const Auth = () => {
                     onChange={(e) => {
                       setEmail(e.target.value);
                       setErrors((prev) => ({ ...prev, email: undefined }));
+                      setDuplicateAccount(false);
                     }}
                     className={errors.email ? "border-destructive" : ""}
                   />
@@ -419,21 +472,47 @@ const Auth = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setErrors((prev) => ({ ...prev, password: undefined }));
-                    }}
-                    className={errors.password ? "border-destructive" : ""}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setErrors((prev) => ({ ...prev, password: undefined }));
+                      }}
+                      className={`pr-11 ${errors.password ? "border-destructive" : ""}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((s) => !s)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      className="absolute right-0 top-0 h-full w-11 flex items-center justify-center text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   {errors.password && (
                     <p className="text-sm text-destructive">{errors.password}</p>
                   )}
                 </div>
+                {!isLogin && duplicateAccount && (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                    Looks like you already have an account —{" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsLogin(true);
+                        setDuplicateAccount(false);
+                        setErrors({});
+                      }}
+                      className="underline font-medium hover:opacity-80"
+                    >
+                      login
+                    </button>
+                  </div>
+                )}
                 {isLogin && (
                   <div className="text-right">
                     <button
@@ -467,6 +546,7 @@ const Auth = () => {
                     setIsLogin(!isLogin);
                     setErrors({});
                     setAgeConfirmed(false);
+                    setDuplicateAccount(false);
                   }}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
