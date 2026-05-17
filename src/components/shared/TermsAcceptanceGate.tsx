@@ -14,7 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link } from "react-router-dom";
 
-const CURRENT_TERMS_VERSION = "2026-04-13";
+const CURRENT_TERMS_VERSION = "2026-05-17";
 
 export const TermsAcceptanceGate = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
