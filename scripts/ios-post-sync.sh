@@ -32,4 +32,14 @@ $PB -c "Add :NSPhotoLibraryAddUsageDescription string 'Familial needs permission
 $PB -c "Delete :NSMicrophoneUsageDescription" "$PLIST" 2>/dev/null
 $PB -c "Add :NSMicrophoneUsageDescription string 'Familial needs access to your microphone to record video with sound and voice notes for your family circle.'" "$PLIST"
 
-echo "✅ Info.plist updated: encryption compliance + privacy strings"
+# Background mode: remote-notification (required for push notifications)
+$PB -c "Delete :UIBackgroundModes" "$PLIST" 2>/dev/null
+$PB -c "Add :UIBackgroundModes array" "$PLIST"
+$PB -c "Add :UIBackgroundModes:0 string remote-notification" "$PLIST"
+
+# NOTE: The "Push Notifications" capability + aps-environment entitlement must be
+# enabled ONCE in Xcode: open ios/App/App.xcworkspace → Signing & Capabilities →
+# "+ Capability" → Push Notifications. This writes App.entitlements and cannot be
+# done from Info.plist alone.
+
+echo "✅ Info.plist updated: encryption compliance + privacy strings + push background mode"
