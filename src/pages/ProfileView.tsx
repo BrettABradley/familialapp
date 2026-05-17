@@ -17,6 +17,7 @@ import { ReportDialog } from "@/components/shared/ReportDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
+import { VideoThumbnail } from "@/components/shared/VideoThumbnail";
 
 interface ProfileData {
   user_id: string;
