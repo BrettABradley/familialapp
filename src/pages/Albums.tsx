@@ -66,6 +66,19 @@ const Albums = () => {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
   const [photos, setPhotos] = useState<AlbumPhoto[]>([]);
+
+  // Preload neighbor photos in lightbox for snappy swipes
+  useEffect(() => {
+    if (!enlargedPhoto) return;
+    const idx = photos.findIndex(p => p.id === enlargedPhoto.id);
+    [idx - 1, idx + 1].forEach((i) => {
+      const p = photos[i];
+      if (p?.photo_url) {
+        const img = new window.Image();
+        img.src = presetImage(p.photo_url, "full");
+      }
+    });
+  }, [enlargedPhoto, photos]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
