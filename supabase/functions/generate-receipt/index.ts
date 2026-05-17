@@ -80,7 +80,7 @@ serve(async (req) => {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(120, 120, 120);
-    doc.text("support@support.familialmedia.com", margin, y + 14);
+    doc.text("support@familialmedia.com", margin, y + 14);
     y += 40;
 
     // "RECEIPT" title

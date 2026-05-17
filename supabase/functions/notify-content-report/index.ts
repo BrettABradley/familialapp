@@ -116,7 +116,7 @@ serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Familial <support@support.familialmedia.com>",
+        from: "Familial <support@familialmedia.com>",
         to: ["support@familialmedia.com"],
         subject: `🚩 Content Report: ${safe(reason)} — ${safe(reportedName)}`,
         html,
