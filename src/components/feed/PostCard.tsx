@@ -16,6 +16,8 @@ import type { Post } from "@/hooks/useFeedPosts";
 import { ReportDialog } from "@/components/shared/ReportDialog";
 import { SmartImage } from "@/components/shared/SmartImage";
 import { avatarUrl, presetImage } from "@/lib/imageUrl";
+import { ZoomableImage } from "@/components/shared/ZoomableImage";
+import useEmblaCarousel from "embla-carousel-react";
 
 interface CircleMemberRef {
   user_id: string;
