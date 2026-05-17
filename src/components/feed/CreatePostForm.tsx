@@ -265,9 +265,16 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
             </Button>
           )}
         </div>
-        {previewUrls.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {previewUrls.map((url, index) => renderPreview(url, index))}
+        {previewUrls.length === 1 && (
+          <div className="mb-4">{renderPreview(previewUrls[0], 0)}</div>
+        )}
+        {previewUrls.length > 1 && (
+          <div className="mb-4 -mx-1 overflow-x-auto snap-x snap-mandatory flex gap-2 px-1 pb-2">
+            {previewUrls.map((url, index) => (
+              <div key={index} className="flex-[0_0_85%] snap-center">
+                {renderPreview(url, index)}
+              </div>
+            ))}
           </div>
         )}
         {uploadProgress !== null && (
