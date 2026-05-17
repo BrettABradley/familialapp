@@ -312,7 +312,7 @@ const PostMediaCarousel = ({
   );
 };
 
-
+export const PostCard = ({
   post,
   isExpanded,
   commentInput,
