@@ -14,6 +14,8 @@ import { LinkPreviewCard } from "@/components/feed/LinkPreviewCard";
 import { getMediaType } from "@/lib/mediaUtils";
 import type { Post } from "@/hooks/useFeedPosts";
 import { ReportDialog } from "@/components/shared/ReportDialog";
+import { SmartImage } from "@/components/shared/SmartImage";
+import { avatarUrl, presetImage } from "@/lib/imageUrl";
 
 interface CircleMemberRef {
   user_id: string;
@@ -161,7 +163,7 @@ const VideoThumbnail = ({ url, onClick }: { url: string; onClick: () => void }) 
       onClick={onClick}
     >
       {thumbnail ? (
-        <img src={thumbnail} alt="Video thumbnail" className="w-full h-full object-cover" />
+        <img src={thumbnail} alt="Video thumbnail" className="w-full h-full object-cover" loading="lazy" decoding="async" />
       ) : (
         <div className="w-full h-full bg-muted animate-pulse" />
       )}
@@ -193,7 +195,7 @@ const MediaItem = ({ url, index, onDownload, onImageClick, onVideoClick }: { url
 
   return (
     <div className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer" onClick={() => onImageClick?.(index)}>
-      <img src={url} alt={`Post image ${index + 1}`} className="w-full h-full object-cover" />
+      <SmartImage src={url} preset="thumb" alt={`Post image ${index + 1}`} className="w-full h-full object-cover" />
       <button
         onClick={(e) => { e.stopPropagation(); onDownload(url); }}
         className="absolute bottom-2 right-2 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
@@ -263,7 +265,7 @@ export const PostCard = ({
         <div className="flex items-center gap-3">
           <Link to={`/profile/${post.author_id}`}>
             <Avatar className="cursor-pointer hover:opacity-80 transition-opacity">
-              <AvatarImage src={post.profiles?.avatar_url || undefined} />
+              <AvatarImage src={avatarUrl(post.profiles?.avatar_url) || undefined} />
               <AvatarFallback>{post.profiles?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
             </Avatar>
           </Link>
@@ -410,10 +412,12 @@ export const PostCard = ({
                     <source src={visualMedia[lightboxIndex]} />
                   </video>
                 ) : (
-                  <img
+                  <SmartImage
                     src={visualMedia[lightboxIndex]}
+                    preset="full"
+                    priority
                     alt={`Post media ${lightboxIndex + 1}`}
-                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
+                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none bg-transparent"
                     onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; touchStartY.current = e.touches[0].clientY; }}
                     onTouchEnd={(e) => {
                       const deltaX = touchStartX.current - e.changedTouches[0].clientX;
