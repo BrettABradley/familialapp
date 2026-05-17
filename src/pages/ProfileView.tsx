@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { VideoThumbnail } from "@/components/shared/VideoThumbnail";
+import { ZoomableImage } from "@/components/shared/ZoomableImage";
 
 interface ProfileData {
   user_id: string;
@@ -66,6 +67,7 @@ const ProfileView = () => {
   const isOwnProfile = user?.id === userId;
   const { blockUser, isBlocked } = useBlockedUsers();
   const [reportOpen, setReportOpen] = useState(false);
+  const [avatarZoomOpen, setAvatarZoomOpen] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -307,12 +309,20 @@ const ProfileView = () => {
       <Card>
         <CardContent className="py-8">
           <div className="flex flex-col items-center gap-4">
-            <Avatar className="h-28 w-28">
-              <AvatarImage src={profileData.avatar_url || undefined} />
-              <AvatarFallback className="text-3xl font-serif">
-                {profileData.display_name?.charAt(0)?.toUpperCase() || "U"}
-              </AvatarFallback>
-            </Avatar>
+            <button
+              type="button"
+              onClick={() => profileData.avatar_url && setAvatarZoomOpen(true)}
+              className="rounded-full focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-label="View profile picture"
+              disabled={!profileData.avatar_url}
+            >
+              <Avatar className="h-28 w-28 cursor-pointer hover:opacity-90 transition-opacity">
+                <AvatarImage src={profileData.avatar_url || undefined} />
+                <AvatarFallback className="text-3xl font-serif">
+                  {profileData.display_name?.charAt(0)?.toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+            </button>
             <div className="text-center space-y-1">
               <div className="flex items-center justify-center gap-2">
                 <h1 className="font-serif text-2xl font-bold text-foreground">
@@ -410,7 +420,33 @@ const ProfileView = () => {
         </CardContent>
       </Card>
 
-      {/* Image Lightbox — fullscreen on mobile, centered modal on desktop */}
+      {/* Avatar zoom lightbox */}
+      <Dialog open={avatarZoomOpen} onOpenChange={setAvatarZoomOpen}>
+        <DialogContent className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
+          <div className="absolute top-0 right-0 z-20 flex items-center gap-2 pr-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
+            <button
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+              onClick={() => setAvatarZoomOpen(false)}
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          {profileData?.avatar_url && (
+            <ZoomableImage
+              className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto flex items-center justify-center"
+              onSwipeDown={() => setAvatarZoomOpen(false)}
+            >
+              <img
+                src={profileData.avatar_url}
+                alt={profileData.display_name || "Profile picture"}
+                className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
+              />
+            </ZoomableImage>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!enlargedImage} onOpenChange={(open) => !open && setEnlargedImage(null)}>
         <DialogContent className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
           {enlargedImage && (() => {
@@ -457,19 +493,18 @@ const ProfileView = () => {
                     }}
                   />
                 ) : (
-                  <img
-                    src={enlargedImage.image_url}
-                    alt={enlargedImage.caption || "Profile photo"}
-                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
-                    onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; (touchStartX as any).__y = e.touches[0].clientY; }}
-                    onTouchEnd={(e) => {
-                      const deltaX = touchStartX.current - e.changedTouches[0].clientX;
-                      const deltaY = e.changedTouches[0].clientY - ((touchStartX as any).__y || 0);
-                      if (deltaY > 80 && Math.abs(deltaX) < 50) { setEnlargedImage(null); return; }
-                      if (deltaX > 50 && currentIndex < images.length - 1) setEnlargedImage(images[currentIndex + 1]);
-                      else if (deltaX < -50 && currentIndex > 0) setEnlargedImage(images[currentIndex - 1]);
-                    }}
-                  />
+                  <ZoomableImage
+                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto flex items-center justify-center"
+                    onSwipeLeft={() => currentIndex < images.length - 1 && setEnlargedImage(images[currentIndex + 1])}
+                    onSwipeRight={() => currentIndex > 0 && setEnlargedImage(images[currentIndex - 1])}
+                    onSwipeDown={() => setEnlargedImage(null)}
+                  >
+                    <img
+                      src={enlargedImage.image_url}
+                      alt={enlargedImage.caption || "Profile photo"}
+                      className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
+                    />
+                  </ZoomableImage>
                 )}
 
                 {/* Navigation arrows */}

@@ -1,29 +1,72 @@
-# Fix grey video thumbnails in personal profile posts
+# Image Zoom + Instagram-Style Carousel
 
-## Problem
-The current fix (`#t=0.1` URL hack with `preload="metadata"`) doesn't reliably paint a frame on iOS WKWebView. Many videos still show as grey tiles because:
-- WKWebView often refuses to decode frames until user gesture
-- Supabase Storage may not honor byte-range requests cleanly for `moov`-at-end MP4s
-- `preload="metadata"` is hinted, not enforced
+Two related upgrades to the feed, profile, and albums, plus a fresh iOS build. **All changes apply to both the web app and the iOS app** (single shared codebase).
 
-## Solution
-Build a small `VideoThumbnail` component that grabs a real still frame and shows it as an `<img>` (or CSS background). The `<video>` element is removed from the grid entirely — only used briefly to capture the frame.
+## 1. Pinch-to-zoom on images
 
-How it works:
-1. Mount a hidden `<video muted playsInline crossOrigin="anonymous" preload="auto">` off-screen
-2. On `loadeddata`, seek to ~0.1s
-3. On `seeked`, draw the current frame to a `<canvas>` and export as a blob URL
-4. Swap to `<img src={blobUrl}>` with the Play overlay
-5. Cache the blob URL per video URL in a module-level `Map` so we don't redo work across re-renders/scroll
-6. Cleanup blob URLs on unmount
+**Where it applies**
+- Lightbox in the Feed (`PostCard` — tap any post image → fullscreen)
+- Personal profile avatars (`Profile.tsx` and `ProfileView.tsx` — tap big avatar to open in the lightbox)
+- **Album photo viewer** (`Albums.tsx` lightbox — tap any album photo → fullscreen with zoom)
+- Fridge photo viewer (same shared lightbox)
 
-Fallback: if the canvas read fails (CORS taint, decode error), fall back to a neutral placeholder with the Play icon — still better than the misleading grey "video" frame.
+**Behavior**
+- Two-finger pinch to zoom (1x–4x) on mobile/touch
+- Double-tap to toggle between 1x and 2.5x
+- One-finger pan when zoomed in
+- Swipe-to-next/previous and swipe-down-to-close are **disabled while zoomed** (no gesture conflicts), re-enabled at 1x
+- Desktop web: scroll-wheel + Ctrl/⌘ zoom, click-drag to pan, double-click to toggle
 
-## Files to change
-- **New** `src/components/shared/VideoThumbnail.tsx` — the component described above
-- **Edit** `src/pages/ProfileView.tsx` (lines ~399–415) — replace the inline `<video>` + Play overlay with `<VideoThumbnail src={img.image_url} />`
+**Implementation**
+- New `<ZoomableImage>` component wrapping `react-zoom-pan-pinch` (~12kb, touch-native, works in browser and Capacitor WebView)
+- Drop it into the existing lightbox in `PostCard`, `Albums`, and a new tiny avatar lightbox
 
-## Notes
-- This is an OTA JS change — no native rebuild needed.
-- Supabase Storage already serves with permissive CORS, so `crossOrigin="anonymous"` + canvas export should work. If a specific bucket strips CORS, the fallback placeholder still hides the grey box.
-- Same component can later be reused in Albums and Feed grids if you want consistent thumbnails everywhere.
+## 2. Instagram-style carousel for multi-image posts
+
+**Limit**
+- Max **5 images per carousel post** (up from current 4-file cap). The 5-cap applies to the post composer only — Albums keep their 100-photo limit.
+
+**Posting side (`CreatePostForm`)**
+- Raise the per-post file cap from 4 to 5
+- Update the in-form preview from a 2-column grid to a swipeable carousel when 2+ images are selected
+
+**Feed side (`PostCard`)**
+- When a post has 2+ visual media, render as a single-frame swipeable carousel (current behavior is a 2-col grid)
+- One image visible at a time, full width of the card, 4:5 aspect ratio (Instagram default)
+- Dot indicators below ("● ○ ○ ○ ○")
+- Small "1/5" counter top-right of the frame
+- Tap any slide → opens lightbox at that index (zoom + swipe nav)
+- Built on the existing `embla-carousel-react` / shadcn `Carousel` already in the project
+- Single-image posts: unchanged (no carousel chrome)
+
+**Caption stays singular** — one `content` field per post, exactly the Instagram model.
+
+## 3. iOS rebuild
+
+After the code changes land:
+1. Pull latest from GitHub
+2. `npm install --legacy-peer-deps` (picks up `react-zoom-pan-pinch`)
+3. `npm run build`
+4. `npx cap sync ios`
+5. Archive & upload from Xcode
+
+No new native permissions, no `Info.plist` changes, no entitlement changes — purely JS-layer additions. Existing push-notification build settings carry over.
+
+## Files that will change
+
+- `src/components/shared/ZoomableImage.tsx` *(new)* — pinch/pan/zoom wrapper
+- `src/components/feed/PostCard.tsx` — visual-media grid → carousel; wrap lightbox image in `ZoomableImage`
+- `src/components/feed/CreatePostForm.tsx` — raise cap to 5; preview grid → carousel
+- `src/pages/Albums.tsx` — wrap album lightbox image in `ZoomableImage`
+- `src/pages/Profile.tsx` — tappable own avatar → lightbox
+- `src/pages/ProfileView.tsx` — tappable viewed avatar → lightbox
+- `package.json` — add `react-zoom-pan-pinch`
+
+## Out of scope (ask if you want them)
+
+- Per-slide captions (Instagram doesn't do this either)
+- Reordering selected images before posting
+- Raising the album per-upload limit
+- Zoom on inline (non-lightbox) thumbnails
+
+Ready to build when you approve.

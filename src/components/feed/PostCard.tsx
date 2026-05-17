@@ -16,6 +16,8 @@ import type { Post } from "@/hooks/useFeedPosts";
 import { ReportDialog } from "@/components/shared/ReportDialog";
 import { SmartImage } from "@/components/shared/SmartImage";
 import { avatarUrl, presetImage } from "@/lib/imageUrl";
+import { ZoomableImage } from "@/components/shared/ZoomableImage";
+import useEmblaCarousel from "embla-carousel-react";
 
 interface CircleMemberRef {
   user_id: string;
@@ -207,6 +209,109 @@ const MediaItem = ({ url, index, onDownload, onImageClick, onVideoClick }: { url
   );
 };
 
+// Instagram-style swipeable carousel for multi-media posts
+const PostMediaCarousel = ({
+  items,
+  onDownload,
+  onImageClick,
+  onVideoClick,
+}: {
+  items: string[];
+  onDownload: (url: string) => void;
+  onImageClick: (index: number) => void;
+  onVideoClick: (index: number) => void;
+}) => {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "start" });
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => setSelectedIndex(emblaApi.selectedScrollSnap());
+    emblaApi.on("select", onSelect);
+    onSelect();
+    return () => { emblaApi.off("select", onSelect); };
+  }, [emblaApi]);
+
+  return (
+    <div className="mb-4">
+      <div className="relative">
+        <div className="overflow-hidden rounded-lg bg-secondary" ref={emblaRef}>
+          <div className="flex">
+            {items.map((url, index) => {
+              const type = getMediaType(url);
+              return (
+                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-[4/5] relative bg-black">
+                  {type === "video" ? (
+                    <div className="w-full h-full" onClick={() => onVideoClick(index)}>
+                      <VideoThumbnail url={url} onClick={() => onVideoClick(index)} />
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="w-full h-full cursor-pointer"
+                      onClick={() => onImageClick(index)}
+                      aria-label={`Open image ${index + 1}`}
+                    >
+                      <SmartImage
+                        src={url}
+                        preset="card"
+                        alt={`Post media ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Counter */}
+        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full pointer-events-none">
+          {selectedIndex + 1} / {items.length}
+        </div>
+
+        {/* Desktop arrows */}
+        {selectedIndex > 0 && (
+          <button
+            type="button"
+            onClick={() => emblaApi?.scrollPrev()}
+            className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+            aria-label="Previous"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        )}
+        {selectedIndex < items.length - 1 && (
+          <button
+            type="button"
+            onClick={() => emblaApi?.scrollNext()}
+            className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+            aria-label="Next"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        )}
+      </div>
+
+      {/* Dot indicators */}
+      <div className="flex justify-center gap-1.5 mt-2">
+        {items.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => emblaApi?.scrollTo(i)}
+            className={`h-1.5 rounded-full transition-all ${
+              i === selectedIndex ? "w-4 bg-foreground" : "w-1.5 bg-muted-foreground/40"
+            }`}
+            aria-label={`Go to slide ${i + 1}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const PostCard = ({
   post,
   isExpanded,
@@ -358,20 +463,25 @@ export const PostCard = ({
           </div>
         )}
 
-        {/* Visual media grid (images + video thumbnails together) */}
-        {visualMedia.length > 0 && (
-          <div className={`grid gap-2 mb-4 ${visualMedia.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-            {visualMedia.map((url, index) => (
-              <MediaItem
-                key={index}
-                url={url}
-                index={index}
-                onDownload={onDownloadImage}
-                onImageClick={() => setLightboxIndex(index)}
-                onVideoClick={() => setLightboxIndex(index)}
-              />
-            ))}
+        {/* Visual media: carousel for 2+, single for 1 */}
+        {visualMedia.length === 1 && (
+          <div className="mb-4">
+            <MediaItem
+              url={visualMedia[0]}
+              index={0}
+              onDownload={onDownloadImage}
+              onImageClick={() => setLightboxIndex(0)}
+              onVideoClick={() => setLightboxIndex(0)}
+            />
           </div>
+        )}
+        {visualMedia.length > 1 && (
+          <PostMediaCarousel
+            items={visualMedia}
+            onDownload={onDownloadImage}
+            onImageClick={(i) => setLightboxIndex(i)}
+            onVideoClick={(i) => setLightboxIndex(i)}
+          />
         )}
 
         {/* Unified Media Lightbox — fullscreen on mobile, centered modal on desktop */}
@@ -424,21 +534,20 @@ export const PostCard = ({
                     <source src={visualMedia[lightboxIndex]} />
                   </video>
                 ) : (
-                  <SmartImage
-                    src={visualMedia[lightboxIndex]}
-                    preset="full"
-                    priority
-                    alt={`Post media ${lightboxIndex + 1}`}
-                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none bg-transparent"
-                    onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; touchStartY.current = e.touches[0].clientY; }}
-                    onTouchEnd={(e) => {
-                      const deltaX = touchStartX.current - e.changedTouches[0].clientX;
-                      const deltaY = e.changedTouches[0].clientY - touchStartY.current;
-                      if (deltaY > 80 && Math.abs(deltaX) < 50) { setLightboxIndex(null); return; }
-                      if (deltaX > 50 && lightboxIndex < visualMedia.length - 1) setLightboxIndex(lightboxIndex + 1);
-                      else if (deltaX < -50 && lightboxIndex > 0) setLightboxIndex(lightboxIndex - 1);
-                    }}
-                  />
+                  <ZoomableImage
+                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto flex items-center justify-center"
+                    onSwipeLeft={() => lightboxIndex < visualMedia.length - 1 && setLightboxIndex(lightboxIndex + 1)}
+                    onSwipeRight={() => lightboxIndex > 0 && setLightboxIndex(lightboxIndex - 1)}
+                    onSwipeDown={() => setLightboxIndex(null)}
+                  >
+                    <SmartImage
+                      src={visualMedia[lightboxIndex]}
+                      preset="full"
+                      priority
+                      alt={`Post media ${lightboxIndex + 1}`}
+                      className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none bg-transparent"
+                    />
+                  </ZoomableImage>
                 )}
 
                 {/* Left/right navigation arrows */}

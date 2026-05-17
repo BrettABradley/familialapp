@@ -62,8 +62,8 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let files = Array.from(e.target.files || []);
-    if (files.length + selectedFiles.length > 4) {
-      toast({ title: "Too many files", description: "You can upload up to 4 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
+    if (files.length + selectedFiles.length > 5) {
+      toast({ title: "Too many files", description: "You can upload up to 5 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
       return;
     }
 
@@ -84,8 +84,8 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   };
 
   const handleVoiceRecording = (blob: Blob) => {
-    if (selectedFiles.length >= 4) {
-      toast({ title: "Too many files", description: "You can upload up to 4 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
+    if (selectedFiles.length >= 5) {
+      toast({ title: "Too many files", description: "You can upload up to 5 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
       return;
     }
     const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
@@ -265,9 +265,16 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
             </Button>
           )}
         </div>
-        {previewUrls.length > 0 && (
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {previewUrls.map((url, index) => renderPreview(url, index))}
+        {previewUrls.length === 1 && (
+          <div className="mb-4">{renderPreview(previewUrls[0], 0)}</div>
+        )}
+        {previewUrls.length > 1 && (
+          <div className="mb-4 -mx-1 overflow-x-auto snap-x snap-mandatory flex gap-2 px-1 pb-2">
+            {previewUrls.map((url, index) => (
+              <div key={index} className="flex-[0_0_85%] snap-center">
+                {renderPreview(url, index)}
+              </div>
+            ))}
           </div>
         )}
         {uploadProgress !== null && (
