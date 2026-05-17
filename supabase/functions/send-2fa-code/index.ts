@@ -90,7 +90,9 @@ serve(async (req) => {
       body: JSON.stringify({
         from: "Familial <support@support.familialmedia.com>",
         to: [user.email],
+        reply_to: "support@familialmedia.com",
         subject: "Your Familial verification code",
+        text: `Your Familial verification code is: ${code}\n\nThis code expires in 5 minutes.\n\nIf you didn't request this code, you can safely ignore this email.`,
         html: `
           <div style="font-family: 'Inter', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 24px; background: #ffffff;">
             <h1 style="font-family: 'Playfair Display', Georgia, serif; font-size: 24px; color: #141414; margin-bottom: 8px;">Verification Code</h1>
