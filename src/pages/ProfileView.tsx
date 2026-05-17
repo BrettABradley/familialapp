@@ -420,7 +420,33 @@ const ProfileView = () => {
         </CardContent>
       </Card>
 
-      {/* Image Lightbox — fullscreen on mobile, centered modal on desktop */}
+      {/* Avatar zoom lightbox */}
+      <Dialog open={avatarZoomOpen} onOpenChange={setAvatarZoomOpen}>
+        <DialogContent className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
+          <div className="absolute top-0 right-0 z-20 flex items-center gap-2 pr-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
+            <button
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+              onClick={() => setAvatarZoomOpen(false)}
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          {profileData?.avatar_url && (
+            <ZoomableImage
+              className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto flex items-center justify-center"
+              onSwipeDown={() => setAvatarZoomOpen(false)}
+            >
+              <img
+                src={profileData.avatar_url}
+                alt={profileData.display_name || "Profile picture"}
+                className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
+              />
+            </ZoomableImage>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!enlargedImage} onOpenChange={(open) => !open && setEnlargedImage(null)}>
         <DialogContent className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
           {enlargedImage && (() => {
