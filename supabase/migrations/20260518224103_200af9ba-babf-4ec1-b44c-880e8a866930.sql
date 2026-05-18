@@ -1,0 +1,1 @@
+ALTER TABLE public.push_tokens RENAME COLUMN expo_token TO device_token;

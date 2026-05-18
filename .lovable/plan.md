@@ -1,72 +1,49 @@
-# iOS Launch Stability Hardening
 
-Apple's "crashed after initial launch" rejection means the binary terminated before the WebView could show the UI. Without the symbolicated crash log we can't be 100% sure which native call faulted, but the launch path has several places where one failing plugin can take the whole app down. This plan removes those failure modes and adds a Splash Screen so we never show a white screen during init.
+## Context
 
-## Most likely culprits (in priority order)
+Your push backend is **already self-hosted** — `send-push-notification` signs an ES256 JWT with your `.p8` key and POSTs directly to `https://api.push.apple.com`. No Expo dependency exists in the send path. Only the column name `expo_token` is legacy; it actually holds raw APNs device tokens from `@capacitor/push-notifications`.
 
-1. **`initCapacitorPlugins()` runs at module load** (`src/main.tsx`) and isn't awaited. The `StatusBar` / `Keyboard` dynamic imports + setters fire before React mounts. If either plugin throws (missing pod after a sync, entitlement mismatch, iPad-specific edge case), the unhandled rejection on iOS 17+ WKWebView can hard-kill the process.
-2. **Push Notifications plugin** is in `package.json` and `UIBackgroundModes:remote-notification` is set in Info.plist, but the `aps-environment` entitlement must be added in Xcode. If the provisioning profile doesn't include push, `PushNotifications.register()` will throw at launch (we call it from `onAuthStateChange` immediately on cold start with a cached session).
-3. **No Splash Screen plugin installed.** iOS shows the launch storyboard, then a blank WebView until React mounts. If the WebView fails to load `index.html` for any reason (bad asset path, missing `dist/` after sync), Apple's automated test sees a frozen/blank app and logs it as a crash.
-4. **`@capgo/native-purchases`** — lazy-loaded, so won't crash launch unless something imports it eagerly. Confirmed lazy in `iapPurchase.ts` ✓.
-5. **Encryption flag** is already set via `ios-post-sync.sh` ✓.
+This does **not** improve App Review approval odds — review never tests delivery. Approval depends on the entitlement + clean launch, both already handled. This pass is hygiene + a small dev-build fix.
 
 ## Changes
 
-### 1. Make `initCapacitorPlugins` crash-proof
-File: `src/lib/capacitorInit.ts`
-- Wrap the whole function body in try/catch and **each plugin import + call in its own try/catch** so a single missing/failed plugin can't abort the rest.
-- Move `await` chain off the top-level promise: log errors with `console.error` instead of rethrowing.
-- Move push-registration listeners behind a `try/catch` and only call `PushNotifications.register()` if `aps-environment` is likely present (we'll just swallow registration errors — they're non-fatal).
+### 1. Rename `push_tokens.expo_token` → `device_token` (migration)
+- `ALTER TABLE public.push_tokens RENAME COLUMN expo_token TO device_token;`
+- Update unique constraint name if it references the old column.
 
-### 2. Defer non-essential native init until after first paint
-File: `src/main.tsx`
-- Call `initCapacitorPlugins()` from inside a `requestIdleCallback` / `setTimeout(…, 0)` after `createRoot(...).render(...)` so the WebView paints the React tree first. Even if a plugin throws, the UI is already up.
+### 2. Update `register-push-token` edge function
+- Accept `{ device_token }` in the body (keep `expo_token` as a fallback alias for one release so cached app sessions don't break).
+- Upsert on `(user_id, device_token)`.
 
-### 3. Add Splash Screen plugin
-- Install `@capacitor/splash-screen`.
-- Configure in `capacitor.config.ts`:
-  ```ts
-  SplashScreen: {
-    launchShowDuration: 2000,
-    launchAutoHide: true,
-    backgroundColor: '#ffffff',
-    showSpinner: false,
-  }
-  ```
-- Call `SplashScreen.hide()` after React mounts (in `App.tsx` `useEffect`).
-- This prevents the "blank white screen" Apple's automated reviewer interprets as a crash.
+### 3. Update `register-push-token` client call
+- `src/lib/pushNotifications.ts`: send `{ device_token: token.value }` instead of `{ expo_token: token.value }`.
 
-### 4. Stricter ErrorBoundary at root for native
-File: `src/components/shared/ErrorBoundary.tsx`
-- On native, also log to `console.error` with structured info (we can see in Xcode).
-- Add a "Reload App" button that, on native, calls `window.location.reload()` (already does).
+### 4. Update `send-push-notification` edge function
+- Replace `expo_token` references with `device_token`.
+- Read `APNS_ENV` env var; if `"sandbox"`, use `https://api.sandbox.push.apple.com`, otherwise `https://api.push.apple.com` (default = production).
+- Remove the "legacy" comment now that the column name is honest.
+- Update invalid-token cleanup `.in("device_token", invalidTokens)`.
 
-### 5. Verify Info.plist + entitlement requirements in `ios-post-sync.sh`
-File: `scripts/ios-post-sync.sh`
-- Add a final `echo` block reminding the user to verify in Xcode:
-  - Signing & Capabilities → **Push Notifications** is added (creates `App.entitlements` with `aps-environment`).
-  - Deployment target ≥ iOS 14.
-  - "Build Phases → Copy Bundle Resources" includes the `public/` web assets via `dist/`.
+### 5. Add `APNS_ENV` secret
+- Use the secrets tool to add `APNS_ENV`. User sets it to `production` for TestFlight/App Store builds (default) or `sandbox` for local Xcode runs.
 
-### 6. Add a launch breadcrumb
-File: `src/main.tsx`
-- Log `[boot] react-mount-start` before `createRoot(...).render()` and `[boot] react-mount-end` in an effect inside `<App>`. Combined with Xcode console capture, this tells us whether the crash is **before** React mounts (native crash) or **after** (JS/runtime error).
+### 6. Doc updates
+- `scripts/ios-post-sync.sh`: replace any Expo mentions with a short note that push uses direct APNs and requires `APPLE_KEY_ID`, `APPLE_ISSUER_ID`, `APPLE_PRIVATE_KEY`, optional `APNS_ENV`.
+- Update `mem://tech/push-notification-infrastructure` memory to remove Expo references.
 
 ## What this does NOT change
 
-- No business-logic or routing changes.
-- No feature removal.
-- No edge function or DB changes.
+- No client UX changes.
+- No changes to `trigger_push_notification` DB function (still calls the same edge function).
+- No App Review-affecting behavior — launch hardening from the previous pass stays as-is.
 
-## After the fix
-You'll need to:
+## After approval
+
+Run:
 ```
 git pull
 npm install --legacy-peer-deps
 npm run build
 npm run cap:sync:ios
 ```
-Then in Xcode: open `ios/App/App.xcworkspace`, Signing & Capabilities → confirm **Push Notifications** capability is checked. Archive and upload a new build.
-
-## One question to confirm scope
-If you have the Apple crash report (Xcode → Window → Organizer → Crashes, or the `.crash` file Apple attached to the rejection email), paste the top of the stack trace. That will let me pinpoint the exact failing call instead of hardening defensively. If you don't have it, the changes above are the safest broad-spectrum fix.
+Then add `APNS_ENV=production` secret if you want explicit prod selection (otherwise it defaults to production).

@@ -39,11 +39,14 @@ serve(async (req: Request) => {
       });
     }
 
-    const { expo_token } = await req.json();
+    const body = await req.json();
+    // Accept either `device_token` (new) or `expo_token` (legacy alias) for one release
+    // so cached app sessions don't break during rollout.
+    const device_token: string | undefined = body?.device_token ?? body?.expo_token;
 
-    if (!expo_token || typeof expo_token !== "string") {
+    if (!device_token || typeof device_token !== "string") {
       return new Response(
-        JSON.stringify({ error: "Missing or invalid expo_token" }),
+        JSON.stringify({ error: "Missing or invalid device_token" }),
         {
           status: 400,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -51,12 +54,11 @@ serve(async (req: Request) => {
       );
     }
 
-    // Upsert the token (unique constraint on user_id + expo_token handles duplicates)
     const { error: upsertError } = await supabase
       .from("push_tokens")
       .upsert(
-        { user_id: user.id, expo_token },
-        { onConflict: "user_id,expo_token" }
+        { user_id: user.id, device_token },
+        { onConflict: "user_id,device_token" }
       );
 
     if (upsertError) {

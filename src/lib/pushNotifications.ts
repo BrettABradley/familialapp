@@ -37,7 +37,7 @@ export async function registerForPushNotifications() {
           return;
         }
         const { error } = await supabase.functions.invoke('register-push-token', {
-          body: { expo_token: token.value },
+          body: { device_token: token.value },
         });
         if (error) console.error('[push] register-push-token failed:', error);
       } catch (e) {
