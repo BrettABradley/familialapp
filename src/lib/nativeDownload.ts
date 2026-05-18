@@ -10,6 +10,14 @@ import { Capacitor } from "@capacitor/core";
  *
  * On web, falls back to the standard anchor-tag download flow.
  */
+function isImageFilename(name: string): boolean {
+  return /\.(jpe?g|png|gif|heic|heif|webp|bmp|tiff?)$/i.test(name);
+}
+
+function isVideoFilename(name: string): boolean {
+  return /\.(mp4|mov|m4v|3gp|avi|mkv)$/i.test(name);
+}
+
 export async function downloadFile(url: string, suggestedName?: string): Promise<void> {
   const filename =
     suggestedName ||
@@ -17,6 +25,22 @@ export async function downloadFile(url: string, suggestedName?: string): Promise
     `download-${Date.now()}`;
 
   if (Capacitor.isNativePlatform()) {
+    // For images/videos: save directly to the device camera roll
+    if (isImageFilename(filename) || isVideoFilename(filename)) {
+      try {
+        const { Media } = await import("@capacitor-community/media");
+        if (isImageFilename(filename)) {
+          await Media.savePhoto({ path: url });
+        } else {
+          await Media.saveVideo({ path: url });
+        }
+        return;
+      } catch (err) {
+        console.warn("Media.savePhoto failed, falling back to share sheet:", err);
+        // Fall through to share-sheet fallback below
+      }
+    }
+
     const { Filesystem, Directory } = await import("@capacitor/filesystem");
     const { Share } = await import("@capacitor/share");
 
@@ -24,7 +48,6 @@ export async function downloadFile(url: string, suggestedName?: string): Promise
     const blob = await res.blob();
     const base64 = await blobToBase64(blob);
 
-    // Write to cache so iOS Share can access via file:// URI
     const written = await Filesystem.writeFile({
       path: filename,
       data: base64,
@@ -37,7 +60,6 @@ export async function downloadFile(url: string, suggestedName?: string): Promise
         dialogTitle: "Save",
       });
     } catch (err: any) {
-      // User dismissed share sheet — not an error
       if (!/cancel/i.test(err?.message || "")) throw err;
     }
     return;
