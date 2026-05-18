@@ -338,13 +338,8 @@ const Albums = () => {
       }
 
       const content = await zip.generateAsync({ type: "blob" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(content);
-      link.download = `${selectedAlbum.name}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
+      const { downloadBlob } = await import("@/lib/nativeDownload");
+      await downloadBlob(content, `${selectedAlbum.name}.zip`);
       toast({ title: "Download ready!" });
     } catch {
       toast({ title: "Download failed", variant: "destructive" });
@@ -619,18 +614,12 @@ const Albums = () => {
                     >
                       <button
                         className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                        onClick={() => {
-                          fetch(enlargedPhoto.photo_url)
-                            .then(r => r.blob())
-                            .then(blob => {
-                              const link = document.createElement("a");
-                              link.href = URL.createObjectURL(blob);
-                              link.download = enlargedPhoto.photo_url.split("/").pop() || "photo.jpg";
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                              URL.revokeObjectURL(link.href);
-                            });
+                        onClick={async () => {
+                          const { downloadFile } = await import("@/lib/nativeDownload");
+                          await downloadFile(
+                            enlargedPhoto.photo_url,
+                            enlargedPhoto.photo_url.split("/").pop()?.split("?")[0] || "photo.jpg"
+                          );
                         }}
                         aria-label="Download"
                       >

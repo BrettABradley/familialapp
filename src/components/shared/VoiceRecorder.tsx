@@ -37,8 +37,39 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
 
   const startRecording = async () => {
     try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+        console.warn("Audio recording not supported on this device");
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+
+      // Safari / iOS WKWebView doesn't support audio/webm — pick the first
+      // supported mime type so MediaRecorder construction doesn't throw and
+      // crash the WebView (which on iOS can boot the user out of the app).
+      const candidates = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4;codecs=mp4a.40.2",
+        "audio/mp4",
+        "audio/aac",
+        "",
+      ];
+      const mimeType =
+        candidates.find((t) => t === "" || (MediaRecorder.isTypeSupported?.(t) ?? false)) ??
+        "";
+
+      let mediaRecorder: MediaRecorder;
+      try {
+        mediaRecorder = mimeType
+          ? new MediaRecorder(stream, { mimeType })
+          : new MediaRecorder(stream);
+      } catch (err) {
+        console.error("MediaRecorder init failed:", err);
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
@@ -47,7 +78,8 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const type = mediaRecorder.mimeType || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type });
         stream.getTracks().forEach((t) => t.stop());
         if (blob.size > 0) onRecordingComplete(blob);
       };
@@ -65,8 +97,8 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
           return prev + 1;
         });
       }, 1000);
-    } catch {
-      // Permission denied or not available
+    } catch (err) {
+      console.error("startRecording error:", err);
     }
   };
 
