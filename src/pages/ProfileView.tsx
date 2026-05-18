@@ -186,15 +186,8 @@ const ProfileView = () => {
 
   const handleDownload = async (url: string, filename?: string) => {
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = filename || url.split("/").pop() || "download";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
+      const { downloadFile } = await import("@/lib/nativeDownload");
+      await downloadFile(url, filename || url.split("/").pop()?.split("?")[0]);
     } catch {
       toast({ title: "Download failed", variant: "destructive" });
     }

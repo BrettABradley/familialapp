@@ -600,6 +600,16 @@ const Messages = () => {
     setIsSending(false);
   };
 
+  const handleMediaDownload = async (url: string) => {
+    try {
+      const { downloadFile } = await import("@/lib/nativeDownload");
+      const ext = url.split(".").pop()?.split("?")[0] || "jpg";
+      await downloadFile(url, `familial-${Date.now()}.${ext}`);
+    } catch {
+      toast({ title: "Download failed", variant: "destructive" });
+    }
+  };
+
   const renderMediaAttachments = (mediaUrls?: string[]) => {
     if (!mediaUrls || mediaUrls.length === 0) return null;
     return (
@@ -608,7 +618,24 @@ const Messages = () => {
           const type = getMediaType(url);
           if (type === 'video') return <video key={i} src={url} controls playsInline className="rounded-md max-w-full max-h-48" />;
           if (type === 'audio') return <audio key={i} src={url} controls className="w-full max-w-[240px]" />;
-          return <img key={i} src={url} alt="attachment" className="rounded-md max-w-full max-h-48 cursor-pointer" />;
+          return (
+            <div key={i} className="relative inline-block group">
+              <img
+                src={url}
+                alt="attachment"
+                className="rounded-md max-w-full max-h-48 cursor-pointer"
+                onClick={() => handleMediaDownload(url)}
+              />
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleMediaDownload(url); }}
+                className="absolute top-1 right-1 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm"
+                aria-label="Download photo"
+              >
+                <Download className="h-4 w-4" />
+              </button>
+            </div>
+          );
         })}
       </div>
     );
