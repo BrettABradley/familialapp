@@ -249,17 +249,10 @@ export const useFeedPosts = () => {
 
   const handleDownloadImage = async (url: string) => {
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const downloadUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = `familial-photo-${Date.now()}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(downloadUrl);
-      toast({ title: "Downloaded!", description: "Photo saved to your device." });
+      const { downloadFile } = await import("@/lib/nativeDownload");
+      const ext = url.split(".").pop()?.split("?")[0] || "jpg";
+      await downloadFile(url, `familial-photo-${Date.now()}.${ext}`);
+      toast({ title: "Saved!", description: "Use the share sheet to save to your photos." });
     } catch {
       toast({ title: "Download failed", description: "Could not download the image.", variant: "destructive" });
     }
