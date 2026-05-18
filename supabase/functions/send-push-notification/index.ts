@@ -7,7 +7,12 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const APNS_HOST = "https://api.push.apple.com"; // production
+// APNs host — production by default. Set APNS_ENV=sandbox for local Xcode dev builds
+// (which receive sandbox device tokens). TestFlight + App Store always use production.
+const APNS_HOST =
+  (Deno.env.get("APNS_ENV") ?? "production").toLowerCase() === "sandbox"
+    ? "https://api.sandbox.push.apple.com"
+    : "https://api.push.apple.com";
 const APNS_TOPIC = "com.familialmedia.familial";
 
 // ---------- ES256 JWT for APNs (cached ~50 min) ----------
@@ -141,10 +146,9 @@ serve(async (req: Request) => {
       }
     }
 
-    // Note: column is named `expo_token` for legacy reasons but now stores APNs device tokens.
     const { data: tokens, error: tokenError } = await supabase
       .from("push_tokens")
-      .select("expo_token")
+      .select("device_token")
       .eq("user_id", user_id);
 
     if (tokenError) {
@@ -174,20 +178,20 @@ serve(async (req: Request) => {
     const invalidTokens: string[] = [];
     let sent = 0;
 
-    for (const t of tokens as { expo_token: string }[]) {
+    for (const t of tokens as { device_token: string }[]) {
       try {
-        const result = await sendApns(t.expo_token, apnsPayload);
+        const result = await sendApns(t.device_token, apnsPayload);
         if (result.ok) {
           sent++;
         } else {
-          console.warn(`APNs ${result.status} for token ${t.expo_token.slice(0, 8)}…: ${result.reason}`);
+          console.warn(`APNs ${result.status} for token ${t.device_token.slice(0, 8)}…: ${result.reason}`);
           if (
             result.status === 410 ||
             result.reason === "BadDeviceToken" ||
             result.reason === "Unregistered" ||
             result.reason === "DeviceTokenNotForTopic"
           ) {
-            invalidTokens.push(t.expo_token);
+            invalidTokens.push(t.device_token);
           }
         }
       } catch (e) {
@@ -200,7 +204,7 @@ serve(async (req: Request) => {
         .from("push_tokens")
         .delete()
         .eq("user_id", user_id)
-        .in("expo_token", invalidTokens);
+        .in("device_token", invalidTokens);
       console.log(`Cleaned ${invalidTokens.length} invalid token(s)`);
     }
 
