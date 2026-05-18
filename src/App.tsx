@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { useVisualViewport } from "@/hooks/useVisualViewport";
+import { useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
 import Unsubscribe from "./pages/Unsubscribe";
@@ -38,6 +40,16 @@ const queryClient = new QueryClient();
 
 const App = () => {
   useVisualViewport();
+  useEffect(() => {
+    console.log("[boot] App effect mounted");
+    if (Capacitor.isNativePlatform()) {
+      import("@capacitor/splash-screen")
+        .then(({ SplashScreen }) =>
+          SplashScreen.hide().catch((e) => console.warn("[boot] splash hide (App) failed", e))
+        )
+        .catch((e) => console.warn("[boot] splash plugin load (App) failed", e));
+    }
+  }, []);
   return (
   <HelmetProvider>
   <QueryClientProvider client={queryClient}>
