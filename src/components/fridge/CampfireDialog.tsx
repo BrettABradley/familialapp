@@ -108,10 +108,14 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
 
     // Upload audio if present
     if (audioBlob) {
-      const fileName = `campfire/${pinId}/${user.id}_${Date.now()}.webm`;
+      const mime = audioBlob.type || "audio/webm";
+      const ext = mime.includes("mp4") || mime.includes("aac")
+        ? "m4a"
+        : mime.includes("webm") ? "webm" : "audio";
+      const fileName = `campfire/${pinId}/${user.id}_${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from("post-media")
-        .upload(fileName, audioBlob, { contentType: "audio/webm" });
+        .upload(fileName, audioBlob, { contentType: mime });
 
       if (uploadError) {
         toast({ title: "Upload failed", description: "Could not upload voice memo.", variant: "destructive" });
@@ -146,6 +150,25 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
       toast({ title: "Story shared! 🔥", description: "Your story has been added to the campfire." });
     }
     setIsSubmitting(false);
+  };
+
+  const handleDeleteOwnStory = async () => {
+    if (!user || !currentStory || currentStory.author_id !== user.id) return;
+    const confirmed = window.confirm("Delete your story from this campfire?");
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from("campfire_stories" as any)
+      .delete()
+      .eq("id", currentStory.id);
+
+    if (error) {
+      toast({ title: "Error", description: "Could not delete your story.", variant: "destructive" });
+      return;
+    }
+    setSelectedAuthor(null);
+    await fetchStories();
+    toast({ title: "Story removed" });
   };
 
   const canSubmit = storyText.trim().length > 0 || audioBlob !== null;
@@ -234,6 +257,18 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
                     className="w-full mt-2 h-8"
                     preload="metadata"
                   />
+                )}
+                {user && currentStory.author_id === user.id && (
+                  <div className="flex justify-end mt-2">
+                    <button
+                      type="button"
+                      onClick={handleDeleteOwnStory}
+                      className="text-[11px] text-amber-200/70 hover:text-amber-100 inline-flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Delete my story
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
