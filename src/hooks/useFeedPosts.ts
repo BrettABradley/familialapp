@@ -250,9 +250,15 @@ export const useFeedPosts = () => {
   const handleDownloadImage = async (url: string) => {
     try {
       const { downloadFile } = await import("@/lib/nativeDownload");
+      const { Capacitor } = await import("@capacitor/core");
       const ext = url.split(".").pop()?.split("?")[0] || "jpg";
       await downloadFile(url, `familial-photo-${Date.now()}.${ext}`);
-      toast({ title: "Saved!", description: "Use the share sheet to save to your photos." });
+      toast({
+        title: "Saved!",
+        description: Capacitor.isNativePlatform()
+          ? "Photo saved to your camera roll."
+          : "Image downloaded.",
+      });
     } catch {
       toast({ title: "Download failed", description: "Could not download the image.", variant: "destructive" });
     }
