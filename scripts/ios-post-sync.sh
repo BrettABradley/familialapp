@@ -43,3 +43,13 @@ $PB -c "Add :UIBackgroundModes:0 string remote-notification" "$PLIST"
 # done from Info.plist alone.
 
 echo "✅ Info.plist updated: encryption compliance + privacy strings + push background mode"
+echo ""
+echo "⚠️  MANUAL XCODE STEPS REQUIRED (one-time, after every fresh 'cap add ios'):"
+echo "   1. Open ios/App/App.xcworkspace in Xcode"
+echo "   2. Select 'App' target → Signing & Capabilities"
+echo "   3. Click '+ Capability' → add 'Push Notifications'"
+echo "      (This generates App.entitlements with the aps-environment key.)"
+echo "      Without this, PushNotifications.register() throws at launch and"
+echo "      can crash App Review's automated test."
+echo "   4. Confirm Deployment Target ≥ iOS 14.0"
+echo "   5. Product → Clean Build Folder before Archive"

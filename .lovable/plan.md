@@ -1,44 +1,72 @@
-# Why the iOS Password Reset Failed for Your Friend
+# iOS Launch Stability Hardening
 
-## Diagnosis (from logs)
+Apple's "crashed after initial launch" rejection means the binary terminated before the WebView could show the UI. Without the symbolicated crash log we can't be 100% sure which native call faulted, but the launch path has several places where one failing plugin can take the whole app down. This plan removes those failure modes and adds a Splash Screen so we never show a white screen during init.
 
-I traced the exact reset attempts for `jacohart55@gmail.com` across the auth logs and the `auth-email-hook` edge function logs:
+## Most likely culprits (in priority order)
 
-| Time (UTC)   | Endpoint            | Result                                    |
-|--------------|---------------------|-------------------------------------------|
-| 17:53:38     | POST /recover       | **429 `over_email_send_rate_limit`** — "email rate limit exceeded" |
-| 18:02:46     | POST /recover       | 200 — hook fired, "Email sent successfully" |
+1. **`initCapacitorPlugins()` runs at module load** (`src/main.tsx`) and isn't awaited. The `StatusBar` / `Keyboard` dynamic imports + setters fire before React mounts. If either plugin throws (missing pod after a sync, entitlement mismatch, iPad-specific edge case), the unhandled rejection on iOS 17+ WKWebView can hard-kill the process.
+2. **Push Notifications plugin** is in `package.json` and `UIBackgroundModes:remote-notification` is set in Info.plist, but the `aps-environment` entitlement must be added in Xcode. If the provisioning profile doesn't include push, `PushNotifications.register()` will throw at launch (we call it from `onAuthStateChange` immediately on cold start with a cached session).
+3. **No Splash Screen plugin installed.** iOS shows the launch storyboard, then a blank WebView until React mounts. If the WebView fails to load `index.html` for any reason (bad asset path, missing `dist/` after sync), Apple's automated test sees a frozen/blank app and logs it as a crash.
+4. **`@capgo/native-purchases`** — lazy-loaded, so won't crash launch unless something imports it eagerly. Confirmed lazy in `iapPurchase.ts` ✓.
+5. **Encryption flag** is already set via `ios-post-sync.sh` ✓.
 
-So nothing is broken in our email pipeline. The reset email that fired at 18:02 went out fine. The earlier 17:53 attempt was blocked **before our hook ever ran** by Supabase Auth's built-in per-email rate limiter.
+## Changes
 
-## Root cause
+### 1. Make `initCapacitorPlugins` crash-proof
+File: `src/lib/capacitorInit.ts`
+- Wrap the whole function body in try/catch and **each plugin import + call in its own try/catch** so a single missing/failed plugin can't abort the rest.
+- Move `await` chain off the top-level promise: log errors with `console.error` instead of rethrowing.
+- Move push-registration listeners behind a `try/catch` and only call `PushNotifications.register()` if `aps-environment` is likely present (we'll just swallow registration errors — they're non-fatal).
 
-Supabase Auth enforces a **per-email-address hourly cap** on `resetPasswordForEmail` (shared with signup + magic link). Default: roughly 4 emails per hour per email address. When exceeded, the API returns `429 over_email_send_rate_limit` and the auth-email-hook is never invoked — so no email is sent, no log row is written, nothing for us to retry.
+### 2. Defer non-essential native init until after first paint
+File: `src/main.tsx`
+- Call `initCapacitorPlugins()` from inside a `requestIdleCallback` / `setTimeout(…, 0)` after `createRoot(...).render(...)` so the WebView paints the React tree first. Even if a plugin throws, the UI is already up.
 
-Why iOS specifically tripped it:
-1. On iOS Safari/WKWebView, taps can register more aggressively (no hover state → users tap to "see" if it worked).
-2. Mail.app + Gmail app combo means users don't always see the first email instantly and re-tap thinking it failed.
-3. Until the fix shipped earlier today, the button had **no client-side cooldown** — every tap fired a fresh `/recover` request and burned through the hourly quota in seconds.
-4. The raw error string "email rate limit exceeded" sounds like a fatal error rather than "wait a minute," which makes users tap *again* in another browser, compounding the problem.
+### 3. Add Splash Screen plugin
+- Install `@capacitor/splash-screen`.
+- Configure in `capacitor.config.ts`:
+  ```ts
+  SplashScreen: {
+    launchShowDuration: 2000,
+    launchAutoHide: true,
+    backgroundColor: '#ffffff',
+    showSpinner: false,
+  }
+  ```
+- Call `SplashScreen.hide()` after React mounts (in `App.tsx` `useEffect`).
+- This prevents the "blank white screen" Apple's automated reviewer interprets as a crash.
 
-## What's already mitigated (shipped earlier this turn)
+### 4. Stricter ErrorBoundary at root for native
+File: `src/components/shared/ErrorBoundary.tsx`
+- On native, also log to `console.error` with structured info (we can see in Xcode).
+- Add a "Reload App" button that, on native, calls `window.location.reload()` (already does).
 
-- 60-second client-side cooldown on "Send Reset Link," persisted in `sessionStorage`.
-- Friendlier error mapping: rate-limit error now shows "Too many reset requests. Please wait a minute and try again, or check your inbox (and spam folder) for an earlier link."
-- Success toast now mentions checking spam.
+### 5. Verify Info.plist + entitlement requirements in `ios-post-sync.sh`
+File: `scripts/ios-post-sync.sh`
+- Add a final `echo` block reminding the user to verify in Xcode:
+  - Signing & Capabilities → **Push Notifications** is added (creates `App.entitlements` with `aps-environment`).
+  - Deployment target ≥ iOS 14.
+  - "Build Phases → Copy Bundle Resources" includes the `public/` web assets via `dist/`.
 
-Once you republish, the friend's scenario (tapping the button repeatedly) can no longer trip the limit.
+### 6. Add a launch breadcrumb
+File: `src/main.tsx`
+- Log `[boot] react-mount-start` before `createRoot(...).render()` and `[boot] react-mount-end` in an effect inside `<App>`. Combined with Xcode console capture, this tells us whether the crash is **before** React mounts (native crash) or **after** (JS/runtime error).
 
-## Additional findings worth noting
+## What this does NOT change
 
-1. **auth-email-hook is on the legacy direct-send pattern** — it uses `sendLovableEmail` via `callback_url` instead of enqueuing through `enqueue_email` to pgmq. It currently works (logs show successful sends), but it bypasses retry safety and the `email_send_log` audit trail. Not the cause of your friend's issue, but worth upgrading later for resilience.
-2. **No Edge Function errors** for the failed attempt — the 429 happens at the Supabase Auth layer, so we have no record of it in `email_send_log`. That's why we'd never see it in an email dashboard.
+- No business-logic or routing changes.
+- No feature removal.
+- No edge function or DB changes.
 
-## Optional follow-ups (not auto-applying — let me know)
+## After the fix
+You'll need to:
+```
+git pull
+npm install --legacy-peer-deps
+npm run build
+npm run cap:sync:ios
+```
+Then in Xcode: open `ios/App/App.xcworkspace`, Signing & Capabilities → confirm **Push Notifications** capability is checked. Archive and upload a new build.
 
-- **Raise the Supabase Auth rate limit** in Cloud → Users → Auth Settings (e.g., 10/hour per email) — a small bump would have absorbed your friend's taps even before the cooldown fix.
-- **Upgrade auth-email-hook to the queue-based pattern** so future rate-limit / 5xx errors retry automatically and every send is logged in `email_send_log`.
-
-## TL;DR for your friend
-
-Their first reset email *did* send — they just tapped the button enough times to hit Supabase's per-email hourly cap. The cooldown + clearer messaging shipped today prevents this from happening again once the app is republished.
+## One question to confirm scope
+If you have the Apple crash report (Xcode → Window → Organizer → Crashes, or the `.crash` file Apple attached to the rejection email), paste the top of the stack trace. That will let me pinpoint the exact failing call instead of hardening defensively. If you don't have it, the changes above are the safest broad-spectrum fix.
