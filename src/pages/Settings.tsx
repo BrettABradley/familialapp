@@ -124,13 +124,25 @@ const Settings = () => {
       const result = await pickImage();
       if (!result) return;
 
+      // Convert HEIC if needed (no-op on iOS native, which already returns JPEG)
       const file = await convertHeicToJpeg(result.file);
       setPendingFile(file);
 
-      const reader = new FileReader();
-      reader.onload = () => setCropImageSrc(reader.result as string);
-      reader.readAsDataURL(file);
+      // If HEIC conversion produced a new File, re-read it; otherwise use the
+      // dataUrl Capacitor / the file input already gave us. Avoiding the extra
+      // FileReader pass fixes a hang on iOS WKWebView for large images.
+      if (file === result.file && result.dataUrl) {
+        setCropImageSrc(result.dataUrl);
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => setCropImageSrc(reader.result as string);
+        reader.onerror = () => {
+          toast({ title: "Error", description: "Could not read the selected image.", variant: "destructive" });
+        };
+        reader.readAsDataURL(file);
+      }
     } catch (err) {
+      console.error("handlePickImage error:", err);
       toast({ title: "Error", description: "Could not access camera or photos. Please check permissions.", variant: "destructive" });
     }
   };
