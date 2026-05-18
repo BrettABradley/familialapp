@@ -148,7 +148,7 @@ const PrivacyPolicy = () => {
               <li><strong>Cloud hosting &amp; database</strong> (Supabase) &mdash; stores your account data and media.</li>
               <li><strong>Email delivery</strong> (Resend) &mdash; sends transactional emails such as 2FA codes, invites, and receipts.</li>
               <li><strong>Payment processing</strong> (Stripe for web, Apple for iOS in-app purchases).</li>
-              <li><strong>Push notification delivery</strong> (Apple Push Notification service, Google Firebase Cloud Messaging, and the Expo push relay).</li>
+              <li><strong>Push notification delivery</strong> (Apple Push Notification service).</li>
               <li><strong>Content-safety scanning</strong> (Google Gemini API), as described above.</li>
               <li><strong>Legal requirements</strong> &mdash; we may disclose information if required by law, court order, or governmental request, or to protect the rights, safety, or property of Familial, our users, or the public.</li>
             </ul>
