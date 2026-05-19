@@ -257,7 +257,7 @@ const PostMediaCarousel = ({
                         src={url}
                         preset="card"
                         alt={`Post media ${index + 1}`}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                       />
                     </button>
                   )}
