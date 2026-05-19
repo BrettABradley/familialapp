@@ -257,7 +257,7 @@ const PostMediaCarousel = ({
                         src={url}
                         preset="card"
                         alt={`Post media ${index + 1}`}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                       />
                     </button>
                   )}
@@ -467,13 +467,34 @@ export const PostCard = ({
         {/* Visual media: carousel for 2+, single for 1 */}
         {visualMedia.length === 1 && (
           <div className="mb-4">
-            <MediaItem
-              url={visualMedia[0]}
-              index={0}
-              onDownload={onDownloadImage}
-              onImageClick={() => setLightboxIndex(0)}
-              onVideoClick={() => setLightboxIndex(0)}
-            />
+            {getMediaType(visualMedia[0]) === 'video' ? (
+              <MediaItem
+                url={visualMedia[0]}
+                index={0}
+                onDownload={onDownloadImage}
+                onImageClick={() => setLightboxIndex(0)}
+                onVideoClick={() => setLightboxIndex(0)}
+              />
+            ) : (
+              <div
+                className="relative group rounded-lg overflow-hidden cursor-pointer bg-muted"
+                onClick={() => setLightboxIndex(0)}
+              >
+                <SmartImage
+                  src={visualMedia[0]}
+                  preset="card"
+                  alt="Post image"
+                  className="w-full h-auto max-h-[600px] object-contain"
+                />
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDownloadImage(visualMedia[0]); }}
+                  className="absolute bottom-2 right-2 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
+                  aria-label="Download image"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         )}
         {visualMedia.length > 1 && (
