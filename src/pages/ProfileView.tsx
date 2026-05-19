@@ -754,7 +754,7 @@ const ProfileView = () => {
               {pendingFiles.length > 1 ? `Add a caption (${pendingFiles.length} items)` : "Add a caption"}
             </h3>
 
-            {pendingPreviews.length > 1 && (
+            {pendingPreviews.length >= 1 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {pendingPreviews.map((p, i) => (
                   <div key={i} className="relative flex-shrink-0 w-16 h-16 rounded-md overflow-hidden bg-muted">
@@ -765,11 +765,32 @@ const ProfileView = () => {
                     ) : (
                       <img src={p.url} alt={`Selected ${i + 1}`} className="w-full h-full object-cover" />
                     )}
+                    <button
+                      type="button"
+                      onClick={() => removePendingItem(i)}
+                      disabled={isUploading}
+                      className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5"
+                      aria-label={`Remove item ${i + 1}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                     <div className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[10px] font-medium px-1 rounded">
                       {i + 1}
                     </div>
                   </div>
                 ))}
+                {pendingFiles.length < MAX_GROUP_ITEMS && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="flex-shrink-0 w-16 h-16 rounded-md border-2 border-dashed border-muted-foreground/30 hover:border-primary hover:bg-secondary/50 flex flex-col items-center justify-center text-muted-foreground transition-colors"
+                    aria-label="Add another item"
+                  >
+                    <ImagePlus className="h-4 w-4" />
+                    <span className="text-[10px] mt-0.5">{pendingFiles.length}/{MAX_GROUP_ITEMS}</span>
+                  </button>
+                )}
               </div>
             )}
 
@@ -785,7 +806,7 @@ const ProfileView = () => {
               <Button variant="outline" onClick={() => resetUploadState()}>
                 Cancel
               </Button>
-              <Button onClick={handleConfirmUpload} disabled={isUploading}>
+              <Button onClick={handleConfirmUpload} disabled={isUploading || pendingFiles.length === 0}>
                 {isUploading ? "Uploading..." : (pendingFiles.length > 1 ? `Post ${pendingFiles.length} items` : "Upload")}
               </Button>
             </div>
