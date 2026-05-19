@@ -364,7 +364,15 @@ const Settings = () => {
               className="w-full"
               onClick={async () => {
                 toast({ title: "Sending test push…" });
-                const { data, error } = await supabase.functions.invoke('push-self-test');
+                // Refresh session so the edge function gets a valid JWT
+                const { data: sessionData } = await supabase.auth.getSession();
+                if (!sessionData.session) {
+                  toast({ title: "Not signed in", description: "Please sign in again and retry.", variant: "destructive" });
+                  return;
+                }
+                const { data, error } = await supabase.functions.invoke('push-self-test', {
+                  headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
+                });
                 if (error) {
                   toast({ title: "Test failed", description: error.message, variant: "destructive" });
                   return;
