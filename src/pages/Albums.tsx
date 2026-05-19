@@ -49,6 +49,134 @@ interface AlbumPhoto {
   created_at: string;
 }
 
+// Embla-powered finger-following lightbox for album photos. Mirrors the
+// PostCard MediaLightbox so the swipe feel is identical across the app.
+const AlbumPhotoLightbox = ({
+  photos,
+  startIndex,
+  onIndexChange,
+  onClose,
+}: {
+  photos: AlbumPhoto[];
+  startIndex: number;
+  onIndexChange: (i: number) => void;
+  onClose: () => void;
+}) => {
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: false,
+    align: "center",
+    duration: 28,
+    dragThreshold: 6,
+    containScroll: "trimSnaps",
+    startIndex,
+  });
+  const [selected, setSelected] = useState(startIndex);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => {
+      const i = emblaApi.selectedScrollSnap();
+      setSelected(i);
+      onIndexChange(i);
+    };
+    emblaApi.on("select", onSelect);
+    return () => { emblaApi.off("select", onSelect); };
+  }, [emblaApi, onIndexChange]);
+
+  useEffect(() => {
+    [selected - 1, selected + 1].forEach((i) => {
+      const p = photos[i];
+      if (p?.photo_url) {
+        const img = new window.Image();
+        img.src = presetImage(p.photo_url, "full");
+      }
+    });
+  }, [selected, photos]);
+
+  const current = photos[selected];
+
+  return (
+    <>
+      <div className="absolute top-0 right-0 z-30 flex items-center gap-2 pr-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
+        <button
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+          onClick={async () => {
+            if (!current) return;
+            const { downloadFile } = await import("@/lib/nativeDownload");
+            await downloadFile(
+              current.photo_url,
+              current.photo_url.split("/").pop()?.split("?")[0] || "photo.jpg"
+            );
+          }}
+          aria-label="Download"
+        >
+          <Download className="h-5 w-5" />
+        </button>
+        <button
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+          onClick={onClose}
+          aria-label="Close"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="w-screen sm:w-[90vw] h-[100dvh] sm:h-[90vh] overflow-hidden" ref={emblaRef}>
+        <div className="flex h-full touch-pan-y will-change-transform">
+          {photos.map((p, i) => (
+            <div key={p.id} className="flex-[0_0_100%] min-w-0 h-full flex items-center justify-center px-2">
+              <SmartImage
+                src={p.photo_url}
+                preset="full"
+                priority={Math.abs(i - selected) <= 1}
+                alt={p.caption || `Photo ${i + 1}`}
+                className="max-h-full max-w-full object-contain select-none bg-transparent"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {photos.length > 1 && (
+        <>
+          {selected > 0 && (
+            <button
+              className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-30 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+              onClick={() => emblaApi?.scrollPrev()}
+              aria-label="Previous"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+          )}
+          {selected < photos.length - 1 && (
+            <button
+              className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-30 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+              onClick={() => emblaApi?.scrollNext()}
+              aria-label="Next"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          )}
+          <div
+            className="absolute left-1/2 -translate-x-1/2 z-30 bg-black/50 backdrop-blur-sm text-white text-sm px-3 py-1 rounded-full pointer-events-none"
+            style={{ bottom: "max(env(safe-area-inset-bottom, 0px), 1rem)" }}
+          >
+            {selected + 1} / {photos.length}
+          </div>
+        </>
+      )}
+      {current?.caption && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 z-30 text-center px-4 text-sm text-white/80 pointer-events-none"
+          style={{ bottom: photos.length > 1 ? "max(env(safe-area-inset-bottom, 0px), 3rem)" : "max(env(safe-area-inset-bottom, 0px), 1rem)" }}
+        >
+          {current.caption}
+        </div>
+      )}
+    </>
+  );
+};
+
 const Albums = () => {
   const { user } = useAuth();
   const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
