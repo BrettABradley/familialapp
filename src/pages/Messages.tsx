@@ -865,13 +865,6 @@ const Messages = () => {
               </span>
             )}
           </button>
-            {selectedGroup.created_by === user?.id && (
-              <label className="absolute inset-0 flex items-center justify-center bg-foreground/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                <Camera className="w-4 h-4 text-background" />
-                <input type="file" accept="image/*,.heic,.heif" className="hidden" onChange={handleGroupAvatarUpload} disabled={isUploadingGroupAvatar} />
-              </label>
-            )}
-          </div>
           <button onClick={handleViewMembers} className="text-left hover:underline">
             <h2 className="font-serif text-xl font-bold text-foreground flex-1">{selectedGroup.name}</h2>
           </button>
