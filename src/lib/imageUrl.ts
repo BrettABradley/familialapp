@@ -28,6 +28,7 @@ function isSupabaseStorageUrl(url: string): boolean {
 
 export interface TransformOpts {
   width?: number;
+  height?: number;
   quality?: number;
   resize?: "cover" | "contain" | "fill";
 }
@@ -37,10 +38,11 @@ export function transformedImage(url: string | null | undefined, opts: Transform
   if (!url) return "";
   if (!isSupabaseStorageUrl(url)) return url;
 
-  const { width, quality = 75, resize = "cover" } = opts;
+  const { width, height, quality = 75, resize = "cover" } = opts;
   const rewritten = url.replace("/storage/v1/object/", "/storage/v1/render/image/");
   const params = new URLSearchParams();
   if (width) params.set("width", String(width));
+  if (height) params.set("height", String(height));
   params.set("quality", String(quality));
   params.set("resize", resize);
   const sep = rewritten.includes("?") ? "&" : "?";
