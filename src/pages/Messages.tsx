@@ -849,14 +849,23 @@ const Messages = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Edit Group Name Dialog */}
+        {/* Edit Group Name Dialog — iOS keyboard-safe: prevent autofocus to avoid focus-trap freeze on Capacitor WebView */}
         <Dialog open={isEditGroupOpen} onOpenChange={setIsEditGroupOpen}>
-          <DialogContent>
+          <DialogContent
+            onOpenAutoFocus={(e) => e.preventDefault()}
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
             <DialogHeader>
               <DialogTitle className="font-serif">Edit Group Name</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-2">
-              <Input value={editGroupName} onChange={(e) => setEditGroupName(e.target.value)} maxLength={100} placeholder="Group name" />
+              <Input
+                value={editGroupName}
+                onChange={(e) => setEditGroupName(e.target.value)}
+                maxLength={100}
+                placeholder="Group name"
+                autoFocus={false}
+              />
               <Button className="w-full" onClick={handleSaveGroupName} disabled={!editGroupName.trim()}>Save</Button>
             </div>
           </DialogContent>
