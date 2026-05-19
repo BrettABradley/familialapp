@@ -523,97 +523,14 @@ export const PostCard = ({
         {/* Unified Media Lightbox — fullscreen on mobile, centered modal on desktop */}
         <Dialog open={lightboxIndex !== null} onOpenChange={(open) => !open && setLightboxIndex(null)}>
           <DialogContent className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
-            {lightboxIndex !== null && visualMedia[lightboxIndex] && (
-              <>
-                {/* Top control bar — safe area aware on mobile */}
-                <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-end gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
-                  {getMediaType(visualMedia[lightboxIndex]) === 'image' && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
-                      onClick={() => onDownloadImage(visualMedia[lightboxIndex])}
-                      aria-label="Download"
-                    >
-                      <Download className="h-5 w-5" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
-                    onClick={() => setLightboxIndex(null)}
-                    aria-label="Close"
-                  >
-                    <X className="h-5 w-5" />
-                  </Button>
-                </div>
-
-                {/* Centered media */}
-                {getMediaType(visualMedia[lightboxIndex]) === 'video' ? (
-                  <video
-                    controls
-                    autoPlay
-                    playsInline
-                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
-                    onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; touchStartY.current = e.touches[0].clientY; }}
-                    onTouchEnd={(e) => {
-                      const deltaX = touchStartX.current - e.changedTouches[0].clientX;
-                      const deltaY = e.changedTouches[0].clientY - touchStartY.current;
-                      if (deltaY > 80 && Math.abs(deltaX) < 50) { setLightboxIndex(null); return; }
-                      if (deltaX > 50 && lightboxIndex < visualMedia.length - 1) setLightboxIndex(lightboxIndex + 1);
-                      else if (deltaX < -50 && lightboxIndex > 0) setLightboxIndex(lightboxIndex - 1);
-                    }}
-                  >
-                    <source src={visualMedia[lightboxIndex]} type="video/mp4" />
-                    <source src={visualMedia[lightboxIndex]} type="video/quicktime" />
-                    <source src={visualMedia[lightboxIndex]} />
-                  </video>
-                ) : (
-                  <ZoomableImage
-                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto flex items-center justify-center"
-                    onSwipeLeft={() => lightboxIndex < visualMedia.length - 1 && setLightboxIndex(lightboxIndex + 1)}
-                    onSwipeRight={() => lightboxIndex > 0 && setLightboxIndex(lightboxIndex - 1)}
-                    onSwipeDown={() => setLightboxIndex(null)}
-                  >
-                    <SmartImage
-                      src={visualMedia[lightboxIndex]}
-                      preset="full"
-                      priority
-                      alt={`Post media ${lightboxIndex + 1}`}
-                      className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none bg-transparent"
-                    />
-                  </ZoomableImage>
-                )}
-
-                {/* Left/right navigation arrows */}
-                {visualMedia.length > 1 && (
-                  <>
-                    {lightboxIndex > 0 && (
-                      <button
-                        className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                        onClick={() => setLightboxIndex((prev) => (prev !== null ? prev - 1 : null))}
-                        aria-label="Previous"
-                      >
-                        <ChevronLeft className="h-6 w-6" />
-                      </button>
-                    )}
-                    {lightboxIndex < visualMedia.length - 1 && (
-                      <button
-                        className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                        onClick={() => setLightboxIndex((prev) => (prev !== null ? prev + 1 : null))}
-                        aria-label="Next"
-                      >
-                        <ChevronRight className="h-6 w-6" />
-                      </button>
-                    )}
-                    {/* Media counter */}
-                    <div className="absolute bottom-6 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 bg-black/50 backdrop-blur-sm text-white text-sm px-3 py-1 rounded-full" style={{ marginBottom: "max(env(safe-area-inset-bottom, 0px), 0px)" }}>
-                      {lightboxIndex + 1} / {visualMedia.length}
-                    </div>
-                  </>
-                )}
-              </>
+            {lightboxIndex !== null && visualMedia.length > 0 && (
+              <MediaLightbox
+                items={visualMedia}
+                startIndex={lightboxIndex}
+                onIndexChange={setLightboxIndex}
+                onClose={() => setLightboxIndex(null)}
+                onDownload={onDownloadImage}
+              />
             )}
           </DialogContent>
         </Dialog>
