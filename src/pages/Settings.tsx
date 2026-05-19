@@ -58,6 +58,9 @@ const Settings = () => {
   const [pushEnabled, setPushEnabled] = useState(true);
   const [mutedTypes, setMutedTypes] = useState<string[]>([]);
   const [notifPrefsLoaded, setNotifPrefsLoaded] = useState(false);
+  const [emailOnMention, setEmailOnMention] = useState(true);
+  const [emailOnUnreadDm, setEmailOnUnreadDm] = useState(true);
+  const [emailOnNewAlbum, setEmailOnNewAlbum] = useState(true);
 
   // 2FA/MFA state (email-based)
   const [mfaEnabled, setMfaEnabled] = useState(false);
