@@ -21,6 +21,8 @@ import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import { validateFileSize, getFileMediaType, getMediaType } from "@/lib/mediaUtils";
 import { convertHeicFiles, convertHeicToJpeg } from "@/lib/heicConverter";
+import { pickImage } from "@/lib/imagePicker";
+import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -141,6 +143,7 @@ const Messages = () => {
   const [editGroupName, setEditGroupName] = useState("");
   const [isUploadingGroupAvatar, setIsUploadingGroupAvatar] = useState(false);
   const [isDeleteGroupOpen, setIsDeleteGroupOpen] = useState(false);
+  const [groupAvatarCropSrc, setGroupAvatarCropSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && selectedCircle) {
@@ -417,13 +420,34 @@ const Messages = () => {
     }
   };
 
-  const handleGroupAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!selectedGroup || !user || !e.target.files?.[0]) return;
+  const handleGroupAvatarPick = async () => {
+    if (!selectedGroup || !user) return;
+    try {
+      const picked = await pickImage();
+      if (!picked) return;
+      const file = await convertHeicToJpeg(picked.file);
+      // Re-read as data URL so the cropper has a stable src on iOS WKWebView.
+      if (file === picked.file && picked.dataUrl) {
+        setGroupAvatarCropSrc(picked.dataUrl);
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => setGroupAvatarCropSrc(reader.result as string);
+        reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      console.error("Group avatar pick error:", err);
+      toast({ title: "Error", description: "Could not open photo picker.", variant: "destructive" });
+    }
+  };
+
+  const handleGroupAvatarCropComplete = async (blob: Blob) => {
+    setGroupAvatarCropSrc(null);
+    if (!selectedGroup || !user) return;
     setIsUploadingGroupAvatar(true);
-    let file = e.target.files[0];
-    file = await convertHeicToJpeg(file);
-    const filePath = `group-chats/${selectedGroup.id}/${Date.now()}-${file.name}`;
-    const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file);
+    const filePath = `group-chats/${selectedGroup.id}/${Date.now()}.jpg`;
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, blob, { upsert: true, contentType: "image/jpeg" });
     if (uploadError) {
       toast({ title: "Error", description: "Failed to upload image.", variant: "destructive" });
       setIsUploadingGroupAvatar(false);
@@ -823,12 +847,24 @@ const Messages = () => {
         <div className="flex-shrink-0 bg-background border-b border-border" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 3.25rem)' }}>
           <div className="flex items-center gap-3 px-4 py-3 min-h-[3.5rem]">
           <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
-          <div className="relative group cursor-pointer">
+          <button
+            type="button"
+            className="relative group cursor-pointer disabled:opacity-50"
+            onClick={(e) => { e.stopPropagation(); if (selectedGroup.created_by === user?.id) handleGroupAvatarPick(); }}
+            disabled={isUploadingGroupAvatar || selectedGroup.created_by !== user?.id}
+            aria-label="Change group photo"
+          >
             {selectedGroup.avatar_url ? (
               <Avatar><AvatarImage src={selectedGroup.avatar_url} /><AvatarFallback><UsersRound className="w-5 h-5" /></AvatarFallback></Avatar>
             ) : (
               <div className="p-2 rounded-full bg-secondary"><UsersRound className="w-5 h-5" /></div>
             )}
+            {selectedGroup.created_by === user?.id && (
+              <span className="absolute inset-0 flex items-center justify-center bg-foreground/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera className="w-4 h-4 text-background" />
+              </span>
+            )}
+          </button>
             {selectedGroup.created_by === user?.id && (
               <label className="absolute inset-0 flex items-center justify-center bg-foreground/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                 <Camera className="w-4 h-4 text-background" />
