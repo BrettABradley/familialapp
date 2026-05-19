@@ -294,26 +294,22 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
           <div className="mb-4 mx-auto max-w-sm">{renderPreview(previewUrls[0], 0)}</div>
         )}
         {previewUrls.length > 1 && (
-          <div className="mb-4 -mx-1 overflow-x-auto snap-x snap-mandatory flex gap-2 px-1 pb-2">
+          <div className="mb-4 grid grid-cols-2 gap-2">
             {previewUrls.map((url, index) => (
-              <div key={index} className="flex-[0_0_85%] snap-center">
-                {renderPreview(url, index)}
-              </div>
+              <div key={index}>{renderPreview(url, index)}</div>
             ))}
             {selectedFiles.length < MAX_FILES && (
-              <div className="flex-[0_0_85%] snap-center">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isPosting}
-                  className="w-full aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary hover:bg-secondary/50 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground"
-                  aria-label="Add more media"
-                >
-                  <Paperclip className="w-6 h-6" />
-                  <span className="text-sm font-medium">Add more</span>
-                  <span className="text-xs">{selectedFiles.length}/{MAX_FILES}</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isPosting}
+                className="w-full aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary hover:bg-secondary/50 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground"
+                aria-label="Add more media"
+              >
+                <Paperclip className="w-6 h-6" />
+                <span className="text-sm font-medium">Add more</span>
+                <span className="text-xs">{selectedFiles.length}/{MAX_FILES}</span>
+              </button>
             )}
           </div>
         )}
