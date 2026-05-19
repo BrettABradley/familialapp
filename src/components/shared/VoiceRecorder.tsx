@@ -142,16 +142,24 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
     }
   };
 
+  const startWebRecordingWithTracking = async () => {
+    await startWebRecording();
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      activeModeRef.current = "web";
+    }
+  };
+
   const startRecording = async () => {
     // On native iOS/Android, prefer the Capacitor voice-recorder plugin so
     // the OS surfaces its native microphone permission prompt instead of
     // relying on WKWebView's getUserMedia (which can hard-crash the app).
-    if (isNative) {
+    if (Capacitor.isNativePlatform()) {
       try {
         const { VoiceRecorder } = await import("capacitor-voice-recorder");
         const can = await VoiceRecorder.canDeviceVoiceRecord();
         if (!can?.value) {
-          toast.error("Voice recording is not supported on this device");
+          console.warn("Native VoiceRecorder reports unavailable, falling back to web recorder");
+          await startWebRecordingWithTracking();
           return;
         }
         const perm = await VoiceRecorder.hasAudioRecordingPermission();
@@ -163,6 +171,7 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
           }
         }
         await VoiceRecorder.startRecording();
+        activeModeRef.current = "native";
         setIsRecording(true);
         setElapsed(0);
         if (timerRef.current) clearInterval(timerRef.current);
@@ -177,24 +186,16 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
         }, 1000);
         return;
       } catch (err: any) {
-        const msg = String(err?.message || err?.code || err || "");
-        // Plugin not installed in the native shell yet — fall back to the
-        // WKWebView getUserMedia API so the mic still works on iOS/Android
-        // until the user runs `npx cap sync` on the new plugin.
-        const notInstalled =
-          /not implemented|unimplemented|not available|UNIMPLEMENTED/i.test(msg);
-        if (notInstalled) {
-          console.warn("Native VoiceRecorder unavailable, falling back to web recorder:", msg);
-          await startWebRecording();
-          return;
-        }
-        console.error("Native startRecording error:", err);
-        toast.error(msg || "Could not start recording");
+        // Any failure on the native path — plugin missing, permission denied
+        // at the OS level, an actively running recorder, etc. — falls back to
+        // the WKWebView MediaRecorder so the mic always works.
+        console.warn("Native VoiceRecorder failed, falling back to web recorder:", err);
+        await startWebRecordingWithTracking();
         return;
       }
     }
 
-    await startWebRecording();
+    await startWebRecordingWithTracking();
   };
 
   const formatTime = (s: number) => {
