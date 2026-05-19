@@ -76,8 +76,16 @@ const Settings = () => {
       setDisplayName(profile.display_name || "");
       setBio(profile.bio || "");
       setLocation(profile.location || "");
+      setEmailOnMention((profile as any).email_on_mention ?? true);
+      setEmailOnUnreadDm((profile as any).email_on_unread_dm ?? true);
+      setEmailOnNewAlbum((profile as any).email_on_new_album ?? true);
     }
   }, [profile]);
+
+  const saveEmailPref = async (field: "email_on_mention" | "email_on_unread_dm" | "email_on_new_album", value: boolean) => {
+    if (!user) return;
+    await supabase.from("profiles").update({ [field]: value } as any).eq("user_id", user.id);
+  };
 
   // Load notification preferences
   useEffect(() => {
