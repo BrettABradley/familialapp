@@ -4,9 +4,8 @@ import { Capacitor } from "@capacitor/core";
  * Download a file from a URL.
  *
  * On native iOS/Android (Capacitor), writes the file to the cache directory
- * and opens the native share sheet so the user can "Save Image" to Photos
- * or "Save to Files" for other file types — `<a download>` doesn't work in
- * iOS WKWebView.
+ * and saves it to the device camera roll. For non-media files, falls back to
+ * opening the native share sheet so the user can "Save to Files".
  *
  * On web, falls back to the standard anchor-tag download flow.
  */
@@ -18,7 +17,25 @@ function isVideoFilename(name: string): boolean {
   return /\.(mp4|mov|m4v|3gp|avi|mkv)$/i.test(name);
 }
 
+// Single-flight guard. iOS WKWebView can occasionally fire a touch handler
+// twice in rapid succession (gesture + synthetic click) which would otherwise
+// save the same photo to the camera roll twice. We dedupe by URL+1.5s window.
+const inFlight = new Map<string, number>();
+function shouldSkip(key: string): boolean {
+  const now = Date.now();
+  const last = inFlight.get(key) || 0;
+  if (now - last < 1500) return true;
+  inFlight.set(key, now);
+  // Cleanup so the map doesn't grow forever
+  setTimeout(() => {
+    if ((inFlight.get(key) || 0) <= now) inFlight.delete(key);
+  }, 3000);
+  return false;
+}
+
 export async function downloadFile(url: string, suggestedName?: string): Promise<void> {
+  if (shouldSkip(`url:${url}`)) return;
+
   const filename =
     suggestedName ||
     url.split("/").pop()?.split("?")[0] ||
@@ -88,10 +105,63 @@ export async function downloadFile(url: string, suggestedName?: string): Promise
 }
 
 /**
+ * Save multiple media URLs to the camera roll (native) or download as a zip
+ * (web). Best-effort: failures on individual items are skipped and reported.
+ */
+export async function downloadFilesToCameraRoll(
+  urls: string[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<{ saved: number; failed: number }> {
+  if (!Capacitor.isNativePlatform()) {
+    throw new Error("Camera roll save is only available on native iOS/Android.");
+  }
+
+  const { Filesystem, Directory } = await import("@capacitor/filesystem");
+  const { Media } = await import("@capacitor-community/media");
+
+  let saved = 0;
+  let failed = 0;
+
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
+    try {
+      const filename = url.split("/").pop()?.split("?")[0] || `photo-${i}.jpg`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`fetch ${res.status}`);
+      const blob = await res.blob();
+      const base64 = await blobToBase64(blob);
+      const cachePath = `bulk-${Date.now()}-${i}-${filename}`;
+      const written = await Filesystem.writeFile({
+        path: cachePath,
+        data: base64,
+        directory: Directory.Cache,
+      });
+
+      if (isVideoFilename(filename)) {
+        await Media.saveVideo({ path: written.uri });
+      } else {
+        await Media.savePhoto({ path: written.uri });
+      }
+      saved++;
+      try {
+        await Filesystem.deleteFile({ path: cachePath, directory: Directory.Cache });
+      } catch {}
+    } catch (err) {
+      console.warn(`Failed to save item ${i}:`, err);
+      failed++;
+    }
+    onProgress?.(i + 1, urls.length);
+  }
+
+  return { saved, failed };
+}
+
+/**
  * Download an in-memory Blob (e.g. a zipped archive).
  * On native, writes to cache + shares; on web, uses anchor download.
  */
 export async function downloadBlob(blob: Blob, filename: string): Promise<void> {
+  if (shouldSkip(`blob:${filename}`)) return;
   if (Capacitor.isNativePlatform()) {
     const { Filesystem, Directory } = await import("@capacitor/filesystem");
     const { Share } = await import("@capacitor/share");
