@@ -10,6 +10,12 @@ fi
 
 PB=/usr/libexec/PlistBuddy
 
+# Force the iOS home-screen display name to "Familial" (not "familialapp").
+# CFBundleDisplayName overrides CFBundleName on the home screen + app switcher.
+$PB -c "Delete :CFBundleDisplayName" "$PLIST" 2>/dev/null
+$PB -c "Add :CFBundleDisplayName string Familial" "$PLIST"
+$PB -c "Set :CFBundleName Familial" "$PLIST" 2>/dev/null || $PB -c "Add :CFBundleName string Familial" "$PLIST"
+
 # Encryption compliance (skips the App Store Connect prompt)
 $PB -c "Delete :ITSAppUsesNonExemptEncryption" "$PLIST" 2>/dev/null
 $PB -c "Add :ITSAppUsesNonExemptEncryption bool false" "$PLIST"
