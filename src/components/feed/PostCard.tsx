@@ -234,18 +234,23 @@ const PostMediaCarousel = ({
   }, [emblaApi]);
 
   return (
-    <div className="mb-4">
+    <div className="mb-4 mx-auto w-full max-w-sm">
       <div className="relative">
-        <div className="overflow-hidden rounded-lg bg-secondary" ref={emblaRef}>
+        <div className="overflow-hidden rounded-lg bg-muted" ref={emblaRef}>
           <div className="flex">
             {items.map((url, index) => {
               const type = getMediaType(url);
               return (
-                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-[4/5] relative bg-black">
+                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-square relative bg-muted">
                   {type === "video" ? (
-                    <div className="w-full h-full" onClick={() => onVideoClick(index)}>
+                    <button
+                      type="button"
+                      className="w-full h-full cursor-pointer"
+                      onClick={() => onVideoClick(index)}
+                      aria-label={`Open video ${index + 1}`}
+                    >
                       <VideoThumbnail url={url} onClick={() => onVideoClick(index)} />
-                    </div>
+                    </button>
                   ) : (
                     <button
                       type="button"
@@ -257,7 +262,7 @@ const PostMediaCarousel = ({
                         src={url}
                         preset="card"
                         alt={`Post media ${index + 1}`}
-                        className="w-full h-full object-contain"
+                        className="w-full h-full object-cover"
                       />
                     </button>
                   )}
