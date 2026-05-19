@@ -388,8 +388,8 @@ export const PostCard = ({
         <div className="flex items-center gap-3">
           <Link to={`/profile/${post.author_id}`}>
             <Avatar className="cursor-pointer hover:opacity-80 transition-opacity">
-              <AvatarImage src={avatarUrl(post.profiles?.avatar_url) || undefined} />
-              <AvatarFallback>{post.profiles?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+              <AvatarImage src={avatarUrl((post.author_id === currentUserId ? profile?.avatar_url : null) || post.profiles?.avatar_url) || undefined} />
+              <AvatarFallback>{(post.author_id === currentUserId ? profile?.display_name : post.profiles?.display_name)?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
             </Avatar>
           </Link>
           <div className="flex-1">
