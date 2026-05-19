@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Home, Calendar, Users, Image, MessageSquare, User } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { haptic } from "@/lib/haptics";
 
 const navItems = [
   { to: "/circles", icon: Users, label: "Circles" },
