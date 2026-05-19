@@ -585,7 +585,7 @@ export const PostCard = ({
 
         <div className="flex items-center gap-4 pt-2 border-t border-border">
           <div className="flex items-center">
-            <Button variant="ghost" size="sm" onClick={() => { import("@/lib/haptics").then(({ haptic }) => haptic.light()); onReaction(post.id); }} className={hasUserReacted ? "text-destructive" : ""}>
+            <Button variant="ghost" size="sm" onClick={() => { haptic.light(); onReaction(post.id); }} className={hasUserReacted ? "text-destructive" : ""}>
               <Heart className={`w-4 h-4 mr-1 ${hasUserReacted ? "fill-current" : ""}`} />
               {post.reactions?.length || 0}
             </Button>
