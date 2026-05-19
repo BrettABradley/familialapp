@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useKeyboardDismissOnScroll } from "@/hooks/useKeyboardDismissOnScroll";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, MapPin, ImagePlus, Trash2, Play, Download, Pencil, X, ChevronLeft, ChevronRight, Ban, Flag } from "lucide-react";
+import { Settings, MapPin, ImagePlus, Trash2, Play, Download, Pencil, X, ChevronLeft, ChevronRight, Ban, Flag, Layers } from "lucide-react";
 import { getMediaType } from "@/lib/mediaUtils";
 import { useBlockedUsers } from "@/hooks/useBlockedUsers";
 import { ReportDialog } from "@/components/shared/ReportDialog";
@@ -33,7 +33,11 @@ interface ProfileImage {
   image_url: string;
   caption: string | null;
   created_at: string;
+  group_id: string;
+  position: number;
 }
+
+const MAX_GROUP_ITEMS = 4;
 
 const ProfileView = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -49,17 +53,22 @@ const ProfileView = () => {
   const [images, setImages] = useState<ProfileImage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
-  const [enlargedImage, setEnlargedImage] = useState<ProfileImage | null>(null);
   const [uploadCaption, setUploadCaption] = useState("");
   const [showCaptionInput, setShowCaptionInput] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
-  // Crop state for new uploads
+  // Multi-file upload state
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingPreviews, setPendingPreviews] = useState<{ url: string; isVideo: boolean }[]>([]);
+
+  // Single-file crop state (only used when exactly 1 image is selected)
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [croppedBlob, setCroppedBlob] = useState<Blob | null>(null);
 
-  // Edit state for existing images
-  const [editingImage, setEditingImage] = useState<ProfileImage | null>(null);
+  // Lightbox now opens a *group* (one post) with a slide index
+  const [lightbox, setLightbox] = useState<{ group: ProfileImage[]; index: number } | null>(null);
+
+  // Edit/Delete operate on whole group
+  const [editingGroup, setEditingGroup] = useState<ProfileImage[] | null>(null);
   const [editCaption, setEditCaption] = useState("");
   const [editCropSrc, setEditCropSrc] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -80,32 +89,101 @@ const ProfileView = () => {
       ]);
 
       if (profileRes.data) setProfileData(profileRes.data);
-      if (imagesRes.data) setImages(imagesRes.data);
+      if (imagesRes.data) setImages(imagesRes.data as ProfileImage[]);
       setIsLoading(false);
     };
 
     fetchData();
   }, [userId]);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    let file = event.target.files?.[0];
-    if (!file) return;
-    event.target.value = "";
-    file = await convertHeicToJpeg(file);
+  // Group images by group_id, newest group first, items inside ordered by position
+  const groups = useMemo(() => {
+    const map = new Map<string, ProfileImage[]>();
+    const order: string[] = [];
+    for (const img of images) {
+      if (!map.has(img.group_id)) {
+        map.set(img.group_id, []);
+        order.push(img.group_id);
+      }
+      map.get(img.group_id)!.push(img);
+    }
+    return order.map((id) => {
+      const items = map.get(id)!;
+      items.sort((a, b) => a.position - b.position);
+      return items;
+    });
+  }, [images]);
 
-    const mediaType = file.type.split("/")[0];
-    if (mediaType === "image") {
-      // Open crop dialog for images
-      const url = URL.createObjectURL(file);
-      setCropSrc(url);
-      setPendingFile(file);
-    } else {
-      // For videos, skip crop
-      setPendingFile(file);
+  // Cleanup pending preview blob URLs
+  useEffect(() => {
+    return () => {
+      pendingPreviews.forEach((p) => URL.revokeObjectURL(p.url));
+    };
+  }, [pendingPreviews]);
+
+  const resetUploadState = () => {
+    pendingPreviews.forEach((p) => URL.revokeObjectURL(p.url));
+    setPendingFiles([]);
+    setPendingPreviews([]);
+    setCroppedBlob(null);
+    setUploadCaption("");
+    setShowCaptionInput(false);
+    setCropSrc(null);
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const list = event.target.files;
+    if (!list || list.length === 0) return;
+    event.target.value = "";
+
+    // Cap at MAX_GROUP_ITEMS
+    let files = Array.from(list);
+    if (files.length > MAX_GROUP_ITEMS) {
+      toast({ title: `Only ${MAX_GROUP_ITEMS} items allowed`, description: `You picked ${files.length}; using the first ${MAX_GROUP_ITEMS}.` });
+      files = files.slice(0, MAX_GROUP_ITEMS);
+    }
+
+    // HEIC convert sequentially
+    const converted: File[] = [];
+    for (const f of files) {
+      try {
+        converted.push(await convertHeicToJpeg(f));
+      } catch {
+        converted.push(f);
+      }
+    }
+
+    if (converted.length === 1) {
+      const only = converted[0];
+      const isImage = only.type.startsWith("image/");
+      if (isImage) {
+        // Preserve existing single-image crop UX
+        const url = URL.createObjectURL(only);
+        setPendingFiles([only]);
+        setPendingPreviews([{ url, isVideo: false }]);
+        setCropSrc(url);
+        return;
+      }
+      // Single video → straight to caption
+      const url = URL.createObjectURL(only);
+      setPendingFiles([only]);
+      setPendingPreviews([{ url, isVideo: true }]);
       setCroppedBlob(null);
       setUploadCaption("");
       setShowCaptionInput(true);
+      return;
     }
+
+    // Multi-item: skip crop entirely
+    const previews = converted.map((f) => ({
+      url: URL.createObjectURL(f),
+      isVideo: f.type.startsWith("video/"),
+    }));
+    setPendingFiles(converted);
+    setPendingPreviews(previews);
+    setCroppedBlob(null);
+    setUploadCaption("");
+    setShowCaptionInput(true);
   };
 
   const handleCropComplete = (blob: Blob) => {
@@ -117,71 +195,97 @@ const ProfileView = () => {
 
   const handleConfirmUpload = async () => {
     if (!user) return;
-    const uploadData = croppedBlob || pendingFile;
-    if (!uploadData) return;
+    if (pendingFiles.length === 0) return;
 
     setIsUploading(true);
     setShowCaptionInput(false);
-    const ext = croppedBlob ? "jpg" : (pendingFile?.name.split(".").pop() || "jpg");
-    const fileName = `${user.id}/${Date.now()}.${ext}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("profile-images")
-      .upload(fileName, uploadData, { contentType: croppedBlob ? "image/jpeg" : pendingFile?.type });
+    const sharedCaption = uploadCaption.trim() || null;
+    const groupId =
+      (typeof crypto !== "undefined" && (crypto as any).randomUUID)
+        ? (crypto as any).randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const isSingleCroppedImage = pendingFiles.length === 1 && !!croppedBlob;
 
-    if (uploadError) {
-      toast({ title: "Upload failed", description: uploadError.message, variant: "destructive" });
-      setIsUploading(false);
-      setPendingFile(null);
-      setCroppedBlob(null);
-      return;
+    const insertedRows: ProfileImage[] = [];
+    const insertedStoragePaths: string[] = [];
+
+    for (let i = 0; i < pendingFiles.length; i++) {
+      const file = pendingFiles[i];
+      const uploadData: Blob = isSingleCroppedImage ? (croppedBlob as Blob) : file;
+      const ext = isSingleCroppedImage ? "jpg" : (file.name.split(".").pop() || "jpg");
+      const fileName = `${user.id}/${Date.now()}-${i}.${ext}`;
+      const contentType = isSingleCroppedImage ? "image/jpeg" : file.type;
+
+      const { error: uploadError } = await supabase.storage
+        .from("profile-images")
+        .upload(fileName, uploadData, { contentType });
+
+      if (uploadError) {
+        toast({ title: `Upload failed for item ${i + 1}`, description: uploadError.message, variant: "destructive" });
+        continue;
+      }
+
+      const { data: publicUrlData } = supabase.storage.from("profile-images").getPublicUrl(fileName);
+
+      const { data: newImage, error: insertError } = await supabase
+        .from("profile_images")
+        .insert({
+          user_id: user.id,
+          image_url: publicUrlData.publicUrl,
+          caption: sharedCaption,
+          group_id: groupId,
+          position: i,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        toast({ title: "Error", description: "Could not save media.", variant: "destructive" });
+        await supabase.storage.from("profile-images").remove([fileName]);
+        continue;
+      }
+
+      if (newImage) {
+        insertedRows.push(newImage as ProfileImage);
+        insertedStoragePaths.push(fileName);
+      }
     }
 
-    const { data: publicUrlData } = supabase.storage.from("profile-images").getPublicUrl(fileName);
+    if (insertedRows.length > 0) {
+      // Prepend the whole new group at the top
+      setImages((prev) => [...insertedRows, ...prev]);
+      toast({ title: insertedRows.length > 1 ? `Posted ${insertedRows.length} items!` : "Media uploaded!" });
 
-    const { data: newImage, error: insertError } = await supabase
-      .from("profile_images")
-      .insert({ user_id: user.id, image_url: publicUrlData.publicUrl, caption: uploadCaption.trim() || null })
-      .select()
-      .single();
-
-    if (insertError) {
-      toast({ title: "Error", description: "Could not save media.", variant: "destructive" });
-    } else if (newImage) {
-      setImages((prev) => [newImage, ...prev]);
-      toast({ title: "Media uploaded!" });
-
-      // Silent background moderation
-      const imageId = newImage.id;
-      const imageUrl = publicUrlData.publicUrl;
-      const storagePath = fileName;
-
-      (async () => {
-        try {
-          const { data: modResult, error: modError } = await supabase.functions.invoke("moderate-content", {
-            body: { imageUrls: [imageUrl] },
-          });
-
-          if (!modError && modResult && !modResult.allowed) {
-            await supabase.from("profile_images").delete().eq("id", imageId);
-            await supabase.storage.from("profile-images").remove([storagePath]);
-            setImages((prev) => prev.filter((i) => i.id !== imageId));
-            toast({
-              title: "Image removed",
-              description: "This image was removed because it may violate our community guidelines.",
-              variant: "destructive",
+      // Silent background moderation per image
+      const imageRows = insertedRows.filter((r) => getMediaType(r.image_url) === "image");
+      if (imageRows.length > 0) {
+        (async () => {
+          try {
+            const { data: modResult, error: modError } = await supabase.functions.invoke("moderate-content", {
+              body: { imageUrls: imageRows.map((r) => r.image_url) },
             });
+
+            if (!modError && modResult && !modResult.allowed) {
+              const ids = insertedRows.map((r) => r.id);
+              await supabase.from("profile_images").delete().in("id", ids);
+              await supabase.storage.from("profile-images").remove(insertedStoragePaths);
+              setImages((prev) => prev.filter((i) => !ids.includes(i.id)));
+              toast({
+                title: "Post removed",
+                description: "This post was removed because it may violate our community guidelines.",
+                variant: "destructive",
+              });
+            }
+          } catch (err) {
+            console.error("Background moderation failed:", err);
           }
-        } catch (err) {
-          console.error("Background moderation failed:", err);
-        }
-      })();
+        })();
+      }
     }
 
     setIsUploading(false);
-    setPendingFile(null);
-    setCroppedBlob(null);
-    setUploadCaption("");
+    resetUploadState();
   };
 
   const handleDownload = async (url: string, filename?: string) => {
@@ -193,51 +297,66 @@ const ProfileView = () => {
     }
   };
 
-  const handleDeleteImage = async (image: ProfileImage) => {
-    const { error } = await supabase.from("profile_images").delete().eq("id", image.id);
-    if (error) {
-      toast({ title: "Error", description: "Could not delete image.", variant: "destructive" });
-    } else {
-      setImages((prev) => prev.filter((i) => i.id !== image.id));
-      setEnlargedImage(null);
-      toast({ title: "Image deleted" });
-    }
+  const extractStoragePath = (publicUrl: string): string | null => {
+    // public URL is .../object/public/profile-images/<userId>/<file>
+    const m = publicUrl.match(/\/profile-images\/(.+?)(?:\?|$)/);
+    return m ? m[1] : null;
   };
 
-  // Edit existing image
-  const handleStartEdit = (image: ProfileImage) => {
-    setEditingImage(image);
-    setEditCaption(image.caption || "");
-    setEnlargedImage(null);
+  const handleDeleteGroup = async (group: ProfileImage[]) => {
+    const ids = group.map((g) => g.id);
+    const paths = group.map((g) => extractStoragePath(g.image_url)).filter((p): p is string => !!p);
+
+    const { error } = await supabase.from("profile_images").delete().in("id", ids);
+    if (error) {
+      toast({ title: "Error", description: "Could not delete post.", variant: "destructive" });
+      return;
+    }
+    if (paths.length > 0) {
+      await supabase.storage.from("profile-images").remove(paths);
+    }
+    setImages((prev) => prev.filter((i) => !ids.includes(i.id)));
+    setLightbox(null);
+    toast({ title: "Post deleted" });
+  };
+
+  // Edit existing group (shared caption)
+  const handleStartEdit = (group: ProfileImage[]) => {
+    setEditingGroup(group);
+    setEditCaption(group[0]?.caption || "");
+    setLightbox(null);
   };
 
   const handleSaveEdit = async () => {
-    if (!editingImage || !user) return;
+    if (!editingGroup || !user) return;
     setIsSavingEdit(true);
 
+    const newCaption = editCaption.trim() || null;
+    const ids = editingGroup.map((g) => g.id);
     const { error } = await supabase
       .from("profile_images")
-      .update({ caption: editCaption.trim() || null })
-      .eq("id", editingImage.id);
+      .update({ caption: newCaption })
+      .in("id", ids);
 
     if (error) {
       toast({ title: "Error", description: "Could not update.", variant: "destructive" });
     } else {
-      setImages((prev) => prev.map((i) => i.id === editingImage.id ? { ...i, caption: editCaption.trim() || null } : i));
+      setImages((prev) => prev.map((i) => ids.includes(i.id) ? { ...i, caption: newCaption } : i));
       toast({ title: "Updated!" });
-      setEditingImage(null);
+      setEditingGroup(null);
     }
     setIsSavingEdit(false);
   };
 
   const handleEditRecrop = () => {
-    if (!editingImage) return;
-    setEditCropSrc(editingImage.image_url);
+    if (!editingGroup || editingGroup.length !== 1) return;
+    setEditCropSrc(editingGroup[0].image_url);
   };
 
   const handleEditCropComplete = async (blob: Blob) => {
     setEditCropSrc(null);
-    if (!editingImage || !user) return;
+    if (!editingGroup || editingGroup.length !== 1 || !user) return;
+    const target = editingGroup[0];
     setIsSavingEdit(true);
 
     const fileName = `${user.id}/${Date.now()}.jpg`;
@@ -256,13 +375,13 @@ const ProfileView = () => {
     const { error: updateError } = await supabase
       .from("profile_images")
       .update({ image_url: publicUrlData.publicUrl })
-      .eq("id", editingImage.id);
+      .eq("id", target.id);
 
     if (updateError) {
       toast({ title: "Error", description: "Failed to update image.", variant: "destructive" });
     } else {
-      setImages((prev) => prev.map((i) => i.id === editingImage.id ? { ...i, image_url: publicUrlData.publicUrl } : i));
-      setEditingImage((prev) => prev ? { ...prev, image_url: publicUrlData.publicUrl } : null);
+      setImages((prev) => prev.map((i) => i.id === target.id ? { ...i, image_url: publicUrlData.publicUrl } : i));
+      setEditingGroup((prev) => prev ? prev.map((i) => i.id === target.id ? { ...i, image_url: publicUrlData.publicUrl } : i) : null);
       toast({ title: "Image updated!" });
     }
     setIsSavingEdit(false);
@@ -295,6 +414,8 @@ const ProfileView = () => {
       </main>
     );
   }
+
+  const currentSlide = lightbox ? lightbox.group[lightbox.index] : null;
 
   return (
     <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
@@ -380,32 +501,49 @@ const ProfileView = () => {
                   <ImagePlus className="h-4 w-4 mr-2" />
                   {isUploading ? "Uploading..." : "Add Media"}
                 </Button>
-                <input ref={fileInputRef} type="file" accept="image/*,video/*,.heic,.heif" onChange={handleFileSelect} className="hidden" />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,video/*,.heic,.heif"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
               </>
             )}
           </div>
         </CardHeader>
         <CardContent>
-          {images.length === 0 ? (
+          {groups.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">
               {isOwnProfile ? "No photos or videos yet. Add some to your profile!" : "No photos or videos yet."}
             </p>
           ) : (
             <div className="grid grid-cols-3 gap-2">
-              {images.map((img) => {
-                const mediaType = getMediaType(img.image_url);
+              {groups.map((group) => {
+                const cover = group[0];
+                const isVideo = getMediaType(cover.image_url) === "video";
+                const count = group.length;
                 return (
-                  <div
-                    key={img.id}
-                    className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity relative"
-                    onClick={() => setEnlargedImage(img)}
+                  <button
+                    type="button"
+                    key={group[0].group_id}
+                    className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity relative bg-muted focus:outline-none focus:ring-2 focus:ring-ring"
+                    onClick={() => setLightbox({ group, index: 0 })}
+                    aria-label={count > 1 ? `Open post with ${count} items` : "Open post"}
                   >
-                    {mediaType === 'video' ? (
-                      <VideoThumbnail src={img.image_url} />
+                    {isVideo ? (
+                      <VideoThumbnail src={cover.image_url} />
                     ) : (
-                      <img src={img.image_url} alt={img.caption || "Profile photo"} className="w-full h-full object-cover" />
+                      <img src={cover.image_url} alt={cover.caption || "Profile photo"} className="w-full h-full object-cover" />
                     )}
-                  </div>
+                    {count > 1 && (
+                      <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[11px] font-medium px-1.5 py-0.5 rounded-full pointer-events-none">
+                        <Layers className="h-3 w-3" />
+                        {count}
+                      </div>
+                    )}
+                  </button>
                 );
               })}
             </div>
@@ -440,140 +578,155 @@ const ProfileView = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!enlargedImage} onOpenChange={(open) => !open && setEnlargedImage(null)}>
+      {/* Post lightbox — swipes within a single group */}
+      <Dialog open={!!lightbox} onOpenChange={(open) => !open && setLightbox(null)}>
         <DialogContent className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
-          {enlargedImage && (() => {
-            const currentIndex = images.findIndex((i) => i.id === enlargedImage.id);
-            return (
-              <>
-                {/* Top control bar — safe area aware on mobile */}
-                <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-end gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
-                    onClick={() => handleDownload(enlargedImage.image_url)}
-                    aria-label="Download"
-                  >
-                    <Download className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
-                    onClick={() => setEnlargedImage(null)}
-                    aria-label="Close"
-                  >
-                    <X className="h-5 w-5" />
-                  </Button>
-                </div>
+          {lightbox && currentSlide && (
+            <>
+              {/* Top control bar — safe area aware on mobile */}
+              <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-end gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                  onClick={() => handleDownload(currentSlide.image_url)}
+                  aria-label="Download"
+                >
+                  <Download className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
+                  onClick={() => setLightbox(null)}
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
 
-                {/* Centered media */}
-                {getMediaType(enlargedImage.image_url) === 'video' ? (
-                  <video
-                    src={enlargedImage.image_url}
-                    controls
-                    autoPlay
-                    playsInline
+              {/* Centered media */}
+              {getMediaType(currentSlide.image_url) === 'video' ? (
+                <video
+                  key={currentSlide.id}
+                  src={currentSlide.image_url}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
+                  onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; (touchStartX as any).__y = e.touches[0].clientY; }}
+                  onTouchEnd={(e) => {
+                    const deltaX = touchStartX.current - e.changedTouches[0].clientX;
+                    const deltaY = e.changedTouches[0].clientY - ((touchStartX as any).__y || 0);
+                    if (deltaY > 80 && Math.abs(deltaX) < 50) { setLightbox(null); return; }
+                    if (deltaX > 50 && lightbox.index < lightbox.group.length - 1) setLightbox({ ...lightbox, index: lightbox.index + 1 });
+                    else if (deltaX < -50 && lightbox.index > 0) setLightbox({ ...lightbox, index: lightbox.index - 1 });
+                  }}
+                />
+              ) : (
+                <ZoomableImage
+                  className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto flex items-center justify-center"
+                  onSwipeLeft={() => lightbox.index < lightbox.group.length - 1 && setLightbox({ ...lightbox, index: lightbox.index + 1 })}
+                  onSwipeRight={() => lightbox.index > 0 && setLightbox({ ...lightbox, index: lightbox.index - 1 })}
+                  onSwipeDown={() => setLightbox(null)}
+                >
+                  <img
+                    key={currentSlide.id}
+                    src={currentSlide.image_url}
+                    alt={currentSlide.caption || "Profile photo"}
                     className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
-                    onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; (touchStartX as any).__y = e.touches[0].clientY; }}
-                    onTouchEnd={(e) => {
-                      const deltaX = touchStartX.current - e.changedTouches[0].clientX;
-                      const deltaY = e.changedTouches[0].clientY - ((touchStartX as any).__y || 0);
-                      if (deltaY > 80 && Math.abs(deltaX) < 50) { setEnlargedImage(null); return; }
-                      if (deltaX > 50 && currentIndex < images.length - 1) setEnlargedImage(images[currentIndex + 1]);
-                      else if (deltaX < -50 && currentIndex > 0) setEnlargedImage(images[currentIndex - 1]);
-                    }}
                   />
-                ) : (
-                  <ZoomableImage
-                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto flex items-center justify-center"
-                    onSwipeLeft={() => currentIndex < images.length - 1 && setEnlargedImage(images[currentIndex + 1])}
-                    onSwipeRight={() => currentIndex > 0 && setEnlargedImage(images[currentIndex - 1])}
-                    onSwipeDown={() => setEnlargedImage(null)}
-                  >
-                    <img
-                      src={enlargedImage.image_url}
-                      alt={enlargedImage.caption || "Profile photo"}
-                      className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
-                    />
-                  </ZoomableImage>
-                )}
+                </ZoomableImage>
+              )}
 
-                {/* Navigation arrows */}
-                {images.length > 1 && (
-                  <>
-                    {currentIndex > 0 && (
-                      <button
-                        className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                        onClick={() => setEnlargedImage(images[currentIndex - 1])}
-                        aria-label="Previous image"
-                      >
-                        <ChevronLeft className="h-6 w-6" />
-                      </button>
-                    )}
-                    {currentIndex < images.length - 1 && (
-                      <button
-                        className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                        onClick={() => setEnlargedImage(images[currentIndex + 1])}
-                        aria-label="Next image"
-                      >
-                        <ChevronRight className="h-6 w-6" />
-                      </button>
-                    )}
-                    {/* Image counter */}
-                    <div className="absolute bottom-6 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 bg-black/50 backdrop-blur-sm text-white text-sm px-3 py-1 rounded-full" style={{ marginBottom: "max(env(safe-area-inset-bottom, 0px), 0px)" }}>
-                      {currentIndex + 1} / {images.length}
-                    </div>
-                  </>
-                )}
-
-                {/* Caption & actions */}
-                {(profileData?.display_name || enlargedImage.caption || isOwnProfile) && (
-                  <div className="absolute bottom-14 sm:bottom-auto sm:relative sm:mt-3 z-10 flex flex-col items-center px-4">
-                    {(profileData?.display_name || enlargedImage.caption) && (
-                      <p className="text-sm text-white/80 sm:text-muted-foreground text-center">
-                        {profileData?.display_name && (
-                          <span className="font-semibold text-white sm:text-foreground">{profileData.display_name}: </span>
-                        )}
-                        {enlargedImage.caption}
-                      </p>
-                    )}
-                    {isOwnProfile && (
-                      <div className="flex gap-2 mt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-black/40 border-white/20 text-white hover:bg-black/60 hover:text-white sm:bg-background sm:border-input sm:text-foreground sm:hover:bg-accent sm:hover:text-accent-foreground"
-                          onClick={() => handleStartEdit(enlargedImage)}
-                        >
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteImage(enlargedImage)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
-                      </div>
-                    )}
+              {/* Navigation arrows + counter (within group) */}
+              {lightbox.group.length > 1 && (
+                <>
+                  {lightbox.index > 0 && (
+                    <button
+                      className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+                      onClick={() => setLightbox({ ...lightbox, index: lightbox.index - 1 })}
+                      aria-label="Previous slide"
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </button>
+                  )}
+                  {lightbox.index < lightbox.group.length - 1 && (
+                    <button
+                      className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+                      onClick={() => setLightbox({ ...lightbox, index: lightbox.index + 1 })}
+                      aria-label="Next slide"
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </button>
+                  )}
+                  <div className="absolute bottom-6 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 bg-black/50 backdrop-blur-sm text-white text-sm px-3 py-1 rounded-full" style={{ marginBottom: "max(env(safe-area-inset-bottom, 0px), 0px)" }}>
+                    {lightbox.index + 1} / {lightbox.group.length}
                   </div>
-                )}
-              </>
-            );
-          })()}
+                </>
+              )}
+
+              {/* Caption & actions (shared across the group) */}
+              {(profileData?.display_name || currentSlide.caption || isOwnProfile) && (
+                <div className="absolute bottom-14 sm:bottom-auto sm:relative sm:mt-3 z-10 flex flex-col items-center px-4">
+                  {(profileData?.display_name || currentSlide.caption) && (
+                    <p className="text-sm text-white/80 sm:text-muted-foreground text-center">
+                      {profileData?.display_name && (
+                        <span className="font-semibold text-white sm:text-foreground">{profileData.display_name}: </span>
+                      )}
+                      {currentSlide.caption}
+                    </p>
+                  )}
+                  {isOwnProfile && (
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-black/40 border-white/20 text-white hover:bg-black/60 hover:text-white sm:bg-background sm:border-input sm:text-foreground sm:hover:bg-accent sm:hover:text-accent-foreground"
+                        onClick={() => handleStartEdit(lightbox.group)}
+                      >
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {lightbox.group.length > 1
+                                ? `This will remove all ${lightbox.group.length} items in this post. This can't be undone.`
+                                : "This will remove this item. This can't be undone."}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteGroup(lightbox.group)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
-      {/* Crop dialog for new uploads */}
+      {/* Crop dialog — only for single-image uploads */}
       {cropSrc && (
         <AvatarCropDialog
           open={!!cropSrc}
           imageSrc={cropSrc}
-          onClose={() => { setCropSrc(null); setPendingFile(null); }}
+          onClose={() => { setCropSrc(null); resetUploadState(); }}
           onCropComplete={handleCropComplete}
           aspect={1}
           cropShape="rect"
@@ -581,11 +734,33 @@ const ProfileView = () => {
         />
       )}
 
-      {/* Caption Input Dialog */}
-      <Dialog open={showCaptionInput} onOpenChange={(open) => { if (!open) { setShowCaptionInput(false); setPendingFile(null); setCroppedBlob(null); } }}>
+      {/* Caption Input Dialog (shared caption for the whole post) */}
+      <Dialog open={showCaptionInput} onOpenChange={(open) => { if (!open) resetUploadState(); }}>
         <DialogContent className="max-w-md">
           <div className="space-y-4">
-            <h3 className="font-serif text-lg font-semibold">Add a caption</h3>
+            <h3 className="font-serif text-lg font-semibold">
+              {pendingFiles.length > 1 ? `Add a caption (${pendingFiles.length} items)` : "Add a caption"}
+            </h3>
+
+            {pendingPreviews.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {pendingPreviews.map((p, i) => (
+                  <div key={i} className="relative flex-shrink-0 w-16 h-16 rounded-md overflow-hidden bg-muted">
+                    {p.isVideo ? (
+                      <div className="w-full h-full flex items-center justify-center bg-black/80">
+                        <Play className="h-5 w-5 text-white" />
+                      </div>
+                    ) : (
+                      <img src={p.url} alt={`Selected ${i + 1}`} className="w-full h-full object-cover" />
+                    )}
+                    <div className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[10px] font-medium px-1 rounded">
+                      {i + 1}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <Textarea
               value={uploadCaption}
               onChange={(e) => setUploadCaption(e.target.value)}
@@ -595,25 +770,35 @@ const ProfileView = () => {
               maxLength={500}
             />
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => { setShowCaptionInput(false); setPendingFile(null); setCroppedBlob(null); }}>
+              <Button variant="outline" onClick={() => resetUploadState()}>
                 Cancel
               </Button>
               <Button onClick={handleConfirmUpload} disabled={isUploading}>
-                {isUploading ? "Uploading..." : "Upload"}
+                {isUploading ? "Uploading..." : (pendingFiles.length > 1 ? `Post ${pendingFiles.length} items` : "Upload")}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Edit existing image dialog */}
-      <Dialog open={!!editingImage} onOpenChange={(open) => { if (!open) setEditingImage(null); }}>
+      {/* Edit existing post dialog (shared caption) */}
+      <Dialog open={!!editingGroup} onOpenChange={(open) => { if (!open) setEditingGroup(null); }}>
         <DialogContent className="max-w-md">
-          {editingImage && (
+          {editingGroup && (
             <div className="space-y-4">
-              <h3 className="font-serif text-lg font-semibold">Edit Photo</h3>
-              <div className="rounded-lg overflow-hidden aspect-square max-h-48 mx-auto">
-                <img src={editingImage.image_url} alt="Preview" className="w-full h-full object-cover" />
+              <h3 className="font-serif text-lg font-semibold">
+                {editingGroup.length > 1 ? `Edit post (${editingGroup.length} items)` : "Edit Photo"}
+              </h3>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {editingGroup.map((item, i) => (
+                  <div key={item.id} className="relative flex-shrink-0 w-20 h-20 rounded-md overflow-hidden bg-muted">
+                    {getMediaType(item.image_url) === "video" ? (
+                      <VideoThumbnail src={item.image_url} />
+                    ) : (
+                      <img src={item.image_url} alt={`Item ${i + 1}`} className="w-full h-full object-cover" />
+                    )}
+                  </div>
+                ))}
               </div>
               <Textarea
                 value={editCaption}
@@ -624,14 +809,14 @@ const ProfileView = () => {
                 maxLength={500}
               />
               <div className="flex gap-2 justify-between">
-                {getMediaType(editingImage.image_url) === 'image' && (
+                {editingGroup.length === 1 && getMediaType(editingGroup[0].image_url) === 'image' && (
                   <Button variant="outline" size="sm" onClick={handleEditRecrop} disabled={isSavingEdit}>
                     <Pencil className="h-4 w-4 mr-2" />
                     Re-crop
                   </Button>
                 )}
                 <div className="flex gap-2 ml-auto">
-                  <Button variant="outline" onClick={() => setEditingImage(null)}>Cancel</Button>
+                  <Button variant="outline" onClick={() => setEditingGroup(null)}>Cancel</Button>
                   <Button onClick={handleSaveEdit} disabled={isSavingEdit}>
                     {isSavingEdit ? "Saving..." : "Save"}
                   </Button>
@@ -642,7 +827,7 @@ const ProfileView = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Re-crop dialog for existing images */}
+      {/* Re-crop dialog for existing single-image post */}
       {editCropSrc && (
         <AvatarCropDialog
           open={!!editCropSrc}
