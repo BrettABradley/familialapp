@@ -1,9 +1,17 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { typingHaptic } from "@/lib/haptics";
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, onKeyDown, ...props }, ref) => {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      // Per-keystroke tick — feels like the native iOS keyboard.
+      if (e.key.length === 1 || e.key === "Backspace" || e.key === "Enter") {
+        typingHaptic();
+      }
+      onKeyDown?.(e);
+    };
     return (
       <input
         type={type}
@@ -12,6 +20,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           className,
         )}
         ref={ref}
+        onKeyDown={handleKeyDown}
         {...props}
       />
     );
