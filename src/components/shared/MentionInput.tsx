@@ -62,6 +62,7 @@ export const MentionInput = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
+    typingHaptic();
     onChange(newValue);
 
     const cursorPos = e.target.selectionStart;
