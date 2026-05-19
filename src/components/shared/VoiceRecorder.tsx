@@ -63,56 +63,17 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
     };
   }, []);
 
-  const startRecording = async () => {
-    // On native iOS/Android, use the Capacitor voice-recorder plugin so the
-    // OS surfaces its native microphone permission prompt instead of relying
-    // on WKWebView's getUserMedia (which can hard-crash the app).
-    if (isNative) {
-      try {
-        const { VoiceRecorder } = await import("capacitor-voice-recorder");
-        const can = await VoiceRecorder.canDeviceVoiceRecord();
-        if (!can?.value) {
-          toast.error("Voice recording is not supported on this device");
-          return;
-        }
-        const perm = await VoiceRecorder.hasAudioRecordingPermission();
-        if (!perm?.value) {
-          const req = await VoiceRecorder.requestAudioRecordingPermission();
-          if (!req?.value) {
-            toast.error("Microphone permission denied. Enable it in Settings → Familial → Microphone.");
-            return;
-          }
-        }
-        await VoiceRecorder.startRecording();
-        setIsRecording(true);
-        setElapsed(0);
-        timerRef.current = setInterval(() => {
-          setElapsed((prev) => {
-            if (prev + 1 >= maxDuration) {
-              stopRecording();
-              return 0;
-            }
-            return prev + 1;
-          });
-        }, 1000);
-      } catch (err: any) {
-        console.error("Native startRecording error:", err);
-        toast.error(err?.message || "Could not start recording");
-      }
-      return;
-    }
-
+  const startWebRecording = async () => {
     try {
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-        console.warn("Audio recording not supported on this device");
+        toast.error("Audio recording isn't supported on this device.");
         return;
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       // Safari / iOS WKWebView doesn't support audio/webm — pick the first
-      // supported mime type so MediaRecorder construction doesn't throw and
-      // crash the WebView (which on iOS can boot the user out of the app).
+      // supported mime type so MediaRecorder construction doesn't throw.
       const candidates = [
         "audio/webm;codecs=opus",
         "audio/webm",
@@ -133,6 +94,7 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
       } catch (err) {
         console.error("MediaRecorder init failed:", err);
         stream.getTracks().forEach((t) => t.stop());
+        toast.error("Could not start recording on this device.");
         return;
       }
 
@@ -163,9 +125,64 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
           return prev + 1;
         });
       }, 1000);
-    } catch (err) {
-      console.error("startRecording error:", err);
+    } catch (err: any) {
+      console.error("startWebRecording error:", err);
+      toast.error(err?.message || "Could not start recording.");
     }
+  };
+
+  const startRecording = async () => {
+    // On native iOS/Android, prefer the Capacitor voice-recorder plugin so
+    // the OS surfaces its native microphone permission prompt instead of
+    // relying on WKWebView's getUserMedia (which can hard-crash the app).
+    if (isNative) {
+      try {
+        const { VoiceRecorder } = await import("capacitor-voice-recorder");
+        const can = await VoiceRecorder.canDeviceVoiceRecord();
+        if (!can?.value) {
+          toast.error("Voice recording is not supported on this device");
+          return;
+        }
+        const perm = await VoiceRecorder.hasAudioRecordingPermission();
+        if (!perm?.value) {
+          const req = await VoiceRecorder.requestAudioRecordingPermission();
+          if (!req?.value) {
+            toast.error("Microphone permission denied. Enable it in Settings → Familial → Microphone.");
+            return;
+          }
+        }
+        await VoiceRecorder.startRecording();
+        setIsRecording(true);
+        setElapsed(0);
+        timerRef.current = setInterval(() => {
+          setElapsed((prev) => {
+            if (prev + 1 >= maxDuration) {
+              stopRecording();
+              return 0;
+            }
+            return prev + 1;
+          });
+        }, 1000);
+        return;
+      } catch (err: any) {
+        const msg = String(err?.message || err?.code || err || "");
+        // Plugin not installed in the native shell yet — fall back to the
+        // WKWebView getUserMedia API so the mic still works on iOS/Android
+        // until the user runs `npx cap sync` on the new plugin.
+        const notInstalled =
+          /not implemented|unimplemented|not available|UNIMPLEMENTED/i.test(msg);
+        if (notInstalled) {
+          console.warn("Native VoiceRecorder unavailable, falling back to web recorder:", msg);
+          await startWebRecording();
+          return;
+        }
+        console.error("Native startRecording error:", err);
+        toast.error(msg || "Could not start recording");
+        return;
+      }
+    }
+
+    await startWebRecording();
   };
 
   const formatTime = (s: number) => {

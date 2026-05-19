@@ -60,10 +60,12 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const [mentionedUserIds, setMentionedUserIds] = useState<Set<string>>(new Set());
 
 
+  const MAX_FILES = 4;
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let files = Array.from(e.target.files || []);
-    if (files.length + selectedFiles.length > 5) {
-      toast({ title: "Too many files", description: "You can upload up to 5 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
+    if (files.length + selectedFiles.length > MAX_FILES) {
+      toast({ title: "Too many files", description: `You can upload up to ${MAX_FILES} files per post. For more images, try creating an Album!`, variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
       return;
     }
 
@@ -81,13 +83,13 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     files.forEach(file => {
       setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]);
     });
-    // Reset input so the same file (or another single file on Safari) can be picked again
+    // Reset input so the same file can be picked again on Safari/iOS
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleVoiceRecording = (blob: Blob) => {
-    if (selectedFiles.length >= 5) {
-      toast({ title: "Too many files", description: "You can upload up to 5 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
+    if (selectedFiles.length >= MAX_FILES) {
+      toast({ title: "Too many files", description: `You can upload up to ${MAX_FILES} files per post.`, variant: "destructive" });
       return;
     }
     const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
@@ -268,7 +270,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
           )}
         </div>
         {previewUrls.length === 1 && (
-          <div className="mb-4">{renderPreview(previewUrls[0], 0)}</div>
+          <div className="mb-4 mx-auto max-w-sm">{renderPreview(previewUrls[0], 0)}</div>
         )}
         {previewUrls.length > 1 && (
           <div className="mb-4 -mx-1 overflow-x-auto snap-x snap-mandatory flex gap-2 px-1 pb-2">
@@ -277,7 +279,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
                 {renderPreview(url, index)}
               </div>
             ))}
-            {selectedFiles.length < 5 && (
+            {selectedFiles.length < MAX_FILES && (
               <div className="flex-[0_0_85%] snap-center">
                 <button
                   type="button"
@@ -288,16 +290,16 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
                 >
                   <Paperclip className="w-6 h-6" />
                   <span className="text-sm font-medium">Add more</span>
-                  <span className="text-xs">{5 - selectedFiles.length} left</span>
+                  <span className="text-xs">{selectedFiles.length}/{MAX_FILES}</span>
                 </button>
               </div>
             )}
           </div>
         )}
-        {previewUrls.length === 1 && selectedFiles.length < 5 && (
-          <div className="mb-2">
+        {previewUrls.length >= 1 && selectedFiles.length < MAX_FILES && (
+          <div className="mb-2 flex justify-center">
             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isPosting}>
-              <Paperclip className="w-4 h-4 mr-2" />Add more
+              <Paperclip className="w-4 h-4 mr-2" />Add more ({selectedFiles.length}/{MAX_FILES})
             </Button>
           </div>
         )}
@@ -317,8 +319,8 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
         )}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
-            <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple onChange={handleFileSelect} className="hidden" />
-            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isPosting}>
+            <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
+            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isPosting || selectedFiles.length >= MAX_FILES}>
               <Paperclip className="w-4 h-4 mr-2" />Add Media
             </Button>
             <VoiceRecorder onRecordingComplete={handleVoiceRecording} />
