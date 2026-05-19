@@ -298,7 +298,15 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-start pt-[calc(env(safe-area-inset-top,0px)+3rem)] sm:justify-center sm:pt-0 px-4 overflow-y-auto pb-[env(safe-area-inset-bottom,0px)]">
+    <div
+      className="min-h-[100dvh] bg-background flex flex-col items-center justify-start pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] sm:justify-center sm:pt-0 px-4 overflow-y-auto"
+      style={{
+        // Always leave enough room at the bottom that the form keeps scrolling
+        // above the iOS keyboard, no matter which field is focused.
+        paddingBottom:
+          "calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-height, 0px) + 6rem)",
+      }}
+    >
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -483,13 +491,15 @@ const Auth = () => {
                         setErrors((prev) => ({ ...prev, password: undefined }));
                       }}
                       onFocus={(e) => {
-                        // iOS keyboard can cover the password field — scroll it into view
+                        // iOS keyboard can cover the password field — scroll the
+                        // submit button into view so the user can finish signup
+                        // without the keyboard blocking the field or the button.
                         const el = e.currentTarget;
                         setTimeout(() => {
-                          el.scrollIntoView({ behavior: "smooth", block: "center" });
-                        }, 300);
+                          el.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }, 320);
                       }}
-                      style={{ scrollMarginBottom: "40vh" }}
+                      style={{ scrollMarginTop: "20vh", scrollMarginBottom: "60vh" }}
                       className={`pr-11 ${errors.password ? "border-destructive" : ""}`}
                     />
                     <button

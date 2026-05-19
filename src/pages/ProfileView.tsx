@@ -63,6 +63,9 @@ const ProfileView = () => {
   // Single-file crop state (only used when exactly 1 image is selected)
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [croppedBlob, setCroppedBlob] = useState<Blob | null>(null);
+  // After the first item is ready, ask the user if they want to add more
+  // to make a carousel before going to the caption step.
+  const [showAddMorePrompt, setShowAddMorePrompt] = useState(false);
 
   // Lightbox now opens a *group* (one post) with a slide index
   const [lightbox, setLightbox] = useState<{ group: ProfileImage[]; index: number } | null>(null);
@@ -128,6 +131,7 @@ const ProfileView = () => {
     setCroppedBlob(null);
     setUploadCaption("");
     setShowCaptionInput(false);
+    setShowAddMorePrompt(false);
     setCropSrc(null);
   };
 
@@ -169,13 +173,13 @@ const ProfileView = () => {
         setCropSrc(url);
         return;
       }
-      // Single video → straight to caption
+      // Single video → ask if they want to add more before caption
       const url = URL.createObjectURL(only);
       setPendingFiles([only]);
       setPendingPreviews([{ url, isVideo: true }]);
       setCroppedBlob(null);
       setUploadCaption("");
-      setShowCaptionInput(true);
+      setShowAddMorePrompt(true);
       return;
     }
 
@@ -184,12 +188,11 @@ const ProfileView = () => {
       url: URL.createObjectURL(f),
       isVideo: f.type.startsWith("video/"),
     }));
-    // If we're adding to a previously-cropped single image, drop the crop
-    // (carousel posts use the originals).
     setCroppedBlob(null);
     setPendingFiles((prev) => [...prev, ...converted]);
     setPendingPreviews((prev) => [...prev, ...newPreviews]);
-    setShowCaptionInput(true);
+    // If caption isn't already up, ask whether to add more first.
+    if (!showCaptionInput) setShowAddMorePrompt(true);
   };
 
   const removePendingItem = (index: number) => {
@@ -203,7 +206,7 @@ const ProfileView = () => {
     setCropSrc(null);
     setCroppedBlob(blob);
     setUploadCaption("");
-    setShowCaptionInput(true);
+    setShowAddMorePrompt(true);
   };
 
   const handleConfirmUpload = async () => {
@@ -745,6 +748,48 @@ const ProfileView = () => {
           title="Crop Photo"
         />
       )}
+
+      {/* Add-more prompt — bridges between selecting a photo and the caption step */}
+      <Dialog open={showAddMorePrompt} onOpenChange={(open) => { if (!open) resetUploadState(); }}>
+        <DialogContent className="max-w-sm">
+          <div className="space-y-4">
+            <h3 className="font-serif text-lg font-semibold">
+              {pendingFiles.length === 1 ? "Add more to a carousel?" : `${pendingFiles.length}/${MAX_GROUP_ITEMS} items`}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              You can post up to {MAX_GROUP_ITEMS} photos or videos together. Add them one at a time.
+            </p>
+            {pendingPreviews.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {pendingPreviews.map((p, i) => (
+                  <div key={i} className="relative flex-shrink-0 w-16 h-16 rounded-md overflow-hidden bg-muted">
+                    {p.isVideo ? (
+                      <div className="w-full h-full flex items-center justify-center bg-black/80"><Play className="h-5 w-5 text-white" /></div>
+                    ) : (
+                      <img src={p.url} alt={`Selected ${i + 1}`} className="w-full h-full object-cover" />
+                    )}
+                    <button type="button" onClick={() => removePendingItem(i)} className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5" aria-label={`Remove item ${i + 1}`}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-col gap-2">
+              {pendingFiles.length < MAX_GROUP_ITEMS && (
+                <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                  <ImagePlus className="h-4 w-4 mr-2" />
+                  Add another ({pendingFiles.length}/{MAX_GROUP_ITEMS})
+                </Button>
+              )}
+              <Button onClick={() => { setShowAddMorePrompt(false); setShowCaptionInput(true); }} disabled={pendingFiles.length === 0}>
+                Continue to caption
+              </Button>
+              <Button variant="ghost" onClick={() => resetUploadState()}>Cancel</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Caption Input Dialog (shared caption for the whole post) */}
       <Dialog open={showCaptionInput} onOpenChange={(open) => { if (!open) resetUploadState(); }}>

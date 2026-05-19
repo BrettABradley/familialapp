@@ -1,10 +1,17 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { typingHaptic } from "@/lib/haptics";
 
 export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
 
-const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ className, ...props }, ref) => {
+const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ className, onKeyDown, ...props }, ref) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key.length === 1 || e.key === "Backspace" || e.key === "Enter") {
+      typingHaptic();
+    }
+    onKeyDown?.(e);
+  };
   return (
     <textarea
       className={cn(
@@ -12,6 +19,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ classNa
         className,
       )}
       ref={ref}
+      onKeyDown={handleKeyDown}
       {...props}
     />
   );
