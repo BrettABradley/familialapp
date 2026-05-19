@@ -297,16 +297,17 @@ const Auth = () => {
     );
   }
 
+  // Sign-in fits on one screen — kill the page scroll. Sign-up + forgot
+  // password have more fields and the keyboard needs to push content up,
+  // so they keep the generous bottom padding.
+  const needsScrollRoom = !isLogin || isForgotPassword;
   return (
     <div
-      className="min-h-[100dvh] bg-background flex flex-col items-center justify-start pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] sm:justify-center sm:pt-0 px-4"
+      className={`min-h-[100dvh] bg-background flex flex-col items-center justify-start pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] sm:justify-center sm:pt-0 px-4 ${needsScrollRoom ? "" : "overflow-hidden"}`}
       style={{
-        // Always leave enough room at the bottom that the form keeps scrolling
-        // above the iOS keyboard, no matter which field is focused. The
-        // document itself scrolls (no nested overflow container) so iOS flick
-        // gestures and `scrollIntoView` always work.
-        paddingBottom:
-          "calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-height, 0px) + 10rem)",
+        paddingBottom: needsScrollRoom
+          ? "calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-height, 0px) + 10rem)"
+          : "calc(env(safe-area-inset-bottom, 0px) + 1.5rem)",
       }}
     >
       <Card className="w-full max-w-md">
