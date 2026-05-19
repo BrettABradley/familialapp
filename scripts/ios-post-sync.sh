@@ -43,6 +43,33 @@ $PB -c "Delete :UIBackgroundModes" "$PLIST" 2>/dev/null
 $PB -c "Add :UIBackgroundModes array" "$PLIST"
 $PB -c "Add :UIBackgroundModes:0 string remote-notification" "$PLIST"
 
+# Push entitlement: make this script self-healing so a fresh native checkout is
+# not dependent on remembering the Xcode capability click. Xcode can still show
+# the capability in Signing & Capabilities, but the signed app now has a real
+# aps-environment entitlement as long as this script has run.
+ENTITLEMENTS="ios/App/App/App.entitlements"
+PROJECT_FILE="ios/App/App.xcodeproj/project.pbxproj"
+if [ -d "ios/App/App" ]; then
+  cat > "$ENTITLEMENTS" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>aps-environment</key>
+  <string>development</string>
+</dict>
+</plist>
+PLIST
+  echo "✅ App.entitlements updated: aps-environment enabled for APNs registration"
+fi
+
+if [ -f "$PROJECT_FILE" ] && ! grep -q "CODE_SIGN_ENTITLEMENTS = App/App.entitlements" "$PROJECT_FILE"; then
+  perl -0pi -e 's/(PRODUCT_BUNDLE_IDENTIFIER = [^;]+;)/$1\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = App\/App.entitlements;/g' "$PROJECT_FILE"
+  echo "✅ Xcode project updated: App.entitlements attached to signing settings"
+elif [ -f "$PROJECT_FILE" ]; then
+  echo "✅ Xcode project already references App.entitlements"
+fi
+
 # Capacitor iOS push bridge. iOS can show the permission prompt and still never
 # deliver an APNs token to JavaScript unless AppDelegate forwards native
 # registration callbacks to the Capacitor PushNotifications plugin.
@@ -58,23 +85,15 @@ else
   echo "⚠️  $APP_DELEGATE not found — skipping push bridge injection"
 fi
 
-# NOTE: The "Push Notifications" capability + aps-environment entitlement must be
-# enabled ONCE in Xcode: open ios/App/App.xcworkspace → Signing & Capabilities →
-# "+ Capability" → Push Notifications. This writes App.entitlements and cannot be
-# done from Info.plist alone.
-
 echo "✅ Info.plist updated: encryption compliance + privacy strings + push background mode"
 echo ""
 echo "ℹ️  Push notifications are sent directly to Apple APNs (no third party)."
 echo "   Required Lovable Cloud secrets: APPLE_KEY_ID, APPLE_ISSUER_ID (Team ID), APPLE_PRIVATE_KEY (.p8)."
 echo "   Optional: APNS_ENV=sandbox for local Xcode dev builds (default: production)."
 echo ""
-echo "⚠️  MANUAL XCODE STEPS REQUIRED (one-time, after every fresh 'cap add ios'):"
+echo "⚠️  XCODE CHECKS BEFORE ARCHIVE:"
 echo "   1. Open ios/App/App.xcworkspace in Xcode"
-echo "   2. Select 'App' target → Signing & Capabilities"
-echo "   3. Click '+ Capability' → add 'Push Notifications'"
-echo "      (This generates App.entitlements with the aps-environment key.)"
-echo "      Without this, PushNotifications.register() throws at launch and"
-echo "      can crash App Review's automated test."
+echo "   2. Confirm App target → Signing & Capabilities shows Push Notifications"
+echo "   3. Confirm App target → Signing & Capabilities → Background Modes has Remote notifications"
 echo "   4. Confirm Deployment Target ≥ iOS 14.0"
 echo "   5. Product → Clean Build Folder before Archive"
