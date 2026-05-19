@@ -19,6 +19,7 @@ import { convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
 import SubscriptionCard from "@/components/settings/SubscriptionCard";
 import { isIOSNative, openAppleSubscriptionManagement } from "@/lib/iapPurchase";
+import { registerForPushNotifications } from "@/lib/pushNotifications";
 import ReceiptHistory from "@/components/settings/ReceiptHistory";
 import {
   AlertDialog,
@@ -355,7 +356,20 @@ const Settings = () => {
           </div>
           <div className="flex items-center justify-between">
             <Label htmlFor="push-notifs">Push notifications</Label>
-            <Switch id="push-notifs" checked={pushEnabled} onCheckedChange={async (v) => { setPushEnabled(v); await saveNotifPrefs({ push_enabled: v }); }} />
+            <Switch
+              id="push-notifs"
+              checked={pushEnabled}
+              onCheckedChange={async (v) => {
+                setPushEnabled(v);
+                await saveNotifPrefs({ push_enabled: v });
+                if (v && isIOSNative()) {
+                  const result = await registerForPushNotifications({ force: true });
+                  if (!result.ok) {
+                    toast({ title: "Push setup failed", description: result.message, variant: "destructive" });
+                  }
+                }
+              }}
+            />
           </div>
           {isIOSNative() && (
             <Button
@@ -363,6 +377,12 @@ const Settings = () => {
               size="sm"
               className="w-full"
               onClick={async () => {
+                toast({ title: "Checking this device…" });
+                const registration = await registerForPushNotifications({ force: true });
+                if (!registration.ok) {
+                  toast({ title: "No registered devices", description: registration.message, variant: "destructive" });
+                  return;
+                }
                 toast({ title: "Sending test push…" });
                 // Refresh session so the edge function gets a valid JWT
                 const { data: sessionData } = await supabase.auth.getSession();
