@@ -21,7 +21,7 @@ import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import JSZip from "jszip";
 import { SmartImage } from "@/components/shared/SmartImage";
 import { presetImage } from "@/lib/imageUrl";
-import { ZoomableImage } from "@/components/shared/ZoomableImage";
+import useEmblaCarousel from "embla-carousel-react";
 
 interface Circle {
   id: string;
@@ -48,6 +48,134 @@ interface AlbumPhoto {
   uploaded_by: string;
   created_at: string;
 }
+
+// Embla-powered finger-following lightbox for album photos. Mirrors the
+// PostCard MediaLightbox so the swipe feel is identical across the app.
+const AlbumPhotoLightbox = ({
+  photos,
+  startIndex,
+  onIndexChange,
+  onClose,
+}: {
+  photos: AlbumPhoto[];
+  startIndex: number;
+  onIndexChange: (i: number) => void;
+  onClose: () => void;
+}) => {
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: false,
+    align: "center",
+    duration: 28,
+    dragThreshold: 6,
+    containScroll: "trimSnaps",
+    startIndex,
+  });
+  const [selected, setSelected] = useState(startIndex);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => {
+      const i = emblaApi.selectedScrollSnap();
+      setSelected(i);
+      onIndexChange(i);
+    };
+    emblaApi.on("select", onSelect);
+    return () => { emblaApi.off("select", onSelect); };
+  }, [emblaApi, onIndexChange]);
+
+  useEffect(() => {
+    [selected - 1, selected + 1].forEach((i) => {
+      const p = photos[i];
+      if (p?.photo_url) {
+        const img = new window.Image();
+        img.src = presetImage(p.photo_url, "full");
+      }
+    });
+  }, [selected, photos]);
+
+  const current = photos[selected];
+
+  return (
+    <>
+      <div className="absolute top-0 right-0 z-30 flex items-center gap-2 pr-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
+        <button
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+          onClick={async () => {
+            if (!current) return;
+            const { downloadFile } = await import("@/lib/nativeDownload");
+            await downloadFile(
+              current.photo_url,
+              current.photo_url.split("/").pop()?.split("?")[0] || "photo.jpg"
+            );
+          }}
+          aria-label="Download"
+        >
+          <Download className="h-5 w-5" />
+        </button>
+        <button
+          className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+          onClick={onClose}
+          aria-label="Close"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      <div className="w-screen sm:w-[90vw] h-[100dvh] sm:h-[90vh] overflow-hidden" ref={emblaRef}>
+        <div className="flex h-full touch-pan-y will-change-transform">
+          {photos.map((p, i) => (
+            <div key={p.id} className="flex-[0_0_100%] min-w-0 h-full flex items-center justify-center px-2">
+              <SmartImage
+                src={p.photo_url}
+                preset="full"
+                priority={Math.abs(i - selected) <= 1}
+                alt={p.caption || `Photo ${i + 1}`}
+                className="max-h-full max-w-full object-contain select-none bg-transparent"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {photos.length > 1 && (
+        <>
+          {selected > 0 && (
+            <button
+              className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-30 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+              onClick={() => emblaApi?.scrollPrev()}
+              aria-label="Previous"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+          )}
+          {selected < photos.length - 1 && (
+            <button
+              className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-30 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+              onClick={() => emblaApi?.scrollNext()}
+              aria-label="Next"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          )}
+          <div
+            className="absolute left-1/2 -translate-x-1/2 z-30 bg-black/50 backdrop-blur-sm text-white text-sm px-3 py-1 rounded-full pointer-events-none"
+            style={{ bottom: "max(env(safe-area-inset-bottom, 0px), 1rem)" }}
+          >
+            {selected + 1} / {photos.length}
+          </div>
+        </>
+      )}
+      {current?.caption && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 z-30 text-center px-4 text-sm text-white/80 pointer-events-none"
+          style={{ bottom: photos.length > 1 ? "max(env(safe-area-inset-bottom, 0px), 3rem)" : "max(env(safe-area-inset-bottom, 0px), 1rem)" }}
+        >
+          {current.caption}
+        </div>
+      )}
+    </>
+  );
+};
 
 const Albums = () => {
   const { user } = useAuth();
@@ -617,100 +745,18 @@ const Albums = () => {
             </div>
           )}
 
-          {/* Enlarged photo dialog with navigation */}
+          {/* Enlarged photo dialog with Embla finger-following swipe */}
           <Dialog open={!!enlargedPhoto} onOpenChange={(open) => !open && setEnlargedPhoto(null)}>
-            <DialogContent className="inset-0 max-h-none overflow-hidden bg-black/95 border-none px-0 py-0 p-0 max-w-none flex flex-col items-center justify-center sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-[95vw] sm:w-fit sm:max-h-[95vh] sm:rounded-lg sm:bg-black/95 sm:p-2 [&>button:last-child]:hidden">
+            <DialogContent className="inset-0 max-h-none overflow-hidden bg-black/95 border-none px-0 py-0 p-0 max-w-none flex flex-col items-center justify-center sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:max-w-[95vw] sm:w-fit sm:max-h-[95vh] sm:rounded-lg sm:bg-black/95 sm:p-0 [&>button:last-child]:hidden">
               <DialogTitle className="sr-only">{enlargedPhoto?.caption || "Photo"}</DialogTitle>
-              {enlargedPhoto && (() => {
-                const currentIndex = photos.findIndex(p => p.id === enlargedPhoto.id);
-                return (
-                  <>
-                    {/* Top control bar */}
-                    <div
-                      className="absolute top-0 right-0 z-20 flex items-center gap-2 pr-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4"
-                    >
-                      <button
-                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                        onClick={async () => {
-                          const { downloadFile } = await import("@/lib/nativeDownload");
-                          await downloadFile(
-                            enlargedPhoto.photo_url,
-                            enlargedPhoto.photo_url.split("/").pop()?.split("?")[0] || "photo.jpg"
-                          );
-                        }}
-                        aria-label="Download"
-                      >
-                        <Download className="h-5 w-5" />
-                      </button>
-                      <button
-                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                        onClick={() => setEnlargedPhoto(null)}
-                        aria-label="Close"
-                      >
-                        <X className="h-5 w-5" />
-                      </button>
-                    </div>
-
-                    {/* Centered image */}
-                    <ZoomableImage
-                      className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto flex items-center justify-center"
-                      onSwipeLeft={() => currentIndex < photos.length - 1 && setEnlargedPhoto(photos[currentIndex + 1])}
-                      onSwipeRight={() => currentIndex > 0 && setEnlargedPhoto(photos[currentIndex - 1])}
-                      onSwipeDown={() => setEnlargedPhoto(null)}
-                    >
-                      <SmartImage
-                        src={enlargedPhoto.photo_url}
-                        preset="full"
-                        priority
-                        alt={enlargedPhoto.caption || "Photo"}
-                        className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none bg-transparent"
-                      />
-                    </ZoomableImage>
-
-                    {/* Left arrow */}
-                    {photos.length > 1 && currentIndex > 0 && (
-                      <button
-                        className="absolute left-2 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                        onClick={() => setEnlargedPhoto(photos[currentIndex - 1])}
-                        aria-label="Previous photo"
-                      >
-                        <ChevronLeft className="h-6 w-6" />
-                      </button>
-                    )}
-
-                    {/* Right arrow */}
-                    {photos.length > 1 && currentIndex < photos.length - 1 && (
-                      <button
-                        className="absolute right-2 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                        onClick={() => setEnlargedPhoto(photos[currentIndex + 1])}
-                        aria-label="Next photo"
-                      >
-                        <ChevronRight className="h-6 w-6" />
-                      </button>
-                    )}
-
-                    {/* Image counter */}
-                    {photos.length > 1 && (
-                      <div
-                        className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full bg-black/50 backdrop-blur-sm text-white text-sm"
-                        style={{ marginBottom: "max(env(safe-area-inset-bottom, 0px), 1rem)" }}
-                      >
-                        {currentIndex + 1} / {photos.length}
-                      </div>
-                    )}
-
-                    {/* Caption */}
-                    {enlargedPhoto.caption && (
-                      <div
-                        className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 text-center px-4 text-sm text-white/80"
-                        style={{ marginBottom: photos.length > 1 ? "max(env(safe-area-inset-bottom, 0px), 3rem)" : "max(env(safe-area-inset-bottom, 0px), 1rem)" }}
-                      >
-                        {enlargedPhoto.caption}
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+              {enlargedPhoto && (
+                <AlbumPhotoLightbox
+                  photos={photos}
+                  startIndex={Math.max(0, photos.findIndex((p) => p.id === enlargedPhoto.id))}
+                  onIndexChange={(i) => setEnlargedPhoto(photos[i] || null)}
+                  onClose={() => setEnlargedPhoto(null)}
+                />
+              )}
             </DialogContent>
           </Dialog>
 

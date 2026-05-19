@@ -242,14 +242,13 @@ const PostMediaCarousel = ({
   return (
     <div className="mb-4 mx-auto w-full max-w-sm">
       <div className="relative">
-        <div className="overflow-hidden rounded-lg bg-muted" ref={emblaRef}>
+        <div className="overflow-hidden rounded-lg bg-black" ref={emblaRef}>
           <div className="flex touch-pan-y will-change-transform">
             {items.map((url, index) => {
               const type = getMediaType(url);
-              // Eagerly load the current slide + immediate neighbors so swipes feel instant.
               const isPriority = Math.abs(index - selectedIndex) <= 1;
               return (
-                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-square relative bg-muted">
+                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-square relative bg-black flex items-center justify-center">
                   {type === "video" ? (
                     <button
                       type="button"
@@ -259,19 +258,28 @@ const PostMediaCarousel = ({
                     >
                       <VideoThumbnail url={url} onClick={() => onVideoClick(index)} />
                     </button>
+                  ) : type === "audio" ? (
+                    <div className="w-full px-4">
+                      <audio controls preload="metadata" className="w-full">
+                        <source src={url} />
+                      </audio>
+                    </div>
                   ) : (
                     <button
                       type="button"
-                      className="w-full h-full cursor-pointer"
+                      className="w-full h-full cursor-pointer flex items-center justify-center"
                       onClick={() => onImageClick(index)}
                       aria-label={`Open image ${index + 1}`}
                     >
+                      {/* object-contain so the full image fits in the square (letterboxed
+                          on black) instead of being cropped. The lightbox still shows
+                          the full original. */}
                       <SmartImage
                         src={url}
                         preset="card"
                         priority={isPriority}
                         alt={`Post media ${index + 1}`}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain bg-black"
                       />
                     </button>
                   )}
@@ -344,8 +352,9 @@ const MediaLightbox = ({
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
     align: "center",
-    duration: 22,
-    dragThreshold: 8,
+    // Slightly slower for a softer, more cinematic feel.
+    duration: 28,
+    dragThreshold: 6,
     containScroll: "trimSnaps",
     startIndex,
   });
@@ -421,6 +430,17 @@ const MediaLightbox = ({
                     <source src={url} type="video/quicktime" />
                     <source src={url} />
                   </video>
+                ) : type === "audio" ? (
+                  <div className="w-full max-w-md px-6">
+                    <audio
+                      controls
+                      autoPlay={isCurrent}
+                      preload="metadata"
+                      className="w-full"
+                    >
+                      <source src={url} />
+                    </audio>
+                  </div>
                 ) : (
                   <SmartImage
                     src={url}

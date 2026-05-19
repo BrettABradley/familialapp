@@ -123,9 +123,16 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     for (let i = 0; i < selectedFiles.length; i++) {
       const file = selectedFiles[i];
       setUploadProgress(Math.round(((i) / selectedFiles.length) * 100));
-      const fileExt = file.name.split(".").pop();
+      // For audio blobs, ALWAYS write the file with an .m4a extension so the
+      // public URL can be detected as audio later (iOS recorders sometimes
+      // hand us files whose extension is .mp4 even though the contents are
+      // AAC-in-MP4-audio, which would otherwise render as a black video).
+      const isAudio = (file.type || "").startsWith("audio") || /voice-note[-_]/i.test(file.name);
+      const fileExt = isAudio ? "m4a" : (file.name.split(".").pop() || "bin");
       const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-      const { error } = await supabase.storage.from("post-media").upload(fileName, file);
+      const { error } = await supabase.storage.from("post-media").upload(fileName, file, {
+        contentType: isAudio ? "audio/mp4" : file.type || undefined,
+      });
       if (error) { continue; }
       const { data } = supabase.storage.from("post-media").getPublicUrl(fileName);
       uploadedUrls.push(data.publicUrl);
@@ -333,7 +340,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
         )}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
-            <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
+            <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
             <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isPosting || selectedFiles.length >= MAX_FILES}>
               <Paperclip className="w-4 h-4 mr-2" />Add Media
             </Button>

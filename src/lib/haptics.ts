@@ -34,10 +34,10 @@ export const haptic = {
 };
 
 /**
- * Per-keystroke haptic — fires a tight selection tick on EVERY keystroke
- * so it stays in sync with the on-screen keyboard. Selection feedback is
- * the lightest tap iOS offers, so it can fire rapidly without lag.
+ * Per-keystroke haptic — fires a light impact on every keystroke so the
+ * user actually feels the tap (selection-start/end together is too subtle
+ * on most iPhones; iOS keyboards themselves use a light impact).
  */
 export function typingHaptic(_everyN = 1) {
-  haptic.selection();
+  haptic.light();
 }
