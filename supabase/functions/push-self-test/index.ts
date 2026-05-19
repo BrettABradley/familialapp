@@ -11,6 +11,7 @@ const APNS_HOST =
   (Deno.env.get("APNS_ENV") ?? "production").toLowerCase() === "sandbox"
     ? "https://api.sandbox.push.apple.com"
     : "https://api.push.apple.com";
+const APNS_ENV = (Deno.env.get("APNS_ENV") ?? "production").toLowerCase();
 const APNS_TOPIC = "com.familialmedia.familial";
 
 let cachedJwt: { token: string; exp: number } | null = null;
@@ -164,12 +165,7 @@ serve(async (req: Request) => {
     for (const t of tokens as { device_token: string }[]) {
       const r = await sendApns(t.device_token, payload);
       results.push({ token_prefix: t.device_token.slice(0, 8) + "…", ...r });
-      if (
-        r.status === 410 ||
-        r.reason === "BadDeviceToken" ||
-        r.reason === "Unregistered" ||
-        r.reason === "DeviceTokenNotForTopic"
-      ) {
+      if (r.status === 410 || r.reason === "Unregistered") {
         invalidTokens.push(t.device_token);
       }
     }
@@ -182,6 +178,7 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         ok: anyOk,
+        apns_environment: APNS_ENV,
         token_count: tokens.length,
         sent: results.filter((r) => r.ok).length,
         cleaned_invalid: invalidTokens.length,

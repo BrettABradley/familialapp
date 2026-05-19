@@ -185,12 +185,7 @@ serve(async (req: Request) => {
           sent++;
         } else {
           console.warn(`APNs ${result.status} for token ${t.device_token.slice(0, 8)}…: ${result.reason}`);
-          if (
-            result.status === 410 ||
-            result.reason === "BadDeviceToken" ||
-            result.reason === "Unregistered" ||
-            result.reason === "DeviceTokenNotForTopic"
-          ) {
+          if (result.status === 410 || result.reason === "Unregistered") {
             invalidTokens.push(t.device_token);
           }
         }
