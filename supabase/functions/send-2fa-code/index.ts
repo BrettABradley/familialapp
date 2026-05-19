@@ -17,7 +17,8 @@ serve(async (req) => {
   }
 
   try {
-    // Authenticate the caller
+    // Authenticate the caller — extract the JWT and pass it explicitly to
+    // auth.getUser() so it works with the new Supabase signing-keys system.
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization" }), {
@@ -25,12 +26,12 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    const token = authHeader.replace(/^Bearer\s+/i, "");
 
-    const supabaseAuth = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") || "", {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    const supabaseAuth = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") || "");
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token);
     if (authError || !user) {
+      console.error("send-2fa-code auth error:", authError);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
