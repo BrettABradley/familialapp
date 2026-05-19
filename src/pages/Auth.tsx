@@ -482,6 +482,14 @@ const Auth = () => {
                         setPassword(e.target.value);
                         setErrors((prev) => ({ ...prev, password: undefined }));
                       }}
+                      onFocus={(e) => {
+                        // iOS keyboard can cover the password field — scroll it into view
+                        const el = e.currentTarget;
+                        setTimeout(() => {
+                          el.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }, 300);
+                      }}
+                      style={{ scrollMarginBottom: "40vh" }}
                       className={`pr-11 ${errors.password ? "border-destructive" : ""}`}
                     />
                     <button
