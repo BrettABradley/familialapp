@@ -369,6 +369,24 @@ const Settings = () => {
         </CardContent>
       </Card>
 
+          <div className="border-t pt-3 space-y-3">
+            <p className="text-sm text-muted-foreground">Email me when:</p>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="email-mention" className="text-sm font-normal">Someone mentions me</Label>
+              <Switch id="email-mention" checked={emailOnMention} onCheckedChange={(v) => { setEmailOnMention(v); saveEmailPref("email_on_mention", v); }} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="email-unread-dm" className="text-sm font-normal">I have unread messages after 1 hour</Label>
+              <Switch id="email-unread-dm" checked={emailOnUnreadDm} onCheckedChange={(v) => { setEmailOnUnreadDm(v); saveEmailPref("email_on_unread_dm", v); }} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="email-new-album" className="text-sm font-normal">Someone in my circle shares an album</Label>
+              <Switch id="email-new-album" checked={emailOnNewAlbum} onCheckedChange={(v) => { setEmailOnNewAlbum(v); saveEmailPref("email_on_new_album", v); }} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Two-Factor Authentication (Email-Based) */}
       <Card className="mt-4">
         <CardHeader>
