@@ -1,10 +1,15 @@
 export function getMediaType(url: string): 'image' | 'video' | 'audio' {
+  // Voice notes from the recorder are always saved under a `voice-note-*`
+  // filename. Detect them by name so legacy files that were stored with a
+  // `.mp4` extension still render in an <audio> player instead of a black
+  // <video>. This is a pure-display heuristic.
+  if (/voice-note[-_]/i.test(url)) return 'audio';
+
   const ext = url.split('.').pop()?.toLowerCase().split('?')[0];
   if (!ext) return 'image';
+  if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(ext)) return 'audio';
   if (['mp4', 'mov', 'webm', 'avi', 'mkv'].includes(ext)) return 'video';
-  if (['mp3', 'wav', 'ogg', 'm4a', 'aac'].includes(ext)) return 'audio';
   if (['heic', 'heif'].includes(ext)) return 'image';
-  // webm can be audio or video - default to video since it's more common in uploads
   return 'image';
 }
 
