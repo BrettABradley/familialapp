@@ -12,9 +12,11 @@ export interface TemplateEntry {
 import { template as mentionNotification } from './mention-notification.tsx'
 import { template as unseenMessage } from './unseen-message.tsx'
 import { template as newAlbum } from './new-album.tsx'
+import { template as founderGift } from './founder-gift.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'mention-notification': mentionNotification,
   'unseen-message': unseenMessage,
   'new-album': newAlbum,
+  'founder-gift': founderGift,
 }
