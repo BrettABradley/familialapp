@@ -58,6 +58,7 @@ export function usePullToRefresh({
     if (pullDistance >= threshold && !isRefreshing) {
       setIsRefreshing(true);
       setPullDistance(threshold); // Hold at threshold during refresh
+      haptic.light();
       try {
         await onRefresh();
       } finally {
