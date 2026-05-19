@@ -27,12 +27,13 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    if (isNative) {
+    if (activeModeRef.current === "native") {
       try {
         const { VoiceRecorder } = await import("capacitor-voice-recorder");
         const result = await VoiceRecorder.stopRecording();
         setIsRecording(false);
         setElapsed(0);
+        activeModeRef.current = null;
         const b64 = result?.value?.recordDataBase64;
         const mime = result?.value?.mimeType || "audio/aac";
         if (!b64) {
@@ -51,6 +52,7 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
         toast.error(err?.message || "Could not stop recording.");
         setIsRecording(false);
         setElapsed(0);
+        activeModeRef.current = null;
       }
       return;
     }
@@ -59,7 +61,8 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
     }
     setIsRecording(false);
     setElapsed(0);
-  }, [isNative, onRecordingComplete]);
+    activeModeRef.current = null;
+  }, [onRecordingComplete]);
 
   useEffect(() => {
     return () => {
