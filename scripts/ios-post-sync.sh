@@ -70,15 +70,6 @@ elif [ -f "$PROJECT_FILE" ]; then
   echo "✅ Xcode project already references App.entitlements"
 fi
 
-# Lock PRODUCT_BUNDLE_IDENTIFIER to com.familialmedia.familial for ALL
-# build configurations (Debug + Release). Capacitor / Lovable's auto-sync
-# otherwise leaves Release as a generated placeholder like
-# `space.manus.familial.mobile.t<timestamp>`, which causes APNs to reject
-# pushes with DeviceTokenNotForTopic and would break TestFlight uploads.
-if [ -f "$PROJECT_FILE" ]; then
-  perl -0pi -e 's/PRODUCT_BUNDLE_IDENTIFIER = [^;]+;/PRODUCT_BUNDLE_IDENTIFIER = com.familialmedia.familial;/g' "$PROJECT_FILE"
-  echo "✅ Xcode project: PRODUCT_BUNDLE_IDENTIFIER locked to com.familialmedia.familial (Debug + Release)"
-fi
 
 # Capacitor iOS push bridge. iOS can show the permission prompt and still never
 # deliver an APNs token to JavaScript unless AppDelegate forwards native
