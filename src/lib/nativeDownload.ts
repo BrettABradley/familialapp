@@ -36,8 +36,9 @@ export async function downloadFile(url: string, suggestedName?: string): Promise
     const blob = await res.blob();
     const base64 = await blobToBase64(blob);
 
+    const cachePath = `download-${Date.now()}-${filename}`;
     const written = await Filesystem.writeFile({
-      path: `download-${Date.now()}-${filename}`,
+      path: cachePath,
       data: base64,
       directory: Directory.Cache,
     });
@@ -54,13 +55,13 @@ export async function downloadFile(url: string, suggestedName?: string): Promise
         // Best-effort cleanup
         try {
           await Filesystem.deleteFile({
-            path: written.path ?? `download-${Date.now()}-${filename}`,
+            path: cachePath,
             directory: Directory.Cache,
           });
         } catch {}
         try {
           const { toast } = await import("sonner");
-          toast.success(isImageFilename(filename) ? "Saved to Photos" : "Saved to Photos");
+          toast.success("Saved to Photos");
         } catch {}
         return;
       } catch (err) {
