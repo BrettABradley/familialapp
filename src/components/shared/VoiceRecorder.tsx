@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, Square } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { toast } from "sonner";
 
 interface VoiceRecorderProps {
   onRecordingComplete: (blob: Blob) => void;
