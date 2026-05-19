@@ -175,9 +175,27 @@ serve(async (req: Request) => {
     }
 
     const anyOk = results.some((r) => r.ok);
+    const firstFailure = results.find((r) => !r.ok);
+    const failureReason = firstFailure?.reason ?? (firstFailure ? `apns_status_${firstFailure.status}` : undefined);
+    if (!anyOk) {
+      console.warn("[push-self-test] APNs rejected all registered tokens:", JSON.stringify(results));
+    }
+
     return new Response(
       JSON.stringify({
         ok: anyOk,
+        reason: anyOk ? undefined : failureReason,
+        hint: anyOk
+          ? undefined
+          : failureReason === "BadDeviceToken"
+            ? "APNs rejected this token as BadDeviceToken. If this is a local Xcode/dev build, set APNS_ENV=sandbox; TestFlight/App Store should use production."
+            : failureReason === "DeviceTokenNotForTopic"
+              ? "APNs says this token is for a different app bundle. Confirm the Xcode bundle identifier is com.familialmedia.familial."
+              : failureReason === "TopicDisallowed"
+                ? "APNs rejected the app topic. Confirm the Apple push key is enabled for this app and the bundle identifier matches."
+                : failureReason === "Unregistered"
+                  ? "APNs says this device token is no longer valid. Reopen the app and enable push again to refresh the token."
+                  : "APNs rejected the push for this registered device. The technical reason is shown below.",
         apns_environment: APNS_ENV,
         token_count: tokens.length,
         sent: results.filter((r) => r.ok).length,
