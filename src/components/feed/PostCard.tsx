@@ -18,6 +18,7 @@ import { SmartImage } from "@/components/shared/SmartImage";
 import { avatarUrl, presetImage } from "@/lib/imageUrl";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
 import useEmblaCarousel from "embla-carousel-react";
+import { haptic, typingHaptic } from "@/lib/haptics";
 
 interface CircleMemberRef {
   user_id: string;
