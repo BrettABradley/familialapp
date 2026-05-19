@@ -58,6 +58,9 @@ const Settings = () => {
   const [pushEnabled, setPushEnabled] = useState(true);
   const [mutedTypes, setMutedTypes] = useState<string[]>([]);
   const [notifPrefsLoaded, setNotifPrefsLoaded] = useState(false);
+  const [emailOnMention, setEmailOnMention] = useState(true);
+  const [emailOnUnreadDm, setEmailOnUnreadDm] = useState(true);
+  const [emailOnNewAlbum, setEmailOnNewAlbum] = useState(true);
 
   // 2FA/MFA state (email-based)
   const [mfaEnabled, setMfaEnabled] = useState(false);
@@ -73,8 +76,16 @@ const Settings = () => {
       setDisplayName(profile.display_name || "");
       setBio(profile.bio || "");
       setLocation(profile.location || "");
+      setEmailOnMention((profile as any).email_on_mention ?? true);
+      setEmailOnUnreadDm((profile as any).email_on_unread_dm ?? true);
+      setEmailOnNewAlbum((profile as any).email_on_new_album ?? true);
     }
   }, [profile]);
+
+  const saveEmailPref = async (field: "email_on_mention" | "email_on_unread_dm" | "email_on_new_album", value: boolean) => {
+    if (!user) return;
+    await supabase.from("profiles").update({ [field]: value } as any).eq("user_id", user.id);
+  };
 
   // Load notification preferences
   useEffect(() => {
@@ -354,6 +365,22 @@ const Settings = () => {
                 <Switch checked={mutedTypes.includes(type)} onCheckedChange={() => toggleMutedType(type)} />
               </div>
             ))}
+          </div>
+
+          <div className="border-t pt-3 space-y-3">
+            <p className="text-sm text-muted-foreground">Email me when:</p>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="email-mention" className="text-sm font-normal">Someone mentions me</Label>
+              <Switch id="email-mention" checked={emailOnMention} onCheckedChange={(v) => { setEmailOnMention(v); saveEmailPref("email_on_mention", v); }} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="email-unread-dm" className="text-sm font-normal">I have unread messages after 1 hour</Label>
+              <Switch id="email-unread-dm" checked={emailOnUnreadDm} onCheckedChange={(v) => { setEmailOnUnreadDm(v); saveEmailPref("email_on_unread_dm", v); }} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="email-new-album" className="text-sm font-normal">Someone in my circle shares an album</Label>
+              <Switch id="email-new-album" checked={emailOnNewAlbum} onCheckedChange={(v) => { setEmailOnNewAlbum(v); saveEmailPref("email_on_new_album", v); }} />
+            </div>
           </div>
         </CardContent>
       </Card>

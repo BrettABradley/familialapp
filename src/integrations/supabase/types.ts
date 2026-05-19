@@ -1029,6 +1029,36 @@ export type Database = {
           },
         ]
       }
+      pending_unread_email_notifications: {
+        Row: {
+          created_at: string
+          email_sent_at: string | null
+          first_unread_at: string
+          id: string
+          last_message_at: string
+          recipient_id: string
+          sender_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_sent_at?: string | null
+          first_unread_at?: string
+          id?: string
+          last_message_at?: string
+          recipient_id: string
+          sender_id: string
+        }
+        Update: {
+          created_at?: string
+          email_sent_at?: string | null
+          first_unread_at?: string
+          id?: string
+          last_message_at?: string
+          recipient_id?: string
+          sender_id?: string
+        }
+        Relationships: []
+      }
       photo_albums: {
         Row: {
           circle_id: string
@@ -1226,6 +1256,9 @@ export type Database = {
           created_at: string
           date_of_birth: string | null
           display_name: string | null
+          email_on_mention: boolean
+          email_on_new_album: boolean
+          email_on_unread_dm: boolean
           id: string
           location: string | null
           two_factor_enabled: boolean
@@ -1240,6 +1273,9 @@ export type Database = {
           created_at?: string
           date_of_birth?: string | null
           display_name?: string | null
+          email_on_mention?: boolean
+          email_on_new_album?: boolean
+          email_on_unread_dm?: boolean
           id?: string
           location?: string | null
           two_factor_enabled?: boolean
@@ -1254,6 +1290,9 @@ export type Database = {
           created_at?: string
           date_of_birth?: string | null
           display_name?: string | null
+          email_on_mention?: boolean
+          email_on_new_album?: boolean
+          email_on_unread_dm?: boolean
           id?: string
           location?: string | null
           two_factor_enabled?: boolean
