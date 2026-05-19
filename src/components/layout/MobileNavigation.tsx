@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Home, Calendar, Users, Image, MessageSquare, User } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { haptic } from "@/lib/haptics";
 
 const navItems = [
   { to: "/circles", icon: Users, label: "Circles" },
@@ -27,6 +28,7 @@ export function MobileNavigation() {
             key={item.to}
             to={item.to}
             aria-label={item.label}
+            onClick={() => { if (!isActive(item.to)) haptic.selection(); }}
             className={`flex flex-col items-center justify-center w-full h-full min-h-[44px] min-w-[44px] transition-colors ${
               isActive(item.to)
                 ? "text-primary"

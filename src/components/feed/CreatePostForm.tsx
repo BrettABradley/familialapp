@@ -323,7 +323,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
             </Button>
             <VoiceRecorder onRecordingComplete={handleVoiceRecording} />
           </div>
-          <Button onClick={handleCreatePost} disabled={(!newPostContent.trim() && selectedFiles.length === 0) || isPosting}>
+          <Button onClick={() => { import("@/lib/haptics").then(({ haptic }) => haptic.medium()); handleCreatePost(); }} disabled={(!newPostContent.trim() && selectedFiles.length === 0) || isPosting}>
             <Send className="w-4 h-4 mr-2" />{isPosting ? "Uploading..." : "Share"}
           </Button>
         </div>

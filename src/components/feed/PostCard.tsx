@@ -18,6 +18,7 @@ import { SmartImage } from "@/components/shared/SmartImage";
 import { avatarUrl, presetImage } from "@/lib/imageUrl";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
 import useEmblaCarousel from "embla-carousel-react";
+import { haptic, typingHaptic } from "@/lib/haptics";
 
 interface CircleMemberRef {
   user_id: string;
@@ -584,7 +585,7 @@ export const PostCard = ({
 
         <div className="flex items-center gap-4 pt-2 border-t border-border">
           <div className="flex items-center">
-            <Button variant="ghost" size="sm" onClick={() => onReaction(post.id)} className={hasUserReacted ? "text-destructive" : ""}>
+            <Button variant="ghost" size="sm" onClick={() => { haptic.light(); onReaction(post.id); }} className={hasUserReacted ? "text-destructive" : ""}>
               <Heart className={`w-4 h-4 mr-1 ${hasUserReacted ? "fill-current" : ""}`} />
               {post.reactions?.length || 0}
             </Button>
@@ -745,13 +746,13 @@ export const PostCard = ({
                     type="text"
                     placeholder="Write a comment..."
                     value={replyingTo ? "" : commentInput}
-                    onChange={(e) => { if (!replyingTo) onCommentInputChange(post.id, e.target.value); }}
+                    onChange={(e) => { if (!replyingTo) { typingHaptic(); onCommentInputChange(post.id, e.target.value); } }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey && !replyingTo) { e.preventDefault(); onSubmitComment(post.id); }
+                      if (e.key === "Enter" && !e.shiftKey && !replyingTo) { e.preventDefault(); haptic.medium(); onSubmitComment(post.id); }
                     }}
                     className="flex-1 bg-secondary rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
-                  <Button size="sm" onClick={() => onSubmitComment(post.id)} disabled={!commentInput?.trim() || isSubmittingComment || !!replyingTo} aria-label="Send comment">
+                  <Button size="sm" onClick={() => { haptic.medium(); onSubmitComment(post.id); }} disabled={!commentInput?.trim() || isSubmittingComment || !!replyingTo} aria-label="Send comment">
                     <Send className="w-4 h-4" />
                   </Button>
                 </div>
