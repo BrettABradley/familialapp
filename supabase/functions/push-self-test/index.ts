@@ -12,7 +12,7 @@ const APNS_HOST =
     ? "https://api.sandbox.push.apple.com"
     : "https://api.push.apple.com";
 const APNS_ENV = (Deno.env.get("APNS_ENV") ?? "production").toLowerCase();
-const APNS_TOPIC = "com.familialmedia.familial";
+const APNS_TOPIC = "space.manus.familial.mobile.t20260223211425";
 
 let cachedJwt: { token: string; exp: number } | null = null;
 
@@ -190,7 +190,7 @@ serve(async (req: Request) => {
           : failureReason === "BadDeviceToken"
             ? "APNs rejected this token as BadDeviceToken. If this is a local Xcode/dev build, set APNS_ENV=sandbox; TestFlight/App Store should use production."
             : failureReason === "DeviceTokenNotForTopic"
-              ? "APNs says this token is for a different app bundle. Confirm the Xcode bundle identifier is com.familialmedia.familial."
+              ? "APNs says this token is for a different app bundle. Confirm the Xcode bundle identifier is space.manus.familial.mobile.t20260223211425."
               : failureReason === "TopicDisallowed"
                 ? "APNs rejected the app topic. Confirm the Apple push key is enabled for this app and the bundle identifier matches."
                 : failureReason === "Unregistered"
