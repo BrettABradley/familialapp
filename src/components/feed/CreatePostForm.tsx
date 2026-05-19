@@ -60,10 +60,12 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const [mentionedUserIds, setMentionedUserIds] = useState<Set<string>>(new Set());
 
 
+  const MAX_FILES = 4;
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let files = Array.from(e.target.files || []);
-    if (files.length + selectedFiles.length > 5) {
-      toast({ title: "Too many files", description: "You can upload up to 5 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
+    if (files.length + selectedFiles.length > MAX_FILES) {
+      toast({ title: "Too many files", description: `You can upload up to ${MAX_FILES} files per post. For more images, try creating an Album!`, variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
       return;
     }
 
@@ -81,13 +83,13 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     files.forEach(file => {
       setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]);
     });
-    // Reset input so the same file (or another single file on Safari) can be picked again
+    // Reset input so the same file can be picked again on Safari/iOS
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleVoiceRecording = (blob: Blob) => {
-    if (selectedFiles.length >= 5) {
-      toast({ title: "Too many files", description: "You can upload up to 5 files per post. For more images, try creating an Album!", variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
+    if (selectedFiles.length >= MAX_FILES) {
+      toast({ title: "Too many files", description: `You can upload up to ${MAX_FILES} files per post.`, variant: "destructive" });
       return;
     }
     const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
