@@ -173,13 +173,13 @@ const ProfileView = () => {
         setCropSrc(url);
         return;
       }
-      // Single video → straight to caption
+      // Single video → ask if they want to add more before caption
       const url = URL.createObjectURL(only);
       setPendingFiles([only]);
       setPendingPreviews([{ url, isVideo: true }]);
       setCroppedBlob(null);
       setUploadCaption("");
-      setShowCaptionInput(true);
+      setShowAddMorePrompt(true);
       return;
     }
 
@@ -188,12 +188,11 @@ const ProfileView = () => {
       url: URL.createObjectURL(f),
       isVideo: f.type.startsWith("video/"),
     }));
-    // If we're adding to a previously-cropped single image, drop the crop
-    // (carousel posts use the originals).
     setCroppedBlob(null);
     setPendingFiles((prev) => [...prev, ...converted]);
     setPendingPreviews((prev) => [...prev, ...newPreviews]);
-    setShowCaptionInput(true);
+    // If caption isn't already up, ask whether to add more first.
+    if (!showCaptionInput) setShowAddMorePrompt(true);
   };
 
   const removePendingItem = (index: number) => {
