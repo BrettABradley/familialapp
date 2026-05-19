@@ -397,11 +397,18 @@ const Settings = () => {
                   toast({ title: "Test failed", description: error.message, variant: "destructive" });
                   return;
                 }
-                const d = data as { ok: boolean; reason?: string; hint?: string; sent?: number; token_count?: number };
+                const d = data as { ok: boolean; reason?: string; hint?: string; sent?: number; token_count?: number; apns_environment?: string };
                 if (d.ok) {
                   toast({ title: `Sent to ${d.sent}/${d.token_count} device(s)`, description: "If you don't see a banner within a few seconds, check iOS Settings → Familial → Notifications." });
                 } else {
-                  toast({ title: "No registered devices", description: d.hint ?? d.reason ?? "Unknown", variant: "destructive" });
+                  const hasRegisteredDevice = typeof d.token_count === 'number' && d.token_count > 0;
+                  toast({
+                    title: hasRegisteredDevice ? "Push delivery failed" : "No registered devices",
+                    description: [d.reason, d.apns_environment ? `APNs: ${d.apns_environment}` : null, d.hint]
+                      .filter(Boolean)
+                      .join(" — ") || "Unknown",
+                    variant: "destructive",
+                  });
                 }
               }}
             >
