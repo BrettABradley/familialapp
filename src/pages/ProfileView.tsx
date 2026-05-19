@@ -206,7 +206,7 @@ const ProfileView = () => {
     setCropSrc(null);
     setCroppedBlob(blob);
     setUploadCaption("");
-    setShowCaptionInput(true);
+    setShowAddMorePrompt(true);
   };
 
   const handleConfirmUpload = async () => {
