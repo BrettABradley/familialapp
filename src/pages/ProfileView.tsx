@@ -517,7 +517,6 @@ const ProfileView = () => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  multiple
                   accept="image/*,video/*,.heic,.heif"
                   onChange={handleFileSelect}
                   className="hidden"
