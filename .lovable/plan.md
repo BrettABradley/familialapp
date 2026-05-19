@@ -1,23 +1,25 @@
-# Fix: Download Image not saving to Camera Roll on iOS
+## Goal
+Send a personal thank-you email from the founder to **haleymliming@gmail.com** and **brycehammaz@gmail.com**, letting them know a Family plan has been gifted to their account.
 
-## Problem
-In `src/lib/nativeDownload.ts`, we call `Media.savePhoto({ path: url })` with a **remote https URL**. The `@capacitor-community/media` plugin on iOS expects a **local file URI** (`file://...`). Passing a remote URL silently fails (or only opens the permission prompt), so the second tap never actually writes anything to the camera roll. iOS permission strings are already configured correctly in `scripts/ios-post-sync.sh`, so this is purely a JS-side bug.
+## Approach
+Use the existing app email infrastructure (`send-transactional-email` edge function + React Email templates registry). One new template, two sends — one per recipient, each with its own idempotency key.
 
-## Fix
-Rewrite the native branch of `downloadFile()` to:
+## Steps
 
-1. `fetch(url)` → blob → base64.
-2. Write the file to `Directory.Cache` via `Filesystem.writeFile` to get a local `file://` URI.
-3. Pass that local URI to `Media.savePhoto({ path: localUri })` (or `saveVideo` for videos).
-4. On success, show a success toast ("Saved to Photos"). On failure, fall back to the existing `Share.share({ url: localUri })` share-sheet flow so the user can still "Save Image" manually.
-5. Clean up the cache file after save (best-effort `Filesystem.deleteFile`).
+1. **Create template** `supabase/functions/_shared/transactional-email-templates/founder-gift.tsx`
+   - React Email component, white background, Playfair-style heading, Inter body to match existing templates.
+   - Optional `name` prop for personalized greeting (falls back to a generic greeting).
+   - Copy: warm note from Brett — thanks for being an early supporter, a Family plan has been added to their account at no cost, no action needed, just enjoy it. Signed "Brett, founder of Familial."
+   - Subject: "A small thank-you from Familial"
+   - Registered as `founder-gift` in `registry.ts`.
 
-No other call sites change — `downloadFile()` keeps the same signature.
+2. **Deploy** the `send-transactional-email` function so the new template is live.
 
-## Files
-- `src/lib/nativeDownload.ts` — rewrite the native image/video branch as described.
+3. **Trigger the two sends** by invoking `send-transactional-email` twice (via `curl_edge_functions`), one per recipient, with idempotency keys `founder-gift-haley-2026-05-19` and `founder-gift-bryce-2026-05-19`.
 
-## Verification
-- iOS native: tap Download on a feed image → grant Photos permission → image appears in Camera Roll immediately, toast confirms.
-- iOS native: tap Download a second time → image saves again, no permission prompt.
-- Web: unchanged anchor-tag download still works.
+4. **Confirm** in chat that both emails were dispatched.
+
+## Notes
+- No new infrastructure needed — transactional email pipeline already exists.
+- No DB changes.
+- Not a marketing/bulk send: two specific individuals, each tied to the gift you just granted them. Compliant with the transactional-email policy.
