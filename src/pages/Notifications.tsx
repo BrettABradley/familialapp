@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +24,7 @@ const Notifications = () => {
   const { user } = useAuth();
   const { isLoading: contextLoading, selectedCircle } = useCircleContext();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
   const [hasMore, setHasMore] = useState(false);
@@ -222,63 +223,64 @@ const Notifications = () => {
         </Card>
       ) : (
         <div className="space-y-3">
-          {notifications.map((notification) => (
-            <Card 
-              key={notification.id} 
-              className={`transition-colors ${!notification.is_read ? 'bg-secondary/30' : ''}`}
-            >
-              <CardContent className="py-4">
-                <div className="flex items-start gap-4">
-                  <div className={`p-2 rounded-full ${!notification.is_read ? 'bg-foreground text-background' : 'bg-secondary text-foreground'}`}>
-                    {getNotificationIcon(notification.type)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    {notification.link ? (
-                      <Link to={notification.link} className="hover:underline">
-                        <p className={`text-foreground ${!notification.is_read ? 'font-medium' : ''}`}>
-                          {notification.title}
-                        </p>
-                      </Link>
-                    ) : (
-                      <p className={`text-foreground ${!notification.is_read ? 'font-medium' : ''}`}>
+          {notifications.map((notification) => {
+            const handleCardTap = () => {
+              if (!notification.is_read) markAsRead(notification.id);
+              if (notification.link) navigate(notification.link);
+            };
+            const isTappable = !!notification.link;
+            return (
+              <Card
+                key={notification.id}
+                onClick={isTappable ? handleCardTap : undefined}
+                className={`transition-colors ${!notification.is_read ? "bg-secondary/30" : ""} ${
+                  isTappable ? "cursor-pointer hover:bg-secondary/40 active:bg-secondary/60" : ""
+                }`}
+              >
+                <CardContent className="py-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`p-2 rounded-full ${!notification.is_read ? "bg-foreground text-background" : "bg-secondary text-foreground"}`}>
+                      {getNotificationIcon(notification.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-foreground ${!notification.is_read ? "font-medium" : ""}`}>
                         {notification.title}
                       </p>
-                    )}
-                    {notification.message && (
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                        {notification.message}
+                      {notification.message && (
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                          {notification.message}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {new Date(notification.created_at).toLocaleDateString()} at{" "}
+                        {new Date(notification.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </p>
-                    )}
-                    {/* Transfer request accept/deny buttons removed — only transfer block is used now */}
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {new Date(notification.created_at).toLocaleDateString()} at{' '}
-                      {new Date(notification.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!notification.is_read && (
+                    </div>
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      {!notification.is_read && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => markAsRead(notification.id)}
+                          aria-label="Mark as read"
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => markAsRead(notification.id)}
-                        aria-label="Mark as read"
+                        onClick={() => deleteNotification(notification.id)}
+                        aria-label="Delete notification"
                       >
-                        <Check className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteNotification(notification.id)}
-                      aria-label="Delete notification"
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
