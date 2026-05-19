@@ -746,13 +746,13 @@ export const PostCard = ({
                     type="text"
                     placeholder="Write a comment..."
                     value={replyingTo ? "" : commentInput}
-                    onChange={(e) => { if (!replyingTo) onCommentInputChange(post.id, e.target.value); }}
+                    onChange={(e) => { if (!replyingTo) { typingHaptic(); onCommentInputChange(post.id, e.target.value); } }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey && !replyingTo) { e.preventDefault(); onSubmitComment(post.id); }
+                      if (e.key === "Enter" && !e.shiftKey && !replyingTo) { e.preventDefault(); haptic.medium(); onSubmitComment(post.id); }
                     }}
                     className="flex-1 bg-secondary rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
-                  <Button size="sm" onClick={() => onSubmitComment(post.id)} disabled={!commentInput?.trim() || isSubmittingComment || !!replyingTo} aria-label="Send comment">
+                  <Button size="sm" onClick={() => { haptic.medium(); onSubmitComment(post.id); }} disabled={!commentInput?.trim() || isSubmittingComment || !!replyingTo} aria-label="Send comment">
                     <Send className="w-4 h-4" />
                   </Button>
                 </div>
