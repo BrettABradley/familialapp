@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 let registrationAttempted = false;
 let lastRegisteredUserId: string | null = null;
+let registrationWatchdog: number | null = null;
 
 /**
  * Reset the in-memory registration guard. Called on sign-out / user-switch
@@ -61,6 +62,10 @@ export async function registerForPushNotifications() {
     await PushNotifications.removeAllListeners();
 
     await PushNotifications.addListener('registration', async (token) => {
+      if (registrationWatchdog) {
+        window.clearTimeout(registrationWatchdog);
+        registrationWatchdog = null;
+      }
       console.log('[push] token-received (APNs OK), length=', token.value?.length);
       try {
         const { data: sd } = await supabase.auth.getSession();
@@ -82,6 +87,10 @@ export async function registerForPushNotifications() {
     });
 
     await PushNotifications.addListener('registrationError', (err) => {
+      if (registrationWatchdog) {
+        window.clearTimeout(registrationWatchdog);
+        registrationWatchdog = null;
+      }
       const msg = String(err?.error ?? err ?? '');
       console.error('[push] registration-error:', msg);
       if (/aps-environment|entitlement/i.test(msg)) {
@@ -103,6 +112,13 @@ export async function registerForPushNotifications() {
 
     console.log('[push] register-called');
     await PushNotifications.register();
+    registrationWatchdog = window.setTimeout(() => {
+      console.warn(
+        '[push] no registration callback after 15s. If permission was granted, add the AppDelegate bridge from Capacitor PushNotifications docs, then run npm run cap:sync:ios and upload a new TestFlight build.'
+      );
+      registrationAttempted = false;
+      registrationWatchdog = null;
+    }, 15000);
   } catch (e) {
     console.error('[push] setup failed:', e);
     registrationAttempted = false;

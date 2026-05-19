@@ -37,6 +37,21 @@ $PB -c "Delete :UIBackgroundModes" "$PLIST" 2>/dev/null
 $PB -c "Add :UIBackgroundModes array" "$PLIST"
 $PB -c "Add :UIBackgroundModes:0 string remote-notification" "$PLIST"
 
+# Capacitor iOS push bridge. iOS can show the permission prompt and still never
+# deliver an APNs token to JavaScript unless AppDelegate forwards native
+# registration callbacks to the Capacitor PushNotifications plugin.
+APP_DELEGATE="ios/App/App/AppDelegate.swift"
+if [ -f "$APP_DELEGATE" ]; then
+  if ! grep -q "capacitorDidRegisterForRemoteNotifications" "$APP_DELEGATE"; then
+    perl -0pi -e 's/\n}\s*$/\n\n    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {\n        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)\n    }\n\n    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {\n        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)\n    }\n}\n/s' "$APP_DELEGATE"
+    echo "✅ AppDelegate updated: Capacitor push registration bridge added"
+  else
+    echo "✅ AppDelegate already has Capacitor push registration bridge"
+  fi
+else
+  echo "⚠️  $APP_DELEGATE not found — skipping push bridge injection"
+fi
+
 # NOTE: The "Push Notifications" capability + aps-environment entitlement must be
 # enabled ONCE in Xcode: open ios/App/App.xcworkspace → Signing & Capabilities →
 # "+ Capability" → Push Notifications. This writes App.entitlements and cannot be
@@ -56,5 +71,4 @@ echo "      (This generates App.entitlements with the aps-environment key.)"
 echo "      Without this, PushNotifications.register() throws at launch and"
 echo "      can crash App Review's automated test."
 echo "   4. Confirm Deployment Target ≥ iOS 14.0"
-echo "   5. Product → Clean Build Folder before Archive"
 echo "   5. Product → Clean Build Folder before Archive"
