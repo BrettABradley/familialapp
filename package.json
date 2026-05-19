@@ -11,7 +11,10 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "cap:sync:ios": "npx cap sync ios && sh scripts/ios-post-sync.sh"
+    "cap:sync:ios": "npx cap sync ios && sh scripts/ios-post-sync.sh",
+    "capacitor:sync:after": "sh scripts/ios-post-sync.sh",
+    "capacitor:copy:after": "sh scripts/ios-post-sync.sh",
+    "capacitor:update:after": "sh scripts/ios-post-sync.sh"
   },
   "dependencies": {
     "@capacitor-community/media": "^9.1.0",
