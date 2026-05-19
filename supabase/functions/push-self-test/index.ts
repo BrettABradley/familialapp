@@ -92,20 +92,22 @@ serve(async (req: Request) => {
   try {
     const authHeader = req.headers.get("Authorization");
     console.log("[push-self-test] received request, authHeader present:", !!authHeader);
-    if (!authHeader) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Missing authorization header" }), {
         status: 401,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
 
+    const token = authHeader.replace("Bearer ", "");
+
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
 
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    const { data: userData, error: authError } = await userClient.auth.getUser(token);
+    const user = userData?.user;
     if (authError || !user) {
       console.error("[push-self-test] auth.getUser failed:", authError?.message, "user:", !!user);
       return new Response(JSON.stringify({ error: "Unauthorized", detail: authError?.message ?? "no_user" }), {
