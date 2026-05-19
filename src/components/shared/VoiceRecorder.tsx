@@ -159,6 +159,7 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
         await VoiceRecorder.startRecording();
         setIsRecording(true);
         setElapsed(0);
+        if (timerRef.current) clearInterval(timerRef.current);
         timerRef.current = setInterval(() => {
           setElapsed((prev) => {
             if (prev + 1 >= maxDuration) {
