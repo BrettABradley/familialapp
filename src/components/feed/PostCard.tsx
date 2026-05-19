@@ -657,9 +657,9 @@ export const PostCard = ({
             <div key={comment.id} className={`flex gap-3 ${isReply ? "ml-10" : ""}`}>
               <Link to={`/profile/${comment.author_id}`}>
                 <Avatar className={`${isReply ? "h-6 w-6" : "h-8 w-8"} cursor-pointer hover:opacity-80 transition-opacity`}>
-                  <AvatarImage src={avatarUrl(comment.profiles?.avatar_url) || undefined} />
-                  <AvatarFallback className="text-xs">{comment.profiles?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
-                </Avatar>
+                <AvatarImage src={avatarUrl((comment.author_id === currentUserId ? profile?.avatar_url : null) || comment.profiles?.avatar_url) || undefined} />
+                <AvatarFallback className="text-xs">{(comment.author_id === currentUserId ? profile?.display_name : comment.profiles?.display_name)?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+              </Avatar>
               </Link>
               <div className="flex-1 bg-secondary rounded-lg px-3 py-2">
                 <div className="flex items-center justify-between">
