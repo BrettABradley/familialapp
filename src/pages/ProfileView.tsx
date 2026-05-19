@@ -131,6 +131,7 @@ const ProfileView = () => {
     setCroppedBlob(null);
     setUploadCaption("");
     setShowCaptionInput(false);
+    setShowAddMorePrompt(false);
     setCropSrc(null);
   };
 
