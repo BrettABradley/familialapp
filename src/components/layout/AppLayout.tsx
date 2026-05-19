@@ -87,6 +87,7 @@ function AppLayoutContent() {
             hasCircles={circles.length > 0}
           />
         )}
+        <UpdatePrompt />
       </div>
     </TermsAcceptanceGate>
   );
