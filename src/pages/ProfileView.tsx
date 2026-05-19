@@ -136,11 +136,16 @@ const ProfileView = () => {
     if (!list || list.length === 0) return;
     event.target.value = "";
 
-    // Cap at MAX_GROUP_ITEMS
-    let files = Array.from(list);
-    if (files.length > MAX_GROUP_ITEMS) {
-      toast({ title: `Only ${MAX_GROUP_ITEMS} items allowed`, description: `You picked ${files.length}; using the first ${MAX_GROUP_ITEMS}.` });
-      files = files.slice(0, MAX_GROUP_ITEMS);
+    // One file at a time, appended to existing pending items, capped at 4.
+    const incoming = Array.from(list);
+    const remaining = MAX_GROUP_ITEMS - pendingFiles.length;
+    if (remaining <= 0) {
+      toast({ title: `Maximum ${MAX_GROUP_ITEMS} items`, description: "Remove one to add another." });
+      return;
+    }
+    let files = incoming.slice(0, remaining);
+    if (incoming.length > remaining) {
+      toast({ title: `Only ${MAX_GROUP_ITEMS} items allowed`, description: `Kept the first ${remaining}.` });
     }
 
     // HEIC convert sequentially
@@ -153,11 +158,11 @@ const ProfileView = () => {
       }
     }
 
-    if (converted.length === 1) {
+    // Adding the FIRST item — preserve existing single-image crop UX for images
+    if (pendingFiles.length === 0 && converted.length === 1) {
       const only = converted[0];
       const isImage = only.type.startsWith("image/");
       if (isImage) {
-        // Preserve existing single-image crop UX
         const url = URL.createObjectURL(only);
         setPendingFiles([only]);
         setPendingPreviews([{ url, isVideo: false }]);
@@ -174,16 +179,24 @@ const ProfileView = () => {
       return;
     }
 
-    // Multi-item: skip crop entirely
-    const previews = converted.map((f) => ({
+    // Appending additional items (or first batch with multiple): skip crop.
+    const newPreviews = converted.map((f) => ({
       url: URL.createObjectURL(f),
       isVideo: f.type.startsWith("video/"),
     }));
-    setPendingFiles(converted);
-    setPendingPreviews(previews);
+    // If we're adding to a previously-cropped single image, drop the crop
+    // (carousel posts use the originals).
     setCroppedBlob(null);
-    setUploadCaption("");
+    setPendingFiles((prev) => [...prev, ...converted]);
+    setPendingPreviews((prev) => [...prev, ...newPreviews]);
     setShowCaptionInput(true);
+  };
+
+  const removePendingItem = (index: number) => {
+    const removed = pendingPreviews[index];
+    if (removed) URL.revokeObjectURL(removed.url);
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+    setPendingPreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleCropComplete = (blob: Blob) => {
