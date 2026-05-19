@@ -1227,22 +1227,28 @@ export type Database = {
         Row: {
           caption: string | null
           created_at: string
+          group_id: string
           id: string
           image_url: string
+          position: number
           user_id: string
         }
         Insert: {
           caption?: string | null
           created_at?: string
+          group_id?: string
           id?: string
           image_url: string
+          position?: number
           user_id: string
         }
         Update: {
           caption?: string | null
           created_at?: string
+          group_id?: string
           id?: string
           image_url?: string
+          position?: number
           user_id?: string
         }
         Relationships: []
