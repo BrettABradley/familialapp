@@ -320,29 +320,46 @@ const Albums = () => {
   const handleDownloadAll = async () => {
     if (!selectedAlbum || photos.length === 0) return;
     setIsDownloadingAll(true);
-    toast({ title: "Preparing download...", description: `Bundling ${photos.length} photos into a zip file.` });
 
     try {
-      const zip = new JSZip();
-      const folder = zip.folder(selectedAlbum.name) || zip;
+      const { Capacitor } = await import("@capacitor/core");
+      if (Capacitor.isNativePlatform()) {
+        // On iOS/Android, save each photo directly to the camera roll so the
+        // user gets the whole album in Photos in one shot.
+        toast({ title: "Saving to Photos...", description: `Saving ${photos.length} photos to your camera roll.` });
+        const { downloadFilesToCameraRoll } = await import("@/lib/nativeDownload");
+        const urls = photos.map(p => p.photo_url);
+        const { saved, failed } = await downloadFilesToCameraRoll(urls);
+        toast({
+          title: failed === 0 ? "Saved to Photos!" : "Partially saved",
+          description: failed === 0
+            ? `${saved} photos saved to your camera roll.`
+            : `${saved} saved, ${failed} failed.`,
+        });
+      } else {
+        toast({ title: "Preparing download...", description: `Bundling ${photos.length} photos into a zip file.` });
+        const zip = new JSZip();
+        const folder = zip.folder(selectedAlbum.name) || zip;
 
-      for (let i = 0; i < photos.length; i++) {
-        try {
-          const response = await fetch(photos[i].photo_url);
-          const blob = await response.blob();
-          const ext = photos[i].photo_url.split(".").pop()?.split("?")[0] || "jpg";
-          folder.file(`photo_${i + 1}.${ext}`, blob);
-        } catch {
-          // skip failed downloads
+        for (let i = 0; i < photos.length; i++) {
+          try {
+            const response = await fetch(photos[i].photo_url);
+            const blob = await response.blob();
+            const ext = photos[i].photo_url.split(".").pop()?.split("?")[0] || "jpg";
+            folder.file(`photo_${i + 1}.${ext}`, blob);
+          } catch {
+            // skip failed downloads
+          }
         }
-      }
 
-      const content = await zip.generateAsync({ type: "blob" });
-      const { downloadBlob } = await import("@/lib/nativeDownload");
-      await downloadBlob(content, `${selectedAlbum.name}.zip`);
-      toast({ title: "Download ready!" });
-    } catch {
-      toast({ title: "Download failed", variant: "destructive" });
+        const content = await zip.generateAsync({ type: "blob" });
+        const { downloadBlob } = await import("@/lib/nativeDownload");
+        await downloadBlob(content, `${selectedAlbum.name}.zip`);
+        toast({ title: "Download ready!" });
+      }
+    } catch (err: any) {
+      console.error("Download all failed:", err);
+      toast({ title: "Download failed", description: err?.message, variant: "destructive" });
     }
     setIsDownloadingAll(false);
   };
