@@ -357,6 +357,29 @@ const Settings = () => {
             <Label htmlFor="push-notifs">Push notifications</Label>
             <Switch id="push-notifs" checked={pushEnabled} onCheckedChange={async (v) => { setPushEnabled(v); await saveNotifPrefs({ push_enabled: v }); }} />
           </div>
+          {isIOSNative() && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={async () => {
+                toast({ title: "Sending test push…" });
+                const { data, error } = await supabase.functions.invoke('push-self-test');
+                if (error) {
+                  toast({ title: "Test failed", description: error.message, variant: "destructive" });
+                  return;
+                }
+                const d = data as { ok: boolean; reason?: string; hint?: string; sent?: number; token_count?: number };
+                if (d.ok) {
+                  toast({ title: `Sent to ${d.sent}/${d.token_count} device(s)`, description: "If you don't see a banner within a few seconds, check iOS Settings → Familial → Notifications." });
+                } else {
+                  toast({ title: "No registered devices", description: d.hint ?? d.reason ?? "Unknown", variant: "destructive" });
+                }
+              }}
+            >
+              Send test push to this device
+            </Button>
+          )}
           <div className="border-t pt-3">
             <p className="text-sm text-muted-foreground mb-3">Mute specific notification types:</p>
             {["comments", "mentions", "events", "fridge_pins", "direct_messages", "campfire_stories"].map(type => (

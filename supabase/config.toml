@@ -65,3 +65,5 @@ project_id = "qxkwxolssapayqyfdwqc"
     verify_jwt = false
   [functions.send-unread-message-emails]
     verify_jwt = true
+  [functions.push-self-test]
+    verify_jwt = false
