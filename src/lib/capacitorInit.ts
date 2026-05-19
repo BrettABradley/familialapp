@@ -75,7 +75,7 @@ export async function initCapacitorPlugins() {
   try {
     const tryRegister = () => {
       try {
-        registerForPushNotifications();
+        registerForPushNotifications().catch((e) => console.warn('[boot] push registration rejected', e));
       } catch (e) {
         console.warn('[boot] push registration threw', e);
       }
