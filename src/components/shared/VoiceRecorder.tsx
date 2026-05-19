@@ -15,8 +15,11 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const isNative = Capacitor.isNativePlatform();
+  // Track which recorder path is actively running so stopRecording uses the
+  // matching API. If the native plugin isn't compiled into the iOS bundle yet
+  // we fall back to the WKWebView MediaRecorder and must NOT call the native
+  // stop, which would throw "not implemented".
+  const activeModeRef = useRef<"native" | "web" | null>(null);
 
   const stopRecording = useCallback(async () => {
     // Always clear the timer first so the elapsed counter freezes immediately.
