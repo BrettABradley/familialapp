@@ -222,7 +222,13 @@ const PostMediaCarousel = ({
   onImageClick: (index: number) => void;
   onVideoClick: (index: number) => void;
 }) => {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "start" });
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: false,
+    align: "start",
+    duration: 18,
+    dragThreshold: 6,
+    containScroll: "trimSnaps",
+  });
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
@@ -237,9 +243,11 @@ const PostMediaCarousel = ({
     <div className="mb-4 mx-auto w-full max-w-sm">
       <div className="relative">
         <div className="overflow-hidden rounded-lg bg-muted" ref={emblaRef}>
-          <div className="flex">
+          <div className="flex touch-pan-y will-change-transform">
             {items.map((url, index) => {
               const type = getMediaType(url);
+              // Eagerly load the current slide + immediate neighbors so swipes feel instant.
+              const isPriority = Math.abs(index - selectedIndex) <= 1;
               return (
                 <div key={index} className="flex-[0_0_100%] min-w-0 aspect-square relative bg-muted">
                   {type === "video" ? (
@@ -261,6 +269,7 @@ const PostMediaCarousel = ({
                       <SmartImage
                         src={url}
                         preset="card"
+                        priority={isPriority}
                         alt={`Post media ${index + 1}`}
                         className="w-full h-full object-cover"
                       />

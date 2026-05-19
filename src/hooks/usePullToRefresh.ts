@@ -20,22 +20,39 @@ export function usePullToRefresh({
   const pulling = useRef(false);
   const isNative = Capacitor.isNativePlatform();
 
+  const isAtScrollTop = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return false;
+    if (el.scrollTop > 0) return false;
+    // The page itself usually scrolls on body/document, not on the wrapper div.
+    // Only allow PTR when BOTH the wrapper and the page are at the very top —
+    // otherwise scrolling back up to the top of a long page accidentally fires
+    // a refresh as soon as the user reaches y=0.
+    const docTop =
+      window.scrollY ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop ||
+      0;
+    return docTop <= 0;
+  }, []);
+
   const handleTouchStart = useCallback(
     (e: TouchEvent) => {
       if (isRefreshing) return;
-      const el = containerRef.current;
-      if (!el || el.scrollTop > 0) return;
+      if (!isAtScrollTop()) {
+        pulling.current = false;
+        return;
+      }
       startY.current = e.touches[0].clientY;
       pulling.current = true;
     },
-    [isRefreshing]
+    [isRefreshing, isAtScrollTop]
   );
 
   const handleTouchMove = useCallback(
     (e: TouchEvent) => {
       if (!pulling.current || isRefreshing) return;
-      const el = containerRef.current;
-      if (!el || el.scrollTop > 0) {
+      if (!isAtScrollTop()) {
         pulling.current = false;
         setPullDistance(0);
         return;
@@ -46,9 +63,13 @@ export function usePullToRefresh({
         const dampened = Math.min(delta * 0.5, maxPull);
         setPullDistance(dampened);
         if (dampened > 10) e.preventDefault();
+      } else if (delta < -5) {
+        // Finger is moving up (user is scrolling down) — abort pull entirely.
+        pulling.current = false;
+        setPullDistance(0);
       }
     },
-    [isRefreshing, maxPull]
+    [isRefreshing, maxPull, isAtScrollTop]
   );
 
   const handleTouchEnd = useCallback(async () => {
