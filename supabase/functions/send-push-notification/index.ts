@@ -13,7 +13,7 @@ const APNS_HOST =
   (Deno.env.get("APNS_ENV") ?? "production").toLowerCase() === "sandbox"
     ? "https://api.sandbox.push.apple.com"
     : "https://api.push.apple.com";
-const APNS_TOPIC = "com.familialmedia.familial";
+const APNS_TOPIC = "space.manus.familial.mobile.t20260223211425";
 
 // ---------- ES256 JWT for APNs (cached ~50 min) ----------
 let cachedJwt: { token: string; exp: number } | null = null;
