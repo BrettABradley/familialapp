@@ -19,25 +19,33 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
   const isNative = Capacitor.isNativePlatform();
 
   const stopRecording = useCallback(async () => {
+    // Always clear the timer first so the elapsed counter freezes immediately.
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     if (isNative) {
       try {
         const { VoiceRecorder } = await import("capacitor-voice-recorder");
         const result = await VoiceRecorder.stopRecording();
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
         setIsRecording(false);
         setElapsed(0);
         const b64 = result?.value?.recordDataBase64;
         const mime = result?.value?.mimeType || "audio/aac";
-        if (b64) {
-          const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-          const blob = new Blob([bytes], { type: mime });
-          if (blob.size > 0) onRecordingComplete(blob);
+        if (!b64) {
+          toast.error("No audio recorded. Try holding the mic a bit longer.");
+          return;
         }
-      } catch (err) {
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        const blob = new Blob([bytes], { type: mime });
+        if (blob.size === 0) {
+          toast.error("Recording was empty. Please try again.");
+          return;
+        }
+        onRecordingComplete(blob);
+      } catch (err: any) {
         console.error("Native stopRecording error:", err);
+        toast.error(err?.message || "Could not stop recording.");
         setIsRecording(false);
         setElapsed(0);
       }
@@ -45,10 +53,6 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
-    }
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
     }
     setIsRecording(false);
     setElapsed(0);
@@ -116,6 +120,7 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
       setIsRecording(true);
       setElapsed(0);
 
+      if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
         setElapsed((prev) => {
           if (prev + 1 >= maxDuration) {
@@ -154,6 +159,7 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
         await VoiceRecorder.startRecording();
         setIsRecording(true);
         setElapsed(0);
+        if (timerRef.current) clearInterval(timerRef.current);
         timerRef.current = setInterval(() => {
           setElapsed((prev) => {
             if (prev + 1 >= maxDuration) {

@@ -234,18 +234,23 @@ const PostMediaCarousel = ({
   }, [emblaApi]);
 
   return (
-    <div className="mb-4">
+    <div className="mb-4 mx-auto w-full max-w-sm">
       <div className="relative">
-        <div className="overflow-hidden rounded-lg bg-secondary" ref={emblaRef}>
+        <div className="overflow-hidden rounded-lg bg-muted" ref={emblaRef}>
           <div className="flex">
             {items.map((url, index) => {
               const type = getMediaType(url);
               return (
-                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-[4/5] relative bg-black">
+                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-square relative bg-muted">
                   {type === "video" ? (
-                    <div className="w-full h-full" onClick={() => onVideoClick(index)}>
+                    <button
+                      type="button"
+                      className="w-full h-full cursor-pointer"
+                      onClick={() => onVideoClick(index)}
+                      aria-label={`Open video ${index + 1}`}
+                    >
                       <VideoThumbnail url={url} onClick={() => onVideoClick(index)} />
-                    </div>
+                    </button>
                   ) : (
                     <button
                       type="button"
@@ -257,7 +262,7 @@ const PostMediaCarousel = ({
                         src={url}
                         preset="card"
                         alt={`Post media ${index + 1}`}
-                        className="w-full h-full object-contain"
+                        className="w-full h-full object-cover"
                       />
                     </button>
                   )}
@@ -383,8 +388,8 @@ export const PostCard = ({
         <div className="flex items-center gap-3">
           <Link to={`/profile/${post.author_id}`}>
             <Avatar className="cursor-pointer hover:opacity-80 transition-opacity">
-              <AvatarImage src={avatarUrl(post.profiles?.avatar_url) || undefined} />
-              <AvatarFallback>{post.profiles?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+              <AvatarImage src={avatarUrl((post.author_id === currentUserId ? profile?.avatar_url : null) || post.profiles?.avatar_url) || undefined} />
+              <AvatarFallback>{(post.author_id === currentUserId ? profile?.display_name : post.profiles?.display_name)?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
             </Avatar>
           </Link>
           <div className="flex-1">
@@ -652,9 +657,9 @@ export const PostCard = ({
             <div key={comment.id} className={`flex gap-3 ${isReply ? "ml-10" : ""}`}>
               <Link to={`/profile/${comment.author_id}`}>
                 <Avatar className={`${isReply ? "h-6 w-6" : "h-8 w-8"} cursor-pointer hover:opacity-80 transition-opacity`}>
-                  <AvatarImage src={avatarUrl(comment.profiles?.avatar_url) || undefined} />
-                  <AvatarFallback className="text-xs">{comment.profiles?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
-                </Avatar>
+                <AvatarImage src={avatarUrl((comment.author_id === currentUserId ? profile?.avatar_url : null) || comment.profiles?.avatar_url) || undefined} />
+                <AvatarFallback className="text-xs">{(comment.author_id === currentUserId ? profile?.display_name : comment.profiles?.display_name)?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+              </Avatar>
               </Link>
               <div className="flex-1 bg-secondary rounded-lg px-3 py-2">
                 <div className="flex items-center justify-between">

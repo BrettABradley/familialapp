@@ -251,16 +251,20 @@ export const useFeedPosts = () => {
     try {
       const { downloadFile } = await import("@/lib/nativeDownload");
       const { Capacitor } = await import("@capacitor/core");
-      const ext = url.split(".").pop()?.split("?")[0] || "jpg";
-      await downloadFile(url, `familial-photo-${Date.now()}.${ext}`);
+      // Always download the ORIGINAL storage object (not the render/image-transformed
+      // thumbnail) so the saved file is full-resolution.
+      const cleanUrl = url.replace("/storage/v1/render/image/", "/storage/v1/object/").split("?")[0];
+      const ext = cleanUrl.split(".").pop() || "jpg";
+      await downloadFile(cleanUrl, `familial-photo-${Date.now()}.${ext}`);
       toast({
         title: "Saved!",
         description: Capacitor.isNativePlatform()
           ? "Photo saved to your camera roll."
           : "Image downloaded.",
       });
-    } catch {
-      toast({ title: "Download failed", description: "Could not download the image.", variant: "destructive" });
+    } catch (err: any) {
+      console.error("Download failed:", err);
+      toast({ title: "Download failed", description: err?.message || "Could not download the image.", variant: "destructive" });
     }
   };
 
