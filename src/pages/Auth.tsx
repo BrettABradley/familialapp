@@ -494,14 +494,20 @@ const Auth = () => {
                       }}
                       onFocus={(e) => {
                         // iOS keyboard can cover the password field — scroll the
-                        // submit button into view so the user can finish signup
-                        // without the keyboard blocking the field or the button.
+                        // field into the center of the visible area so both the
+                        // field and the Create Account button stay reachable.
                         const el = e.currentTarget;
-                        setTimeout(() => {
-                          el.scrollIntoView({ behavior: "smooth", block: "start" });
-                        }, 320);
+                        const scroll = () => {
+                          try {
+                            el.scrollIntoView({ behavior: "smooth", block: "center" });
+                          } catch {}
+                        };
+                        // Two passes: once right away, again after the iOS
+                        // keyboard finishes animating and --keyboard-height is set.
+                        setTimeout(scroll, 50);
+                        setTimeout(scroll, 380);
                       }}
-                      style={{ scrollMarginTop: "20vh", scrollMarginBottom: "60vh" }}
+                      style={{ scrollMarginTop: "10vh", scrollMarginBottom: "calc(var(--keyboard-height, 0px) + 8rem)" }}
                       className={`pr-11 ${errors.password ? "border-destructive" : ""}`}
                     />
                     <button
