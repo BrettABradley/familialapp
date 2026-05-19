@@ -4,6 +4,22 @@ import { supabase } from '@/integrations/supabase/client';
 let registrationAttempted = false;
 let lastRegisteredUserId: string | null = null;
 let registrationWatchdog: number | null = null;
+let activeRegistration: Promise<PushRegistrationResult> | null = null;
+
+export type PushRegistrationResult = {
+  ok: boolean;
+  status:
+    | 'registered'
+    | 'already_attempted'
+    | 'not_ios'
+    | 'no_session'
+    | 'permission_denied'
+    | 'registration_error'
+    | 'upload_failed'
+    | 'timeout'
+    | 'setup_failed';
+  message: string;
+};
 
 /**
  * Reset the in-memory registration guard. Called on sign-out / user-switch
@@ -28,21 +44,44 @@ export function resetPushRegistrationState() {
  * exactly what we observed in production. The logs below make this
  * diagnosable from Safari Web Inspector.
  */
-export async function registerForPushNotifications() {
+export async function registerForPushNotifications(options: { force?: boolean } = {}): Promise<PushRegistrationResult> {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') {
     console.log('[push] skip — not native iOS');
-    return;
+    return { ok: false, status: 'not_ios', message: 'Push registration only runs in the iOS app.' };
   }
+
+  if (activeRegistration) return activeRegistration;
 
   // Allow re-registration if the signed-in user changed
   const { data: sessionData } = await supabase.auth.getSession();
   const currentUserId = sessionData.session?.user?.id ?? null;
-  if (registrationAttempted && lastRegisteredUserId === currentUserId) {
+  if (!currentUserId) {
+    registrationAttempted = false;
+    lastRegisteredUserId = null;
+    return { ok: false, status: 'no_session', message: 'Please sign in again before enabling push notifications.' };
+  }
+
+  if (!options.force && registrationAttempted && lastRegisteredUserId === currentUserId) {
     console.log('[push] already attempted this session for this user');
-    return;
+    return { ok: true, status: 'already_attempted', message: 'Push registration already ran for this session.' };
   }
   registrationAttempted = true;
   lastRegisteredUserId = currentUserId;
+
+  activeRegistration = runPushRegistration().finally(() => {
+    activeRegistration = null;
+  });
+
+  return activeRegistration;
+}
+
+async function runPushRegistration(): Promise<PushRegistrationResult> {
+  const clearWatchdog = () => {
+    if (registrationWatchdog) {
+      window.clearTimeout(registrationWatchdog);
+      registrationWatchdog = null;
+    }
+  };
 
   try {
     const { PushNotifications } = await import('@capacitor/push-notifications');
@@ -56,71 +95,94 @@ export async function registerForPushNotifications() {
     if (perm.receive !== 'granted') {
       console.warn('[push] permission not granted — aborting:', perm.receive);
       registrationAttempted = false; // allow retry if user re-enables in Settings
-      return;
+      return { ok: false, status: 'permission_denied', message: 'Push permission is not enabled for Familial in iOS Settings.' };
     }
 
     await PushNotifications.removeAllListeners();
 
-    await PushNotifications.addListener('registration', async (token) => {
-      if (registrationWatchdog) {
-        window.clearTimeout(registrationWatchdog);
-        registrationWatchdog = null;
-      }
-      console.log('[push] token-received (APNs OK), length=', token.value?.length);
+    return await new Promise<PushRegistrationResult>(async (resolve) => {
+      let settled = false;
+      const settle = (result: PushRegistrationResult) => {
+        if (settled) return;
+        settled = true;
+        clearWatchdog();
+        resolve(result);
+      };
+
+      await PushNotifications.addListener('registration', async (token) => {
+        console.log('[push] token-received (APNs OK), length=', token.value?.length);
+        try {
+          const { data: sd } = await supabase.auth.getSession();
+          if (!sd.session) {
+            console.warn('[push] no session at token-received time — skipping upload');
+            registrationAttempted = false;
+            settle({ ok: false, status: 'no_session', message: 'Please sign in again so this device can be saved for push notifications.' });
+            return;
+          }
+
+          const { error } = await supabase.functions.invoke('register-push-token', {
+            headers: { Authorization: `Bearer ${sd.session.access_token}` },
+            body: { device_token: token.value },
+          });
+
+          if (error) {
+            console.error('[push] token-upload-failed:', error);
+            registrationAttempted = false;
+            settle({ ok: false, status: 'upload_failed', message: error.message || 'The device token could not be saved.' });
+          } else {
+            console.log('[push] token-uploaded ✅');
+            settle({ ok: true, status: 'registered', message: 'This iPhone is registered for push notifications.' });
+          }
+        } catch (e) {
+          console.error('[push] token-upload threw:', e);
+          registrationAttempted = false;
+          settle({ ok: false, status: 'upload_failed', message: e instanceof Error ? e.message : 'The device token could not be saved.' });
+        }
+      });
+
+      await PushNotifications.addListener('registrationError', (err) => {
+        const msg = String(err?.error ?? err ?? '');
+        console.error('[push] registration-error:', msg);
+        if (/aps-environment|entitlement/i.test(msg)) {
+          console.error(
+            '[push] ⚠️ FIX: Open ios/App/App.xcworkspace → App target → ' +
+              'Signing & Capabilities → + Capability → "Push Notifications". ' +
+              'Without the aps-environment entitlement APNs cannot issue a token.'
+          );
+        }
+        registrationAttempted = false; // allow retry on next sign-in
+        settle({ ok: false, status: 'registration_error', message: msg || 'iOS could not register this device with APNs.' });
+      });
+
+      await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+        const link = action.notification?.data?.link;
+        if (link && typeof link === 'string') {
+          window.location.href = link;
+        }
+      });
+
+      console.log('[push] register-called');
       try {
-        const { data: sd } = await supabase.auth.getSession();
-        if (!sd.session) {
-          console.warn('[push] no session at token-received time — skipping upload');
-          return;
-        }
-        const { error } = await supabase.functions.invoke('register-push-token', {
-          body: { device_token: token.value },
-        });
-        if (error) {
-          console.error('[push] token-upload-failed:', error);
-        } else {
-          console.log('[push] token-uploaded ✅');
-        }
+        await PushNotifications.register();
       } catch (e) {
-        console.error('[push] token-upload threw:', e);
+        console.error('[push] register threw:', e);
+        registrationAttempted = false;
+        settle({ ok: false, status: 'registration_error', message: e instanceof Error ? e.message : 'iOS could not register this device with APNs.' });
+        return;
       }
-    });
 
-    await PushNotifications.addListener('registrationError', (err) => {
-      if (registrationWatchdog) {
-        window.clearTimeout(registrationWatchdog);
-        registrationWatchdog = null;
-      }
-      const msg = String(err?.error ?? err ?? '');
-      console.error('[push] registration-error:', msg);
-      if (/aps-environment|entitlement/i.test(msg)) {
-        console.error(
-          '[push] ⚠️ FIX: Open ios/App/App.xcworkspace → App target → ' +
-            'Signing & Capabilities → + Capability → "Push Notifications". ' +
-            'Without the aps-environment entitlement APNs cannot issue a token.'
+      registrationWatchdog = window.setTimeout(() => {
+        console.warn(
+          '[push] no registration callback after 15s. If permission was granted, add the AppDelegate bridge from Capacitor PushNotifications docs, then run npm run cap:sync:ios and upload a new TestFlight build.'
         );
-      }
-      registrationAttempted = false; // allow retry on next sign-in
+        registrationAttempted = false;
+        settle({ ok: false, status: 'timeout', message: 'iOS did not return an APNs token. Rebuild after running the iOS sync script so the AppDelegate push bridge is included.' });
+      }, 15000);
     });
-
-    await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
-      const link = action.notification?.data?.link;
-      if (link && typeof link === 'string') {
-        window.location.href = link;
-      }
-    });
-
-    console.log('[push] register-called');
-    await PushNotifications.register();
-    registrationWatchdog = window.setTimeout(() => {
-      console.warn(
-        '[push] no registration callback after 15s. If permission was granted, add the AppDelegate bridge from Capacitor PushNotifications docs, then run npm run cap:sync:ios and upload a new TestFlight build.'
-      );
-      registrationAttempted = false;
-      registrationWatchdog = null;
-    }, 15000);
   } catch (e) {
     console.error('[push] setup failed:', e);
     registrationAttempted = false;
+    clearWatchdog();
+    return { ok: false, status: 'setup_failed', message: e instanceof Error ? e.message : 'Push notifications could not be initialized.' };
   }
 }
