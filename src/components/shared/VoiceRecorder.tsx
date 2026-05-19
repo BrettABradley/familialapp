@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, Square } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { toast } from "sonner";
 
 interface VoiceRecorderProps {
   onRecordingComplete: (blob: Blob) => void;
@@ -14,7 +16,33 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const stopRecording = useCallback(() => {
+  const isNative = Capacitor.isNativePlatform();
+
+  const stopRecording = useCallback(async () => {
+    if (isNative) {
+      try {
+        const { VoiceRecorder } = await import("capacitor-voice-recorder");
+        const result = await VoiceRecorder.stopRecording();
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        setIsRecording(false);
+        setElapsed(0);
+        const b64 = result?.value?.recordDataBase64;
+        const mime = result?.value?.mimeType || "audio/aac";
+        if (b64) {
+          const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+          const blob = new Blob([bytes], { type: mime });
+          if (blob.size > 0) onRecordingComplete(blob);
+        }
+      } catch (err) {
+        console.error("Native stopRecording error:", err);
+        setIsRecording(false);
+        setElapsed(0);
+      }
+      return;
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
@@ -24,7 +52,7 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
     }
     setIsRecording(false);
     setElapsed(0);
-  }, []);
+  }, [isNative, onRecordingComplete]);
 
   useEffect(() => {
     return () => {
@@ -36,6 +64,44 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
   }, []);
 
   const startRecording = async () => {
+    // On native iOS/Android, use the Capacitor voice-recorder plugin so the
+    // OS surfaces its native microphone permission prompt instead of relying
+    // on WKWebView's getUserMedia (which can hard-crash the app).
+    if (isNative) {
+      try {
+        const { VoiceRecorder } = await import("capacitor-voice-recorder");
+        const can = await VoiceRecorder.canDeviceVoiceRecord();
+        if (!can?.value) {
+          toast.error("Voice recording is not supported on this device");
+          return;
+        }
+        const perm = await VoiceRecorder.hasAudioRecordingPermission();
+        if (!perm?.value) {
+          const req = await VoiceRecorder.requestAudioRecordingPermission();
+          if (!req?.value) {
+            toast.error("Microphone permission denied. Enable it in Settings → Familial → Microphone.");
+            return;
+          }
+        }
+        await VoiceRecorder.startRecording();
+        setIsRecording(true);
+        setElapsed(0);
+        timerRef.current = setInterval(() => {
+          setElapsed((prev) => {
+            if (prev + 1 >= maxDuration) {
+              stopRecording();
+              return 0;
+            }
+            return prev + 1;
+          });
+        }, 1000);
+      } catch (err: any) {
+        console.error("Native startRecording error:", err);
+        toast.error(err?.message || "Could not start recording");
+      }
+      return;
+    }
+
     try {
       if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
         console.warn("Audio recording not supported on this device");
