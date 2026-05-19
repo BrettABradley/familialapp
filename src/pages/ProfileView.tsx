@@ -63,6 +63,9 @@ const ProfileView = () => {
   // Single-file crop state (only used when exactly 1 image is selected)
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [croppedBlob, setCroppedBlob] = useState<Blob | null>(null);
+  // After the first item is ready, ask the user if they want to add more
+  // to make a carousel before going to the caption step.
+  const [showAddMorePrompt, setShowAddMorePrompt] = useState(false);
 
   // Lightbox now opens a *group* (one post) with a slide index
   const [lightbox, setLightbox] = useState<{ group: ProfileImage[]; index: number } | null>(null);
