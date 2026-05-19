@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
+import { haptic } from "@/lib/haptics";
 
 interface UsePullToRefreshOptions {
   onRefresh: () => Promise<void>;
