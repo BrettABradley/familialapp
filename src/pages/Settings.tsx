@@ -366,8 +366,6 @@ const Settings = () => {
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
 
           <div className="border-t pt-3 space-y-3">
             <p className="text-sm text-muted-foreground">Email me when:</p>
