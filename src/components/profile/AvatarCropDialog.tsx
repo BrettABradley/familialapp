@@ -20,11 +20,28 @@ interface AvatarCropDialogProps {
   title?: string;
 }
 
+async function loadImageWithOrientation(imageSrc: string): Promise<HTMLImageElement | ImageBitmap> {
+  // iOS photos carry EXIF rotation. createImageBitmap with imageOrientation:"from-image"
+  // bakes the rotation into the bitmap so the cropped output matches what the user saw.
+  try {
+    const res = await fetch(imageSrc);
+    const blob = await res.blob();
+    // @ts-ignore - imageOrientation is supported in modern Safari/Chrome
+    return await createImageBitmap(blob, { imageOrientation: "from-image" });
+  } catch {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = imageSrc;
+    });
+    return img;
+  }
+}
+
 async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
-  const image = new Image();
-  image.crossOrigin = "anonymous";
-  image.src = imageSrc;
-  await new Promise((resolve) => (image.onload = resolve));
+  const image = await loadImageWithOrientation(imageSrc);
 
   const canvas = document.createElement("canvas");
   canvas.width = pixelCrop.width;
@@ -32,7 +49,7 @@ async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
   const ctx = canvas.getContext("2d")!;
 
   ctx.drawImage(
-    image,
+    image as CanvasImageSource,
     pixelCrop.x,
     pixelCrop.y,
     pixelCrop.width,
@@ -44,7 +61,7 @@ async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
   );
 
   return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob!), "image/jpeg", 0.9);
+    canvas.toBlob((blob) => resolve(blob!), "image/jpeg", 0.92);
   });
 }
 

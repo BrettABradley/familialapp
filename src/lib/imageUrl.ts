@@ -14,11 +14,12 @@
 
 export type ImagePreset = "thumb" | "card" | "full" | "avatar";
 
-const PRESETS: Record<ImagePreset, { width: number; quality: number }> = {
+const PRESETS: Record<ImagePreset, { width: number; height?: number; quality: number }> = {
   thumb: { width: 400, quality: 70 },   // feed grid tiles, album grid, fridge tiles
   card: { width: 800, quality: 75 },    // single-image post
   full: { width: 1600, quality: 80 },   // lightbox
-  avatar: { width: 128, quality: 75 },  // avatars
+  // Square 256px so retina/large avatars stay crisp and are always 1:1 cropped
+  avatar: { width: 256, height: 256, quality: 80 },
 };
 
 function isSupabaseStorageUrl(url: string): boolean {
@@ -27,6 +28,7 @@ function isSupabaseStorageUrl(url: string): boolean {
 
 export interface TransformOpts {
   width?: number;
+  height?: number;
   quality?: number;
   resize?: "cover" | "contain" | "fill";
 }
@@ -36,10 +38,11 @@ export function transformedImage(url: string | null | undefined, opts: Transform
   if (!url) return "";
   if (!isSupabaseStorageUrl(url)) return url;
 
-  const { width, quality = 75, resize = "cover" } = opts;
+  const { width, height, quality = 75, resize = "cover" } = opts;
   const rewritten = url.replace("/storage/v1/object/", "/storage/v1/render/image/");
   const params = new URLSearchParams();
   if (width) params.set("width", String(width));
+  if (height) params.set("height", String(height));
   params.set("quality", String(quality));
   params.set("resize", resize);
   const sep = rewritten.includes("?") ? "&" : "?";
