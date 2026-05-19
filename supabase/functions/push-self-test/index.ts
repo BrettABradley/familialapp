@@ -91,8 +91,9 @@ serve(async (req: Request) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
+    console.log("[push-self-test] received request, authHeader present:", !!authHeader);
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing authorization" }), {
+      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
         status: 401,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
@@ -106,11 +107,13 @@ serve(async (req: Request) => {
 
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      console.error("[push-self-test] auth.getUser failed:", authError?.message, "user:", !!user);
+      return new Response(JSON.stringify({ error: "Unauthorized", detail: authError?.message ?? "no_user" }), {
         status: 401,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
+    console.log("[push-self-test] authenticated user:", user.id);
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
