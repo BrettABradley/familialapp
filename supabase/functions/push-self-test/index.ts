@@ -12,7 +12,7 @@ const APNS_HOST =
     ? "https://api.sandbox.push.apple.com"
     : "https://api.push.apple.com";
 const APNS_ENV = (Deno.env.get("APNS_ENV") ?? "production").toLowerCase();
-const APNS_TOPIC = "com.familialmedia.familial";
+const APNS_TOPIC = "space.manus.familial.mobile.t20260223211425";
 
 let cachedJwt: { token: string; exp: number } | null = null;
 
