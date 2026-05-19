@@ -482,7 +482,21 @@ const Messages = () => {
       toast({ title: "Too many files", description: "You can attach up to 4 files per message.", variant: "destructive" });
       return;
     }
-    const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
+    if (!blob || blob.size === 0) {
+      toast({ title: "No audio recorded", description: "The recording was empty. Please try again.", variant: "destructive" });
+      return;
+    }
+    // Derive a sensible file extension from the actual blob mime type so the
+    // upload + playback uses the right container (iOS = m4a/aac, web = webm).
+    const mime = blob.type || "audio/webm";
+    const ext = mime.includes("mp4") || mime.includes("aac") || mime.includes("m4a")
+      ? "m4a"
+      : mime.includes("webm")
+        ? "webm"
+        : mime.includes("wav")
+          ? "wav"
+          : "m4a";
+    const file = new File([blob], `voice-note-${Date.now()}.${ext}`, { type: mime });
     setSelectedFiles(prev => [...prev, file]);
     setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]);
   };
