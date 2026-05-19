@@ -4,7 +4,7 @@ const BUNDLE_ID = "app.lovable.f745440093af4f4390a60d52ff08c778";
 // TODO: replace with numeric App Store ID once the app is live.
 // While in TestFlight-only, the App Store URL won't resolve; we fall back to
 // a generic apps.apple.com search that opens TestFlight if installed.
-export const APP_STORE_URL = "https://apps.apple.com/app/familial/id0000000000";
+export const APP_STORE_URL = "https://apps.apple.com/app/familial/id6760382623";
 export const TESTFLIGHT_URL = "itms-beta://";
 
 const FETCH_CACHE_KEY = "appVersionCheck:lastFetch";
