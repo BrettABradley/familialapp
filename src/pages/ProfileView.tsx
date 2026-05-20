@@ -303,6 +303,8 @@ const ProfileView = () => {
           }
         })();
       }
+    } else {
+      toast({ title: "Upload failed", description: "No media was saved. Please try again.", variant: "destructive" });
     }
 
     setIsUploading(false);
