@@ -725,7 +725,7 @@ const ProfileView = () => {
                   {pendingPreviews[0].isVideo ? (
                     <video src={pendingPreviews[0].url} controls playsInline className="h-full w-full bg-muted object-cover" />
                   ) : (
-                    <img src={pendingPreviews[0].url} alt="Selected item 1" className="h-full w-full object-cover" />
+                    <SquareImageThumbnail src={pendingPreviews[0].url} alt="Selected item 1" />
                   )}
                   <button type="button" onClick={() => removePendingItem(0)} disabled={isUploading} className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm" aria-label="Remove selected item">
                     <X className="h-5 w-5" />
@@ -738,7 +738,7 @@ const ProfileView = () => {
                       {p.isVideo ? (
                         <video src={p.url} playsInline muted className="h-full w-full bg-muted object-cover" />
                       ) : (
-                        <img src={p.url} alt={`Selected item ${i + 1}`} className="h-full w-full object-cover" />
+                        <SquareImageThumbnail src={p.url} alt={`Selected item ${i + 1}`} />
                       )}
                       <button type="button" onClick={() => removePendingItem(i)} disabled={isUploading} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm" aria-label={`Remove item ${i + 1}`}>
                         <X className="h-4 w-4" />
