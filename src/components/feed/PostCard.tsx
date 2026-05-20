@@ -210,6 +210,34 @@ const MediaItem = ({ url, index, onDownload, onImageClick, onVideoClick }: { url
   );
 };
 
+const FeedImagePreview = ({
+  url,
+  alt,
+  priority,
+}: {
+  url: string;
+  alt: string;
+  priority?: boolean;
+}) => (
+  <>
+    <SmartImage
+      src={url}
+      preset="card"
+      priority={priority}
+      alt=""
+      aria-hidden="true"
+      className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-xl"
+    />
+    <SmartImage
+      src={url}
+      preset="card"
+      priority={priority}
+      alt={alt}
+      className="relative z-10 h-full w-full object-contain"
+    />
+  </>
+);
+
 // Instagram-style swipeable carousel for multi-media posts
 const PostMediaCarousel = ({
   items,
@@ -271,13 +299,7 @@ const PostMediaCarousel = ({
                       onClick={() => onImageClick(index)}
                       aria-label={`Open image ${index + 1}`}
                     >
-                      <SmartImage
-                        src={url}
-                        preset="card"
-                        priority={isPriority}
-                        alt={`Post media ${index + 1}`}
-                        className="h-full w-full object-cover"
-                      />
+                      <FeedImagePreview url={url} priority={isPriority} alt={`Post media ${index + 1}`} />
                     </button>
                   )}
                 </div>
@@ -653,15 +675,10 @@ export const PostCard = ({
                 className="relative group rounded-lg overflow-hidden cursor-pointer bg-secondary w-full aspect-square"
                 onClick={() => setLightboxIndex(0)}
               >
-                <SmartImage
-                  src={visualMedia[0]}
-                  preset="card"
-                  alt="Post image"
-                  className="w-full h-full object-cover"
-                />
+                <FeedImagePreview url={visualMedia[0]} alt="Post image" priority />
                 <button
                   onClick={(e) => { e.stopPropagation(); onDownloadImage(visualMedia[0]); }}
-                  className="absolute bottom-2 right-2 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
+                  className="absolute bottom-2 right-2 z-20 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
                   aria-label="Download image"
                 >
                   <Download className="w-4 h-4" />
