@@ -652,14 +652,14 @@ export const PostCard = ({
               />
             ) : (
               <div
-                className="relative group rounded-lg overflow-hidden cursor-pointer bg-black mx-auto w-full max-w-sm aspect-square"
+                className="relative group rounded-lg overflow-hidden cursor-pointer bg-secondary mx-auto w-full max-w-sm aspect-square"
                 onClick={() => setLightboxIndex(0)}
               >
                 <SmartImage
                   src={visualMedia[0]}
                   preset="card"
                   alt="Post image"
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-cover"
                 />
                 <button
                   onClick={(e) => { e.stopPropagation(); onDownloadImage(visualMedia[0]); }}
