@@ -203,14 +203,18 @@ export function FridgeBoard({
                           </audio>
                         </div>
                       ) : (
-                        <SmartImage
-                          src={pin.image_url}
-                          preset="thumb"
-                          alt={pin.title}
-                          className="block w-full aspect-square object-cover bg-zinc-200 cursor-pointer"
-                          style={{ imageRendering: "auto" }}
+                        <div
+                          className="block w-full aspect-square bg-white cursor-pointer flex items-center justify-center overflow-hidden"
                           onClick={() => setEnlargedPin(pin)}
-                        />
+                        >
+                          <SmartImage
+                            src={pin.image_url}
+                            preset="thumb"
+                            alt={pin.title}
+                            className="max-w-full max-h-full w-auto h-auto object-contain"
+                            style={{ imageRendering: "auto" }}
+                          />
+                        </div>
                       )
                     ) : (
                       <div
@@ -384,13 +388,15 @@ export function FridgeBoard({
                     </audio>
                   </div>
                 ) : (
-                  <SmartImage
-                    src={enlargedPin.image_url}
-                    preset="full"
-                    priority
-                    alt={enlargedPin.title}
-                    className="w-full aspect-square object-cover rounded-none bg-zinc-200"
-                  />
+                  <div className="w-full aspect-square bg-white flex items-center justify-center overflow-hidden">
+                    <SmartImage
+                      src={enlargedPin.image_url}
+                      preset="full"
+                      priority
+                      alt={enlargedPin.title}
+                      className="max-w-full max-h-full w-auto h-auto object-contain"
+                    />
+                  </div>
                 )
               ) : (
                 <div className="flex aspect-square items-center justify-center bg-zinc-100 text-center p-6 font-mono">
