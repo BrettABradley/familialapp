@@ -786,7 +786,7 @@ const ProfileView = () => {
                     {getMediaType(item.image_url) === "video" ? (
                       <VideoThumbnail src={item.image_url} />
                     ) : (
-                      <img src={item.image_url} alt={`Item ${i + 1}`} className="w-full h-full object-cover" />
+                      <SquareImageThumbnail src={item.image_url} alt={`Item ${i + 1}`} />
                     )}
                   </div>
                 ))}
