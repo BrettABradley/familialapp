@@ -757,7 +757,7 @@ const ProfileView = () => {
       )}
 
       {/* Add-more prompt — bridges between selecting a photo and the caption step */}
-      <Dialog open={showAddMorePrompt} onOpenChange={(open) => { if (!open) setShowAddMorePrompt(false); }}>
+      <Dialog open={showAddMorePrompt && pendingFiles.length > 0} onOpenChange={(open) => { if (!open) setShowAddMorePrompt(false); }}>
         <DialogContent className="max-w-sm max-h-[min(92svh,560px)] overflow-y-auto">
           <div className="space-y-4">
             <h3 className="font-serif text-lg font-semibold">
