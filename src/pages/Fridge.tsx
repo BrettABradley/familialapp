@@ -59,6 +59,9 @@ const Fridge = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [isLoadingPins, setIsLoadingPins] = useState(true);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [upcomingEvents, setUpcomingEvents] = useState<Array<{ id: string; title: string; event_date: string; event_time: string | null; location: string | null; description: string | null }>>([]);
+  const [linkedEventId, setLinkedEventId] = useState<string>("");
+
 
   useEffect(() => {
     if (circles.length > 0) {
@@ -86,6 +89,61 @@ const Fridge = () => {
     }
     setIsLoadingPins(false);
   };
+
+  useEffect(() => {
+    if (pinType !== "event" || !selectedCircle) {
+      setUpcomingEvents([]);
+      return;
+    }
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    supabase
+      .from("events")
+      .select("id, title, event_date, event_time, location, description")
+      .eq("circle_id", selectedCircle)
+      .gte("event_date", todayStr)
+      .order("event_date", { ascending: true })
+      .order("event_time", { ascending: true, nullsFirst: true })
+      .limit(25)
+      .then(({ data }) => {
+        if (data) setUpcomingEvents(data as any);
+      });
+  }, [pinType, selectedCircle]);
+
+  const formatEventLabel = (e: { title: string; event_date: string; event_time: string | null }) => {
+    const [y, m, d] = e.event_date.split("-").map(Number);
+    const dt = new Date(y, (m || 1) - 1, d || 1);
+    const dateStr = dt.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    let timeStr = "";
+    if (e.event_time) {
+      const [hh, mm] = e.event_time.split(":").map(Number);
+      const tDt = new Date();
+      tDt.setHours(hh || 0, mm || 0, 0, 0);
+      timeStr = ` · ${tDt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+    }
+    return `${e.title} — ${dateStr}${timeStr}`;
+  };
+
+  const handleLinkEvent = (eventId: string) => {
+    setLinkedEventId(eventId);
+    if (eventId === "__custom__") return;
+    const ev = upcomingEvents.find((e) => e.id === eventId);
+    if (!ev) return;
+    setTitle(ev.title.slice(0, 100));
+    const [y, m, d] = ev.event_date.split("-").map(Number);
+    const dt = new Date(y, (m || 1) - 1, d || 1);
+    const dateStr = dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    let detail = dateStr;
+    if (ev.event_time) {
+      const [hh, mm] = ev.event_time.split(":").map(Number);
+      const tDt = new Date();
+      tDt.setHours(hh || 0, mm || 0, 0, 0);
+      detail += ` at ${tDt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+    }
+    if (ev.location) detail += ` · ${ev.location}`;
+    setContent(detail.slice(0, 150));
+  };
+
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
@@ -180,6 +238,7 @@ const Fridge = () => {
     setTitle("");
     setContent("");
     setPinType("note");
+    setLinkedEventId("");
     setCampfirePrompt("");
     setSelectedImage(null);
     if (imagePreview) {
@@ -327,6 +386,31 @@ const Fridge = () => {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {pinType === "event" && (
+                  <div className="space-y-2">
+                    <Label>Link to upcoming event (optional)</Label>
+                    <Select value={linkedEventId} onValueChange={handleLinkEvent}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={upcomingEvents.length === 0 ? "No upcoming events" : "Choose an event from the calendar"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__custom__">Custom reminder (no link)</SelectItem>
+                        {upcomingEvents.map((ev) => (
+                          <SelectItem key={ev.id} value={ev.id}>
+                            {formatEventLabel(ev)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {upcomingEvents.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        No upcoming events in this circle yet. <Link to="/events" className="underline">Add one to the calendar</Link>.
+                      </p>
+                    )}
+                  </div>
+                )}
+
 
                 {pinType !== "campfire" && (
                   <div className="space-y-2">
