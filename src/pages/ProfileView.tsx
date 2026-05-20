@@ -558,7 +558,7 @@ const ProfileView = () => {
                     {isVideo ? (
                       <VideoThumbnail src={cover.image_url} />
                     ) : (
-                      <img src={cover.image_url} alt={cover.caption || "Profile photo"} className="w-full h-full object-contain bg-black" />
+                      <img src={cover.image_url} alt={cover.caption || "Profile photo"} className="w-full h-full object-contain bg-background" />
                     )}
                     {count > 1 && (
                       <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[11px] font-medium px-1.5 py-0.5 rounded-full pointer-events-none">
@@ -774,7 +774,7 @@ const ProfileView = () => {
                     {p.isVideo ? (
                       <div className="w-full h-full flex items-center justify-center bg-black/80"><Play className="h-5 w-5 text-white" /></div>
                     ) : (
-                      <img src={p.url} alt={`Selected ${i + 1}`} className="w-full h-full object-contain bg-black" />
+                      <img src={p.url} alt={`Selected ${i + 1}`} className="w-full h-full object-contain bg-background" />
                     )}
                     <button type="button" onClick={() => removePendingItem(i)} className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5" aria-label={`Remove item ${i + 1}`}>
                       <X className="h-3 w-3" />
@@ -819,7 +819,7 @@ const ProfileView = () => {
                         <Play className="h-5 w-5 text-white" />
                       </div>
                     ) : (
-                      <img src={p.url} alt={`Selected ${i + 1}`} className="w-full h-full object-contain bg-black" />
+                      <img src={p.url} alt={`Selected ${i + 1}`} className="w-full h-full object-contain bg-background" />
                     )}
                     <button
                       type="button"
