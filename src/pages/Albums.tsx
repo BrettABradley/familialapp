@@ -20,6 +20,7 @@ import { convertHeicToJpeg, convertHeicFiles } from "@/lib/heicConverter";
 import JSZip from "jszip";
 import { SmartImage } from "@/components/shared/SmartImage";
 import { presetImage } from "@/lib/imageUrl";
+import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import useEmblaCarousel from "embla-carousel-react";
 
 interface Circle {
@@ -59,13 +60,7 @@ const AlbumImagePreview = ({
   preset?: "thumb" | "card";
   priority?: boolean;
 }) => (
-  <SmartImage
-    src={url}
-    preset={preset}
-    priority={priority}
-    alt={alt}
-    className="h-full w-full object-cover"
-  />
+  <SquareImageThumbnail src={url} preset={preset} priority={priority} alt={alt} />
 );
 
 // Embla-powered finger-following lightbox for album photos. Mirrors the
