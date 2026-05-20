@@ -515,7 +515,7 @@ const ProfileView = () => {
                     {isVideo ? (
                       <VideoThumbnail src={cover.image_url} />
                     ) : (
-                      <img src={cover.image_url} alt={cover.caption || "Profile photo"} className="w-full h-full object-contain bg-background" />
+                      <img src={cover.image_url} alt={cover.caption || "Profile photo"} className="w-full h-full object-cover" />
                     )}
                     {count > 1 && (
                       <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[11px] font-medium px-1.5 py-0.5 rounded-full pointer-events-none">
@@ -722,9 +722,9 @@ const ProfileView = () => {
               {pendingPreviews.length === 1 ? (
                 <div className="relative mx-auto aspect-square w-full max-w-xl overflow-hidden rounded-lg bg-muted">
                   {pendingPreviews[0].isVideo ? (
-                    <video src={pendingPreviews[0].url} controls playsInline className="h-full w-full bg-muted object-contain" />
+                    <video src={pendingPreviews[0].url} controls playsInline className="h-full w-full bg-muted object-cover" />
                   ) : (
-                    <img src={pendingPreviews[0].url} alt="Selected item 1" className="h-full w-full object-contain" />
+                    <img src={pendingPreviews[0].url} alt="Selected item 1" className="h-full w-full object-cover" />
                   )}
                   <button type="button" onClick={() => removePendingItem(0)} disabled={isUploading} className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm" aria-label="Remove selected item">
                     <X className="h-5 w-5" />
@@ -735,9 +735,9 @@ const ProfileView = () => {
                   {pendingPreviews.map((p, i) => (
                     <div key={i} className="relative aspect-square overflow-hidden rounded-lg bg-muted">
                       {p.isVideo ? (
-                        <video src={p.url} playsInline muted className="h-full w-full bg-muted object-contain" />
+                        <video src={p.url} playsInline muted className="h-full w-full bg-muted object-cover" />
                       ) : (
-                        <img src={p.url} alt={`Selected item ${i + 1}`} className="h-full w-full object-contain" />
+                        <img src={p.url} alt={`Selected item ${i + 1}`} className="h-full w-full object-cover" />
                       )}
                       <button type="button" onClick={() => removePendingItem(i)} disabled={isUploading} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm" aria-label={`Remove item ${i + 1}`}>
                         <X className="h-4 w-4" />
