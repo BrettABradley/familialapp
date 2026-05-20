@@ -7,6 +7,7 @@ import { getMediaType } from "@/lib/mediaUtils";
 import { PixelCampfire } from "./PixelCampfire";
 import { CampfireDialog } from "./CampfireDialog";
 import { SmartImage } from "@/components/shared/SmartImage";
+import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 
 export interface FridgeBoardPin {
   id: string;
@@ -207,12 +208,10 @@ export function FridgeBoard({
                           className="block w-full aspect-square bg-white cursor-pointer overflow-hidden"
                           onClick={() => setEnlargedPin(pin)}
                         >
-                          <SmartImage
+                          <SquareImageThumbnail
                             src={pin.image_url}
                             preset="thumb"
                             alt={pin.title}
-                            className="h-full w-full object-cover"
-                            style={{ imageRendering: "auto" }}
                           />
                         </div>
                       )
