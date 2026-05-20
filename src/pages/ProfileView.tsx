@@ -19,6 +19,7 @@ import { convertHeicToJpeg } from "@/lib/heicConverter";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { VideoThumbnail } from "@/components/shared/VideoThumbnail";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
+import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 
 interface ProfileData {
   user_id: string;
@@ -515,7 +516,7 @@ const ProfileView = () => {
                     {isVideo ? (
                       <VideoThumbnail src={cover.image_url} />
                     ) : (
-                      <img src={cover.image_url} alt={cover.caption || "Profile photo"} className="w-full h-full object-cover" />
+                      <SquareImageThumbnail src={cover.image_url} alt={cover.caption || "Profile photo"} />
                     )}
                     {count > 1 && (
                       <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[11px] font-medium px-1.5 py-0.5 rounded-full pointer-events-none">
