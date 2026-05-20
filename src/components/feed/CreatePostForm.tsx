@@ -339,7 +339,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
         )}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
-            <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
+            <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
             <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isPosting || selectedFiles.length >= MAX_FILES}>
               <Paperclip className="w-4 h-4 mr-2" />Add Media
             </Button>
