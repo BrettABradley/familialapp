@@ -65,6 +65,21 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
   }, [onRecordingComplete]);
 
   useEffect(() => {
+    // Preload the native voice-recorder plugin on mount so the very first tap
+    // doesn't pay the dynamic-import cost (which on iOS adds 1-3s before the
+    // OS permission prompt appears). Also warm up the permission check.
+    if (Capacitor.isNativePlatform()) {
+      import("capacitor-voice-recorder")
+        .then(async ({ VoiceRecorder }) => {
+          try {
+            await VoiceRecorder.canDeviceVoiceRecord();
+            await VoiceRecorder.hasAudioRecordingPermission();
+          } catch {
+            // ignore — handled at record time
+          }
+        })
+        .catch(() => {});
+    }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
