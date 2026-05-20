@@ -197,8 +197,8 @@ const MediaItem = ({ url, index, onDownload, onImageClick, onVideoClick }: { url
   }
 
   return (
-    <div className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer bg-black" onClick={() => onImageClick?.(index)}>
-      <SmartImage src={url} preset="thumb" alt={`Post image ${index + 1}`} className="w-full h-full object-contain" />
+    <div className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer bg-secondary" onClick={() => onImageClick?.(index)}>
+      <SmartImage src={url} preset="thumb" alt={`Post image ${index + 1}`} className="w-full h-full object-cover" />
       <button
         onClick={(e) => { e.stopPropagation(); onDownload(url); }}
         className="absolute bottom-2 right-2 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
