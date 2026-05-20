@@ -801,23 +801,23 @@ const ProfileView = () => {
       </Dialog>
 
       {/* Caption Input Dialog (shared caption for the whole post) */}
-      <Dialog open={showCaptionInput} onOpenChange={(open) => { if (!open) resetUploadState(); }}>
-        <DialogContent className="max-w-md">
+      <Dialog open={showCaptionInput} onOpenChange={(open) => { if (!open) setShowCaptionInput(false); }}>
+        <DialogContent className="max-w-md max-h-[min(92svh,600px)] overflow-y-auto">
           <div className="space-y-4">
             <h3 className="font-serif text-lg font-semibold">
               {pendingFiles.length > 1 ? `Add a caption (${pendingFiles.length} items)` : "Add a caption"}
             </h3>
 
             {pendingPreviews.length >= 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <div className="grid grid-cols-4 gap-2 pb-1">
                 {pendingPreviews.map((p, i) => (
-                  <div key={i} className="relative flex-shrink-0 w-16 h-16 rounded-md overflow-hidden bg-muted">
+                  <div key={i} className="relative aspect-square rounded-md overflow-hidden bg-muted">
                     {p.isVideo ? (
                       <div className="w-full h-full flex items-center justify-center bg-black/80">
                         <Play className="h-5 w-5 text-white" />
                       </div>
                     ) : (
-                      <img src={p.url} alt={`Selected ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={p.url} alt={`Selected ${i + 1}`} className="w-full h-full object-contain bg-black" />
                     )}
                     <button
                       type="button"
@@ -838,7 +838,7 @@ const ProfileView = () => {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="flex-shrink-0 w-16 h-16 rounded-md border-2 border-dashed border-muted-foreground/30 hover:border-primary hover:bg-secondary/50 flex flex-col items-center justify-center text-muted-foreground transition-colors"
+                    className="aspect-square rounded-md border-2 border-dashed border-muted-foreground/30 hover:border-primary hover:bg-secondary/50 flex flex-col items-center justify-center text-muted-foreground transition-colors"
                     aria-label="Add another item"
                   >
                     <ImagePlus className="h-4 w-4" />
