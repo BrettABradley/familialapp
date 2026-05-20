@@ -204,14 +204,14 @@ export function FridgeBoard({
                         </div>
                       ) : (
                         <div
-                          className="block w-full aspect-square bg-white cursor-pointer flex items-center justify-center overflow-hidden"
+                          className="block w-full aspect-square bg-white cursor-pointer overflow-hidden"
                           onClick={() => setEnlargedPin(pin)}
                         >
                           <SmartImage
                             src={pin.image_url}
                             preset="thumb"
                             alt={pin.title}
-                            className="max-w-full max-h-full w-auto h-auto object-contain"
+                            className="h-full w-full object-cover"
                             style={{ imageRendering: "auto" }}
                           />
                         </div>
