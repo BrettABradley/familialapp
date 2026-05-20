@@ -20,6 +20,7 @@ import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
+import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 
 interface Circle {
   id: string;
@@ -498,11 +499,9 @@ const Fridge = () => {
                       />
                       {imagePreview ? (
                         <div className="relative">
-                          <img
-                            src={imagePreview}
-                            alt="Preview"
-                            className="w-full aspect-square object-cover rounded-lg"
-                          />
+                          <div className="aspect-square overflow-hidden rounded-lg">
+                            <SquareImageThumbnail src={imagePreview} alt="Preview" />
+                          </div>
                           <Button
                             variant="secondary"
                             size="sm"

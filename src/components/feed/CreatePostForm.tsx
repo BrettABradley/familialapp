@@ -15,6 +15,7 @@ import { MentionInput } from "@/components/shared/MentionInput";
 import { useCircleMembers } from "@/hooks/useCircleMembers";
 import { validateFileSize, getFileMediaType } from "@/lib/mediaUtils";
 import { convertHeicFiles } from "@/lib/heicConverter";
+import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 
 interface CreatePostFormProps {
   onPostCreated: () => void;
@@ -225,7 +226,9 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
             <audio controls src={url} className="w-full" />
           </div>
         ) : (
-          <img src={url} alt={`Preview ${index + 1}`} className="w-full aspect-square object-cover" />
+          <div className="aspect-square w-full overflow-hidden">
+            <SquareImageThumbnail src={url} alt={`Preview ${index + 1}`} />
+          </div>
         )}
         <button
           onClick={() => removeFile(index)}
