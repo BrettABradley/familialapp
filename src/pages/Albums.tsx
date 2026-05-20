@@ -775,19 +775,6 @@ const Albums = () => {
               )}
             </DialogContent>
           </Dialog>
-
-          {/* Cover Crop Dialog */}
-          {coverCropSrc && (
-            <AvatarCropDialog
-              open={!!coverCropSrc}
-              imageSrc={coverCropSrc}
-              onClose={() => { setCoverCropSrc(null); setPendingCoverFile(null); }}
-              onCropComplete={handleCoverCropComplete}
-              aspect={3 / 1}
-              cropShape="rect"
-              title="Crop Album Cover"
-            />
-          )}
         </div>
       ) : (
         // Albums List View
