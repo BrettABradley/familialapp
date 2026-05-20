@@ -737,13 +737,12 @@ const Albums = () => {
 
           {/* Cover Photo Preview */}
           {selectedAlbum.cover_photo_url && (
-            <div className="mb-6 rounded-lg overflow-hidden bg-card flex items-center justify-center max-h-[420px]">
-              <SmartImage
-                src={selectedAlbum.cover_photo_url}
+            <div className="relative mb-6 aspect-square rounded-lg overflow-hidden bg-secondary">
+              <AlbumImagePreview
+                url={selectedAlbum.cover_photo_url}
                 preset="card"
                 priority
                 alt={`${selectedAlbum.name} cover`}
-                className="max-w-full max-h-[420px] w-auto h-auto object-contain"
               />
             </div>
           )}
@@ -760,11 +759,11 @@ const Albums = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {photos.map((photo) => (
                 <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer bg-secondary" style={{ contentVisibility: "auto", containIntrinsicSize: "300px 300px" }} onClick={() => setEnlargedPhoto(photo)}>
-                  <SmartImage src={photo.photo_url} preset="thumb" alt={photo.caption || "Photo"} className="w-full h-full object-cover" />
+                  <AlbumImagePreview url={photo.photo_url} preset="thumb" alt={photo.caption || "Photo"} />
                   {user && photo.uploaded_by === user.id && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo); }}
-                      className="absolute top-2 right-2 bg-background/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
+                      className="absolute top-2 right-2 z-20 bg-background/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
                       aria-label="Delete photo"
                     >
                       <X className="w-4 h-4" />
