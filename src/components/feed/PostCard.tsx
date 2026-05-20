@@ -660,7 +660,7 @@ export const PostCard = ({
                   src={visualMedia[0]}
                   preset="card"
                   alt="Post image"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                 />
                 <button
                   onClick={(e) => { e.stopPropagation(); onDownloadImage(visualMedia[0]); }}
