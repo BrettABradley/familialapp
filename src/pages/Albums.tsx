@@ -713,7 +713,7 @@ const Albums = () => {
                 preset="card"
                 priority
                 alt={`${selectedAlbum.name} cover`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain bg-black"
               />
             </div>
           )}
@@ -729,8 +729,8 @@ const Albums = () => {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {photos.map((photo) => (
-                <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer" style={{ contentVisibility: "auto", containIntrinsicSize: "300px 300px" }} onClick={() => setEnlargedPhoto(photo)}>
-                  <SmartImage src={photo.photo_url} preset="thumb" alt={photo.caption || "Photo"} className="w-full h-full object-cover" />
+                <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer bg-black" style={{ contentVisibility: "auto", containIntrinsicSize: "300px 300px" }} onClick={() => setEnlargedPhoto(photo)}>
+                  <SmartImage src={photo.photo_url} preset="thumb" alt={photo.caption || "Photo"} className="w-full h-full object-contain" />
                   {user && photo.uploaded_by === user.id && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo); }}
