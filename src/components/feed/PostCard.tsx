@@ -242,13 +242,13 @@ const PostMediaCarousel = ({
   return (
     <div className="mb-4 mx-auto w-full max-w-sm">
       <div className="relative">
-        <div className="overflow-hidden rounded-lg bg-black" ref={emblaRef}>
+        <div className="overflow-hidden rounded-lg bg-secondary" ref={emblaRef}>
           <div className="flex touch-pan-y will-change-transform">
             {items.map((url, index) => {
               const type = getMediaType(url);
               const isPriority = Math.abs(index - selectedIndex) <= 1;
               return (
-                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-square relative bg-black flex items-center justify-center">
+                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-square relative bg-secondary flex items-center justify-center">
                   {type === "video" ? (
                     <button
                       type="button"
@@ -271,15 +271,14 @@ const PostMediaCarousel = ({
                       onClick={() => onImageClick(index)}
                       aria-label={`Open image ${index + 1}`}
                     >
-                      {/* object-contain so the full image fits in the square (letterboxed
-                          on black) instead of being cropped. The lightbox still shows
-                          the full original. */}
+                      {/* object-cover fills the square thumbnail; the lightbox shows
+                          the full original uncropped. */}
                       <SmartImage
                         src={url}
                         preset="card"
                         priority={isPriority}
                         alt={`Post media ${index + 1}`}
-                        className="w-full h-full object-contain bg-black"
+                        className="w-full h-full object-cover"
                       />
                     </button>
                   )}
