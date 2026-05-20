@@ -1,11 +1,13 @@
 import Header from "@/components/landing/Header";
 import Footer from "@/components/landing/Footer";
 import SEO from "@/components/shared/SEO";
+import LegalPageCloseButton from "@/components/shared/LegalPageCloseButton";
 
 const TermsOfService = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
       <SEO title="Terms of Service - Familial" description="Review Familial's terms of service — the rules and guidelines for using our private family social network." path="/terms" />
+      <LegalPageCloseButton />
       <Header />
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 max-w-4xl">
         <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground mb-2">Terms of Service</h1>
