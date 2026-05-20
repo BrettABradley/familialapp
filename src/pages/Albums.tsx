@@ -867,9 +867,9 @@ const Albums = () => {
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </button>
                   )}
-                  <div className="aspect-video bg-secondary relative overflow-hidden">
+                  <div className="aspect-square bg-secondary relative overflow-hidden">
                     {album.cover_photo_url ? (
-                      <SmartImage src={album.cover_photo_url} preset="card" alt={album.name} className="w-full h-full object-cover" />
+                      <AlbumImagePreview url={album.cover_photo_url} preset="card" alt={album.name} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Image className="w-12 h-12 text-muted-foreground" />
