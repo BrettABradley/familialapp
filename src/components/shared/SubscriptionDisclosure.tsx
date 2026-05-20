@@ -17,11 +17,11 @@ const SubscriptionDisclosure = ({ variant = "full", className = "" }: Subscripti
     return (
       <p className={`text-xs text-muted-foreground leading-relaxed ${className}`}>
         Auto-renews monthly until canceled. Manage in Apple ID Settings.{" "}
-        <Link to="/terms-of-service" className="underline hover:text-foreground">
+        <Link to="/terms" className="underline hover:text-foreground">
           Terms of Use (EULA)
         </Link>
         {" · "}
-        <Link to="/privacy-policy" className="underline hover:text-foreground">
+        <Link to="/privacy" className="underline hover:text-foreground">
           Privacy Policy
         </Link>
       </p>
@@ -46,11 +46,11 @@ const SubscriptionDisclosure = ({ variant = "full", className = "" }: Subscripti
         or cancel your subscriptions in your Apple ID Settings → Subscriptions after purchase.
       </p>
       <p>
-        <Link to="/terms-of-service" className="underline hover:text-foreground">
+        <Link to="/terms" className="underline hover:text-foreground">
           Terms of Use (EULA)
         </Link>
         {" · "}
-        <Link to="/privacy-policy" className="underline hover:text-foreground">
+        <Link to="/privacy" className="underline hover:text-foreground">
           Privacy Policy
         </Link>
       </p>
