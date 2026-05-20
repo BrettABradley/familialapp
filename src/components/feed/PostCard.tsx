@@ -242,13 +242,13 @@ const PostMediaCarousel = ({
   return (
     <div className="mb-4 mx-auto w-full max-w-sm">
       <div className="relative">
-        <div className="overflow-hidden rounded-lg bg-secondary" ref={emblaRef}>
+        <div className="overflow-hidden rounded-lg bg-card" ref={emblaRef}>
           <div className="flex touch-pan-y will-change-transform">
             {items.map((url, index) => {
               const type = getMediaType(url);
               const isPriority = Math.abs(index - selectedIndex) <= 1;
               return (
-                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-square relative bg-secondary flex items-center justify-center">
+                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-square relative bg-card flex items-center justify-center">
                   {type === "video" ? (
                     <button
                       type="button"
@@ -267,18 +267,18 @@ const PostMediaCarousel = ({
                   ) : (
                     <button
                       type="button"
-                      className="w-full h-full cursor-pointer flex items-center justify-center"
+                      className="w-full h-full cursor-pointer flex items-center justify-center bg-card"
                       onClick={() => onImageClick(index)}
                       aria-label={`Open image ${index + 1}`}
                     >
-                      {/* object-cover fills the square thumbnail; the lightbox shows
-                          the full original uncropped. */}
+                      {/* object-contain shows the entire image with no zoom/crop.
+                          Container bg matches the post card so there are no visible bars. */}
                       <SmartImage
                         src={url}
                         preset="card"
                         priority={isPriority}
                         alt={`Post media ${index + 1}`}
-                        className="w-full h-full object-cover"
+                        className="max-w-full max-h-full w-auto h-auto object-contain"
                       />
                     </button>
                   )}
