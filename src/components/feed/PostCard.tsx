@@ -675,15 +675,10 @@ export const PostCard = ({
                 className="relative group rounded-lg overflow-hidden cursor-pointer bg-secondary w-full aspect-square"
                 onClick={() => setLightboxIndex(0)}
               >
-                <SmartImage
-                  src={visualMedia[0]}
-                  preset="card"
-                  alt="Post image"
-                  className="w-full h-full object-cover"
-                />
+                <FeedImagePreview url={visualMedia[0]} alt="Post image" priority />
                 <button
                   onClick={(e) => { e.stopPropagation(); onDownloadImage(visualMedia[0]); }}
-                  className="absolute bottom-2 right-2 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
+                  className="absolute bottom-2 right-2 z-20 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
                   aria-label="Download image"
                 >
                   <Download className="w-4 h-4" />
