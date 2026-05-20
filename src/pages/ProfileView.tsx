@@ -38,7 +38,7 @@ interface ProfileImage {
   position: number;
 }
 
-const MAX_GROUP_ITEMS = 4;
+const MAX_GROUP_ITEMS = 5;
 
 const ProfileView = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -131,17 +131,15 @@ const ProfileView = () => {
     if (!list || list.length === 0) return;
     event.target.value = "";
 
-    // One file at a time, appended to existing pending items, capped at 4.
+    // Strictly one file at a time, appended to existing pending items, capped at MAX_GROUP_ITEMS.
     const incoming = Array.from(list);
     const remaining = MAX_GROUP_ITEMS - pendingFiles.length;
     if (remaining <= 0) {
       toast({ title: `Maximum ${MAX_GROUP_ITEMS} items`, description: "Remove one to add another." });
       return;
     }
-    let files = incoming.slice(0, remaining);
-    if (incoming.length > remaining) {
-      toast({ title: `Only ${MAX_GROUP_ITEMS} items allowed`, description: `Kept the first ${remaining}.` });
-    }
+    // Only take the first file even if the picker returned more
+    let files = incoming.slice(0, 1);
 
     // HEIC convert sequentially
     const converted: File[] = [];
@@ -751,13 +749,28 @@ const ProfileView = () => {
                 </div>
               )}
 
-              <div className="mx-auto mt-4 flex w-full max-w-xl flex-col gap-3 pb-28">
+              <div className="mx-auto mt-6 flex w-full max-w-xl flex-col gap-4 pb-28">
                 {pendingFiles.length < MAX_GROUP_ITEMS && (
-                  <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="h-12">
-                    <ImagePlus className="h-4 w-4 mr-2" />
-                    Add another ({pendingFiles.length}/{MAX_GROUP_ITEMS})
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="h-12"
+                    >
+                      <ImagePlus className="h-4 w-4 mr-2" />
+                      Add another photo ({pendingFiles.length}/{MAX_GROUP_ITEMS})
+                    </Button>
+                    <p className="text-center text-xs text-muted-foreground">
+                      Add up to {MAX_GROUP_ITEMS} photos, or continue with a caption below.
+                    </p>
+                  </div>
                 )}
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Caption</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
                 <Textarea
                   value={uploadCaption}
                   onChange={(e) => setUploadCaption(e.target.value)}
