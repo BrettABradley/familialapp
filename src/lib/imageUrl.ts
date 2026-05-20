@@ -5,7 +5,7 @@
  * Any public/signed storage URL like:
  *   https://<ref>.supabase.co/storage/v1/object/public/<bucket>/<path>
  * can be rewritten to:
- *   https://<ref>.supabase.co/storage/v1/render/image/public/<bucket>/<path>?width=W&quality=Q&resize=cover
+ *   https://<ref>.supabase.co/storage/v1/render/image/public/<bucket>/<path>?width=W&quality=Q&resize=contain
  * which returns a WebP-encoded, CDN-cached, properly sized image.
  *
  * For non-Supabase URLs (external avatars, data URIs, etc.) we return the
@@ -14,12 +14,12 @@
 
 export type ImagePreset = "thumb" | "card" | "full" | "avatar";
 
-const PRESETS: Record<ImagePreset, { width: number; height?: number; quality: number }> = {
+const PRESETS: Record<ImagePreset, { width: number; height?: number; quality: number; resize?: TransformOpts["resize"] }> = {
   thumb: { width: 400, quality: 70 },   // feed grid tiles, album grid, fridge tiles
   card: { width: 800, quality: 75 },    // single-image post
   full: { width: 1600, quality: 80 },   // lightbox
   // Square 256px so retina/large avatars stay crisp and are always 1:1 cropped
-  avatar: { width: 256, height: 256, quality: 80 },
+  avatar: { width: 256, height: 256, quality: 80, resize: "cover" },
 };
 
 function isSupabaseStorageUrl(url: string): boolean {
@@ -38,7 +38,7 @@ export function transformedImage(url: string | null | undefined, opts: Transform
   if (!url) return "";
   if (!isSupabaseStorageUrl(url)) return url;
 
-  const { width, height, quality = 75, resize = "cover" } = opts;
+  const { width, height, quality = 75, resize = "contain" } = opts;
   const rewritten = url.replace("/storage/v1/object/", "/storage/v1/render/image/");
   const params = new URLSearchParams();
   if (width) params.set("width", String(width));
