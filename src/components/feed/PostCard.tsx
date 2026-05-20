@@ -197,8 +197,8 @@ const MediaItem = ({ url, index, onDownload, onImageClick, onVideoClick }: { url
   }
 
   return (
-    <div className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer bg-black" onClick={() => onImageClick?.(index)}>
-      <SmartImage src={url} preset="thumb" alt={`Post image ${index + 1}`} className="w-full h-full object-contain" />
+    <div className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer bg-secondary" onClick={() => onImageClick?.(index)}>
+      <SmartImage src={url} preset="thumb" alt={`Post image ${index + 1}`} className="w-full h-full object-cover" />
       <button
         onClick={(e) => { e.stopPropagation(); onDownload(url); }}
         className="absolute bottom-2 right-2 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
@@ -242,13 +242,13 @@ const PostMediaCarousel = ({
   return (
     <div className="mb-4 mx-auto w-full max-w-sm">
       <div className="relative">
-        <div className="overflow-hidden rounded-lg bg-black" ref={emblaRef}>
+        <div className="overflow-hidden rounded-lg bg-secondary" ref={emblaRef}>
           <div className="flex touch-pan-y will-change-transform">
             {items.map((url, index) => {
               const type = getMediaType(url);
               const isPriority = Math.abs(index - selectedIndex) <= 1;
               return (
-                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-square relative bg-black flex items-center justify-center">
+                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-square relative bg-secondary flex items-center justify-center">
                   {type === "video" ? (
                     <button
                       type="button"
@@ -271,15 +271,14 @@ const PostMediaCarousel = ({
                       onClick={() => onImageClick(index)}
                       aria-label={`Open image ${index + 1}`}
                     >
-                      {/* object-contain so the full image fits in the square (letterboxed
-                          on black) instead of being cropped. The lightbox still shows
-                          the full original. */}
+                      {/* object-cover fills the square thumbnail; the lightbox shows
+                          the full original uncropped. */}
                       <SmartImage
                         src={url}
                         preset="card"
                         priority={isPriority}
                         alt={`Post media ${index + 1}`}
-                        className="w-full h-full object-contain bg-black"
+                        className="w-full h-full object-cover"
                       />
                     </button>
                   )}
@@ -653,14 +652,14 @@ export const PostCard = ({
               />
             ) : (
               <div
-                className="relative group rounded-lg overflow-hidden cursor-pointer bg-black mx-auto w-full max-w-sm aspect-square"
+                className="relative group rounded-lg overflow-hidden cursor-pointer bg-secondary mx-auto w-full max-w-sm aspect-square"
                 onClick={() => setLightboxIndex(0)}
               >
                 <SmartImage
                   src={visualMedia[0]}
                   preset="card"
                   alt="Post image"
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-cover"
                 />
                 <button
                   onClick={(e) => { e.stopPropagation(); onDownloadImage(visualMedia[0]); }}
