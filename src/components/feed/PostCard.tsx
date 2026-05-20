@@ -219,23 +219,13 @@ const FeedImagePreview = ({
   alt: string;
   priority?: boolean;
 }) => (
-  <>
-    <SmartImage
-      src={url}
-      preset="card"
-      priority={priority}
-      alt=""
-      aria-hidden="true"
-      className="absolute inset-0 h-full w-full scale-110 object-cover bg-transparent opacity-35 blur-2xl"
-    />
-    <SmartImage
-      src={url}
-      preset="card"
-      priority={priority}
-      alt={alt}
-      className="relative z-10 h-full w-full object-contain bg-transparent"
-    />
-  </>
+  <SmartImage
+    src={url}
+    preset="card"
+    priority={priority}
+    alt={alt}
+    className="h-full w-full object-cover"
+  />
 );
 
 // Instagram-style swipeable carousel for multi-media posts
