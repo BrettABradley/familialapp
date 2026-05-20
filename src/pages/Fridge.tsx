@@ -387,6 +387,31 @@ const Fridge = () => {
                   </Select>
                 </div>
 
+                {pinType === "event" && (
+                  <div className="space-y-2">
+                    <Label>Link to upcoming event (optional)</Label>
+                    <Select value={linkedEventId} onValueChange={handleLinkEvent}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={upcomingEvents.length === 0 ? "No upcoming events" : "Choose an event from the calendar"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__custom__">Custom reminder (no link)</SelectItem>
+                        {upcomingEvents.map((ev) => (
+                          <SelectItem key={ev.id} value={ev.id}>
+                            {formatEventLabel(ev)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {upcomingEvents.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        No upcoming events in this circle yet. <Link to="/events" className="underline">Add one to the calendar</Link>.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+
                 {pinType !== "campfire" && (
                   <div className="space-y-2">
                     <Label htmlFor="title">Title</Label>
