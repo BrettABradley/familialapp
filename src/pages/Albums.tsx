@@ -49,6 +49,36 @@ interface AlbumPhoto {
   created_at: string;
 }
 
+const AlbumImagePreview = ({
+  url,
+  alt,
+  preset = "thumb",
+  priority = false,
+}: {
+  url: string;
+  alt: string;
+  preset?: "thumb" | "card";
+  priority?: boolean;
+}) => (
+  <>
+    <SmartImage
+      src={url}
+      preset={preset}
+      priority={priority}
+      alt=""
+      aria-hidden="true"
+      className="absolute inset-0 h-full w-full scale-110 object-cover bg-transparent opacity-35 blur-2xl"
+    />
+    <SmartImage
+      src={url}
+      preset={preset}
+      priority={priority}
+      alt={alt}
+      className="relative z-10 h-full w-full object-contain bg-transparent"
+    />
+  </>
+);
+
 // Embla-powered finger-following lightbox for album photos. Mirrors the
 // PostCard MediaLightbox so the swipe feel is identical across the app.
 const AlbumPhotoLightbox = ({
