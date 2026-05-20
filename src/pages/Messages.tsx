@@ -23,6 +23,7 @@ import { validateFileSize, getFileMediaType, getMediaType } from "@/lib/mediaUti
 import { convertHeicFiles, convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
+import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -693,7 +694,7 @@ const Messages = () => {
               ) : mediaType === 'audio' ? (
                 <div className="w-full h-full flex items-center justify-center bg-secondary text-xs text-muted-foreground">🎵</div>
               ) : (
-                <img src={url} alt="" className="w-full h-full object-cover" />
+                <SquareImageThumbnail src={url} alt="" />
               )}
               <button onClick={() => removeFile(index)} className="absolute top-0.5 right-0.5 bg-background/80 rounded-full p-0.5">
                 <X className="w-3 h-3" />
