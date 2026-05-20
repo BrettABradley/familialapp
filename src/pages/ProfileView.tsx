@@ -60,13 +60,6 @@ const ProfileView = () => {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [pendingPreviews, setPendingPreviews] = useState<{ url: string; isVideo: boolean }[]>([]);
 
-  // Single-file crop state (only used when exactly 1 image is selected)
-  const [cropSrc, setCropSrc] = useState<string | null>(null);
-  const [croppedBlob, setCroppedBlob] = useState<Blob | null>(null);
-  // After the first item is ready, ask the user if they want to add more
-  // to make a carousel before going to the caption step.
-  const [showAddMorePrompt, setShowAddMorePrompt] = useState(false);
-
   // Lightbox now opens a *group* (one post) with a slide index
   const [lightbox, setLightbox] = useState<{ group: ProfileImage[]; index: number } | null>(null);
 
@@ -128,19 +121,14 @@ const ProfileView = () => {
     pendingPreviews.forEach((p) => URL.revokeObjectURL(p.url));
     setPendingFiles([]);
     setPendingPreviews([]);
-    setCroppedBlob(null);
     setUploadCaption("");
     setShowCaptionInput(false);
-    setShowAddMorePrompt(false);
-    setCropSrc(null);
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const list = event.target.files;
     if (!list || list.length === 0) return;
     event.target.value = "";
-    setShowAddMorePrompt(false);
-    setShowCaptionInput(false);
 
     // One file at a time, appended to existing pending items, capped at 4.
     const incoming = Array.from(list);
@@ -164,36 +152,14 @@ const ProfileView = () => {
       }
     }
 
-    // Adding the FIRST item — preserve existing single-image crop UX for images
-    if (pendingFiles.length === 0 && converted.length === 1) {
-      const only = converted[0];
-      const isImage = only.type.startsWith("image/");
-      if (isImage) {
-        const url = URL.createObjectURL(only);
-        setPendingFiles([only]);
-        setPendingPreviews([{ url, isVideo: false }]);
-        setCropSrc(url);
-        return;
-      }
-      // Single video → ask if they want to add more before caption
-      const url = URL.createObjectURL(only);
-      setPendingFiles([only]);
-      setPendingPreviews([{ url, isVideo: true }]);
-      setCroppedBlob(null);
-      setUploadCaption("");
-      setShowAddMorePrompt(true);
-      return;
-    }
-
-    // Appending additional items (or first batch with multiple): skip crop.
+    // Keep the original media intact and show it in the full-screen composer immediately.
     const newPreviews = converted.map((f) => ({
       url: URL.createObjectURL(f),
       isVideo: f.type.startsWith("video/"),
     }));
-    setCroppedBlob(null);
     setPendingFiles((prev) => [...prev, ...converted]);
     setPendingPreviews((prev) => [...prev, ...newPreviews]);
-    setShowAddMorePrompt(true);
+    setShowCaptionInput(true);
   };
 
   const removePendingItem = (index: number) => {
@@ -205,13 +171,6 @@ const ProfileView = () => {
     if (nextCount <= 0) {
       resetUploadState();
     }
-  };
-
-  const handleCropComplete = (blob: Blob) => {
-    setCropSrc(null);
-    setCroppedBlob(blob);
-    setUploadCaption("");
-    setShowAddMorePrompt(true);
   };
 
   const handleConfirmUpload = async () => {
@@ -226,17 +185,16 @@ const ProfileView = () => {
       (typeof crypto !== "undefined" && (crypto as any).randomUUID)
         ? (crypto as any).randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const isSingleCroppedImage = pendingFiles.length === 1 && !!croppedBlob;
 
     const insertedRows: ProfileImage[] = [];
     const insertedStoragePaths: string[] = [];
 
     for (let i = 0; i < pendingFiles.length; i++) {
       const file = pendingFiles[i];
-      const uploadData: Blob = isSingleCroppedImage ? (croppedBlob as Blob) : file;
-      const ext = isSingleCroppedImage ? "jpg" : (file.name.split(".").pop() || "jpg");
+      const uploadData: Blob = file;
+      const ext = file.name.split(".").pop() || "jpg";
       const fileName = `${user.id}/${Date.now()}-${i}.${ext}`;
-      const contentType = isSingleCroppedImage ? "image/jpeg" : file.type;
+      const contentType = file.type;
 
       const { error: uploadError } = await supabase.storage
         .from("profile-images")
@@ -743,127 +701,71 @@ const ProfileView = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Crop dialog — only for single-image uploads */}
-      {cropSrc && (
-        <AvatarCropDialog
-          open={!!cropSrc}
-          imageSrc={cropSrc}
-          onClose={() => { setCropSrc(null); resetUploadState(); }}
-          onCropComplete={handleCropComplete}
-          aspect={1}
-          cropShape="rect"
-          title="Crop Photo"
-        />
-      )}
-
-      {/* Add-more prompt — bridges between selecting a photo and the caption step */}
-      <Dialog open={showAddMorePrompt && pendingFiles.length > 0} onOpenChange={(open) => { if (!open) setShowAddMorePrompt(false); }}>
-        <DialogContent className="max-w-sm max-h-[min(92svh,560px)] overflow-y-auto">
-          <div className="space-y-4">
-            <h3 className="font-serif text-lg font-semibold">
-              {pendingFiles.length === 1 ? "Add more to a carousel?" : `${pendingFiles.length}/${MAX_GROUP_ITEMS} items`}
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              You can post up to {MAX_GROUP_ITEMS} photos or videos together. Add them one at a time.
-            </p>
-            {pendingPreviews.length > 0 && (
-              <div className="grid grid-cols-4 gap-2 pb-1">
-                {pendingPreviews.map((p, i) => (
-                  <div key={i} className="relative aspect-square rounded-md overflow-hidden bg-muted">
-                    {p.isVideo ? (
-                      <div className="w-full h-full flex items-center justify-center bg-black/80"><Play className="h-5 w-5 text-white" /></div>
-                    ) : (
-                      <img src={p.url} alt={`Selected ${i + 1}`} className="w-full h-full object-contain bg-background" />
-                    )}
-                    <button type="button" onClick={() => removePendingItem(i)} className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5" aria-label={`Remove item ${i + 1}`}>
-                      <X className="h-3 w-3" />
-                    </button>
-                    <div className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[10px] font-medium px-1 rounded">
-                      {i + 1}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="flex flex-col gap-2">
-              {pendingFiles.length < MAX_GROUP_ITEMS && (
-                <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-                  <ImagePlus className="h-4 w-4 mr-2" />
-                  Add another ({pendingFiles.length}/{MAX_GROUP_ITEMS})
-                </Button>
-              )}
-              <Button onClick={() => { setShowAddMorePrompt(false); setShowCaptionInput(true); }} disabled={pendingFiles.length === 0}>
-                Continue to caption
-              </Button>
-              <Button variant="ghost" onClick={() => resetUploadState()}>Cancel</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Caption Input Dialog (shared caption for the whole post) */}
-      <Dialog open={showCaptionInput} onOpenChange={(open) => { if (!open) setShowCaptionInput(false); }}>
-        <DialogContent className="max-w-md max-h-[min(92svh,600px)] overflow-y-auto">
-          <div className="space-y-4">
-            <h3 className="font-serif text-lg font-semibold">
-              {pendingFiles.length > 1 ? `Add a caption (${pendingFiles.length} items)` : "Add a caption"}
-            </h3>
-
-            {pendingPreviews.length >= 1 && (
-              <div className="grid grid-cols-4 gap-2 pb-1">
-                {pendingPreviews.map((p, i) => (
-                  <div key={i} className="relative aspect-square rounded-md overflow-hidden bg-muted">
-                    {p.isVideo ? (
-                      <div className="w-full h-full flex items-center justify-center bg-black/80">
-                        <Play className="h-5 w-5 text-white" />
-                      </div>
-                    ) : (
-                      <img src={p.url} alt={`Selected ${i + 1}`} className="w-full h-full object-contain bg-background" />
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removePendingItem(i)}
-                      disabled={isUploading}
-                      className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5"
-                      aria-label={`Remove item ${i + 1}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                    <div className="absolute bottom-0.5 right-0.5 bg-black/60 text-white text-[10px] font-medium px-1 rounded">
-                      {i + 1}
-                    </div>
-                  </div>
-                ))}
-                {pendingFiles.length < MAX_GROUP_ITEMS && (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="aspect-square rounded-md border-2 border-dashed border-muted-foreground/30 hover:border-primary hover:bg-secondary/50 flex flex-col items-center justify-center text-muted-foreground transition-colors"
-                    aria-label="Add another item"
-                  >
-                    <ImagePlus className="h-4 w-4" />
-                    <span className="text-[10px] mt-0.5">{pendingFiles.length}/{MAX_GROUP_ITEMS}</span>
-                  </button>
-                )}
+      <Dialog open={showCaptionInput && pendingFiles.length > 0} onOpenChange={(open) => { if (!open && !isUploading) resetUploadState(); }}>
+        <DialogContent className="inset-0 left-0 top-0 h-[100svh] w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0 bg-background p-0 sm:inset-0 sm:left-0 sm:top-0 sm:h-[100svh] sm:w-screen sm:max-w-none sm:translate-x-0 sm:translate-y-0 [&>button:last-child]:hidden">
+          <div className="flex h-full flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border px-4 pb-3 pt-[max(env(safe-area-inset-top,0px),1rem)]">
+              <button type="button" onClick={resetUploadState} disabled={isUploading} className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary" aria-label="Cancel upload">
+                <X className="h-5 w-5" />
+              </button>
+              <div className="text-center">
+                <h3 className="font-serif text-lg font-semibold">New profile post</h3>
+                <p className="text-xs text-muted-foreground">{pendingFiles.length}/{MAX_GROUP_ITEMS} selected</p>
               </div>
-            )}
+              <Button size="sm" onClick={handleConfirmUpload} disabled={isUploading || pendingFiles.length === 0}>
+                {isUploading ? "Posting..." : "Post"}
+              </Button>
+            </div>
 
-            <Textarea
-              value={uploadCaption}
-              onChange={(e) => setUploadCaption(e.target.value)}
-              placeholder="Write a caption (optional)..."
-              className="resize-none"
-              rows={3}
-              maxLength={500}
-            />
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => resetUploadState()}>
-                Cancel
-              </Button>
-              <Button onClick={handleConfirmUpload} disabled={isUploading || pendingFiles.length === 0}>
-                {isUploading ? "Uploading..." : (pendingFiles.length > 1 ? `Post ${pendingFiles.length} items` : "Upload")}
-              </Button>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              {pendingPreviews.length === 1 ? (
+                <div className="relative mx-auto aspect-square w-full max-w-xl overflow-hidden rounded-lg bg-muted">
+                  {pendingPreviews[0].isVideo ? (
+                    <video src={pendingPreviews[0].url} controls playsInline className="h-full w-full bg-muted object-contain" />
+                  ) : (
+                    <img src={pendingPreviews[0].url} alt="Selected item 1" className="h-full w-full object-contain" />
+                  )}
+                  <button type="button" onClick={() => removePendingItem(0)} disabled={isUploading} className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm" aria-label="Remove selected item">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {pendingPreviews.map((p, i) => (
+                    <div key={i} className="relative aspect-square overflow-hidden rounded-lg bg-muted">
+                      {p.isVideo ? (
+                        <video src={p.url} playsInline muted className="h-full w-full bg-muted object-contain" />
+                      ) : (
+                        <img src={p.url} alt={`Selected item ${i + 1}`} className="h-full w-full object-contain" />
+                      )}
+                      <button type="button" onClick={() => removePendingItem(i)} disabled={isUploading} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm" aria-label={`Remove item ${i + 1}`}>
+                        <X className="h-4 w-4" />
+                      </button>
+                      <div className="absolute bottom-2 left-2 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium text-foreground shadow-sm">
+                        {i + 1}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mx-auto mt-4 flex w-full max-w-xl flex-col gap-3 pb-28">
+                {pendingFiles.length < MAX_GROUP_ITEMS && (
+                  <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="h-12">
+                    <ImagePlus className="h-4 w-4 mr-2" />
+                    Add another ({pendingFiles.length}/{MAX_GROUP_ITEMS})
+                  </Button>
+                )}
+                <Textarea
+                  value={uploadCaption}
+                  onChange={(e) => setUploadCaption(e.target.value)}
+                  placeholder="Write a caption (optional)..."
+                  className="min-h-28 resize-none text-base"
+                  rows={4}
+                  maxLength={500}
+                />
+              </div>
             </div>
           </div>
         </DialogContent>
