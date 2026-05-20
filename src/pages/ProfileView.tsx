@@ -38,7 +38,7 @@ interface ProfileImage {
   position: number;
 }
 
-const MAX_GROUP_ITEMS = 4;
+const MAX_GROUP_ITEMS = 5;
 
 const ProfileView = () => {
   const { userId } = useParams<{ userId: string }>();
