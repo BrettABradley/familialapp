@@ -222,16 +222,32 @@ export const VoiceRecorder = ({ onRecordingComplete, maxDuration = 120 }: VoiceR
   return (
     <div className="flex items-center gap-2">
       {isRecording ? (
-        <>
-          <Button type="button" variant="destructive" size="sm" onClick={stopRecording}>
-            <Square className="w-4 h-4 mr-1" />
-            Stop
-          </Button>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="inline-block w-2 h-2 rounded-full bg-destructive animate-pulse" />
-            {formatTime(elapsed)} / {formatTime(maxDuration)}
+        <div className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-destructive/10 border border-destructive/20">
+          <button
+            type="button"
+            onClick={stopRecording}
+            className="h-7 w-7 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:opacity-90 transition-opacity"
+            aria-label="Stop recording"
+          >
+            <Square className="w-3 h-3 fill-current" />
+          </button>
+          <div className="flex items-end gap-[2px] h-4">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span
+                key={i}
+                className="w-[2px] bg-destructive rounded-full animate-pulse"
+                style={{
+                  height: `${40 + ((i * 17) % 60)}%`,
+                  animationDelay: `${i * 120}ms`,
+                  animationDuration: "900ms",
+                }}
+              />
+            ))}
           </div>
-        </>
+          <span className="text-xs font-medium tabular-nums text-foreground/80">
+            {formatTime(elapsed)}
+          </span>
+        </div>
       ) : (
         <Button type="button" variant="ghost" size="icon" onClick={startRecording} className="h-9 w-9 flex-shrink-0">
           <Mic className="w-4 h-4" />
