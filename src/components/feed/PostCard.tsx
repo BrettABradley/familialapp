@@ -671,12 +671,29 @@ export const PostCard = ({
           </div>
         )}
         {visualMedia.length > 1 && (
-          <PostMediaCarousel
-            items={visualMedia}
-            onDownload={onDownloadImage}
-            onImageClick={(i) => setLightboxIndex(i)}
-            onVideoClick={(i) => setLightboxIndex(i)}
-          />
+          <div className="mb-4 grid grid-cols-2 gap-2">
+            {visualMedia.map((url, i) => (
+              <div key={i} className="relative group">
+                {getMediaType(url) === 'video' ? (
+                  <VideoThumbnail url={url} onClick={() => setLightboxIndex(i)} />
+                ) : (
+                  <div
+                    className="relative rounded-lg overflow-hidden cursor-pointer bg-secondary w-full aspect-square"
+                    onClick={() => setLightboxIndex(i)}
+                  >
+                    <FeedImagePreview url={url} alt={`Post media ${i + 1}`} priority={i < 2} />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDownloadImage(url); }}
+                      className="absolute bottom-2 right-2 z-20 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
+                      aria-label="Download image"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Unified Media Lightbox — fullscreen on mobile, centered modal on desktop */}
