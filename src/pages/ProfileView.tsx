@@ -139,6 +139,8 @@ const ProfileView = () => {
     const list = event.target.files;
     if (!list || list.length === 0) return;
     event.target.value = "";
+    setShowAddMorePrompt(false);
+    setShowCaptionInput(false);
 
     // One file at a time, appended to existing pending items, capped at 4.
     const incoming = Array.from(list);
@@ -191,15 +193,18 @@ const ProfileView = () => {
     setCroppedBlob(null);
     setPendingFiles((prev) => [...prev, ...converted]);
     setPendingPreviews((prev) => [...prev, ...newPreviews]);
-    // If caption isn't already up, ask whether to add more first.
-    if (!showCaptionInput) setShowAddMorePrompt(true);
+    setShowAddMorePrompt(true);
   };
 
   const removePendingItem = (index: number) => {
     const removed = pendingPreviews[index];
     if (removed) URL.revokeObjectURL(removed.url);
+    const nextCount = pendingFiles.length - 1;
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
     setPendingPreviews((prev) => prev.filter((_, i) => i !== index));
+    if (nextCount <= 0) {
+      resetUploadState();
+    }
   };
 
   const handleCropComplete = (blob: Blob) => {
