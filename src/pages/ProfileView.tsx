@@ -749,13 +749,28 @@ const ProfileView = () => {
                 </div>
               )}
 
-              <div className="mx-auto mt-4 flex w-full max-w-xl flex-col gap-3 pb-28">
+              <div className="mx-auto mt-6 flex w-full max-w-xl flex-col gap-4 pb-28">
                 {pendingFiles.length < MAX_GROUP_ITEMS && (
-                  <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="h-12">
-                    <ImagePlus className="h-4 w-4 mr-2" />
-                    Add another ({pendingFiles.length}/{MAX_GROUP_ITEMS})
-                  </Button>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="h-12"
+                    >
+                      <ImagePlus className="h-4 w-4 mr-2" />
+                      Add another photo ({pendingFiles.length}/{MAX_GROUP_ITEMS})
+                    </Button>
+                    <p className="text-center text-xs text-muted-foreground">
+                      Add up to {MAX_GROUP_ITEMS} photos, or continue with a caption below.
+                    </p>
+                  </div>
                 )}
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Caption</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
                 <Textarea
                   value={uploadCaption}
                   onChange={(e) => setUploadCaption(e.target.value)}
