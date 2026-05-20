@@ -238,6 +238,7 @@ const Fridge = () => {
     setTitle("");
     setContent("");
     setPinType("note");
+    setLinkedEventId("");
     setCampfirePrompt("");
     setSelectedImage(null);
     if (imagePreview) {
