@@ -60,13 +60,6 @@ const ProfileView = () => {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [pendingPreviews, setPendingPreviews] = useState<{ url: string; isVideo: boolean }[]>([]);
 
-  // Single-file crop state (only used when exactly 1 image is selected)
-  const [cropSrc, setCropSrc] = useState<string | null>(null);
-  const [croppedBlob, setCroppedBlob] = useState<Blob | null>(null);
-  // After the first item is ready, ask the user if they want to add more
-  // to make a carousel before going to the caption step.
-  const [showAddMorePrompt, setShowAddMorePrompt] = useState(false);
-
   // Lightbox now opens a *group* (one post) with a slide index
   const [lightbox, setLightbox] = useState<{ group: ProfileImage[]; index: number } | null>(null);
 
@@ -128,19 +121,14 @@ const ProfileView = () => {
     pendingPreviews.forEach((p) => URL.revokeObjectURL(p.url));
     setPendingFiles([]);
     setPendingPreviews([]);
-    setCroppedBlob(null);
     setUploadCaption("");
     setShowCaptionInput(false);
-    setShowAddMorePrompt(false);
-    setCropSrc(null);
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const list = event.target.files;
     if (!list || list.length === 0) return;
     event.target.value = "";
-    setShowAddMorePrompt(false);
-    setShowCaptionInput(false);
 
     // One file at a time, appended to existing pending items, capped at 4.
     const incoming = Array.from(list);
@@ -164,36 +152,14 @@ const ProfileView = () => {
       }
     }
 
-    // Adding the FIRST item — preserve existing single-image crop UX for images
-    if (pendingFiles.length === 0 && converted.length === 1) {
-      const only = converted[0];
-      const isImage = only.type.startsWith("image/");
-      if (isImage) {
-        const url = URL.createObjectURL(only);
-        setPendingFiles([only]);
-        setPendingPreviews([{ url, isVideo: false }]);
-        setCropSrc(url);
-        return;
-      }
-      // Single video → ask if they want to add more before caption
-      const url = URL.createObjectURL(only);
-      setPendingFiles([only]);
-      setPendingPreviews([{ url, isVideo: true }]);
-      setCroppedBlob(null);
-      setUploadCaption("");
-      setShowAddMorePrompt(true);
-      return;
-    }
-
-    // Appending additional items (or first batch with multiple): skip crop.
+    // Keep the original media intact and show it in the full-screen composer immediately.
     const newPreviews = converted.map((f) => ({
       url: URL.createObjectURL(f),
       isVideo: f.type.startsWith("video/"),
     }));
-    setCroppedBlob(null);
     setPendingFiles((prev) => [...prev, ...converted]);
     setPendingPreviews((prev) => [...prev, ...newPreviews]);
-    setShowAddMorePrompt(true);
+    setShowCaptionInput(true);
   };
 
   const removePendingItem = (index: number) => {
@@ -205,13 +171,6 @@ const ProfileView = () => {
     if (nextCount <= 0) {
       resetUploadState();
     }
-  };
-
-  const handleCropComplete = (blob: Blob) => {
-    setCropSrc(null);
-    setCroppedBlob(blob);
-    setUploadCaption("");
-    setShowAddMorePrompt(true);
   };
 
   const handleConfirmUpload = async () => {
@@ -226,17 +185,16 @@ const ProfileView = () => {
       (typeof crypto !== "undefined" && (crypto as any).randomUUID)
         ? (crypto as any).randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const isSingleCroppedImage = pendingFiles.length === 1 && !!croppedBlob;
 
     const insertedRows: ProfileImage[] = [];
     const insertedStoragePaths: string[] = [];
 
     for (let i = 0; i < pendingFiles.length; i++) {
       const file = pendingFiles[i];
-      const uploadData: Blob = isSingleCroppedImage ? (croppedBlob as Blob) : file;
-      const ext = isSingleCroppedImage ? "jpg" : (file.name.split(".").pop() || "jpg");
+      const uploadData: Blob = file;
+      const ext = file.name.split(".").pop() || "jpg";
       const fileName = `${user.id}/${Date.now()}-${i}.${ext}`;
-      const contentType = isSingleCroppedImage ? "image/jpeg" : file.type;
+      const contentType = file.type;
 
       const { error: uploadError } = await supabase.storage
         .from("profile-images")
