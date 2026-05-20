@@ -17,7 +17,6 @@ import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users, Camera, Pencil, Check
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { convertHeicToJpeg, convertHeicFiles } from "@/lib/heicConverter";
-import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import JSZip from "jszip";
 import { SmartImage } from "@/components/shared/SmartImage";
 import { presetImage } from "@/lib/imageUrl";
@@ -246,10 +245,6 @@ const Albums = () => {
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   
-  // Cover crop state
-  const [coverCropSrc, setCoverCropSrc] = useState<string | null>(null);
-  const [pendingCoverFile, setPendingCoverFile] = useState<File | null>(null);
-
   const [newAlbum, setNewAlbum] = useState({
     name: "",
     description: "",
@@ -359,24 +354,17 @@ const Albums = () => {
 
   const handleCoverFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
-    if (!file || !selectedAlbum) return;
+    if (!file || !selectedAlbum || !user) return;
     if (coverInputRef.current) coverInputRef.current.value = "";
     file = await convertHeicToJpeg(file);
-    setPendingCoverFile(file);
-    const url = URL.createObjectURL(file);
-    setCoverCropSrc(url);
-  };
-
-  const handleCoverCropComplete = async (croppedBlob: Blob) => {
-    setCoverCropSrc(null);
-    if (!user || !selectedAlbum) return;
 
     setIsUploadingCover(true);
-    const fileName = `covers/${selectedAlbum.id}/${Date.now()}.jpg`;
+    const fileExt = file.name.split(".").pop() || "jpg";
+    const fileName = `covers/${selectedAlbum.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
       .from("post-media")
-      .upload(fileName, croppedBlob, { upsert: true, contentType: "image/jpeg" });
+      .upload(fileName, file, { upsert: true, contentType: file.type || "image/jpeg" });
 
     if (uploadError) {
       toast({ title: "Error", description: "Failed to upload cover photo.", variant: "destructive" });
@@ -400,7 +388,6 @@ const Albums = () => {
     }
 
     setIsUploadingCover(false);
-    setPendingCoverFile(null);
   };
 
   const processAndUploadFiles = async (rawFiles: File[]) => {
