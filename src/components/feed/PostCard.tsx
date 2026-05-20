@@ -17,6 +17,7 @@ import { ReportDialog } from "@/components/shared/ReportDialog";
 import { SmartImage } from "@/components/shared/SmartImage";
 import { avatarUrl, presetImage } from "@/lib/imageUrl";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
+import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import useEmblaCarousel from "embla-carousel-react";
 import { haptic, typingHaptic } from "@/lib/haptics";
 
@@ -218,15 +219,7 @@ const FeedImagePreview = ({
   url: string;
   alt: string;
   priority?: boolean;
-}) => (
-  <SmartImage
-    src={url}
-    preset="card"
-    priority={priority}
-    alt={alt}
-    className="h-full w-full object-cover"
-  />
-);
+}) => <SquareImageThumbnail src={url} preset="card" priority={priority} alt={alt} />;
 
 // Instagram-style swipeable carousel for multi-media posts
 const PostMediaCarousel = ({
