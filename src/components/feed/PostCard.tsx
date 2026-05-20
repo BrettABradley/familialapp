@@ -240,7 +240,7 @@ const PostMediaCarousel = ({
   }, [emblaApi]);
 
   return (
-    <div className="mb-4 mx-auto w-full max-w-sm">
+    <div className="mb-4 w-full">
       <div className="relative">
         <div className="overflow-hidden rounded-lg bg-card" ref={emblaRef}>
           <div className="flex touch-pan-y will-change-transform">
@@ -248,7 +248,7 @@ const PostMediaCarousel = ({
               const type = getMediaType(url);
               const isPriority = Math.abs(index - selectedIndex) <= 1;
               return (
-                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-square relative bg-card flex items-center justify-center">
+                <div key={index} className="flex-[0_0_100%] min-w-0 aspect-square relative bg-secondary overflow-hidden">
                   {type === "video" ? (
                     <button
                       type="button"
@@ -267,18 +267,16 @@ const PostMediaCarousel = ({
                   ) : (
                     <button
                       type="button"
-                      className="w-full h-full cursor-pointer flex items-center justify-center bg-card"
+                      className="w-full h-full cursor-pointer bg-secondary"
                       onClick={() => onImageClick(index)}
                       aria-label={`Open image ${index + 1}`}
                     >
-                      {/* object-contain shows the entire image with no zoom/crop.
-                          Container bg matches the post card so there are no visible bars. */}
                       <SmartImage
                         src={url}
                         preset="card"
                         priority={isPriority}
                         alt={`Post media ${index + 1}`}
-                        className="max-w-full max-h-full w-auto h-auto object-contain"
+                        className="h-full w-full object-cover"
                       />
                     </button>
                   )}
@@ -652,7 +650,7 @@ export const PostCard = ({
               />
             ) : (
               <div
-                className="relative group rounded-lg overflow-hidden cursor-pointer bg-secondary mx-auto w-full max-w-sm aspect-square"
+                className="relative group rounded-lg overflow-hidden cursor-pointer bg-secondary w-full aspect-square"
                 onClick={() => setLightboxIndex(0)}
               >
                 <SmartImage
