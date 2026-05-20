@@ -59,6 +59,9 @@ const Fridge = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [isLoadingPins, setIsLoadingPins] = useState(true);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [upcomingEvents, setUpcomingEvents] = useState<Array<{ id: string; title: string; event_date: string; event_time: string | null; location: string | null; description: string | null }>>([]);
+  const [linkedEventId, setLinkedEventId] = useState<string>("");
+
 
   useEffect(() => {
     if (circles.length > 0) {
