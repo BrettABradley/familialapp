@@ -17,7 +17,6 @@ import { ArrowLeft, Plus, Image, Trash2, Upload, X, Users, Camera, Pencil, Check
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { convertHeicToJpeg, convertHeicFiles } from "@/lib/heicConverter";
-import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import JSZip from "jszip";
 import { SmartImage } from "@/components/shared/SmartImage";
 import { presetImage } from "@/lib/imageUrl";
@@ -48,6 +47,36 @@ interface AlbumPhoto {
   uploaded_by: string;
   created_at: string;
 }
+
+const AlbumImagePreview = ({
+  url,
+  alt,
+  preset = "thumb",
+  priority = false,
+}: {
+  url: string;
+  alt: string;
+  preset?: "thumb" | "card";
+  priority?: boolean;
+}) => (
+  <>
+    <SmartImage
+      src={url}
+      preset={preset}
+      priority={priority}
+      alt=""
+      aria-hidden="true"
+      className="absolute inset-0 h-full w-full scale-110 object-cover bg-transparent opacity-35 blur-2xl"
+    />
+    <SmartImage
+      src={url}
+      preset={preset}
+      priority={priority}
+      alt={alt}
+      className="relative z-10 h-full w-full object-contain bg-transparent"
+    />
+  </>
+);
 
 // Embla-powered finger-following lightbox for album photos. Mirrors the
 // PostCard MediaLightbox so the swipe feel is identical across the app.
@@ -216,10 +245,6 @@ const Albums = () => {
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   
-  // Cover crop state
-  const [coverCropSrc, setCoverCropSrc] = useState<string | null>(null);
-  const [pendingCoverFile, setPendingCoverFile] = useState<File | null>(null);
-
   const [newAlbum, setNewAlbum] = useState({
     name: "",
     description: "",
@@ -329,24 +354,17 @@ const Albums = () => {
 
   const handleCoverFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let file = e.target.files?.[0];
-    if (!file || !selectedAlbum) return;
+    if (!file || !selectedAlbum || !user) return;
     if (coverInputRef.current) coverInputRef.current.value = "";
     file = await convertHeicToJpeg(file);
-    setPendingCoverFile(file);
-    const url = URL.createObjectURL(file);
-    setCoverCropSrc(url);
-  };
-
-  const handleCoverCropComplete = async (croppedBlob: Blob) => {
-    setCoverCropSrc(null);
-    if (!user || !selectedAlbum) return;
 
     setIsUploadingCover(true);
-    const fileName = `covers/${selectedAlbum.id}/${Date.now()}.jpg`;
+    const fileExt = file.name.split(".").pop() || "jpg";
+    const fileName = `covers/${selectedAlbum.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
       .from("post-media")
-      .upload(fileName, croppedBlob, { upsert: true, contentType: "image/jpeg" });
+      .upload(fileName, file, { upsert: true, contentType: file.type || "image/jpeg" });
 
     if (uploadError) {
       toast({ title: "Error", description: "Failed to upload cover photo.", variant: "destructive" });
@@ -370,7 +388,6 @@ const Albums = () => {
     }
 
     setIsUploadingCover(false);
-    setPendingCoverFile(null);
   };
 
   const processAndUploadFiles = async (rawFiles: File[]) => {
@@ -707,13 +724,12 @@ const Albums = () => {
 
           {/* Cover Photo Preview */}
           {selectedAlbum.cover_photo_url && (
-            <div className="mb-6 rounded-lg overflow-hidden bg-card flex items-center justify-center max-h-[420px]">
-              <SmartImage
-                src={selectedAlbum.cover_photo_url}
+            <div className="relative mb-6 aspect-square rounded-lg overflow-hidden bg-secondary">
+              <AlbumImagePreview
+                url={selectedAlbum.cover_photo_url}
                 preset="card"
                 priority
                 alt={`${selectedAlbum.name} cover`}
-                className="max-w-full max-h-[420px] w-auto h-auto object-contain"
               />
             </div>
           )}
@@ -730,11 +746,11 @@ const Albums = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {photos.map((photo) => (
                 <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer bg-secondary" style={{ contentVisibility: "auto", containIntrinsicSize: "300px 300px" }} onClick={() => setEnlargedPhoto(photo)}>
-                  <SmartImage src={photo.photo_url} preset="thumb" alt={photo.caption || "Photo"} className="w-full h-full object-cover" />
+                  <AlbumImagePreview url={photo.photo_url} preset="thumb" alt={photo.caption || "Photo"} />
                   {user && photo.uploaded_by === user.id && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo); }}
-                      className="absolute top-2 right-2 bg-background/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
+                      className="absolute top-2 right-2 z-20 bg-background/80 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
                       aria-label="Delete photo"
                     >
                       <X className="w-4 h-4" />
@@ -759,19 +775,6 @@ const Albums = () => {
               )}
             </DialogContent>
           </Dialog>
-
-          {/* Cover Crop Dialog */}
-          {coverCropSrc && (
-            <AvatarCropDialog
-              open={!!coverCropSrc}
-              imageSrc={coverCropSrc}
-              onClose={() => { setCoverCropSrc(null); setPendingCoverFile(null); }}
-              onCropComplete={handleCoverCropComplete}
-              aspect={3 / 1}
-              cropShape="rect"
-              title="Crop Album Cover"
-            />
-          )}
         </div>
       ) : (
         // Albums List View
@@ -838,9 +841,9 @@ const Albums = () => {
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </button>
                   )}
-                  <div className="aspect-video bg-secondary relative overflow-hidden">
+                  <div className="aspect-square bg-secondary relative overflow-hidden">
                     {album.cover_photo_url ? (
-                      <SmartImage src={album.cover_photo_url} preset="card" alt={album.name} className="w-full h-full object-cover" />
+                      <AlbumImagePreview url={album.cover_photo_url} preset="card" alt={album.name} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Image className="w-12 h-12 text-muted-foreground" />
