@@ -210,6 +210,34 @@ const MediaItem = ({ url, index, onDownload, onImageClick, onVideoClick }: { url
   );
 };
 
+const FeedImagePreview = ({
+  url,
+  alt,
+  priority,
+}: {
+  url: string;
+  alt: string;
+  priority?: boolean;
+}) => (
+  <>
+    <SmartImage
+      src={url}
+      preset="card"
+      priority={priority}
+      alt=""
+      aria-hidden="true"
+      className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-xl"
+    />
+    <SmartImage
+      src={url}
+      preset="card"
+      priority={priority}
+      alt={alt}
+      className="relative z-10 h-full w-full object-contain"
+    />
+  </>
+);
+
 // Instagram-style swipeable carousel for multi-media posts
 const PostMediaCarousel = ({
   items,
@@ -271,13 +299,7 @@ const PostMediaCarousel = ({
                       onClick={() => onImageClick(index)}
                       aria-label={`Open image ${index + 1}`}
                     >
-                      <SmartImage
-                        src={url}
-                        preset="card"
-                        priority={isPriority}
-                        alt={`Post media ${index + 1}`}
-                        className="h-full w-full object-cover"
-                      />
+                      <FeedImagePreview url={url} priority={isPriority} alt={`Post media ${index + 1}`} />
                     </button>
                   )}
                 </div>
