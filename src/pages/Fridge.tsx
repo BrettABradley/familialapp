@@ -501,7 +501,7 @@ const Fridge = () => {
                           <img
                             src={imagePreview}
                             alt="Preview"
-                            className="w-full aspect-video object-cover rounded-lg"
+                            className="w-full aspect-square object-cover rounded-lg"
                           />
                           <Button
                             variant="secondary"
