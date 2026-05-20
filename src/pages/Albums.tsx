@@ -707,13 +707,13 @@ const Albums = () => {
 
           {/* Cover Photo Preview */}
           {selectedAlbum.cover_photo_url && (
-            <div className="mb-6 rounded-lg overflow-hidden aspect-[3/1] relative bg-secondary">
+            <div className="mb-6 rounded-lg overflow-hidden bg-card flex items-center justify-center max-h-[420px]">
               <SmartImage
                 src={selectedAlbum.cover_photo_url}
                 preset="card"
                 priority
                 alt={`${selectedAlbum.name} cover`}
-                className="w-full h-full object-cover"
+                className="max-w-full max-h-[420px] w-auto h-auto object-contain"
               />
             </div>
           )}
