@@ -131,17 +131,15 @@ const ProfileView = () => {
     if (!list || list.length === 0) return;
     event.target.value = "";
 
-    // One file at a time, appended to existing pending items, capped at 4.
+    // Strictly one file at a time, appended to existing pending items, capped at MAX_GROUP_ITEMS.
     const incoming = Array.from(list);
     const remaining = MAX_GROUP_ITEMS - pendingFiles.length;
     if (remaining <= 0) {
       toast({ title: `Maximum ${MAX_GROUP_ITEMS} items`, description: "Remove one to add another." });
       return;
     }
-    let files = incoming.slice(0, remaining);
-    if (incoming.length > remaining) {
-      toast({ title: `Only ${MAX_GROUP_ITEMS} items allowed`, description: `Kept the first ${remaining}.` });
-    }
+    // Only take the first file even if the picker returned more
+    let files = incoming.slice(0, 1);
 
     // HEIC convert sequentially
     const converted: File[] = [];
