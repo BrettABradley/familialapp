@@ -60,7 +60,12 @@ async function sendTemplateEmail(
       body: JSON.stringify({ templateName, recipientEmail, templateData, idempotencyKey }),
     });
     const text = await res.text();
-    const payload = text ? JSON.parse(text) : null;
+    let payload: any = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      payload = null;
+    }
     if (!res.ok || payload?.error) {
       const error = payload?.error ?? text ?? `HTTP ${res.status}`;
       console.error(`${templateName} email failed`, { recipientEmail, error });
@@ -384,19 +389,22 @@ Deno.serve(async (req: Request) => {
           await supabaseAdmin.from("enterprise_accounts").insert(payload);
         }
 
+        let welcome_email_result = skippedEmail(false);
+        let gift_email_result = skippedEmail(send_email);
+
         if (is_new) {
           const { data: targetAuth } = await supabaseAdmin.auth.admin.getUserById(target_user_id);
           const { data: prof } = await supabaseAdmin.from("profiles")
             .select("display_name").eq("user_id", target_user_id).maybeSingle();
           const recipient = targetAuth?.user?.email ?? contact_email;
-          let welcome_email_result = skippedEmail(true, recipient ? undefined : "Target user has no email address");
+          welcome_email_result = skippedEmail(true, recipient ? undefined : "Target user has no email address");
           if (recipient) {
             welcome_email_result = await sendTemplateEmail("enterprise-welcome", recipient, {
               name: prof?.display_name ?? undefined,
               contactEmail: contact_email,
             }, `enterprise-welcome-${target_user_id}-${operationId}`);
           }
-          let gift_email_result = skippedEmail(send_email, send_email && !targetAuth?.user?.email ? "Target user has no email address" : undefined);
+          gift_email_result = skippedEmail(send_email, send_email && !targetAuth?.user?.email ? "Target user has no email address" : undefined);
           if (send_email && targetAuth?.user?.email) {
             gift_email_result = await sendGiftEmail(
               targetAuth.user.email,
