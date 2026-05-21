@@ -342,19 +342,26 @@ const Albums = () => {
     }
   };
 
-  const handleCoverFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    let file = e.target.files?.[0];
-    if (!file || !selectedAlbum || !user) return;
-    if (coverInputRef.current) coverInputRef.current.value = "";
-    file = await convertHeicToJpeg(file);
+  const handleCoverPick = async () => {
+    if (!selectedAlbum || !user) return;
+    try {
+      const picked = await pickImage();
+      if (!picked) return;
+      setCoverCropSrc(picked.dataUrl);
+    } catch (err: any) {
+      toast({ title: "Couldn't open photos", description: err?.message || "Please try again.", variant: "destructive" });
+    }
+  };
 
+  const handleCoverCropComplete = async (blob: Blob) => {
+    if (!selectedAlbum || !user) return;
+    setCoverCropSrc(null);
     setIsUploadingCover(true);
-    const fileExt = file.name.split(".").pop() || "jpg";
-    const fileName = `covers/${selectedAlbum.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+    const fileName = `covers/${selectedAlbum.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
 
     const { error: uploadError } = await supabase.storage
       .from("post-media")
-      .upload(fileName, file, { upsert: true, contentType: file.type || "image/jpeg" });
+      .upload(fileName, blob, { upsert: true, contentType: "image/jpeg" });
 
     if (uploadError) {
       toast({ title: "Error", description: "Failed to upload cover photo.", variant: "destructive" });
@@ -379,6 +386,8 @@ const Albums = () => {
 
     setIsUploadingCover(false);
   };
+
+
 
   const processAndUploadFiles = async (rawFiles: File[]) => {
     if (!rawFiles.length || !user || !selectedAlbum) return;
