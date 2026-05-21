@@ -63,6 +63,8 @@ const ProfileView = () => {
   // Multi-file upload state
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [pendingPreviews, setPendingPreviews] = useState<{ url: string; isVideo: boolean }[]>([]);
+  const [pendingCrop, setPendingCrop] = useState<{ src: string; file: File } | null>(null);
+  const [isPreparingCrop, setIsPreparingCrop] = useState(false);
 
   // Lightbox now opens a *group* (one post) with a slide index
   const [lightbox, setLightbox] = useState<{ group: ProfileImage[]; index: number } | null>(null);
@@ -132,6 +134,31 @@ const ProfileView = () => {
     setPendingPreviews([]);
     setUploadCaption("");
     setShowCaptionInput(false);
+    setPendingCrop(null);
+  };
+
+  const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Could not read image"));
+    reader.readAsDataURL(file);
+  });
+
+  const preparePhotoCrop = async (selectedFile: File) => {
+    if (selectedFile.type.startsWith("video/")) {
+      await addPendingFile(selectedFile);
+      return;
+    }
+    setIsPreparingCrop(true);
+    try {
+      const displayFile = await convertHeicToJpeg(selectedFile);
+      const src = await readFileAsDataUrl(displayFile);
+      setPendingCrop({ src, file: displayFile });
+    } catch {
+      toast({ title: "Could not prepare photo", description: "Please try a different image.", variant: "destructive" });
+    } finally {
+      setIsPreparingCrop(false);
+    }
   };
 
   const addPendingFile = async (selectedFile: File) => {
@@ -185,7 +212,7 @@ const ProfileView = () => {
     if (Capacitor.isNativePlatform()) {
       try {
         const picked = await pickImage();
-        if (picked) await addPendingFile(picked.file);
+        if (picked) await preparePhotoCrop(picked.file);
       } catch {
         toast({ title: "Could not open photos", description: "Please try again.", variant: "destructive" });
       }
@@ -202,9 +229,20 @@ const ProfileView = () => {
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
-    await addPendingFile(selectedFile);
+    await preparePhotoCrop(selectedFile);
     // Clear after processing so the same file can be re-picked next time.
     if (event.target) event.target.value = "";
+  };
+
+  const handlePendingCropComplete = async (blob: Blob) => {
+    const sourceName = pendingCrop?.file.name || "profile-photo.jpg";
+    setPendingCrop(null);
+    const croppedFile = new File(
+      [blob],
+      sourceName.replace(/\.[^/.]+$/, ".jpg"),
+      { type: "image/jpeg" }
+    );
+    await addPendingFile(croppedFile);
   };
 
   const removePendingItem = (index: number) => {
