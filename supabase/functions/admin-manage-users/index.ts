@@ -339,11 +339,20 @@ Deno.serve(async (req: Request) => {
           await supabaseAdmin.from("enterprise_accounts").insert(payload);
         }
 
-        if (is_new && send_email) {
+        if (is_new) {
           const { data: targetAuth } = await supabaseAdmin.auth.admin.getUserById(target_user_id);
           const { data: prof } = await supabaseAdmin.from("profiles")
             .select("display_name").eq("user_id", target_user_id).maybeSingle();
-          if (targetAuth?.user?.email) await sendGiftEmail(targetAuth.user.email, prof?.display_name ?? null);
+          const recipient = targetAuth?.user?.email ?? contact_email;
+          if (recipient) {
+            await sendTemplateEmail("enterprise-welcome", recipient, {
+              name: prof?.display_name ?? undefined,
+              contactEmail: contact_email,
+            });
+          }
+          if (send_email && targetAuth?.user?.email) {
+            await sendGiftEmail(targetAuth.user.email, prof?.display_name ?? null);
+          }
         }
 
         await logAdminAction(supabaseAdmin, adminEmail, is_new ? "create_enterprise" : "update_enterprise", {
