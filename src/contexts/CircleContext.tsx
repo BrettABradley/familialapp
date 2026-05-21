@@ -44,6 +44,8 @@ interface CircleContextType {
   refetchUserPlan: () => Promise<void>;
   isCircleReadOnly: (circleId: string) => boolean;
   isCircleAdmin: (circleId: string) => boolean;
+  lockCircleSwitcher: boolean;
+  setLockCircleSwitcher: (locked: boolean) => void;
 }
 
 const CircleContext = createContext<CircleContextType | undefined>(undefined);
