@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/popover";
 import { LogOut, Users, Calendar, Settings, Pin, MessageSquare, Image, Menu, Home, User, Bell, Check, Trash2, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import icon from "@/assets/icon.png";
+import icon from "@/assets/icon-transparent.png";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
