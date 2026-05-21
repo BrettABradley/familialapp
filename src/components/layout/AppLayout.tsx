@@ -13,7 +13,7 @@ import { UpdatePrompt } from "@/components/shared/UpdatePrompt";
 
 function AppLayoutContent() {
   const { user, loading: authLoading, signOut } = useAuth();
-  const { circles, selectedCircle, setSelectedCircle, isLoading: circlesLoading, profile } = useCircleContext();
+  const { circles, selectedCircle, setSelectedCircle, isLoading: circlesLoading, profile, lockCircleSwitcher } = useCircleContext();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -71,6 +71,7 @@ function AppLayoutContent() {
             onCircleChange={setSelectedCircle}
             onSignOut={handleSignOut}
             overrideLabel={isProfileRoute ? "All Circles" : undefined}
+            lockCircle={lockCircleSwitcher}
           />
         )}
         <main key={location.pathname} className="animate-page-fade-in">

@@ -82,7 +82,7 @@ type ChatView = "list" | "dm" | "group";
 const Messages = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
+  const { circles, selectedCircle, isLoading: contextLoading, isCircleReadOnly, setLockCircleSwitcher } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -203,6 +203,14 @@ const Messages = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, groupMessages]);
+
+  // Lock the circle switcher whenever a chat is open so users can't switch
+  // circles mid-conversation (chats are circle-scoped).
+  useEffect(() => {
+    const inChat = (chatView === "dm" && !!selectedUser) || (chatView === "group" && !!selectedGroup);
+    setLockCircleSwitcher(inChat);
+    return () => setLockCircleSwitcher(false);
+  }, [chatView, selectedUser, selectedGroup, setLockCircleSwitcher]);
 
   const fetchCircleMembers = async () => {
     if (!user || !selectedCircle) return;

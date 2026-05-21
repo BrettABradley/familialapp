@@ -44,6 +44,8 @@ interface CircleContextType {
   refetchUserPlan: () => Promise<void>;
   isCircleReadOnly: (circleId: string) => boolean;
   isCircleAdmin: (circleId: string) => boolean;
+  lockCircleSwitcher: boolean;
+  setLockCircleSwitcher: (locked: boolean) => void;
 }
 
 const CircleContext = createContext<CircleContextType | undefined>(undefined);
@@ -67,6 +69,7 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [lockCircleSwitcher, setLockCircleSwitcher] = useState(false);
 
   const fetchCircles = async () => {
     if (!user) {
@@ -233,6 +236,8 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
         refetchUserPlan: fetchUserPlan,
         isCircleReadOnly,
         isCircleAdmin,
+        lockCircleSwitcher,
+        setLockCircleSwitcher,
       }}
     >
       {children}
