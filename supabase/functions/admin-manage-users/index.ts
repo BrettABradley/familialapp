@@ -353,6 +353,14 @@ Deno.serve(async (req: Request) => {
           if (send_email && targetAuth?.user?.email) {
             await sendGiftEmail(targetAuth.user.email, prof?.display_name ?? null);
           }
+          // In-app notification bell entry
+          await supabaseAdmin.from("notifications").insert({
+            user_id: target_user_id,
+            type: "enterprise_activated",
+            title: "Your account has been upgraded to Enterprise",
+            message: `You now have access to ${max_circles} circles with up to ${max_members_per_circle} members each. Welcome to Familial Enterprise.`,
+            link: "/settings",
+          });
         }
 
         await logAdminAction(supabaseAdmin, adminEmail, is_new ? "create_enterprise" : "update_enterprise", {
