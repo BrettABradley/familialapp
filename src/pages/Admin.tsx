@@ -75,6 +75,7 @@ const Admin = () => {
 
   useEffect(() => {
     if (!isAdmin) return;
+    if (activeTab === "admins-users") return; // managed by its own component
     if (activeTab === "reports") fetchData("reports", reportStatus);
     else if (activeTab === "appeals") fetchData("appeals", appealStatus);
     else fetchData(activeTab);
