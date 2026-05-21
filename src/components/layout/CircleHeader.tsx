@@ -210,6 +210,7 @@ export function CircleHeader({
   const currentCircle = circles.find((c) => c.id === selectedCircle);
   const isMobile = useIsMobile();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const isPlatformAdmin = useIsPlatformAdmin();
 
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border pt-[env(safe-area-inset-top)]">
