@@ -38,6 +38,7 @@ const Settings = () => {
   const { profile, isLoading: contextLoading, refetchProfile } = useCircleContext();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const isPlatformAdmin = useIsPlatformAdmin();
   const mainRef = useRef<HTMLElement>(null);
   useKeyboardDismissOnScroll(mainRef);
   
