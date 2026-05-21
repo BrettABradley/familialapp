@@ -707,88 +707,13 @@ const ProfileView = () => {
         <DialogContent className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
           {lightbox && currentSlide && (
             <>
-              {/* Top control bar — safe area aware on mobile */}
-              <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-end gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
-                  onClick={() => handleDownload(currentSlide.image_url)}
-                  aria-label="Download"
-                >
-                  <Download className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
-                  onClick={() => setLightbox(null)}
-                  aria-label="Close"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-
-              {/* Centered media */}
-              {getMediaType(currentSlide.image_url) === 'video' ? (
-                <video
-                  key={currentSlide.id}
-                  src={currentSlide.image_url}
-                  controls
-                  autoPlay
-                  playsInline
-                  className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
-                  onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; touchStartY.current = e.touches[0].clientY; }}
-                  onTouchEnd={(e) => {
-                    const deltaX = touchStartX.current - e.changedTouches[0].clientX;
-                    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
-                    if (deltaY > 80 && Math.abs(deltaX) < 50) { setLightbox(null); return; }
-                    if (deltaX > 50 && lightbox.index < lightbox.group.length - 1) setLightbox({ ...lightbox, index: lightbox.index + 1 });
-                    else if (deltaX < -50 && lightbox.index > 0) setLightbox({ ...lightbox, index: lightbox.index - 1 });
-                  }}
-                />
-              ) : (
-                <ZoomableImage
-                  className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto flex items-center justify-center"
-                  onSwipeLeft={() => lightbox.index < lightbox.group.length - 1 && setLightbox({ ...lightbox, index: lightbox.index + 1 })}
-                  onSwipeRight={() => lightbox.index > 0 && setLightbox({ ...lightbox, index: lightbox.index - 1 })}
-                  onSwipeDown={() => setLightbox(null)}
-                >
-                  <img
-                    key={currentSlide.id}
-                    src={currentSlide.image_url}
-                    alt={currentSlide.caption || "Profile photo"}
-                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
-                  />
-                </ZoomableImage>
-              )}
-
-              {/* Navigation arrows + counter (within group) */}
-              {lightbox.group.length > 1 && (
-                <>
-                  {lightbox.index > 0 && (
-                    <button
-                      className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                      onClick={() => setLightbox({ ...lightbox, index: lightbox.index - 1 })}
-                      aria-label="Previous slide"
-                    >
-                      <ChevronLeft className="h-6 w-6" />
-                    </button>
-                  )}
-                  {lightbox.index < lightbox.group.length - 1 && (
-                    <button
-                      className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                      onClick={() => setLightbox({ ...lightbox, index: lightbox.index + 1 })}
-                      aria-label="Next slide"
-                    >
-                      <ChevronRight className="h-6 w-6" />
-                    </button>
-                  )}
-                  <div className="absolute bottom-6 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 bg-black/50 backdrop-blur-sm text-white text-sm px-3 py-1 rounded-full" style={{ marginBottom: "max(env(safe-area-inset-bottom, 0px), 0px)" }}>
-                    {lightbox.index + 1} / {lightbox.group.length}
-                  </div>
-                </>
-              )}
+              <ProfileMediaLightbox
+                group={lightbox.group}
+                startIndex={lightbox.index}
+                onIndexChange={(index) => setLightbox((prev) => prev ? { ...prev, index } : prev)}
+                onClose={() => setLightbox(null)}
+                onDownload={handleDownload}
+              />
 
               {/* Caption & actions (shared across the group) */}
               {(profileData?.display_name || currentSlide.caption || isOwnProfile) && (
