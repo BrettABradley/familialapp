@@ -44,8 +44,12 @@ serve(async (req: Request) => {
       });
     }
 
-    const userEmail = userData.user.email;
-    if (userEmail !== FOUNDER_EMAIL) {
+    const { data: adminRow } = await supabaseAdmin
+      .from("platform_admins")
+      .select("user_id")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+    if (!adminRow) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
