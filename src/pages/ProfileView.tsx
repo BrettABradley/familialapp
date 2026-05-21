@@ -192,14 +192,19 @@ const ProfileView = () => {
       return;
     }
 
-    fileInputRef.current?.click();
+    // Web: reset value before opening so re-selecting the same file still fires onChange.
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
-    event.target.value = "";
     if (!selectedFile) return;
     await addPendingFile(selectedFile);
+    // Clear after processing so the same file can be re-picked next time.
+    if (event.target) event.target.value = "";
   };
 
   const removePendingItem = (index: number) => {
