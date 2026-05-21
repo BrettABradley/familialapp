@@ -371,6 +371,7 @@ const MediaLightbox = ({
       const i = emblaApi.selectedScrollSnap();
       setSelected(i);
       onIndexChange(i);
+      zoomedRef.current = false;
     };
     emblaApi.on("select", onSelect);
     return () => { emblaApi.off("select", onSelect); };
