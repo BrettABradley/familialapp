@@ -75,7 +75,7 @@ serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Familial Media <welcome@support.familialmedia.com>",
+        from: "Familial <welcome@support.familialmedia.com>",
         to: [NOTIFY_EMAIL],
         subject: `New Store Offer: ${safe(offerTitle)} from ${safe(companyName)}`,
         html,

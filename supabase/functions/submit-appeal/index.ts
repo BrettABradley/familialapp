@@ -71,7 +71,7 @@ serve(async (req: Request) => {
             "X-Connection-Api-Key": RESEND_API_KEY,
           },
           body: JSON.stringify({
-            from: "Familial Moderation <support@familialmedia.com>",
+            from: "Familial <support@familialmedia.com>",
             to: ["brettbradley007@gmail.com"],
             subject: `New appeal from ${email}`,
             html: `<p><strong>${email}</strong> has submitted an appeal:</p>
