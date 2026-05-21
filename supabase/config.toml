@@ -71,3 +71,5 @@ project_id = "qxkwxolssapayqyfdwqc"
     verify_jwt = false
   [functions.submit-appeal]
     verify_jwt = false
+  [functions.admin-manage-users]
+    verify_jwt = false
