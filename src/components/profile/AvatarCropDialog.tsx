@@ -15,7 +15,7 @@ interface AvatarCropDialogProps {
   imageSrc: string;
   onClose: () => void;
   onCropComplete: (croppedBlob: Blob) => void;
-  aspect?: number;
+  aspect?: number | null;
   cropShape?: "round" | "rect";
   title?: string;
 }
@@ -102,7 +102,7 @@ const AvatarCropDialog = ({
             image={imageSrc}
             crop={crop}
             zoom={zoom}
-            aspect={aspect}
+            aspect={aspect ?? undefined}
             cropShape={cropShape}
             showGrid={cropShape === "rect"}
             onCropChange={setCrop}
