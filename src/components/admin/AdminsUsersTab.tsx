@@ -45,6 +45,13 @@ const invoke = async (action: string, payload: any = {}) => {
   return data;
 };
 
+const emailStatusText = (email?: any, label = "Email") => {
+  if (!email?.requested) return `${label} skipped.`;
+  if (email.queued) return `${label} queued.`;
+  if (email.suppressed) return `${label} suppressed.`;
+  return `${label} not queued${email?.error ? `: ${email.error}` : "."}`;
+};
+
 export const AdminsUsersTab = ({ currentUserId }: Props) => {
   const { toast } = useToast();
 
@@ -142,10 +149,10 @@ export const AdminsUsersTab = ({ currentUserId }: Props) => {
     if (!compTarget) return;
     setActionLoading(true);
     try {
-      await invoke("comp_plan", {
+      const data = await invoke("comp_plan", {
         user_id: compTarget.user_id, plan: compPlan, note: compNote, send_gift_email: compSendEmail,
       });
-      toast({ title: "Plan comped", description: `${compTarget.email} → ${compPlan}` });
+      toast({ title: "Plan comped", description: `${compTarget.email} → ${compPlan}. ${emailStatusText(data.email, "Founder email")}` });
       setCompTarget(null); setCompNote(""); setCompPlan("family"); setCompSendEmail(true);
       runLookup(); loadComps();
     } catch (e: any) { toast({ title: "Failed", description: e.message, variant: "destructive" }); }
@@ -189,7 +196,7 @@ export const AdminsUsersTab = ({ currentUserId }: Props) => {
     if (!entDialog?.user_id) return;
     setActionLoading(true);
     try {
-      await invoke("upsert_enterprise", {
+      const data = await invoke("upsert_enterprise", {
         user_id: entDialog.user_id,
         is_new: entDialog.is_new,
         contact_email: entForm.contact_email,
@@ -201,7 +208,12 @@ export const AdminsUsersTab = ({ currentUserId }: Props) => {
         notes: entForm.notes,
         send_gift_email: entForm.send_gift_email,
       });
-      toast({ title: entDialog.is_new ? "Enterprise account created" : "Enterprise account updated" });
+      toast({
+        title: entDialog.is_new ? "Enterprise account created" : "Enterprise account updated",
+        description: entDialog.is_new
+          ? `${emailStatusText(data.welcome_email, "Enterprise welcome")} ${emailStatusText(data.gift_email, "Founder email")}`
+          : undefined,
+      });
       setEntDialog(null);
       loadEnterprise(); if (query) runLookup();
     } catch (e: any) { toast({ title: "Failed", description: e.message, variant: "destructive" }); }
