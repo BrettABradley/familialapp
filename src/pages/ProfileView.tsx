@@ -879,12 +879,13 @@ const ProfileView = () => {
               </div>
               <Textarea
                 value={editCaption}
-                onChange={(e) => setEditCaption(e.target.value)}
+                onChange={(e) => setEditCaption(e.target.value.slice(0, 300))}
                 placeholder="Edit caption..."
                 className="resize-none"
                 rows={3}
-                maxLength={500}
+                maxLength={300}
               />
+              <p className={`text-xs text-right ${editCaption.length >= 280 ? 'text-destructive' : 'text-muted-foreground'}`}>{editCaption.length}/300</p>
               <div className="flex gap-2 justify-between">
                 {editingGroup.length === 1 && getMediaType(editingGroup[0].image_url) === 'image' && (
                   <Button variant="outline" size="sm" onClick={handleEditRecrop} disabled={isSavingEdit}>
