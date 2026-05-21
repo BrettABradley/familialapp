@@ -145,17 +145,25 @@ const AlbumPhotoLightbox = ({
 
       <div className="w-screen sm:w-[90vw] h-[100dvh] sm:h-[90vh] overflow-hidden" ref={emblaRef} {...swipeDown}>
         <div className="flex h-full touch-pan-y will-change-transform">
-          {photos.map((p, i) => (
-            <div key={p.id} className="flex-[0_0_100%] min-w-0 h-full flex items-center justify-center px-2">
-              <SmartImage
-                src={p.photo_url}
-                preset="full"
-                priority={Math.abs(i - selected) <= 1}
-                alt={p.caption || `Photo ${i + 1}`}
-                className="max-h-full max-w-full object-contain select-none bg-transparent"
-              />
-            </div>
-          ))}
+          {photos.map((p, i) => {
+            const isCurrent = i === selected;
+            return (
+              <div key={p.id} className="flex-[0_0_100%] min-w-0 h-full flex items-center justify-center px-2">
+                <ZoomableImage
+                  className="w-full h-full flex items-center justify-center"
+                  onScaleChange={(s) => { if (isCurrent) zoomedRef.current = s > 1.05; }}
+                >
+                  <SmartImage
+                    src={p.photo_url}
+                    preset="full"
+                    priority={Math.abs(i - selected) <= 1}
+                    alt={p.caption || `Photo ${i + 1}`}
+                    className="max-h-full max-w-full object-contain select-none bg-transparent"
+                  />
+                </ZoomableImage>
+              </div>
+            );
+          })}
         </div>
       </div>
 
