@@ -138,34 +138,31 @@ const ProfileView = () => {
     // Strictly one file at a time, appended to existing pending items, capped at MAX_GROUP_ITEMS.
     const incoming = Array.from(list);
     event.target.value = "";
-    if (incoming.length === 0) return;
+    const selectedFile = incoming[0];
+    if (!selectedFile) return;
 
     const remaining = MAX_GROUP_ITEMS - pendingFiles.length;
     if (remaining <= 0) {
       toast({ title: `Maximum ${MAX_GROUP_ITEMS} items`, description: "Remove one to add another." });
       return;
     }
-    // Only take the first file even if the picker returned more
-    let files = incoming.slice(0, 1);
 
-    // HEIC convert sequentially
-    const converted: File[] = [];
-    for (const f of files) {
-      try {
-        converted.push(await convertHeicToJpeg(f));
-      } catch {
-        converted.push(f);
-      }
-    }
-
-    // Keep the original media intact and show it in the full-screen composer immediately.
-    const newPreviews = converted.map((f) => ({
-      url: URL.createObjectURL(f),
-      isVideo: f.type.startsWith("video/"),
-    }));
-    setPendingFiles((prev) => [...prev, ...converted]);
-    setPendingPreviews((prev) => [...prev, ...newPreviews]);
+    // Open the composer immediately; convert/downscale in the background so iOS never feels like the upload vanished.
+    setPendingFiles((prev) => [...prev, selectedFile]);
+    setPendingPreviews((prev) => [...prev, {
+      url: URL.createObjectURL(selectedFile),
+      isVideo: selectedFile.type.startsWith("video/"),
+    }]);
     setShowCaptionInput(true);
+
+    try {
+      const convertedFile = await convertHeicToJpeg(selectedFile);
+      if (convertedFile !== selectedFile) {
+        setPendingFiles((prev) => prev.map((file) => file === selectedFile ? convertedFile : file));
+      }
+    } catch {
+      // Keep the original file selected if conversion fails; the user can still continue or remove it.
+    }
   };
 
   const removePendingItem = (index: number) => {
