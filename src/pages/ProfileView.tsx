@@ -57,7 +57,8 @@ const ProfileMediaLightbox = ({
   onClose: () => void;
   onDownload: (url: string) => void;
 }) => {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "center", duration: 34, dragThreshold: 4, containScroll: "trimSnaps", startIndex });
+  const zoomedRef = useRef(false);
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "center", duration: 34, dragThreshold: 4, containScroll: "trimSnaps", startIndex, watchDrag: () => !zoomedRef.current });
   const [selected, setSelected] = useState(startIndex);
   const current = group[selected];
 
@@ -67,6 +68,7 @@ const ProfileMediaLightbox = ({
       const index = emblaApi.selectedScrollSnap();
       setSelected(index);
       onIndexChange(index);
+      zoomedRef.current = false;
     };
     emblaApi.on("select", onSelect);
     onSelect();
@@ -81,15 +83,23 @@ const ProfileMediaLightbox = ({
       </div>
       <div className="h-[100dvh] w-screen overflow-hidden sm:h-[90vh] sm:w-[90vw]" ref={emblaRef}>
         <div className="flex h-full touch-pan-y will-change-transform">
-          {group.map((item, index) => (
-            <div key={item.id} className="flex h-full min-w-0 flex-[0_0_100%] items-center justify-center px-2">
-              {getMediaType(item.image_url) === "video" ? (
-                <video src={item.image_url} controls autoPlay={index === selected} playsInline className="max-h-full max-w-full select-none object-contain" />
-              ) : (
-                <SmartImage src={item.image_url} preset="full" priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
-              )}
-            </div>
-          ))}
+          {group.map((item, index) => {
+            const isCurrent = index === selected;
+            return (
+              <div key={item.id} className="flex h-full min-w-0 flex-[0_0_100%] items-center justify-center px-2">
+                {getMediaType(item.image_url) === "video" ? (
+                  <video src={item.image_url} controls autoPlay={isCurrent} playsInline className="max-h-full max-w-full select-none object-contain" />
+                ) : (
+                  <ZoomableImage
+                    className="w-full h-full flex items-center justify-center"
+                    onScaleChange={(s) => { if (isCurrent) zoomedRef.current = s > 1.05; }}
+                  >
+                    <SmartImage src={item.image_url} preset="full" priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
+                  </ZoomableImage>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
       {group.length > 1 && (

@@ -352,6 +352,7 @@ const MediaLightbox = ({
   onClose: () => void;
   onDownload: (url: string) => void;
 }) => {
+  const zoomedRef = useRef(false);
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
     align: "center",
@@ -360,6 +361,7 @@ const MediaLightbox = ({
     dragThreshold: 6,
     containScroll: "trimSnaps",
     startIndex,
+    watchDrag: () => !zoomedRef.current,
   });
   const [selected, setSelected] = useState(startIndex);
 
@@ -369,6 +371,7 @@ const MediaLightbox = ({
       const i = emblaApi.selectedScrollSnap();
       setSelected(i);
       onIndexChange(i);
+      zoomedRef.current = false;
     };
     emblaApi.on("select", onSelect);
     return () => { emblaApi.off("select", onSelect); };
@@ -446,13 +449,18 @@ const MediaLightbox = ({
                     </audio>
                   </div>
                 ) : (
-                  <SmartImage
-                    src={url}
-                    preset="full"
-                    priority={Math.abs(i - selected) <= 1}
-                    alt={`Media ${i + 1}`}
-                    className="max-h-full max-w-full object-contain select-none bg-transparent"
-                  />
+                  <ZoomableImage
+                    className="w-full h-full flex items-center justify-center"
+                    onScaleChange={(s) => { if (isCurrent) zoomedRef.current = s > 1.05; }}
+                  >
+                    <SmartImage
+                      src={url}
+                      preset="full"
+                      priority={Math.abs(i - selected) <= 1}
+                      alt={`Media ${i + 1}`}
+                      className="max-h-full max-w-full object-contain select-none bg-transparent"
+                    />
+                  </ZoomableImage>
                 )}
               </div>
             );
