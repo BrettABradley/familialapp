@@ -888,24 +888,11 @@ const Messages = () => {
         <div className="flex-shrink-0 bg-background border-b border-border" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 3.25rem)' }}>
           <div className="flex items-center gap-3 px-4 py-3 min-h-[3.5rem]">
           <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
-          <button
-            type="button"
-            className="relative group cursor-pointer disabled:opacity-50"
-            onClick={(e) => { e.stopPropagation(); if (selectedGroup.created_by === user?.id) handleGroupAvatarPick(); }}
-            disabled={isUploadingGroupAvatar || selectedGroup.created_by !== user?.id}
-            aria-label="Change group photo"
-          >
-            {selectedGroup.avatar_url ? (
-              <Avatar><AvatarImage src={selectedGroup.avatar_url} /><AvatarFallback><UsersRound className="w-5 h-5" /></AvatarFallback></Avatar>
-            ) : (
-              <div className="p-2 rounded-full bg-secondary"><UsersRound className="w-5 h-5" /></div>
-            )}
-            {selectedGroup.created_by === user?.id && (
-              <span className="absolute inset-0 flex items-center justify-center bg-foreground/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                <Camera className="w-4 h-4 text-background" />
-              </span>
-            )}
-          </button>
+          {selectedGroup.avatar_url ? (
+            <Avatar><AvatarImage src={selectedGroup.avatar_url} /><AvatarFallback><UsersRound className="w-5 h-5" /></AvatarFallback></Avatar>
+          ) : (
+            <div className="p-2 rounded-full bg-secondary"><UsersRound className="w-5 h-5" /></div>
+          )}
           <button onClick={handleViewMembers} className="text-left hover:underline">
             <h2 className="font-serif text-xl font-bold text-foreground flex-1">{selectedGroup.name}</h2>
           </button>
