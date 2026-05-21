@@ -71,6 +71,7 @@ function AppLayoutContent() {
             onCircleChange={setSelectedCircle}
             onSignOut={handleSignOut}
             overrideLabel={isProfileRoute ? "All Circles" : undefined}
+            lockCircle={lockCircleSwitcher}
           />
         )}
         <main key={location.pathname} className="animate-page-fade-in">
