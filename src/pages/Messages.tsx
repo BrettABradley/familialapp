@@ -809,7 +809,7 @@ const Messages = () => {
 
   // Chat view (DM or Group)
   if (chatView === "dm" && selectedUser) {
-    const canDeleteSelectedDm = messages[0]?.sender_id === user?.id;
+    const canDeleteSelectedDm = true;
     const dmView = (
       <div className="fixed inset-0 z-[60] bg-background flex flex-col md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]" style={{ height: 'calc(100% - var(--keyboard-height, 0px))' }}>
         <div className="flex-shrink-0 bg-background border-b border-border" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 3.25rem)' }}>
