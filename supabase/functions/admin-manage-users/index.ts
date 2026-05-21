@@ -2,6 +2,7 @@
 // All operations are admin-gated, audit-logged, and respect the
 // "free-tier-only" rule for comps so paying customers are never overwritten.
 import { corsHeaders, jsonResponse, requireAdmin, logAdminAction } from "../_shared/admin-guard.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const PLAN_LIMITS: Record<string, { max_circles: number; max_members_per_circle: number }> = {
   free: { max_circles: 1, max_members_per_circle: 8 },
@@ -49,29 +50,19 @@ async function sendTemplateEmail(
   }
 
   try {
-    const url = `${supabaseUrl}/functions/v1/send-transactional-email`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${serviceRoleKey}`,
-        apikey: serviceRoleKey,
-      },
-      body: JSON.stringify({ templateName, recipientEmail, templateData, idempotencyKey }),
+    const client = createClient(supabaseUrl, serviceRoleKey);
+    const { data, error } = await client.functions.invoke("send-transactional-email", {
+      body: { templateName, recipientEmail, templateData, idempotencyKey },
     });
-    const text = await res.text();
-    let payload: any = null;
-    try {
-      payload = text ? JSON.parse(text) : null;
-    } catch {
-      payload = null;
+    if (error) {
+      console.error(`${templateName} email failed`, { recipientEmail, error: error.message });
+      return { requested: true, queued: false, error: error.message };
     }
-    if (!res.ok || payload?.error) {
-      const error = payload?.error ?? text ?? `HTTP ${res.status}`;
-      console.error(`${templateName} email failed`, { recipientEmail, error });
-      return { requested: true, queued: false, error };
+    if (data?.error) {
+      console.error(`${templateName} email failed`, { recipientEmail, error: data.error });
+      return { requested: true, queued: false, error: data.error };
     }
-    if (payload?.reason === "email_suppressed") {
+    if (data?.reason === "email_suppressed") {
       return { requested: true, queued: false, suppressed: true };
     }
     return { requested: true, queued: true };
