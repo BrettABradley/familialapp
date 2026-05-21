@@ -20,6 +20,7 @@ import { ZoomableImage } from "@/components/shared/ZoomableImage";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import useEmblaCarousel from "embla-carousel-react";
 import { haptic, typingHaptic } from "@/lib/haptics";
+import { useSwipeDownClose } from "@/hooks/useSwipeDownClose";
 
 interface CircleMemberRef {
   user_id: string;
