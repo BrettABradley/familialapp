@@ -268,6 +268,7 @@ Deno.serve(async (req: Request) => {
             targetAuth.user.email,
             prof?.display_name ?? null,
             `founder-gift-${target_user_id}-${compedAt}`,
+            authHeader,
           );
         }
 
