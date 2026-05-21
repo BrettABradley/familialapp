@@ -207,12 +207,42 @@ Deno.serve(async (req: Request) => {
               .neq("user_id", p.user_id);
             membersBroughtIn = count ?? 0;
           }
+          // Latest founder-gift email status for this recipient
+          let emailStatus: string | null = null;
+          let emailError: string | null = null;
+          let emailSentAt: string | null = null;
+          const recipient = u?.user?.email;
+          if (recipient) {
+            const { data: logRows } = await supabaseAdmin
+              .from("email_send_log")
+              .select("status, error_message, created_at, message_id")
+              .eq("template_name", "founder-gift")
+              .eq("recipient_email", recipient)
+              .order("created_at", { ascending: false })
+              .limit(20);
+            // Dedup by message_id, keep most recent per message
+            const seen = new Set<string>();
+            const latest = (logRows ?? []).filter((r: any) => {
+              const k = r.message_id ?? r.created_at;
+              if (seen.has(k)) return false;
+              seen.add(k); return true;
+            });
+            const top = latest[0];
+            if (top) {
+              emailStatus = top.status;
+              emailError = top.error_message ?? null;
+              emailSentAt = top.created_at;
+            }
+          }
           return {
             user_id: p.user_id, plan: p.plan,
             comped_by_admin_at: p.comped_by_admin_at, comp_note: p.comp_note,
             email: u?.user?.email, display_name: prof?.display_name,
             circles_owned: circleIds.length,
             members_brought_in: membersBroughtIn,
+            email_status: emailStatus,
+            email_error: emailError,
+            email_sent_at: emailSentAt,
           };
         }));
         return jsonResponse({ comps: enriched });
