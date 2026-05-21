@@ -44,13 +44,15 @@ async function sendTemplateEmail(
   idempotencyKey: string,
 ) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceRoleKey) {
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !anonKey) {
     return { requested: true, queued: false, error: "Email service is not configured" };
   }
 
   try {
-    const client = createClient(supabaseUrl, serviceRoleKey);
+    // Use anon key for gateway auth (service_role key in new sb_secret_ format
+    // is rejected as "Invalid JWT" by the edge gateway).
+    const client = createClient(supabaseUrl, anonKey);
     const { data, error } = await client.functions.invoke("send-transactional-email", {
       body: { templateName, recipientEmail, templateData, idempotencyKey },
     });
