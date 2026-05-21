@@ -925,11 +925,12 @@ const Messages = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Edit Group Name Dialog — iOS keyboard-safe: prevent autofocus to avoid focus-trap freeze on Capacitor WebView */}
-        <Dialog open={isEditGroupOpen} onOpenChange={setIsEditGroupOpen}>
+        {/* Edit Group Name Dialog — iOS keyboard-safe: modal={false} prevents Radix focus-trap freeze on Capacitor WebView */}
+        <Dialog open={isEditGroupOpen} onOpenChange={setIsEditGroupOpen} modal={false}>
           <DialogContent
             onOpenAutoFocus={(e) => e.preventDefault()}
             onCloseAutoFocus={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
           >
             <DialogHeader>
               <DialogTitle className="font-serif">Edit Group Name</DialogTitle>
@@ -942,7 +943,10 @@ const Messages = () => {
                 placeholder="Group name"
                 autoFocus={false}
               />
-              <Button className="w-full" onClick={handleSaveGroupName} disabled={!editGroupName.trim()}>Save</Button>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setIsEditGroupOpen(false)}>Cancel</Button>
+                <Button className="flex-1" onClick={handleSaveGroupName} disabled={!editGroupName.trim()}>Save</Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
