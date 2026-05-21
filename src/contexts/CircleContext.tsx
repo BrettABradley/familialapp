@@ -236,6 +236,8 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
         refetchUserPlan: fetchUserPlan,
         isCircleReadOnly,
         isCircleAdmin,
+        lockCircleSwitcher,
+        setLockCircleSwitcher,
       }}
     >
       {children}
