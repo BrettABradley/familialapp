@@ -676,21 +676,15 @@ const Albums = () => {
                   {isDownloadingAll ? "Zipping..." : "Download All"}
                 </Button>
               )}
-              <input
-                ref={coverInputRef}
-                type="file"
-                accept="image/*,.heic,.heif"
-                onChange={handleCoverFileSelect}
-                className="hidden"
-              />
               <Button
                 variant="outline"
-                onClick={() => coverInputRef.current?.click()}
+                onClick={handleCoverPick}
                 disabled={isUploadingCover}
               >
                 <Camera className="w-4 h-4 mr-2" />
                 {isUploadingCover ? "Uploading..." : "Set Cover"}
               </Button>
+
               <input
                 ref={fileInputRef}
                 type="file"
