@@ -203,6 +203,7 @@ export function CircleHeader({
   onSignOut,
   showNav = true,
   overrideLabel,
+  lockCircle = false,
 }: CircleHeaderProps) {
   const { user } = useAuth();
   const currentCircle = circles.find((c) => c.id === selectedCircle);
@@ -231,7 +232,7 @@ export function CircleHeader({
                   <AvatarFallback className="text-xs">{currentCircle.name.charAt(0)}</AvatarFallback>
                 </Avatar>
               )}
-              {circles.length === 1 ? (
+              {circles.length === 1 || lockCircle ? (
                 <span className="font-medium text-foreground">
                   {currentCircle?.name || "Circle"}
                 </span>
@@ -262,6 +263,7 @@ export function CircleHeader({
             </>
           )}
         </div>
+
 
         {/* Mobile: fridge pin + bell (only on mobile, uses Sheet) */}
         {showNav && !overrideLabel && isMobile && user && (
