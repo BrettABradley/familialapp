@@ -69,6 +69,7 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [lockCircleSwitcher, setLockCircleSwitcher] = useState(false);
 
   const fetchCircles = async () => {
     if (!user) {
