@@ -21,12 +21,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { LogOut, Users, Calendar, Settings, Pin, MessageSquare, Image, Menu, Home, User, Bell, Check, Trash2, X } from "lucide-react";
+import { LogOut, Users, Calendar, Settings, Pin, MessageSquare, Image, Menu, Home, User, Bell, Check, Trash2, X, ShieldCheck } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import icon from "@/assets/icon-transparent.png";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsPlatformAdmin } from "@/hooks/useIsPlatformAdmin";
 
 interface Circle {
   id: string;
@@ -209,6 +210,7 @@ export function CircleHeader({
   const currentCircle = circles.find((c) => c.id === selectedCircle);
   const isMobile = useIsMobile();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const isPlatformAdmin = useIsPlatformAdmin();
 
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border pt-[env(safe-area-inset-top)]">
@@ -304,6 +306,16 @@ export function CircleHeader({
                       </Link>
                     </SheetClose>
                   ))}
+                  {isPlatformAdmin && (
+                    <SheetClose asChild>
+                      <Link to="/admin">
+                        <Button variant="ghost" className="w-full justify-start gap-2">
+                          <ShieldCheck className="w-4 h-4" />
+                          <span>Admin</span>
+                        </Button>
+                      </Link>
+                    </SheetClose>
+                  )}
                   <SheetClose asChild>
                     <Button variant="ghost" className="w-full justify-start gap-2 text-destructive hover:text-destructive" onClick={onSignOut}>
                       <LogOut className="w-4 h-4" />
@@ -335,6 +347,14 @@ export function CircleHeader({
           <div className="hidden xl:flex items-center gap-2 ml-auto">
             {!overrideLabel && user && (
               <NotificationBell userId={user.id} selectedCircle={selectedCircle} variant="popover" />
+            )}
+            {isPlatformAdmin && (
+              <Link to="/admin">
+                <Button variant="ghost" size="sm" className="gap-1.5">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Admin</span>
+                </Button>
+              </Link>
             )}
             <Button variant="ghost" size="sm" className="gap-1.5" onClick={onSignOut}>
               <LogOut className="w-4 h-4" />

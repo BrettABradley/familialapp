@@ -21,6 +21,7 @@ import SubscriptionCard from "@/components/settings/SubscriptionCard";
 import { isIOSNative, openAppleSubscriptionManagement } from "@/lib/iapPurchase";
 import { registerForPushNotifications } from "@/lib/pushNotifications";
 import ReceiptHistory from "@/components/settings/ReceiptHistory";
+import { useIsPlatformAdmin } from "@/hooks/useIsPlatformAdmin";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,7 @@ const Settings = () => {
   const { profile, isLoading: contextLoading, refetchProfile } = useCircleContext();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const isPlatformAdmin = useIsPlatformAdmin();
   const mainRef = useRef<HTMLElement>(null);
   useKeyboardDismissOnScroll(mainRef);
   
@@ -341,6 +343,25 @@ const Settings = () => {
         </div>
       )}
       <ReceiptHistory />
+
+      {isPlatformAdmin && (
+        <Card className="mt-6 border-primary/40">
+          <CardHeader>
+            <CardTitle className="font-serif text-lg flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5" /> Moderator Tools
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              You have platform moderator access. Review reports, appeals, and manage users from the admin dashboard.
+            </p>
+            <Button onClick={() => navigate("/admin")} className="w-full">
+              Open Admin Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
 
       {/* Notification Preferences */}
       <Card className="mt-6">
