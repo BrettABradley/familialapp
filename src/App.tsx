@@ -28,6 +28,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Upgrade from "./pages/Upgrade";
 import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
+import Appeal from "./pages/Appeal";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import CookiePolicy from "./pages/CookiePolicy";
