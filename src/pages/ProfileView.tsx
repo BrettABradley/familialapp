@@ -48,6 +48,7 @@ const ProfileView = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
   useKeyboardDismissOnScroll(mainRef);
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
@@ -134,36 +135,48 @@ const ProfileView = () => {
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const list = event.target.files;
     if (!list || list.length === 0) return;
-    event.target.value = "";
 
     // Strictly one file at a time, appended to existing pending items, capped at MAX_GROUP_ITEMS.
     const incoming = Array.from(list);
+    event.target.value = "";
+    const selectedFile = incoming[0];
+    if (!selectedFile) return;
+
     const remaining = MAX_GROUP_ITEMS - pendingFiles.length;
     if (remaining <= 0) {
       toast({ title: `Maximum ${MAX_GROUP_ITEMS} items`, description: "Remove one to add another." });
       return;
     }
-    // Only take the first file even if the picker returned more
-    let files = incoming.slice(0, 1);
 
-    // HEIC convert sequentially
-    const converted: File[] = [];
-    for (const f of files) {
-      try {
-        converted.push(await convertHeicToJpeg(f));
-      } catch {
-        converted.push(f);
-      }
-    }
-
-    // Keep the original media intact and show it in the full-screen composer immediately.
-    const newPreviews = converted.map((f) => ({
-      url: URL.createObjectURL(f),
-      isVideo: f.type.startsWith("video/"),
-    }));
-    setPendingFiles((prev) => [...prev, ...converted]);
-    setPendingPreviews((prev) => [...prev, ...newPreviews]);
+    // Open the composer immediately; convert/downscale in the background so iOS never feels like the upload vanished.
+    const previewUrl = URL.createObjectURL(selectedFile);
+    setPendingFiles((prev) => [...prev, selectedFile]);
+    setPendingPreviews((prev) => [...prev, {
+      url: previewUrl,
+      isVideo: selectedFile.type.startsWith("video/"),
+    }]);
     setShowCaptionInput(true);
+
+    try {
+      const convertedFile = await convertHeicToJpeg(selectedFile);
+      if (convertedFile !== selectedFile) {
+        setPendingFiles((prev) => prev.map((file) => file === selectedFile ? convertedFile : file));
+        const convertedPreviewUrl = URL.createObjectURL(convertedFile);
+        let replacedPreview = false;
+        setPendingPreviews((prev) => prev.map((preview) => {
+          if (preview.url !== previewUrl) return preview;
+          replacedPreview = true;
+          return {
+            url: convertedPreviewUrl,
+            isVideo: convertedFile.type.startsWith("video/"),
+          };
+        }));
+        if (replacedPreview) URL.revokeObjectURL(previewUrl);
+        else URL.revokeObjectURL(convertedPreviewUrl);
+      }
+    } catch {
+      // Keep the original file selected if conversion fails; the user can still continue or remove it.
+    }
   };
 
   const removePendingItem = (index: number) => {
@@ -186,8 +199,8 @@ const ProfileView = () => {
 
     const sharedCaption = uploadCaption.trim() || null;
     const groupId =
-      (typeof crypto !== "undefined" && (crypto as any).randomUUID)
-        ? (crypto as any).randomUUID()
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
     const insertedRows: ProfileImage[] = [];
@@ -598,10 +611,10 @@ const ProfileView = () => {
                   autoPlay
                   playsInline
                   className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
-                  onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; (touchStartX as any).__y = e.touches[0].clientY; }}
+                  onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; touchStartY.current = e.touches[0].clientY; }}
                   onTouchEnd={(e) => {
                     const deltaX = touchStartX.current - e.changedTouches[0].clientX;
-                    const deltaY = e.changedTouches[0].clientY - ((touchStartX as any).__y || 0);
+                    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
                     if (deltaY > 80 && Math.abs(deltaX) < 50) { setLightbox(null); return; }
                     if (deltaX > 50 && lightbox.index < lightbox.group.length - 1) setLightbox({ ...lightbox, index: lightbox.index + 1 });
                     else if (deltaX < -50 && lightbox.index > 0) setLightbox({ ...lightbox, index: lightbox.index - 1 });
