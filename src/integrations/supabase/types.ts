@@ -79,6 +79,39 @@ export type Database = {
           },
         ]
       }
+      app_version_config: {
+        Row: {
+          created_at: string
+          id: string
+          latest_version: string
+          min_supported_version: string
+          platform: string
+          store_url: string
+          update_message: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          latest_version: string
+          min_supported_version: string
+          platform: string
+          store_url: string
+          update_message?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          latest_version?: string
+          min_supported_version?: string
+          platform?: string
+          store_url?: string
+          update_message?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       banned_emails: {
         Row: {
           banned_at: string

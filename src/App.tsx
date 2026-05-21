@@ -9,6 +9,7 @@ import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { UpdateGate } from "@/components/UpdateGate";
 import Index from "./pages/Index";
 import Unsubscribe from "./pages/Unsubscribe";
 import Auth from "./pages/Auth";
@@ -59,6 +60,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <UpdateGate>
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<Index />} />
@@ -94,6 +96,7 @@ const App = () => {
             
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </UpdateGate>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
