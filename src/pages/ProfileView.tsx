@@ -22,6 +22,8 @@ import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { VideoThumbnail } from "@/components/shared/VideoThumbnail";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
+import { SmartImage } from "@/components/shared/SmartImage";
+import useEmblaCarousel from "embla-carousel-react";
 
 interface ProfileData {
   user_id: string;
@@ -41,6 +43,65 @@ interface ProfileImage {
 }
 
 const MAX_GROUP_ITEMS = 5;
+
+const ProfileMediaLightbox = ({
+  group,
+  startIndex,
+  onIndexChange,
+  onClose,
+  onDownload,
+}: {
+  group: ProfileImage[];
+  startIndex: number;
+  onIndexChange: (index: number) => void;
+  onClose: () => void;
+  onDownload: (url: string) => void;
+}) => {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "center", duration: 34, dragThreshold: 4, containScroll: "trimSnaps", startIndex });
+  const [selected, setSelected] = useState(startIndex);
+  const current = group[selected];
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => {
+      const index = emblaApi.selectedScrollSnap();
+      setSelected(index);
+      onIndexChange(index);
+    };
+    emblaApi.on("select", onSelect);
+    onSelect();
+    return () => { emblaApi.off("select", onSelect); };
+  }, [emblaApi, onIndexChange]);
+
+  return (
+    <>
+      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-end gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
+        {current && <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60" onClick={() => onDownload(current.image_url)} aria-label="Download"><Download className="h-5 w-5" /></Button>}
+        <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60" onClick={onClose} aria-label="Close"><X className="h-5 w-5" /></Button>
+      </div>
+      <div className="h-[100dvh] w-screen overflow-hidden sm:h-[90vh] sm:w-[90vw]" ref={emblaRef}>
+        <div className="flex h-full touch-pan-y will-change-transform">
+          {group.map((item, index) => (
+            <div key={item.id} className="flex h-full min-w-0 flex-[0_0_100%] items-center justify-center px-2">
+              {getMediaType(item.image_url) === "video" ? (
+                <video src={item.image_url} controls autoPlay={index === selected} playsInline className="max-h-full max-w-full select-none object-contain" />
+              ) : (
+                <SmartImage src={item.image_url} preset="full" priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      {group.length > 1 && (
+        <>
+          {selected > 0 && <button className="hidden sm:flex absolute left-4 top-1/2 z-30 min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60" onClick={() => emblaApi?.scrollPrev()} aria-label="Previous slide"><ChevronLeft className="h-6 w-6" /></button>}
+          {selected < group.length - 1 && <button className="hidden sm:flex absolute right-4 top-1/2 z-30 min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60" onClick={() => emblaApi?.scrollNext()} aria-label="Next slide"><ChevronRight className="h-6 w-6" /></button>}
+          <div className="absolute left-1/2 z-30 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-sm text-white backdrop-blur-sm" style={{ bottom: "max(env(safe-area-inset-bottom, 0px), 1rem)" }}>{selected + 1} / {group.length}</div>
+        </>
+      )}
+    </>
+  );
+};
 
 const ProfileView = () => {
   const { userId } = useParams<{ userId: string }>();
