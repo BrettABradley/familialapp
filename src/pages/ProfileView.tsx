@@ -134,10 +134,12 @@ const ProfileView = () => {
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const list = event.target.files;
     if (!list || list.length === 0) return;
-    event.target.value = "";
 
     // Strictly one file at a time, appended to existing pending items, capped at MAX_GROUP_ITEMS.
     const incoming = Array.from(list);
+    event.target.value = "";
+    if (incoming.length === 0) return;
+
     const remaining = MAX_GROUP_ITEMS - pendingFiles.length;
     if (remaining <= 0) {
       toast({ title: `Maximum ${MAX_GROUP_ITEMS} items`, description: "Remove one to add another." });
