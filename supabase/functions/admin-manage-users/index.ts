@@ -40,24 +40,46 @@ async function sendTemplateEmail(
   templateName: string,
   recipientEmail: string,
   templateData: Record<string, unknown>,
+  idempotencyKey: string,
 ) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { requested: true, queued: false, error: "Email service is not configured" };
+  }
+
   try {
-    const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-transactional-email`;
-    await fetch(url, {
+    const url = `${supabaseUrl}/functions/v1/send-transactional-email`;
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
       },
-      body: JSON.stringify({ templateName, recipientEmail, templateData }),
+      body: JSON.stringify({ templateName, recipientEmail, templateData, idempotencyKey }),
     });
+    const text = await res.text();
+    const payload = text ? JSON.parse(text) : null;
+    if (!res.ok || payload?.error) {
+      const error = payload?.error ?? text ?? `HTTP ${res.status}`;
+      console.error(`${templateName} email failed`, { recipientEmail, error });
+      return { requested: true, queued: false, error };
+    }
+    if (payload?.reason === "email_suppressed") {
+      return { requested: true, queued: false, suppressed: true };
+    }
+    return { requested: true, queued: true };
   } catch (e) {
     console.error(`${templateName} email failed`, e);
+    return { requested: true, queued: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
 
-const sendGiftEmail = (recipientEmail: string, name: string | null) =>
-  sendTemplateEmail("founder-gift", recipientEmail, { name: name ?? undefined });
+const skippedEmail = (requested = false, error?: string) => ({ requested, queued: false, error });
+
+const sendGiftEmail = (recipientEmail: string, name: string | null, idempotencyKey: string) =>
+  sendTemplateEmail("founder-gift", recipientEmail, { name: name ?? undefined }, idempotencyKey);
 
 
 Deno.serve(async (req: Request) => {
@@ -214,12 +236,13 @@ Deno.serve(async (req: Request) => {
           return jsonResponse({ error: `User has an ${stripe_status} Stripe subscription. Comp blocked.` }, 409);
         }
         const limits = PLAN_LIMITS[plan];
+        const compedAt = new Date().toISOString();
         const upsertRow = {
           user_id: target_user_id,
           plan,
           max_circles: limits.max_circles,
           max_members_per_circle: limits.max_members_per_circle,
-          comped_by_admin_at: new Date().toISOString(),
+          comped_by_admin_at: compedAt,
           comp_note: note,
           source: "admin_comp",
           updated_at: new Date().toISOString(),
@@ -235,16 +258,21 @@ Deno.serve(async (req: Request) => {
           message: `You've been upgraded to ${plan === "family" ? "Family" : "Extended"} on the house. Enjoy!`,
         });
 
+        let email_result = skippedEmail(send_email, send_email && !targetAuth?.user?.email ? "Target user has no email address" : undefined);
         if (send_email && targetAuth?.user?.email) {
           const { data: prof } = await supabaseAdmin.from("profiles")
             .select("display_name").eq("user_id", target_user_id).maybeSingle();
-          await sendGiftEmail(targetAuth.user.email, prof?.display_name ?? null);
+          email_result = await sendGiftEmail(
+            targetAuth.user.email,
+            prof?.display_name ?? null,
+            `founder-gift-${target_user_id}-${compedAt}`,
+          );
         }
 
         await logAdminAction(supabaseAdmin, adminEmail, "comp_plan", {
-          target_user_id, details: { plan, note, send_email },
+          target_user_id, details: { plan, note, send_email, email_result },
         });
-        return jsonResponse({ ok: true });
+        return jsonResponse({ ok: true, email: email_result });
       }
 
       case "revoke_comp": {
@@ -327,6 +355,8 @@ Deno.serve(async (req: Request) => {
           if (stripe_status) return jsonResponse({ error: `User has an ${stripe_status} Stripe subscription. Cannot convert to enterprise.` }, 409);
         }
 
+        const operationId = crypto.randomUUID();
+
         // Upsert user_plans → enterprise
         const { error: planErr } = await supabaseAdmin.from("user_plans").upsert({
           user_id: target_user_id,
@@ -359,14 +389,20 @@ Deno.serve(async (req: Request) => {
           const { data: prof } = await supabaseAdmin.from("profiles")
             .select("display_name").eq("user_id", target_user_id).maybeSingle();
           const recipient = targetAuth?.user?.email ?? contact_email;
+          let welcome_email_result = skippedEmail(true, recipient ? undefined : "Target user has no email address");
           if (recipient) {
-            await sendTemplateEmail("enterprise-welcome", recipient, {
+            welcome_email_result = await sendTemplateEmail("enterprise-welcome", recipient, {
               name: prof?.display_name ?? undefined,
               contactEmail: contact_email,
-            });
+            }, `enterprise-welcome-${target_user_id}-${operationId}`);
           }
+          let gift_email_result = skippedEmail(send_email, send_email && !targetAuth?.user?.email ? "Target user has no email address" : undefined);
           if (send_email && targetAuth?.user?.email) {
-            await sendGiftEmail(targetAuth.user.email, prof?.display_name ?? null);
+            gift_email_result = await sendGiftEmail(
+              targetAuth.user.email,
+              prof?.display_name ?? null,
+              `founder-gift-enterprise-${target_user_id}-${operationId}`,
+            );
           }
           // In-app notification bell entry
           await supabaseAdmin.from("notifications").insert({
@@ -379,9 +415,9 @@ Deno.serve(async (req: Request) => {
         }
 
         await logAdminAction(supabaseAdmin, adminEmail, is_new ? "create_enterprise" : "update_enterprise", {
-          target_user_id, details: { max_circles, max_members_per_circle, agreed_price_cents, billing_cadence, next_invoice_due_at },
+          target_user_id, details: { max_circles, max_members_per_circle, agreed_price_cents, billing_cadence, next_invoice_due_at, send_email, welcome_email_result: is_new ? welcome_email_result : undefined, gift_email_result: is_new ? gift_email_result : undefined },
         });
-        return jsonResponse({ ok: true });
+        return jsonResponse({ ok: true, welcome_email: is_new ? welcome_email_result : undefined, gift_email: is_new ? gift_email_result : undefined });
       }
 
       case "mark_invoice_sent": {
