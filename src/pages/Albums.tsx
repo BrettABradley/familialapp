@@ -80,6 +80,7 @@ const AlbumPhotoLightbox = ({
   onIndexChange: (i: number) => void;
   onClose: () => void;
 }) => {
+  const zoomedRef = useRef(false);
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
     align: "center",
@@ -87,6 +88,7 @@ const AlbumPhotoLightbox = ({
     dragThreshold: 6,
     containScroll: "trimSnaps",
     startIndex,
+    watchDrag: () => !zoomedRef.current,
   });
   const [selected, setSelected] = useState(startIndex);
 
@@ -96,6 +98,7 @@ const AlbumPhotoLightbox = ({
       const i = emblaApi.selectedScrollSnap();
       setSelected(i);
       onIndexChange(i);
+      zoomedRef.current = false;
     };
     emblaApi.on("select", onSelect);
     return () => { emblaApi.off("select", onSelect); };
