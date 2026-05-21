@@ -352,6 +352,7 @@ const MediaLightbox = ({
   onClose: () => void;
   onDownload: (url: string) => void;
 }) => {
+  const zoomedRef = useRef(false);
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
     align: "center",
@@ -360,6 +361,7 @@ const MediaLightbox = ({
     dragThreshold: 6,
     containScroll: "trimSnaps",
     startIndex,
+    watchDrag: () => !zoomedRef.current,
   });
   const [selected, setSelected] = useState(startIndex);
 
