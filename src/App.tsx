@@ -74,6 +74,7 @@ const App = () => {
             <Route path="/blog" element={<Blog />} />
             <Route path="/support" element={<Support />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/appeal" element={<Appeal />} />
             
             {/* Authenticated routes with persistent layout */}
             <Route element={<AppLayout />}>
