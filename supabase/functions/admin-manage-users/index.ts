@@ -42,6 +42,7 @@ async function sendTemplateEmail(
   recipientEmail: string,
   templateData: Record<string, unknown>,
   idempotencyKey: string,
+  authHeader: string,
 ) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
@@ -50,12 +51,13 @@ async function sendTemplateEmail(
   }
 
   try {
-    // Use anon key for gateway auth (service_role key in new sb_secret_ format
-    // is rejected as "Invalid JWT" by the edge gateway).
-    const client = createClient(supabaseUrl, anonKey);
+    // send-transactional-email has verify_jwt=true; forward the caller's
+    // admin JWT so the gateway accepts it.
+    const client = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
     const { data, error } = await client.functions.invoke("send-transactional-email", {
       body: { templateName, recipientEmail, templateData, idempotencyKey },
-      headers: { Authorization: `Bearer ${anonKey}` },
     });
     if (error) {
       console.error(`${templateName} email failed`, { recipientEmail, error: error.message });
@@ -77,8 +79,8 @@ async function sendTemplateEmail(
 
 const skippedEmail = (requested = false, error?: string) => ({ requested, queued: false, error });
 
-const sendGiftEmail = (recipientEmail: string, name: string | null, idempotencyKey: string) =>
-  sendTemplateEmail("founder-gift", recipientEmail, { name: name ?? undefined }, idempotencyKey);
+const sendGiftEmail = (recipientEmail: string, name: string | null, idempotencyKey: string, authHeader: string) =>
+  sendTemplateEmail("founder-gift", recipientEmail, { name: name ?? undefined }, idempotencyKey, authHeader);
 
 
 Deno.serve(async (req: Request) => {
@@ -88,6 +90,7 @@ Deno.serve(async (req: Request) => {
   if ("error" in guard) return guard.error;
   const { supabaseAdmin, user: admin } = guard;
   const adminEmail = admin.email ?? "unknown";
+  const authHeader = req.headers.get("Authorization") ?? "";
 
   let body: any;
   try {
@@ -265,6 +268,7 @@ Deno.serve(async (req: Request) => {
             targetAuth.user.email,
             prof?.display_name ?? null,
             `founder-gift-${target_user_id}-${compedAt}`,
+            authHeader,
           );
         }
 
@@ -396,7 +400,7 @@ Deno.serve(async (req: Request) => {
             welcome_email_result = await sendTemplateEmail("enterprise-welcome", recipient, {
               name: prof?.display_name ?? undefined,
               contactEmail: contact_email,
-            }, `enterprise-welcome-${target_user_id}-${operationId}`);
+            }, `enterprise-welcome-${target_user_id}-${operationId}`, authHeader);
           }
           gift_email_result = skippedEmail(send_email, send_email && !targetAuth?.user?.email ? "Target user has no email address" : undefined);
           if (send_email && targetAuth?.user?.email) {
@@ -404,6 +408,7 @@ Deno.serve(async (req: Request) => {
               targetAuth.user.email,
               prof?.display_name ?? null,
               `founder-gift-enterprise-${target_user_id}-${operationId}`,
+              authHeader,
             );
           }
           // In-app notification bell entry
