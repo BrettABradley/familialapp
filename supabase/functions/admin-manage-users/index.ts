@@ -36,7 +36,11 @@ async function stripeActiveSub(customerEmail: string | null): Promise<string | n
   }
 }
 
-async function sendGiftEmail(recipientEmail: string, name: string | null) {
+async function sendTemplateEmail(
+  templateName: string,
+  recipientEmail: string,
+  templateData: Record<string, unknown>,
+) {
   try {
     const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-transactional-email`;
     await fetch(url, {
@@ -45,16 +49,16 @@ async function sendGiftEmail(recipientEmail: string, name: string | null) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
       },
-      body: JSON.stringify({
-        templateName: "founder-gift",
-        recipientEmail,
-        templateData: { name: name ?? undefined },
-      }),
+      body: JSON.stringify({ templateName, recipientEmail, templateData }),
     });
   } catch (e) {
-    console.error("gift email failed", e);
+    console.error(`${templateName} email failed`, e);
   }
 }
+
+const sendGiftEmail = (recipientEmail: string, name: string | null) =>
+  sendTemplateEmail("founder-gift", recipientEmail, { name: name ?? undefined });
+
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
