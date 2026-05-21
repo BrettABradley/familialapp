@@ -36,7 +36,11 @@ async function stripeActiveSub(customerEmail: string | null): Promise<string | n
   }
 }
 
-async function sendGiftEmail(recipientEmail: string, name: string | null) {
+async function sendTemplateEmail(
+  templateName: string,
+  recipientEmail: string,
+  templateData: Record<string, unknown>,
+) {
   try {
     const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-transactional-email`;
     await fetch(url, {
@@ -45,16 +49,16 @@ async function sendGiftEmail(recipientEmail: string, name: string | null) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
       },
-      body: JSON.stringify({
-        templateName: "founder-gift",
-        recipientEmail,
-        templateData: { name: name ?? undefined },
-      }),
+      body: JSON.stringify({ templateName, recipientEmail, templateData }),
     });
   } catch (e) {
-    console.error("gift email failed", e);
+    console.error(`${templateName} email failed`, e);
   }
 }
+
+const sendGiftEmail = (recipientEmail: string, name: string | null) =>
+  sendTemplateEmail("founder-gift", recipientEmail, { name: name ?? undefined });
+
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -335,11 +339,20 @@ Deno.serve(async (req: Request) => {
           await supabaseAdmin.from("enterprise_accounts").insert(payload);
         }
 
-        if (is_new && send_email) {
+        if (is_new) {
           const { data: targetAuth } = await supabaseAdmin.auth.admin.getUserById(target_user_id);
           const { data: prof } = await supabaseAdmin.from("profiles")
             .select("display_name").eq("user_id", target_user_id).maybeSingle();
-          if (targetAuth?.user?.email) await sendGiftEmail(targetAuth.user.email, prof?.display_name ?? null);
+          const recipient = targetAuth?.user?.email ?? contact_email;
+          if (recipient) {
+            await sendTemplateEmail("enterprise-welcome", recipient, {
+              name: prof?.display_name ?? undefined,
+              contactEmail: contact_email,
+            });
+          }
+          if (send_email && targetAuth?.user?.email) {
+            await sendGiftEmail(targetAuth.user.email, prof?.display_name ?? null);
+          }
         }
 
         await logAdminAction(supabaseAdmin, adminEmail, is_new ? "create_enterprise" : "update_enterprise", {

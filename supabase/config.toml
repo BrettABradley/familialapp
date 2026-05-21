@@ -73,3 +73,6 @@ project_id = "qxkwxolssapayqyfdwqc"
     verify_jwt = false
   [functions.admin-manage-users]
     verify_jwt = false
+  [functions.send-invoice-reminders]
+    verify_jwt = false
+
