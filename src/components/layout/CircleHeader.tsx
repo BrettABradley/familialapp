@@ -306,6 +306,16 @@ export function CircleHeader({
                       </Link>
                     </SheetClose>
                   ))}
+                  {isPlatformAdmin && (
+                    <SheetClose asChild>
+                      <Link to="/admin">
+                        <Button variant="ghost" className="w-full justify-start gap-2">
+                          <ShieldCheck className="w-4 h-4" />
+                          <span>Admin</span>
+                        </Button>
+                      </Link>
+                    </SheetClose>
+                  )}
                   <SheetClose asChild>
                     <Button variant="ghost" className="w-full justify-start gap-2 text-destructive hover:text-destructive" onClick={onSignOut}>
                       <LogOut className="w-4 h-4" />
