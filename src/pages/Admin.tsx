@@ -336,6 +336,11 @@ const Admin = () => {
             </div>
           ) : <p className="text-muted-foreground text-sm py-8 text-center">No metrics.</p>}
         </TabsContent>
+
+        {/* ADMINS & USERS */}
+        <TabsContent value="admins-users">
+          {user && <AdminsUsersTab currentUserId={user.id} />}
+        </TabsContent>
       </Tabs>
 
       {/* Action confirmation dialog */}
