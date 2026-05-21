@@ -75,6 +75,8 @@ export const AdminsUsersTab = ({ currentUserId }: Props) => {
   // enterprise
   const [enterprise, setEnterprise] = useState<any[]>([]);
   const [entLoading, setEntLoading] = useState(false);
+  const [entPage, setEntPage] = useState(1);
+  const ENT_PER_PAGE = 10;
   const [entDialog, setEntDialog] = useState<{ row: any | null; is_new: boolean; user_id?: string; account_email?: string } | null>(null);
   const [entForm, setEntForm] = useState({
     contact_email: "", agreed_price_cents: 0, billing_cadence: "monthly",
