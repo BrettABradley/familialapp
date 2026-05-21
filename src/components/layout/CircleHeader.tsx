@@ -42,6 +42,7 @@ interface CircleHeaderProps {
   onSignOut: () => void;
   showNav?: boolean;
   overrideLabel?: string;
+  lockCircle?: boolean;
 }
 
 const navItems = [
