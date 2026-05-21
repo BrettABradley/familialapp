@@ -109,6 +109,7 @@ const AlbumPhotoLightbox = ({
   }, [selected, photos]);
 
   const current = photos[selected];
+  const swipeDown = useSwipeDownClose(onClose);
 
   return (
     <>
