@@ -90,6 +90,7 @@ Deno.serve(async (req: Request) => {
   if ("error" in guard) return guard.error;
   const { supabaseAdmin, user: admin } = guard;
   const adminEmail = admin.email ?? "unknown";
+  const authHeader = req.headers.get("Authorization") ?? "";
 
   let body: any;
   try {
