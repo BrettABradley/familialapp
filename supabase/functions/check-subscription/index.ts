@@ -43,11 +43,19 @@ serve(async (req) => {
     // Founder plan is manually assigned — never overwrite it from Stripe.
     // Apple-sourced plans are managed by the App Store; never overwrite from Stripe.
     // Admin-comped plans are gifts; never overwrite from Stripe.
+    // Enterprise plans are managed manually by platform admins; never overwrite from Stripe.
     const { data: currentPlanCheck } = await supabaseAdmin
       .from("user_plans")
       .select("plan, source, comped_by_admin_at")
       .eq("user_id", user.id)
       .maybeSingle();
+
+    if (currentPlanCheck?.plan === "enterprise" || currentPlanCheck?.source === "enterprise") {
+      log("Enterprise plan detected — skipping Stripe sync", { userId: user.id });
+      return new Response(JSON.stringify({ synced: true, plan: "enterprise", source: "enterprise" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (currentPlanCheck?.plan === "founder") {
       log("Founder plan detected — skipping Stripe sync", { userId: user.id });
