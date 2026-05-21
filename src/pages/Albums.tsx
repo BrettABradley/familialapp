@@ -23,6 +23,8 @@ import { presetImage } from "@/lib/imageUrl";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import useEmblaCarousel from "embla-carousel-react";
 import { useSwipeDownClose } from "@/hooks/useSwipeDownClose";
+import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
+import { pickImage } from "@/lib/imagePicker";
 
 interface Circle {
   id: string;
