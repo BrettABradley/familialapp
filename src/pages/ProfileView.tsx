@@ -148,9 +148,10 @@ const ProfileView = () => {
     }
 
     // Open the composer immediately; convert/downscale in the background so iOS never feels like the upload vanished.
+    const previewUrl = URL.createObjectURL(selectedFile);
     setPendingFiles((prev) => [...prev, selectedFile]);
     setPendingPreviews((prev) => [...prev, {
-      url: URL.createObjectURL(selectedFile),
+      url: previewUrl,
       isVideo: selectedFile.type.startsWith("video/"),
     }]);
     setShowCaptionInput(true);
@@ -159,6 +160,18 @@ const ProfileView = () => {
       const convertedFile = await convertHeicToJpeg(selectedFile);
       if (convertedFile !== selectedFile) {
         setPendingFiles((prev) => prev.map((file) => file === selectedFile ? convertedFile : file));
+        const convertedPreviewUrl = URL.createObjectURL(convertedFile);
+        let replacedPreview = false;
+        setPendingPreviews((prev) => prev.map((preview) => {
+          if (preview.url !== previewUrl) return preview;
+          replacedPreview = true;
+          return {
+            url: convertedPreviewUrl,
+            isVideo: convertedFile.type.startsWith("video/"),
+          };
+        }));
+        if (replacedPreview) URL.revokeObjectURL(previewUrl);
+        else URL.revokeObjectURL(convertedPreviewUrl);
       }
     } catch {
       // Keep the original file selected if conversion fails; the user can still continue or remove it.
