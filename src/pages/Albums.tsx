@@ -857,6 +857,17 @@ const Albums = () => {
         </>
       )}
     </main>
+    {coverCropSrc && (
+      <AvatarCropDialog
+        open={!!coverCropSrc}
+        imageSrc={coverCropSrc}
+        onClose={() => setCoverCropSrc(null)}
+        onCropComplete={handleCoverCropComplete}
+        aspect={1}
+        cropShape="rect"
+        title="Crop Album Cover"
+      />
+    )}
     </PullToRefreshWrapper>
   );
 };
