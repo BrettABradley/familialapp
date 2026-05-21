@@ -920,13 +920,9 @@ const Messages = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Edit Group Dialog — iOS keyboard-safe: modal={false} prevents Radix focus-trap freeze on Capacitor WebView */}
-        <Dialog open={isEditGroupOpen} onOpenChange={setIsEditGroupOpen} modal={false}>
-          <DialogContent
-            onOpenAutoFocus={(e) => e.preventDefault()}
-            onCloseAutoFocus={(e) => e.preventDefault()}
-            onInteractOutside={(e) => e.preventDefault()}
-          >
+        {/* Edit Group Dialog — z-[70] to render above the z-[60] chat view */}
+        <Dialog open={isEditGroupOpen} onOpenChange={setIsEditGroupOpen}>
+          <DialogContent className="z-[80]">
             <DialogHeader>
               <DialogTitle className="font-serif">Edit Group</DialogTitle>
             </DialogHeader>
@@ -947,7 +943,6 @@ const Messages = () => {
                 onChange={(e) => setEditGroupName(e.target.value)}
                 maxLength={100}
                 placeholder="Group name"
-                autoFocus={false}
               />
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setIsEditGroupOpen(false)}>Cancel</Button>
