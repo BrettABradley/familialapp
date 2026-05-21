@@ -204,6 +204,14 @@ const Messages = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, groupMessages]);
 
+  // Lock the circle switcher whenever a chat is open so users can't switch
+  // circles mid-conversation (chats are circle-scoped).
+  useEffect(() => {
+    const inChat = (chatView === "dm" && !!selectedUser) || (chatView === "group" && !!selectedGroup);
+    setLockCircleSwitcher(inChat);
+    return () => setLockCircleSwitcher(false);
+  }, [chatView, selectedUser, selectedGroup, setLockCircleSwitcher]);
+
   const fetchCircleMembers = async () => {
     if (!user || !selectedCircle) return;
 
