@@ -110,8 +110,6 @@ const ProfileView = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
-  const touchStartX = useRef<number>(0);
-  const touchStartY = useRef<number>(0);
   useKeyboardDismissOnScroll(mainRef);
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
@@ -622,9 +620,9 @@ const ProfileView = () => {
             <CardTitle className="font-serif text-lg">Photos</CardTitle>
             {isOwnProfile && (
               <>
-                <Button variant="outline" size="sm" onClick={handleAddMediaClick} disabled={isUploading}>
+                <Button variant="outline" size="sm" onClick={handleAddMediaClick} disabled={isUploading || isPreparingCrop}>
                   <ImagePlus className="h-4 w-4 mr-2" />
-                  {isUploading ? "Uploading..." : "Add Media"}
+                  {isUploading ? "Uploading..." : isPreparingCrop ? "Preparing..." : "Add Media"}
                 </Button>
                 <input
                   ref={fileInputRef}
@@ -911,6 +909,18 @@ const ProfileView = () => {
           aspect={1}
           cropShape="rect"
           title="Re-crop Photo"
+        />
+      )}
+
+      {pendingCrop && (
+        <AvatarCropDialog
+          open={!!pendingCrop}
+          imageSrc={pendingCrop.src}
+          onClose={() => setPendingCrop(null)}
+          onCropComplete={handlePendingCropComplete}
+          aspect={1}
+          cropShape="rect"
+          title="Crop Photo"
         />
       )}
 
