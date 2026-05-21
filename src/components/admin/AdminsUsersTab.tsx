@@ -362,11 +362,30 @@ export const AdminsUsersTab = ({ currentUserId }: Props) => {
           ) : (
             <>
               <div className="space-y-2">
-                {comps.slice((compsPage - 1) * COMPS_PER_PAGE, compsPage * COMPS_PER_PAGE).map((c) => (
+                {comps.slice((compsPage - 1) * COMPS_PER_PAGE, compsPage * COMPS_PER_PAGE).map((c) => {
+                  const status = c.email_status as string | null;
+                  const dotColor =
+                    status === "sent" ? "bg-green-500" :
+                    status === "pending" ? "bg-yellow-500" :
+                    status ? "bg-red-500" : "bg-muted-foreground/40";
+                  const dotLabel =
+                    status === "sent" ? `Founder email sent${c.email_sent_at ? ` ${new Date(c.email_sent_at).toLocaleString()}` : ""}` :
+                    status === "pending" ? "Founder email pending" :
+                    status ? `Founder email ${status}${c.email_error ? `: ${c.email_error}` : ""}` :
+                    "No founder email on record";
+                  return (
                   <Card key={c.user_id}>
                     <CardContent className="pt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
                       <div className="min-w-0">
-                        <p className="font-medium">{c.email}</p>
+                        <div className="flex items-center gap-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={`inline-block w-2.5 h-2.5 rounded-full ${dotColor}`} aria-label={dotLabel} />
+                            </TooltipTrigger>
+                            <TooltipContent>{dotLabel}</TooltipContent>
+                          </Tooltip>
+                          <p className="font-medium">{c.email}</p>
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           {c.display_name && <>{c.display_name} · </>}
                           {c.plan} · since {new Date(c.comped_by_admin_at).toLocaleDateString()}
@@ -381,7 +400,8 @@ export const AdminsUsersTab = ({ currentUserId }: Props) => {
                       </Button>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
               {comps.length > COMPS_PER_PAGE && (
                 <div className="flex items-center justify-between mt-3 text-sm">
