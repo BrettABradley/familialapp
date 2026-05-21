@@ -344,6 +344,25 @@ const Settings = () => {
       )}
       <ReceiptHistory />
 
+      {isPlatformAdmin && (
+        <Card className="mt-6 border-primary/40">
+          <CardHeader>
+            <CardTitle className="font-serif text-lg flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5" /> Moderator Tools
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              You have platform moderator access. Review reports, appeals, and manage users from the admin dashboard.
+            </p>
+            <Button onClick={() => navigate("/admin")} className="w-full">
+              Open Admin Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+
       {/* Notification Preferences */}
       <Card className="mt-6">
         <CardHeader>
