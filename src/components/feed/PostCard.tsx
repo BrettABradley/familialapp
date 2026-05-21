@@ -448,13 +448,18 @@ const MediaLightbox = ({
                     </audio>
                   </div>
                 ) : (
-                  <SmartImage
-                    src={url}
-                    preset="full"
-                    priority={Math.abs(i - selected) <= 1}
-                    alt={`Media ${i + 1}`}
-                    className="max-h-full max-w-full object-contain select-none bg-transparent"
-                  />
+                  <ZoomableImage
+                    className="w-full h-full flex items-center justify-center"
+                    onScaleChange={(s) => { if (isCurrent) zoomedRef.current = s > 1.05; }}
+                  >
+                    <SmartImage
+                      src={url}
+                      preset="full"
+                      priority={Math.abs(i - selected) <= 1}
+                      alt={`Media ${i + 1}`}
+                      className="max-h-full max-w-full object-contain select-none bg-transparent"
+                    />
+                  </ZoomableImage>
                 )}
               </div>
             );
