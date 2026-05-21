@@ -21,12 +21,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { LogOut, Users, Calendar, Settings, Pin, MessageSquare, Image, Menu, Home, User, Bell, Check, Trash2, X } from "lucide-react";
+import { LogOut, Users, Calendar, Settings, Pin, MessageSquare, Image, Menu, Home, User, Bell, Check, Trash2, X, ShieldCheck } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import icon from "@/assets/icon-transparent.png";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useIsPlatformAdmin } from "@/hooks/useIsPlatformAdmin";
 
 interface Circle {
   id: string;
