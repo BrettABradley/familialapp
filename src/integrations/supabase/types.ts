@@ -600,6 +600,48 @@ export type Database = {
         }
         Relationships: []
       }
+      enterprise_accounts: {
+        Row: {
+          agreed_price_cents: number
+          billing_cadence: string
+          contact_email: string
+          created_at: string
+          created_by: string
+          currency: string
+          id: string
+          next_invoice_due_at: string | null
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agreed_price_cents?: number
+          billing_cadence?: string
+          contact_email: string
+          created_at?: string
+          created_by: string
+          currency?: string
+          id?: string
+          next_invoice_due_at?: string | null
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agreed_price_cents?: number
+          billing_cadence?: string
+          contact_email?: string
+          created_at?: string
+          created_by?: string
+          currency?: string
+          id?: string
+          next_invoice_due_at?: string | null
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       event_rsvps: {
         Row: {
           created_at: string
@@ -1639,6 +1681,8 @@ export type Database = {
         Row: {
           apple_original_transaction_id: string | null
           cancel_at_period_end: boolean
+          comp_note: string | null
+          comped_by_admin_at: string | null
           created_at: string
           current_period_end: string | null
           extra_members: number
@@ -1653,6 +1697,8 @@ export type Database = {
         Insert: {
           apple_original_transaction_id?: string | null
           cancel_at_period_end?: boolean
+          comp_note?: string | null
+          comped_by_admin_at?: string | null
           created_at?: string
           current_period_end?: string | null
           extra_members?: number
@@ -1667,6 +1713,8 @@ export type Database = {
         Update: {
           apple_original_transaction_id?: string | null
           cancel_at_period_end?: boolean
+          comp_note?: string | null
+          comped_by_admin_at?: string | null
           created_at?: string
           current_period_end?: string | null
           extra_members?: number

@@ -9,8 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
-import { Loader2, ShieldAlert, ShieldCheck, FileText, AlertTriangle, Clock } from "lucide-react";
+import { Loader2, ShieldAlert, ShieldCheck, FileText, AlertTriangle, Clock, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { AdminsUsersTab } from "@/components/admin/AdminsUsersTab";
 
 type ModAction =
   | "dismiss" | "restore" | "delete_content"
@@ -74,6 +75,7 @@ const Admin = () => {
 
   useEffect(() => {
     if (!isAdmin) return;
+    if (activeTab === "admins-users") return; // managed by its own component
     if (activeTab === "reports") fetchData("reports", reportStatus);
     else if (activeTab === "appeals") fetchData("appeals", appealStatus);
     else fetchData(activeTab);
@@ -166,6 +168,7 @@ const Admin = () => {
           <TabsTrigger value="banned">Banned</TabsTrigger>
           <TabsTrigger value="audit">Audit</TabsTrigger>
           <TabsTrigger value="metrics">Metrics</TabsTrigger>
+          <TabsTrigger value="admins-users"><Users className="w-4 h-4 mr-1" />Admins & Users</TabsTrigger>
         </TabsList>
 
         {/* QUEUE */}
@@ -332,6 +335,11 @@ const Admin = () => {
               ))}
             </div>
           ) : <p className="text-muted-foreground text-sm py-8 text-center">No metrics.</p>}
+        </TabsContent>
+
+        {/* ADMINS & USERS */}
+        <TabsContent value="admins-users">
+          {user && <AdminsUsersTab currentUserId={user.id} />}
         </TabsContent>
       </Tabs>
 
