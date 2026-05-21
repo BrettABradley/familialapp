@@ -22,6 +22,7 @@ import { SmartImage } from "@/components/shared/SmartImage";
 import { presetImage } from "@/lib/imageUrl";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import useEmblaCarousel from "embla-carousel-react";
+import { useSwipeDownClose } from "@/hooks/useSwipeDownClose";
 
 interface Circle {
   id: string;
