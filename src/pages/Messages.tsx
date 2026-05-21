@@ -467,10 +467,7 @@ const Messages = () => {
 
   const handleDeleteGroup = async () => {
     if (!selectedGroup) return;
-    // Delete members, messages, then the group chat
-    await supabase.from("group_chat_messages").delete().eq("group_chat_id", selectedGroup.id);
-    await supabase.from("group_chat_members").delete().eq("group_chat_id", selectedGroup.id);
-    const { error } = await supabase.from("group_chats").delete().eq("id", selectedGroup.id);
+    const { error } = await (supabase as any).rpc("delete_group_chat_as_creator", { _group_chat_id: selectedGroup.id });
     if (error) {
       toast({ title: "Error", description: "Failed to delete group chat.", variant: "destructive" });
     } else {
@@ -479,6 +476,20 @@ const Messages = () => {
       setGroupChats(prev => prev.filter(g => g.id !== selectedGroup.id));
       setIsDeleteGroupOpen(false);
     }
+  };
+
+  const handleDeletePrivateConversation = async () => {
+    if (!selectedUser) return;
+    const { error } = await (supabase as any).rpc("delete_private_conversation_as_creator", { _other_user_id: selectedUser.user_id });
+    if (error) {
+      toast({ title: "Error", description: error.message || "Failed to delete chat.", variant: "destructive" });
+      return;
+    }
+    setMessages([]);
+    setConversations(prev => prev.filter(c => c.user.user_id !== selectedUser.user_id));
+    setSelectedUser(null);
+    setChatView("list");
+    toast({ title: "Chat deleted" });
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
