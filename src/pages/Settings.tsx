@@ -21,6 +21,7 @@ import SubscriptionCard from "@/components/settings/SubscriptionCard";
 import { isIOSNative, openAppleSubscriptionManagement } from "@/lib/iapPurchase";
 import { registerForPushNotifications } from "@/lib/pushNotifications";
 import ReceiptHistory from "@/components/settings/ReceiptHistory";
+import { useIsPlatformAdmin } from "@/hooks/useIsPlatformAdmin";
 import {
   AlertDialog,
   AlertDialogAction,
