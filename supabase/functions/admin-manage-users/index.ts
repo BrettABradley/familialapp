@@ -55,6 +55,7 @@ async function sendTemplateEmail(
     const client = createClient(supabaseUrl, anonKey);
     const { data, error } = await client.functions.invoke("send-transactional-email", {
       body: { templateName, recipientEmail, templateData, idempotencyKey },
+      headers: { Authorization: `Bearer ${anonKey}` },
     });
     if (error) {
       console.error(`${templateName} email failed`, { recipientEmail, error: error.message });
