@@ -518,7 +518,7 @@ const ProfileView = () => {
             <CardTitle className="font-serif text-lg">Photos</CardTitle>
             {isOwnProfile && (
               <>
-                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                <Button variant="outline" size="sm" onClick={handleAddMediaClick} disabled={isUploading}>
                   <ImagePlus className="h-4 w-4 mr-2" />
                   {isUploading ? "Uploading..." : "Add Media"}
                 </Button>
@@ -795,7 +795,7 @@ const ProfileView = () => {
                   <div className="flex flex-col gap-2">
                     <Button
                       variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={handleAddMediaClick}
                       disabled={isUploading}
                       className="h-12"
                     >
