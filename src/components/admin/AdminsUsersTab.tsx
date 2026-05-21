@@ -402,36 +402,56 @@ export const AdminsUsersTab = ({ currentUserId }: Props) => {
               No enterprise accounts yet. Use User Lookup → "Make Enterprise" to create one.
             </p>
           ) : (
-            <div className="space-y-2">
-              {enterprise.map((e) => (
-                <Card key={e.id}>
-                  <CardContent className="pt-4 space-y-2 text-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="font-medium">{e.account_email}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {e.display_name && <>{e.display_name} · </>}
-                          Contact: {e.contact_email}
-                        </p>
+            <>
+              <div className="space-y-2">
+                {enterprise.slice((entPage - 1) * ENT_PER_PAGE, entPage * ENT_PER_PAGE).map((e) => (
+                  <Card key={e.id}>
+                    <CardContent className="pt-4 space-y-2 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="font-medium">{e.account_email}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {e.display_name && <>{e.display_name} · </>}
+                            Contact: {e.contact_email}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">{e.plan}</Badge>
                       </div>
-                      <Badge variant="secondary">{e.plan}</Badge>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
-                      <div>Circles: <span className="text-foreground">{e.max_circles}</span></div>
-                      <div>Members/circle: <span className="text-foreground">{e.max_members_per_circle}</span></div>
-                      <div>${(e.agreed_price_cents / 100).toFixed(2)} {e.currency} / {e.billing_cadence}</div>
-                      <div>Next invoice: {e.next_invoice_due_at ? new Date(e.next_invoice_due_at).toLocaleDateString() : "—"}</div>
-                    </div>
-                    {e.notes && <p className="text-xs italic">{e.notes}</p>}
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      <Button size="sm" variant="outline" onClick={() => openEnterpriseEdit(e)}>Edit</Button>
-                      <Button size="sm" onClick={() => markInvoiceSent(e.id)}>Mark invoice sent</Button>
-                      <Button size="sm" variant="destructive" onClick={() => removeEnterprise(e.user_id)}>Remove</Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
+                        <div>Circles: <span className="text-foreground">{e.max_circles}</span></div>
+                        <div>Members/circle: <span className="text-foreground">{e.max_members_per_circle}</span></div>
+                        <div>${(e.agreed_price_cents / 100).toFixed(2)} {e.currency} / {e.billing_cadence}</div>
+                        <div>Next invoice: {e.next_invoice_due_at ? new Date(e.next_invoice_due_at).toLocaleDateString() : "—"}</div>
+                      </div>
+                      {e.notes && <p className="text-xs italic">{e.notes}</p>}
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        <Button size="sm" variant="outline" onClick={() => openEnterpriseEdit(e)}>Edit</Button>
+                        <Button size="sm" onClick={() => markInvoiceSent(e.id)}>Mark invoice sent</Button>
+                        <Button size="sm" variant="destructive" onClick={() => removeEnterprise(e.user_id)}>Remove</Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              {enterprise.length > ENT_PER_PAGE && (
+                <div className="flex items-center justify-between mt-3 text-sm">
+                  <span className="text-muted-foreground">
+                    Showing {(entPage - 1) * ENT_PER_PAGE + 1}–{Math.min(entPage * ENT_PER_PAGE, enterprise.length)} of {enterprise.length}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" disabled={entPage === 1}
+                      onClick={() => setEntPage((p) => Math.max(1, p - 1))}>
+                      Previous
+                    </Button>
+                    <Button size="sm" variant="outline"
+                      disabled={entPage * ENT_PER_PAGE >= enterprise.length}
+                      onClick={() => setEntPage((p) => p + 1)}>
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </section>
 
