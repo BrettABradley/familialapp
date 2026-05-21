@@ -16,6 +16,8 @@ import { useBlockedUsers } from "@/hooks/useBlockedUsers";
 import { ReportDialog } from "@/components/shared/ReportDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
+import { pickImage } from "@/lib/imagePicker";
+import { Capacitor } from "@capacitor/core";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { VideoThumbnail } from "@/components/shared/VideoThumbnail";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
@@ -132,16 +134,7 @@ const ProfileView = () => {
     setShowCaptionInput(false);
   };
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const list = event.target.files;
-    if (!list || list.length === 0) return;
-
-    // Strictly one file at a time, appended to existing pending items, capped at MAX_GROUP_ITEMS.
-    const incoming = Array.from(list);
-    event.target.value = "";
-    const selectedFile = incoming[0];
-    if (!selectedFile) return;
-
+  const addPendingFile = async (selectedFile: File) => {
     const remaining = MAX_GROUP_ITEMS - pendingFiles.length;
     if (remaining <= 0) {
       toast({ title: `Maximum ${MAX_GROUP_ITEMS} items`, description: "Remove one to add another." });
@@ -150,33 +143,63 @@ const ProfileView = () => {
 
     // Open the composer immediately; convert/downscale in the background so iOS never feels like the upload vanished.
     const previewUrl = URL.createObjectURL(selectedFile);
+    setShowCaptionInput(true);
     setPendingFiles((prev) => [...prev, selectedFile]);
     setPendingPreviews((prev) => [...prev, {
       url: previewUrl,
       isVideo: selectedFile.type.startsWith("video/"),
     }]);
-    setShowCaptionInput(true);
 
     try {
       const convertedFile = await convertHeicToJpeg(selectedFile);
       if (convertedFile !== selectedFile) {
+        const stillPending = pendingPreviewsRef.current.some((preview) => preview.url === previewUrl);
+        if (!stillPending) {
+          URL.revokeObjectURL(previewUrl);
+          return;
+        }
+
         setPendingFiles((prev) => prev.map((file) => file === selectedFile ? convertedFile : file));
         const convertedPreviewUrl = URL.createObjectURL(convertedFile);
-        let replacedPreview = false;
         setPendingPreviews((prev) => prev.map((preview) => {
           if (preview.url !== previewUrl) return preview;
-          replacedPreview = true;
           return {
             url: convertedPreviewUrl,
             isVideo: convertedFile.type.startsWith("video/"),
           };
         }));
-        if (replacedPreview) URL.revokeObjectURL(previewUrl);
-        else URL.revokeObjectURL(convertedPreviewUrl);
+        URL.revokeObjectURL(previewUrl);
       }
     } catch {
       // Keep the original file selected if conversion fails; the user can still continue or remove it.
     }
+  };
+
+  const handleAddMediaClick = async () => {
+    if (isUploading) return;
+    if (pendingFiles.length >= MAX_GROUP_ITEMS) {
+      toast({ title: `Maximum ${MAX_GROUP_ITEMS} items`, description: "Remove one to add another." });
+      return;
+    }
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const picked = await pickImage();
+        if (picked) await addPendingFile(picked.file);
+      } catch {
+        toast({ title: "Could not open photos", description: "Please try again.", variant: "destructive" });
+      }
+      return;
+    }
+
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    event.target.value = "";
+    if (!selectedFile) return;
+    await addPendingFile(selectedFile);
   };
 
   const removePendingItem = (index: number) => {
