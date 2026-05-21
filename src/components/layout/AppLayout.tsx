@@ -13,7 +13,7 @@ import { UpdatePrompt } from "@/components/shared/UpdatePrompt";
 
 function AppLayoutContent() {
   const { user, loading: authLoading, signOut } = useAuth();
-  const { circles, selectedCircle, setSelectedCircle, isLoading: circlesLoading, profile } = useCircleContext();
+  const { circles, selectedCircle, setSelectedCircle, isLoading: circlesLoading, profile, lockCircleSwitcher } = useCircleContext();
   const navigate = useNavigate();
   const location = useLocation();
   
