@@ -111,12 +111,17 @@ const ProfileView = () => {
     });
   }, [images]);
 
-  // Cleanup pending preview blob URLs
+  // Cleanup pending preview blob URLs on unmount only.
+  // (Per-item revocation is handled by removePendingItem / resetUploadState.)
+  const pendingPreviewsRef = useRef(pendingPreviews);
+  useEffect(() => {
+    pendingPreviewsRef.current = pendingPreviews;
+  }, [pendingPreviews]);
   useEffect(() => {
     return () => {
-      pendingPreviews.forEach((p) => URL.revokeObjectURL(p.url));
+      pendingPreviewsRef.current.forEach((p) => URL.revokeObjectURL(p.url));
     };
-  }, [pendingPreviews]);
+  }, []);
 
   const resetUploadState = () => {
     pendingPreviews.forEach((p) => URL.revokeObjectURL(p.url));
