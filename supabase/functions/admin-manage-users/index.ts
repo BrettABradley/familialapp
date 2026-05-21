@@ -42,6 +42,7 @@ async function sendTemplateEmail(
   recipientEmail: string,
   templateData: Record<string, unknown>,
   idempotencyKey: string,
+  authHeader: string,
 ) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
@@ -50,12 +51,13 @@ async function sendTemplateEmail(
   }
 
   try {
-    // Use anon key for gateway auth (service_role key in new sb_secret_ format
-    // is rejected as "Invalid JWT" by the edge gateway).
-    const client = createClient(supabaseUrl, anonKey);
+    // send-transactional-email has verify_jwt=true; forward the caller's
+    // admin JWT so the gateway accepts it.
+    const client = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
     const { data, error } = await client.functions.invoke("send-transactional-email", {
       body: { templateName, recipientEmail, templateData, idempotencyKey },
-      headers: { Authorization: `Bearer ${anonKey}` },
     });
     if (error) {
       console.error(`${templateName} email failed`, { recipientEmail, error: error.message });
@@ -77,8 +79,8 @@ async function sendTemplateEmail(
 
 const skippedEmail = (requested = false, error?: string) => ({ requested, queued: false, error });
 
-const sendGiftEmail = (recipientEmail: string, name: string | null, idempotencyKey: string) =>
-  sendTemplateEmail("founder-gift", recipientEmail, { name: name ?? undefined }, idempotencyKey);
+const sendGiftEmail = (recipientEmail: string, name: string | null, idempotencyKey: string, authHeader: string) =>
+  sendTemplateEmail("founder-gift", recipientEmail, { name: name ?? undefined }, idempotencyKey, authHeader);
 
 
 Deno.serve(async (req: Request) => {
