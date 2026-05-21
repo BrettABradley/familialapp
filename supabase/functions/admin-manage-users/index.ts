@@ -400,7 +400,7 @@ Deno.serve(async (req: Request) => {
             welcome_email_result = await sendTemplateEmail("enterprise-welcome", recipient, {
               name: prof?.display_name ?? undefined,
               contactEmail: contact_email,
-            }, `enterprise-welcome-${target_user_id}-${operationId}`);
+            }, `enterprise-welcome-${target_user_id}-${operationId}`, authHeader);
           }
           gift_email_result = skippedEmail(send_email, send_email && !targetAuth?.user?.email ? "Target user has no email address" : undefined);
           if (send_email && targetAuth?.user?.email) {
@@ -408,6 +408,7 @@ Deno.serve(async (req: Request) => {
               targetAuth.user.email,
               prof?.display_name ?? null,
               `founder-gift-enterprise-${target_user_id}-${operationId}`,
+              authHeader,
             );
           }
           // In-app notification bell entry
