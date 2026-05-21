@@ -8,6 +8,8 @@ interface ZoomableImageProps {
   onSwipeLeft?: () => void;
   onSwipeRight?: () => void;
   onSwipeDown?: () => void;
+  /** Notified whenever the zoom scale changes — lets parents (e.g. an Embla carousel) disable swipe while zoomed. */
+  onScaleChange?: (scale: number) => void;
   className?: string;
 }
 
@@ -21,6 +23,7 @@ export const ZoomableImage = ({
   onSwipeLeft,
   onSwipeRight,
   onSwipeDown,
+  onScaleChange,
   className,
 }: ZoomableImageProps) => {
   const apiRef = useRef<ReactZoomPanPinchRef | null>(null);
@@ -70,7 +73,10 @@ export const ZoomableImage = ({
         wheel={{ step: 0.2, activationKeys: ["Control", "Meta"] }}
         pinch={{ step: 5 }}
         panning={{ disabled: scale <= 1.05 }}
-        onTransform={(ref) => setScale(ref.state.scale)}
+        onTransform={(ref) => {
+          setScale(ref.state.scale);
+          onScaleChange?.(ref.state.scale);
+        }}
       >
         <TransformComponent
           wrapperStyle={{ width: "100%", height: "100%" }}
@@ -82,3 +88,4 @@ export const ZoomableImage = ({
     </div>
   );
 };
+
