@@ -19,6 +19,7 @@ import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { convertHeicToJpeg, convertHeicFiles } from "@/lib/heicConverter";
 import JSZip from "jszip";
 import { SmartImage } from "@/components/shared/SmartImage";
+import { ZoomableImage } from "@/components/shared/ZoomableImage";
 import { presetImage } from "@/lib/imageUrl";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import useEmblaCarousel from "embla-carousel-react";
