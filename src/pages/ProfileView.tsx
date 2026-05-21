@@ -785,41 +785,59 @@ const ProfileView = () => {
               </Button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-              {pendingPreviews.length === 1 ? (
-                <div className="relative mx-auto aspect-square w-full max-w-xl overflow-hidden rounded-lg bg-muted">
-                  {pendingPreviews[0].isVideo ? (
-                    <video src={pendingPreviews[0].url} controls playsInline className="h-full w-full bg-muted object-cover" />
-                  ) : (
-                    <SquareImageThumbnail src={pendingPreviews[0].url} alt="Selected item 1" />
-                  )}
-                  <button type="button" onClick={() => removePendingItem(0)} disabled={isUploading} className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm" aria-label="Remove selected item">
-                    <X className="h-5 w-5" />
-                  </button>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-height, 0px) + 1rem)' }}>
+              {/* Caption first so it stays visible above keyboard on iOS */}
+              <div className="mx-auto flex w-full max-w-xl flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Caption</span>
+                  <span className={`text-xs ${uploadCaption.length >= 280 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {uploadCaption.length}/300
+                  </span>
                 </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {pendingPreviews.map((p, i) => (
-                    <div key={i} className="relative aspect-square overflow-hidden rounded-lg bg-muted">
-                      {p.isVideo ? (
-                        <video src={p.url} playsInline muted className="h-full w-full bg-muted object-cover" />
-                      ) : (
-                        <SquareImageThumbnail src={p.url} alt={`Selected item ${i + 1}`} />
-                      )}
-                      <button type="button" onClick={() => removePendingItem(i)} disabled={isUploading} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm" aria-label={`Remove item ${i + 1}`}>
-                        <X className="h-4 w-4" />
-                      </button>
-                      <div className="absolute bottom-2 left-2 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium text-foreground shadow-sm">
-                        {i + 1}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                <Textarea
+                  value={uploadCaption}
+                  onChange={(e) => setUploadCaption(e.target.value.slice(0, 300))}
+                  placeholder="Write a caption (optional)..."
+                  className="min-h-24 resize-none text-base"
+                  rows={3}
+                  maxLength={300}
+                />
+              </div>
 
-              <div className="mx-auto mt-6 flex w-full max-w-xl flex-col gap-4 pb-28">
+              <div className="mx-auto mt-6 w-full max-w-xl">
+                {pendingPreviews.length === 1 ? (
+                  <div className="relative mx-auto aspect-square w-full overflow-hidden rounded-lg bg-muted">
+                    {pendingPreviews[0].isVideo ? (
+                      <video src={pendingPreviews[0].url} controls playsInline className="h-full w-full bg-muted object-cover" />
+                    ) : (
+                      <SquareImageThumbnail src={pendingPreviews[0].url} alt="Selected item 1" />
+                    )}
+                    <button type="button" onClick={() => removePendingItem(0)} disabled={isUploading} className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm" aria-label="Remove selected item">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {pendingPreviews.map((p, i) => (
+                      <div key={i} className="relative aspect-square overflow-hidden rounded-lg bg-muted">
+                        {p.isVideo ? (
+                          <video src={p.url} playsInline muted className="h-full w-full bg-muted object-cover" />
+                        ) : (
+                          <SquareImageThumbnail src={p.url} alt={`Selected item ${i + 1}`} />
+                        )}
+                        <button type="button" onClick={() => removePendingItem(i)} disabled={isUploading} className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm" aria-label={`Remove item ${i + 1}`}>
+                          <X className="h-4 w-4" />
+                        </button>
+                        <div className="absolute bottom-2 left-2 rounded-full bg-background/90 px-2 py-0.5 text-xs font-medium text-foreground shadow-sm">
+                          {i + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {pendingFiles.length < MAX_GROUP_ITEMS && (
-                  <div className="flex flex-col gap-2">
+                  <div className="mt-4 flex flex-col gap-2">
                     <Button
                       variant="outline"
                       onClick={handleAddMediaClick}
@@ -830,23 +848,10 @@ const ProfileView = () => {
                       Add another photo ({pendingFiles.length}/{MAX_GROUP_ITEMS})
                     </Button>
                     <p className="text-center text-xs text-muted-foreground">
-                      Add up to {MAX_GROUP_ITEMS} photos, or continue with a caption below.
+                      Add up to {MAX_GROUP_ITEMS} photos.
                     </p>
                   </div>
                 )}
-                <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-border" />
-                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Caption</span>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-                <Textarea
-                  value={uploadCaption}
-                  onChange={(e) => setUploadCaption(e.target.value)}
-                  placeholder="Write a caption (optional)..."
-                  className="min-h-28 resize-none text-base"
-                  rows={4}
-                  maxLength={500}
-                />
               </div>
             </div>
           </div>
@@ -874,12 +879,13 @@ const ProfileView = () => {
               </div>
               <Textarea
                 value={editCaption}
-                onChange={(e) => setEditCaption(e.target.value)}
+                onChange={(e) => setEditCaption(e.target.value.slice(0, 300))}
                 placeholder="Edit caption..."
                 className="resize-none"
                 rows={3}
-                maxLength={500}
+                maxLength={300}
               />
+              <p className={`text-xs text-right ${editCaption.length >= 280 ? 'text-destructive' : 'text-muted-foreground'}`}>{editCaption.length}/300</p>
               <div className="flex gap-2 justify-between">
                 {editingGroup.length === 1 && getMediaType(editingGroup[0].image_url) === 'image' && (
                   <Button variant="outline" size="sm" onClick={handleEditRecrop} disabled={isSavingEdit}>
