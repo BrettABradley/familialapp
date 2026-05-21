@@ -69,6 +69,8 @@ export const AdminsUsersTab = ({ currentUserId }: Props) => {
   // active comps
   const [comps, setComps] = useState<any[]>([]);
   const [compsLoading, setCompsLoading] = useState(false);
+  const [compsPage, setCompsPage] = useState(1);
+  const COMPS_PER_PAGE = 10;
 
   // enterprise
   const [enterprise, setEnterprise] = useState<any[]>([]);
@@ -344,27 +346,51 @@ export const AdminsUsersTab = ({ currentUserId }: Props) => {
           {compsLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : comps.length === 0 ? (
             <p className="text-sm text-muted-foreground">No active comps.</p>
           ) : (
-            <div className="space-y-2">
-              {comps.map((c) => (
-                <Card key={c.user_id}>
-                  <CardContent className="pt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
-                    <div>
-                      <p className="font-medium">{c.email}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {c.display_name && <>{c.display_name} · </>}
-                        {c.plan} · since {new Date(c.comped_by_admin_at).toLocaleDateString()}
-                      </p>
-                      {c.comp_note && <p className="text-xs italic mt-1">"{c.comp_note}"</p>}
-                    </div>
-                    <Button size="sm" variant="destructive" onClick={() => revokeComp(c.user_id)}>
-                      Revoke
+            <>
+              <div className="space-y-2">
+                {comps.slice((compsPage - 1) * COMPS_PER_PAGE, compsPage * COMPS_PER_PAGE).map((c) => (
+                  <Card key={c.user_id}>
+                    <CardContent className="pt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <div className="min-w-0">
+                        <p className="font-medium">{c.email}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {c.display_name && <>{c.display_name} · </>}
+                          {c.plan} · since {new Date(c.comped_by_admin_at).toLocaleDateString()}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Reach: <span className="text-foreground font-medium">{c.members_brought_in ?? 0}</span> member{(c.members_brought_in ?? 0) === 1 ? "" : "s"} across <span className="text-foreground font-medium">{c.circles_owned ?? 0}</span> circle{(c.circles_owned ?? 0) === 1 ? "" : "s"}
+                        </p>
+                        {c.comp_note && <p className="text-xs italic mt-1">"{c.comp_note}"</p>}
+                      </div>
+                      <Button size="sm" variant="destructive" onClick={() => revokeComp(c.user_id)}>
+                        Revoke
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              {comps.length > COMPS_PER_PAGE && (
+                <div className="flex items-center justify-between mt-3 text-sm">
+                  <span className="text-muted-foreground">
+                    Showing {(compsPage - 1) * COMPS_PER_PAGE + 1}–{Math.min(compsPage * COMPS_PER_PAGE, comps.length)} of {comps.length}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" disabled={compsPage === 1}
+                      onClick={() => setCompsPage((p) => Math.max(1, p - 1))}>
+                      Previous
                     </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    <Button size="sm" variant="outline"
+                      disabled={compsPage * COMPS_PER_PAGE >= comps.length}
+                      onClick={() => setCompsPage((p) => p + 1)}>
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </section>
+
 
         {/* ============ ENTERPRISE ============ */}
         <section>

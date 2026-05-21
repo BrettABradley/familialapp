@@ -170,10 +170,25 @@ Deno.serve(async (req: Request) => {
           const { data: u } = await supabaseAdmin.auth.admin.getUserById(p.user_id);
           const { data: prof } = await supabaseAdmin.from("profiles")
             .select("display_name").eq("user_id", p.user_id).maybeSingle();
+          // Reach stats: circles they own + total non-owner members across those circles
+          const { data: ownedCircles } = await supabaseAdmin.from("circles")
+            .select("id").eq("owner_id", p.user_id);
+          const circleIds = (ownedCircles ?? []).map((c: any) => c.id);
+          let membersBroughtIn = 0;
+          if (circleIds.length > 0) {
+            const { count } = await supabaseAdmin
+              .from("circle_memberships")
+              .select("user_id", { count: "exact", head: true })
+              .in("circle_id", circleIds)
+              .neq("user_id", p.user_id);
+            membersBroughtIn = count ?? 0;
+          }
           return {
             user_id: p.user_id, plan: p.plan,
             comped_by_admin_at: p.comped_by_admin_at, comp_note: p.comp_note,
             email: u?.user?.email, display_name: prof?.display_name,
+            circles_owned: circleIds.length,
+            members_brought_in: membersBroughtIn,
           };
         }));
         return jsonResponse({ comps: enriched });
