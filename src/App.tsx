@@ -60,6 +60,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <UpdateGate>
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<Index />} />
