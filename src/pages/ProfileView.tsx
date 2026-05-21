@@ -57,7 +57,8 @@ const ProfileMediaLightbox = ({
   onClose: () => void;
   onDownload: (url: string) => void;
 }) => {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "center", duration: 34, dragThreshold: 4, containScroll: "trimSnaps", startIndex });
+  const zoomedRef = useRef(false);
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "center", duration: 34, dragThreshold: 4, containScroll: "trimSnaps", startIndex, watchDrag: () => !zoomedRef.current });
   const [selected, setSelected] = useState(startIndex);
   const current = group[selected];
 
@@ -67,6 +68,7 @@ const ProfileMediaLightbox = ({
       const index = emblaApi.selectedScrollSnap();
       setSelected(index);
       onIndexChange(index);
+      zoomedRef.current = false;
     };
     emblaApi.on("select", onSelect);
     onSelect();
