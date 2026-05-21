@@ -1,6 +1,6 @@
 import { Heart, Mail, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
-import icon from "@/assets/icon.png";
+import icon from "@/assets/icon-transparent.png";
 
 const Footer = () => {
   return (
