@@ -387,6 +387,7 @@ const MediaLightbox = ({
 
   const currentUrl = items[selected];
   const isImage = currentUrl && getMediaType(currentUrl) === "image";
+  const swipeDown = useSwipeDownClose(onClose);
 
   return (
     <>
@@ -415,7 +416,7 @@ const MediaLightbox = ({
       </div>
 
       {/* Embla viewport — full width/height of dialog */}
-      <div className="w-screen sm:w-[90vw] h-[100dvh] sm:h-[90vh] overflow-hidden" ref={emblaRef}>
+      <div className="w-screen sm:w-[90vw] h-[100dvh] sm:h-[90vh] overflow-hidden" ref={emblaRef} {...swipeDown}>
         <div className="flex h-full touch-pan-y will-change-transform">
           {items.map((url, i) => {
             const type = getMediaType(url);
