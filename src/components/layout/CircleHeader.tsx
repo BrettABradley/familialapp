@@ -348,6 +348,14 @@ export function CircleHeader({
             {!overrideLabel && user && (
               <NotificationBell userId={user.id} selectedCircle={selectedCircle} variant="popover" />
             )}
+            {isPlatformAdmin && (
+              <Link to="/admin">
+                <Button variant="ghost" size="sm" className="gap-1.5">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Admin</span>
+                </Button>
+              </Link>
+            )}
             <Button variant="ghost" size="sm" className="gap-1.5" onClick={onSignOut}>
               <LogOut className="w-4 h-4" />
               <span>Sign Out</span>
