@@ -69,6 +69,8 @@ export const AdminsUsersTab = ({ currentUserId }: Props) => {
   // active comps
   const [comps, setComps] = useState<any[]>([]);
   const [compsLoading, setCompsLoading] = useState(false);
+  const [compsPage, setCompsPage] = useState(1);
+  const COMPS_PER_PAGE = 10;
 
   // enterprise
   const [enterprise, setEnterprise] = useState<any[]>([]);
