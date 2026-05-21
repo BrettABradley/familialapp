@@ -206,7 +206,7 @@ const Albums = () => {
   const circleIdParam = searchParams.get("circle");
   const albumIdParam = searchParams.get("album");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const coverInputRef = useRef<HTMLInputElement>(null);
+  
   const [enlargedPhoto, setEnlargedPhoto] = useState<AlbumPhoto | null>(null);
   const touchStartXRef = useRef<number>(0);
   
