@@ -1603,6 +1603,14 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      delete_group_chat_as_creator: {
+        Args: { _group_chat_id: string }
+        Returns: undefined
+      }
+      delete_private_conversation_as_creator: {
+        Args: { _other_user_id: string }
+        Returns: undefined
+      }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number

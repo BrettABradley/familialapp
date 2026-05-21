@@ -467,10 +467,7 @@ const Messages = () => {
 
   const handleDeleteGroup = async () => {
     if (!selectedGroup) return;
-    // Delete members, messages, then the group chat
-    await supabase.from("group_chat_messages").delete().eq("group_chat_id", selectedGroup.id);
-    await supabase.from("group_chat_members").delete().eq("group_chat_id", selectedGroup.id);
-    const { error } = await supabase.from("group_chats").delete().eq("id", selectedGroup.id);
+    const { error } = await (supabase as any).rpc("delete_group_chat_as_creator", { _group_chat_id: selectedGroup.id });
     if (error) {
       toast({ title: "Error", description: "Failed to delete group chat.", variant: "destructive" });
     } else {
@@ -479,6 +476,20 @@ const Messages = () => {
       setGroupChats(prev => prev.filter(g => g.id !== selectedGroup.id));
       setIsDeleteGroupOpen(false);
     }
+  };
+
+  const handleDeletePrivateConversation = async () => {
+    if (!selectedUser) return;
+    const { error } = await (supabase as any).rpc("delete_private_conversation_as_creator", { _other_user_id: selectedUser.user_id });
+    if (error) {
+      toast({ title: "Error", description: error.message || "Failed to delete chat.", variant: "destructive" });
+      return;
+    }
+    setMessages([]);
+    setConversations(prev => prev.filter(c => c.user.user_id !== selectedUser.user_id));
+    setSelectedUser(null);
+    setChatView("list");
+    toast({ title: "Chat deleted" });
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -797,6 +808,7 @@ const Messages = () => {
 
   // Chat view (DM or Group)
   if (chatView === "dm" && selectedUser) {
+    const canDeleteSelectedDm = messages[0]?.sender_id === user?.id;
     const dmView = (
       <div className="fixed inset-0 z-[60] bg-background flex flex-col md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]" style={{ height: 'calc(100% - var(--keyboard-height, 0px))' }}>
         <div className="flex-shrink-0 bg-background border-b border-border" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 3.25rem)' }}>
@@ -808,6 +820,25 @@ const Messages = () => {
           <Link to={`/profile/${selectedUser.user_id}`} className="hover:underline">
             <h2 className="font-serif text-xl font-bold text-foreground">{selectedUser.display_name || "Unknown"}</h2>
           </Link>
+          {canDeleteSelectedDm && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="ml-auto text-destructive hover:text-destructive" aria-label="Delete chat">
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Chat</AlertDialogTitle>
+                  <AlertDialogDescription>This will permanently delete this conversation for both people. This cannot be undone.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeletePrivateConversation} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4" onTouchMove={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}>

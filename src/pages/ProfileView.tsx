@@ -22,6 +22,8 @@ import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { VideoThumbnail } from "@/components/shared/VideoThumbnail";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
+import { SmartImage } from "@/components/shared/SmartImage";
+import useEmblaCarousel from "embla-carousel-react";
 
 interface ProfileData {
   user_id: string;
@@ -42,6 +44,65 @@ interface ProfileImage {
 
 const MAX_GROUP_ITEMS = 5;
 
+const ProfileMediaLightbox = ({
+  group,
+  startIndex,
+  onIndexChange,
+  onClose,
+  onDownload,
+}: {
+  group: ProfileImage[];
+  startIndex: number;
+  onIndexChange: (index: number) => void;
+  onClose: () => void;
+  onDownload: (url: string) => void;
+}) => {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "center", duration: 34, dragThreshold: 4, containScroll: "trimSnaps", startIndex });
+  const [selected, setSelected] = useState(startIndex);
+  const current = group[selected];
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => {
+      const index = emblaApi.selectedScrollSnap();
+      setSelected(index);
+      onIndexChange(index);
+    };
+    emblaApi.on("select", onSelect);
+    onSelect();
+    return () => { emblaApi.off("select", onSelect); };
+  }, [emblaApi, onIndexChange]);
+
+  return (
+    <>
+      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-end gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
+        {current && <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60" onClick={() => onDownload(current.image_url)} aria-label="Download"><Download className="h-5 w-5" /></Button>}
+        <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60" onClick={onClose} aria-label="Close"><X className="h-5 w-5" /></Button>
+      </div>
+      <div className="h-[100dvh] w-screen overflow-hidden sm:h-[90vh] sm:w-[90vw]" ref={emblaRef}>
+        <div className="flex h-full touch-pan-y will-change-transform">
+          {group.map((item, index) => (
+            <div key={item.id} className="flex h-full min-w-0 flex-[0_0_100%] items-center justify-center px-2">
+              {getMediaType(item.image_url) === "video" ? (
+                <video src={item.image_url} controls autoPlay={index === selected} playsInline className="max-h-full max-w-full select-none object-contain" />
+              ) : (
+                <SmartImage src={item.image_url} preset="full" priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      {group.length > 1 && (
+        <>
+          {selected > 0 && <button className="hidden sm:flex absolute left-4 top-1/2 z-30 min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60" onClick={() => emblaApi?.scrollPrev()} aria-label="Previous slide"><ChevronLeft className="h-6 w-6" /></button>}
+          {selected < group.length - 1 && <button className="hidden sm:flex absolute right-4 top-1/2 z-30 min-h-[44px] min-w-[44px] -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm hover:bg-black/60" onClick={() => emblaApi?.scrollNext()} aria-label="Next slide"><ChevronRight className="h-6 w-6" /></button>}
+          <div className="absolute left-1/2 z-30 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-sm text-white backdrop-blur-sm" style={{ bottom: "max(env(safe-area-inset-bottom, 0px), 1rem)" }}>{selected + 1} / {group.length}</div>
+        </>
+      )}
+    </>
+  );
+};
+
 const ProfileView = () => {
   const { userId } = useParams<{ userId: string }>();
   const { user } = useAuth();
@@ -49,8 +110,6 @@ const ProfileView = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
-  const touchStartX = useRef<number>(0);
-  const touchStartY = useRef<number>(0);
   useKeyboardDismissOnScroll(mainRef);
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
@@ -63,6 +122,8 @@ const ProfileView = () => {
   // Multi-file upload state
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [pendingPreviews, setPendingPreviews] = useState<{ url: string; isVideo: boolean }[]>([]);
+  const [pendingCrop, setPendingCrop] = useState<{ src: string; file: File } | null>(null);
+  const [isPreparingCrop, setIsPreparingCrop] = useState(false);
 
   // Lightbox now opens a *group* (one post) with a slide index
   const [lightbox, setLightbox] = useState<{ group: ProfileImage[]; index: number } | null>(null);
@@ -132,6 +193,31 @@ const ProfileView = () => {
     setPendingPreviews([]);
     setUploadCaption("");
     setShowCaptionInput(false);
+    setPendingCrop(null);
+  };
+
+  const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Could not read image"));
+    reader.readAsDataURL(file);
+  });
+
+  const preparePhotoCrop = async (selectedFile: File) => {
+    if (selectedFile.type.startsWith("video/")) {
+      await addPendingFile(selectedFile);
+      return;
+    }
+    setIsPreparingCrop(true);
+    try {
+      const displayFile = await convertHeicToJpeg(selectedFile);
+      const src = await readFileAsDataUrl(displayFile);
+      setPendingCrop({ src, file: displayFile });
+    } catch {
+      toast({ title: "Could not prepare photo", description: "Please try a different image.", variant: "destructive" });
+    } finally {
+      setIsPreparingCrop(false);
+    }
   };
 
   const addPendingFile = async (selectedFile: File) => {
@@ -185,7 +271,7 @@ const ProfileView = () => {
     if (Capacitor.isNativePlatform()) {
       try {
         const picked = await pickImage();
-        if (picked) await addPendingFile(picked.file);
+        if (picked) await preparePhotoCrop(picked.file);
       } catch {
         toast({ title: "Could not open photos", description: "Please try again.", variant: "destructive" });
       }
@@ -202,9 +288,20 @@ const ProfileView = () => {
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
-    await addPendingFile(selectedFile);
+    await preparePhotoCrop(selectedFile);
     // Clear after processing so the same file can be re-picked next time.
     if (event.target) event.target.value = "";
+  };
+
+  const handlePendingCropComplete = async (blob: Blob) => {
+    const sourceName = pendingCrop?.file.name || "profile-photo.jpg";
+    setPendingCrop(null);
+    const croppedFile = new File(
+      [blob],
+      sourceName.replace(/\.[^/.]+$/, ".jpg"),
+      { type: "image/jpeg" }
+    );
+    await addPendingFile(croppedFile);
   };
 
   const removePendingItem = (index: number) => {
@@ -523,9 +620,9 @@ const ProfileView = () => {
             <CardTitle className="font-serif text-lg">Photos</CardTitle>
             {isOwnProfile && (
               <>
-                <Button variant="outline" size="sm" onClick={handleAddMediaClick} disabled={isUploading}>
+                <Button variant="outline" size="sm" onClick={handleAddMediaClick} disabled={isUploading || isPreparingCrop}>
                   <ImagePlus className="h-4 w-4 mr-2" />
-                  {isUploading ? "Uploading..." : "Add Media"}
+                  {isUploading ? "Uploading..." : isPreparingCrop ? "Preparing..." : "Add Media"}
                 </Button>
                 <input
                   ref={fileInputRef}
@@ -608,88 +705,13 @@ const ProfileView = () => {
         <DialogContent className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
           {lightbox && currentSlide && (
             <>
-              {/* Top control bar — safe area aware on mobile */}
-              <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-end gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
-                  onClick={() => handleDownload(currentSlide.image_url)}
-                  aria-label="Download"
-                >
-                  <Download className="h-5 w-5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60"
-                  onClick={() => setLightbox(null)}
-                  aria-label="Close"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-
-              {/* Centered media */}
-              {getMediaType(currentSlide.image_url) === 'video' ? (
-                <video
-                  key={currentSlide.id}
-                  src={currentSlide.image_url}
-                  controls
-                  autoPlay
-                  playsInline
-                  className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
-                  onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; touchStartY.current = e.touches[0].clientY; }}
-                  onTouchEnd={(e) => {
-                    const deltaX = touchStartX.current - e.changedTouches[0].clientX;
-                    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
-                    if (deltaY > 80 && Math.abs(deltaX) < 50) { setLightbox(null); return; }
-                    if (deltaX > 50 && lightbox.index < lightbox.group.length - 1) setLightbox({ ...lightbox, index: lightbox.index + 1 });
-                    else if (deltaX < -50 && lightbox.index > 0) setLightbox({ ...lightbox, index: lightbox.index - 1 });
-                  }}
-                />
-              ) : (
-                <ZoomableImage
-                  className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto flex items-center justify-center"
-                  onSwipeLeft={() => lightbox.index < lightbox.group.length - 1 && setLightbox({ ...lightbox, index: lightbox.index + 1 })}
-                  onSwipeRight={() => lightbox.index > 0 && setLightbox({ ...lightbox, index: lightbox.index - 1 })}
-                  onSwipeDown={() => setLightbox(null)}
-                >
-                  <img
-                    key={currentSlide.id}
-                    src={currentSlide.image_url}
-                    alt={currentSlide.caption || "Profile photo"}
-                    className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
-                  />
-                </ZoomableImage>
-              )}
-
-              {/* Navigation arrows + counter (within group) */}
-              {lightbox.group.length > 1 && (
-                <>
-                  {lightbox.index > 0 && (
-                    <button
-                      className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                      onClick={() => setLightbox({ ...lightbox, index: lightbox.index - 1 })}
-                      aria-label="Previous slide"
-                    >
-                      <ChevronLeft className="h-6 w-6" />
-                    </button>
-                  )}
-                  {lightbox.index < lightbox.group.length - 1 && (
-                    <button
-                      className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-                      onClick={() => setLightbox({ ...lightbox, index: lightbox.index + 1 })}
-                      aria-label="Next slide"
-                    >
-                      <ChevronRight className="h-6 w-6" />
-                    </button>
-                  )}
-                  <div className="absolute bottom-6 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 bg-black/50 backdrop-blur-sm text-white text-sm px-3 py-1 rounded-full" style={{ marginBottom: "max(env(safe-area-inset-bottom, 0px), 0px)" }}>
-                    {lightbox.index + 1} / {lightbox.group.length}
-                  </div>
-                </>
-              )}
+              <ProfileMediaLightbox
+                group={lightbox.group}
+                startIndex={lightbox.index}
+                onIndexChange={(index) => setLightbox((prev) => prev ? { ...prev, index } : prev)}
+                onClose={() => setLightbox(null)}
+                onDownload={handleDownload}
+              />
 
               {/* Caption & actions (shared across the group) */}
               {(profileData?.display_name || currentSlide.caption || isOwnProfile) && (
@@ -887,6 +909,18 @@ const ProfileView = () => {
           aspect={1}
           cropShape="rect"
           title="Re-crop Photo"
+        />
+      )}
+
+      {pendingCrop && (
+        <AvatarCropDialog
+          open={!!pendingCrop}
+          imageSrc={pendingCrop.src}
+          onClose={() => setPendingCrop(null)}
+          onCropComplete={handlePendingCropComplete}
+          aspect={1}
+          cropShape="rect"
+          title="Crop Photo"
         />
       )}
 
