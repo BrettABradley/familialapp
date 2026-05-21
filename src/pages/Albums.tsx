@@ -213,6 +213,7 @@ const Albums = () => {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
   const [photos, setPhotos] = useState<AlbumPhoto[]>([]);
+  const [coverCropSrc, setCoverCropSrc] = useState<string | null>(null);
 
   // Preload neighbor photos in lightbox for snappy swipes
   useEffect(() => {
