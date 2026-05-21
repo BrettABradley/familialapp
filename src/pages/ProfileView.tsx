@@ -48,6 +48,7 @@ const ProfileView = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
   useKeyboardDismissOnScroll(mainRef);
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
@@ -198,8 +199,8 @@ const ProfileView = () => {
 
     const sharedCaption = uploadCaption.trim() || null;
     const groupId =
-      (typeof crypto !== "undefined" && (crypto as any).randomUUID)
-        ? (crypto as any).randomUUID()
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
     const insertedRows: ProfileImage[] = [];
@@ -610,10 +611,10 @@ const ProfileView = () => {
                   autoPlay
                   playsInline
                   className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
-                  onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; (touchStartX as any).__y = e.touches[0].clientY; }}
+                  onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; touchStartY.current = e.touches[0].clientY; }}
                   onTouchEnd={(e) => {
                     const deltaX = touchStartX.current - e.changedTouches[0].clientX;
-                    const deltaY = e.changedTouches[0].clientY - ((touchStartX as any).__y || 0);
+                    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
                     if (deltaY > 80 && Math.abs(deltaX) < 50) { setLightbox(null); return; }
                     if (deltaX > 50 && lightbox.index < lightbox.group.length - 1) setLightbox({ ...lightbox, index: lightbox.index + 1 });
                     else if (deltaX < -50 && lightbox.index > 0) setLightbox({ ...lightbox, index: lightbox.index - 1 });
