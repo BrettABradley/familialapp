@@ -9,8 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
-import { Loader2, ShieldAlert, ShieldCheck, FileText, AlertTriangle, Clock } from "lucide-react";
+import { Loader2, ShieldAlert, ShieldCheck, FileText, AlertTriangle, Clock, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { AdminsUsersTab } from "@/components/admin/AdminsUsersTab";
 
 type ModAction =
   | "dismiss" | "restore" | "delete_content"
@@ -166,6 +167,7 @@ const Admin = () => {
           <TabsTrigger value="banned">Banned</TabsTrigger>
           <TabsTrigger value="audit">Audit</TabsTrigger>
           <TabsTrigger value="metrics">Metrics</TabsTrigger>
+          <TabsTrigger value="admins-users"><Users className="w-4 h-4 mr-1" />Admins & Users</TabsTrigger>
         </TabsList>
 
         {/* QUEUE */}
