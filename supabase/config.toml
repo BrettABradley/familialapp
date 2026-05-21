@@ -67,3 +67,7 @@ project_id = "qxkwxolssapayqyfdwqc"
     verify_jwt = true
   [functions.push-self-test]
     verify_jwt = false
+  [functions.moderation-action]
+    verify_jwt = false
+  [functions.submit-appeal]
+    verify_jwt = false

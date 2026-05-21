@@ -425,6 +425,7 @@ export type Database = {
       }
       content_reports: {
         Row: {
+          assigned_to: string | null
           comment_id: string | null
           created_at: string
           details: string | null
@@ -433,9 +434,15 @@ export type Database = {
           reason: string
           reported_user_id: string | null
           reporter_id: string
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          sla_due_at: string
           status: string
         }
         Insert: {
+          assigned_to?: string | null
           comment_id?: string | null
           created_at?: string
           details?: string | null
@@ -444,9 +451,15 @@ export type Database = {
           reason: string
           reported_user_id?: string | null
           reporter_id: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          sla_due_at?: string
           status?: string
         }
         Update: {
+          assigned_to?: string | null
           comment_id?: string | null
           created_at?: string
           details?: string | null
@@ -455,6 +468,11 @@ export type Database = {
           reason?: string
           reported_user_id?: string | null
           reporter_id?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          sla_due_at?: string
           status?: string
         }
         Relationships: [
@@ -948,6 +966,41 @@ export type Database = {
           },
         ]
       }
+      moderation_decisions: {
+        Row: {
+          action: string
+          actor_id: string
+          created_at: string
+          id: string
+          note: string | null
+          report_id: string
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          report_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          report_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderation_decisions_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "content_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           email_enabled: boolean
@@ -1142,6 +1195,27 @@ export type Database = {
           },
         ]
       }
+      platform_admins: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       posts: {
         Row: {
           author_id: string
@@ -1257,6 +1331,7 @@ export type Database = {
         Row: {
           accepted_terms_at: string | null
           accepted_terms_version: string | null
+          account_status: string
           avatar_url: string | null
           bio: string | null
           created_at: string
@@ -1267,6 +1342,8 @@ export type Database = {
           email_on_unread_dm: boolean
           id: string
           location: string | null
+          spam_reporter: boolean
+          suspended_until: string | null
           two_factor_enabled: boolean
           updated_at: string
           user_id: string
@@ -1274,6 +1351,7 @@ export type Database = {
         Insert: {
           accepted_terms_at?: string | null
           accepted_terms_version?: string | null
+          account_status?: string
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
@@ -1284,6 +1362,8 @@ export type Database = {
           email_on_unread_dm?: boolean
           id?: string
           location?: string | null
+          spam_reporter?: boolean
+          suspended_until?: string | null
           two_factor_enabled?: boolean
           updated_at?: string
           user_id: string
@@ -1291,6 +1371,7 @@ export type Database = {
         Update: {
           accepted_terms_at?: string | null
           accepted_terms_version?: string | null
+          account_status?: string
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
@@ -1301,6 +1382,8 @@ export type Database = {
           email_on_unread_dm?: boolean
           id?: string
           location?: string | null
+          spam_reporter?: boolean
+          suspended_until?: string | null
           two_factor_enabled?: boolean
           updated_at?: string
           user_id?: string
@@ -1366,6 +1449,39 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
         ]
+      }
+      shadow_reports: {
+        Row: {
+          comment_id: string | null
+          created_at: string
+          details: string | null
+          id: string
+          post_id: string | null
+          reason: string
+          reported_user_id: string | null
+          reporter_id: string
+        }
+        Insert: {
+          comment_id?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          post_id?: string | null
+          reason: string
+          reported_user_id?: string | null
+          reporter_id: string
+        }
+        Update: {
+          comment_id?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          post_id?: string | null
+          reason?: string
+          reported_user_id?: string | null
+          reporter_id?: string
+        }
+        Relationships: []
       }
       store_offers: {
         Row: {
@@ -1469,6 +1585,56 @@ export type Database = {
         }
         Relationships: []
       }
+      user_appeals: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          message: string
+          original_report_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          reviewer_note: string | null
+          status: string
+          token: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          message: string
+          original_report_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          reviewer_note?: string | null
+          status?: string
+          token?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string
+          original_report_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          reviewer_note?: string | null
+          status?: string
+          token?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_appeals_original_report_id_fkey"
+            columns: ["original_report_id"]
+            isOneToOne: false
+            referencedRelation: "content_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_plans: {
         Row: {
           apple_original_transaction_id: string | null
@@ -1542,6 +1708,50 @@ export type Database = {
             columns: ["circle_id"]
             isOneToOne: false
             referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_strikes: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          reason: string | null
+          report_id: string | null
+          severity: string
+          user_id: string
+          voided_at: string | null
+          voided_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          reason?: string | null
+          report_id?: string | null
+          severity?: string
+          user_id: string
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          reason?: string | null
+          report_id?: string | null
+          severity?: string
+          user_id?: string
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_strikes_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "content_reports"
             referencedColumns: ["id"]
           },
         ]
@@ -1638,6 +1848,7 @@ export type Database = {
         Args: { _group_chat_id: string; _user_id: string }
         Returns: boolean
       }
+      is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
       join_circle_by_invite_code: {
         Args: { _invite_code: string }
         Returns: {

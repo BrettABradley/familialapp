@@ -44,8 +44,12 @@ serve(async (req: Request) => {
       });
     }
 
-    const userEmail = userData.user.email;
-    if (userEmail !== FOUNDER_EMAIL) {
+    const { data: adminRow } = await supabaseAdmin
+      .from("platform_admins")
+      .select("user_id")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+    if (!adminRow) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -57,17 +61,69 @@ serve(async (req: Request) => {
 
     if (tab === "reports") {
       const status = url.searchParams.get("status") || "pending";
-      const { data, error } = await supabaseAdmin
+      const { data: reports, error } = await supabaseAdmin
         .from("content_reports")
+        .select("*")
+        .eq("status", status)
+        .order("sla_due_at", { ascending: true })
+        .limit(100);
+
+      // Enrich with reporter / target info + content snippet
+      const enriched = await Promise.all((reports ?? []).map(async (r: any) => {
+        const [reporterP, targetP, post, comment, strikes] = await Promise.all([
+          supabaseAdmin.from("profiles").select("display_name,spam_reporter")
+            .eq("user_id", r.reporter_id).maybeSingle(),
+          r.reported_user_id
+            ? supabaseAdmin.from("profiles").select("display_name,account_status")
+                .eq("user_id", r.reported_user_id).maybeSingle()
+            : Promise.resolve({ data: null }),
+          r.post_id
+            ? supabaseAdmin.from("posts").select("content,media_urls,is_hidden,deleted_at")
+                .eq("id", r.post_id).maybeSingle()
+            : Promise.resolve({ data: null }),
+          r.comment_id
+            ? supabaseAdmin.from("comments").select("content,is_hidden,deleted_at")
+                .eq("id", r.comment_id).maybeSingle()
+            : Promise.resolve({ data: null }),
+          r.reported_user_id
+            ? supabaseAdmin.from("user_strikes").select("id", { count: "exact", head: true })
+                .eq("user_id", r.reported_user_id)
+                .is("voided_at", null)
+                .gt("expires_at", new Date().toISOString())
+            : Promise.resolve({ count: 0 }),
+        ]);
+        return {
+          ...r,
+          reporter_name: reporterP.data?.display_name ?? null,
+          reporter_is_spam: reporterP.data?.spam_reporter ?? false,
+          target_name: (targetP as any).data?.display_name ?? null,
+          target_status: (targetP as any).data?.account_status ?? null,
+          target_active_strikes: (strikes as any).count ?? 0,
+          post_snippet: (post as any).data?.content ?? null,
+          post_media: (post as any).data?.media_urls ?? null,
+          comment_snippet: (comment as any).data?.content ?? null,
+          overdue: r.status === "pending" && new Date(r.sla_due_at) < new Date(),
+        };
+      }));
+
+      return new Response(JSON.stringify({ data: enriched, error: error?.message }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (tab === "appeals") {
+      const status = url.searchParams.get("status") || "pending";
+      const { data, error } = await supabaseAdmin
+        .from("user_appeals")
         .select("*")
         .eq("status", status)
         .order("created_at", { ascending: false })
         .limit(100);
-
       return new Response(JSON.stringify({ data, error: error?.message }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     if (tab === "banned") {
       const { data, error } = await supabaseAdmin
