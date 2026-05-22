@@ -8,8 +8,13 @@ import { useToast } from "@/hooks/use-toast";
 
 const sessionKey = (uid: string) => `twoFactorVerified:${uid}`;
 
+// 2FA verification is persisted per-device in localStorage so users only need
+// to re-verify after an explicit sign-out (not on tab close / app relaunch).
 export function clearTwoFactorVerified() {
   try {
+    Object.keys(localStorage).forEach((k) => {
+      if (k.startsWith("twoFactorVerified:")) localStorage.removeItem(k);
+    });
     Object.keys(sessionStorage).forEach((k) => {
       if (k.startsWith("twoFactorVerified:")) sessionStorage.removeItem(k);
     });
@@ -34,8 +39,8 @@ export function TwoFactorGate({ children }: { children: ReactNode }) {
         setChecking(false);
         return;
       }
-      // Already verified in this browser session?
-      if (sessionStorage.getItem(sessionKey(user.id))) {
+      // Already verified on this device?
+      if (localStorage.getItem(sessionKey(user.id)) || sessionStorage.getItem(sessionKey(user.id))) {
         if (!cancelled) {
           setVerified(true);
           setChecking(false);
@@ -88,7 +93,7 @@ export function TwoFactorGate({ children }: { children: ReactNode }) {
       });
       return;
     }
-    sessionStorage.setItem(sessionKey(user.id), "1");
+    localStorage.setItem(sessionKey(user.id), "1");
     setVerified(true);
     toast({ title: "Verified", description: "Welcome back." });
   };
