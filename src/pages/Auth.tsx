@@ -355,7 +355,7 @@ const Auth = () => {
             </>
           ) : (
             <>
-              <>
+
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 {!isLogin && (
