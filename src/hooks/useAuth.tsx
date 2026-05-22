@@ -84,6 +84,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     });
     try {
+      Object.keys(localStorage).forEach((k) => {
+        if (k.startsWith('twoFactorVerified:')) localStorage.removeItem(k);
+      });
       Object.keys(sessionStorage).forEach((k) => {
         if (k.startsWith('twoFactorVerified:')) sessionStorage.removeItem(k);
       });
