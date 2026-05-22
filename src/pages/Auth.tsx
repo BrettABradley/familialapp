@@ -234,26 +234,9 @@ const Auth = () => {
         } else {
           setFailedAttempts(0);
           setLockoutUntil(null);
-          // Check if email-based 2FA is enabled
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("two_factor_enabled")
-            .eq("user_id", (await supabase.auth.getUser()).data.user?.id || "")
-            .maybeSingle();
-          if ((profileData as any)?.two_factor_enabled) {
-            // Send 2FA code
-            const { data: sendData, error: sendErr } = await supabase.functions.invoke("send-2fa-code");
-            if (sendErr || !sendData?.success) {
-              toast({ title: "Error", description: "Failed to send verification code.", variant: "destructive" });
-              setIsLoading(false);
-              return;
-            }
-            setShowEmailChallenge(true);
-            setIsLoading(false);
-            return;
-          }
           toast({ title: "Welcome back!", description: "You've successfully signed in." });
         }
+
       } else {
         // Age confirmation (COPPA 13+)
         if (!ageConfirmed) {
@@ -372,64 +355,8 @@ const Auth = () => {
             </>
           ) : (
             <>
-              {showEmailChallenge ? (
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground text-center">
-                    We've sent a 6-digit verification code to your email. Enter it below to sign in.
-                  </p>
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="000000"
-                    value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
-                    className="text-center text-2xl tracking-widest"
-                  />
-                  <Button
-                    className="w-full"
-                    disabled={mfaCode.length !== 6 || isLoading}
-                    onClick={async () => {
-                      setIsLoading(true);
-                      const { data, error } = await supabase.functions.invoke("verify-2fa-code", {
-                        body: { code: mfaCode },
-                      });
-                      if (error || !data?.success) {
-                        toast({ title: "Invalid code", description: data?.error || "Please check your email and try again.", variant: "destructive" });
-                      } else {
-                        toast({ title: "Welcome back!", description: "You've successfully signed in." });
-                        setShowEmailChallenge(false);
-                      }
-                      setIsLoading(false);
-                    }}
-                  >
-                    {isLoading ? "Verifying..." : "Verify"}
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setShowEmailChallenge(false);
-                      setMfaCode("");
-                      const { data, error } = await supabase.functions.invoke("send-2fa-code");
-                      if (!error && data?.success) {
-                        toast({ title: "New code sent", description: "Check your email for a new verification code." });
-                        setShowEmailChallenge(true);
-                      }
-                    }}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors w-full text-center"
-                  >
-                    Resend code
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowEmailChallenge(false); setMfaCode(""); supabase.auth.signOut(); }}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors w-full text-center"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
               <>
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 {!isLogin && (
                   <>
