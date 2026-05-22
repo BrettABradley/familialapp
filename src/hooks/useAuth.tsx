@@ -83,6 +83,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem(key);
       }
     });
+    try {
+      Object.keys(sessionStorage).forEach((k) => {
+        if (k.startsWith('twoFactorVerified:')) sessionStorage.removeItem(k);
+      });
+    } catch {}
+
     setSession(null);
     setUser(null);
   };

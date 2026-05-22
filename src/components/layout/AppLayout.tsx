@@ -10,6 +10,8 @@ import { TermsAcceptanceGate } from "@/components/shared/TermsAcceptanceGate";
 import { OfflineBanner } from "@/components/shared/OfflineBanner";
 import { OnboardingFlow } from "@/components/shared/OnboardingFlow";
 import { UpdatePrompt } from "@/components/shared/UpdatePrompt";
+import { TwoFactorGate, clearTwoFactorVerified } from "@/components/auth/TwoFactorGate";
+
 
 function AppLayoutContent() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -40,9 +42,11 @@ function AppLayoutContent() {
     signingOut.current = true;
     localStorage.removeItem("selectedCircle");
     localStorage.removeItem("postAuthRedirect");
+    clearTwoFactorVerified();
     await signOut();
     window.location.href = "/auth";
   };
+
 
   // Show nothing while checking auth
   if (authLoading) {
@@ -59,39 +63,42 @@ function AppLayoutContent() {
   }
 
   return (
-    <TermsAcceptanceGate>
-      <div className="min-h-screen bg-background pb-20 md:pb-0">
-        <OfflineBanner />
-        {circlesLoading ? (
-          <CircleHeaderSkeleton />
-        ) : (
-          <CircleHeader
-            circles={circles}
-            selectedCircle={selectedCircle}
-            onCircleChange={setSelectedCircle}
-            onSignOut={handleSignOut}
-            overrideLabel={isProfileRoute ? "All Circles" : undefined}
-            lockCircle={lockCircleSwitcher}
-          />
-        )}
-        <main key={location.pathname} className="animate-page-fade-in">
-          <div className="container mx-auto px-4 mt-4">
-            <TransferBlockBanner />
-          </div>
-          <Outlet />
-        </main>
-        <MobileNavigation />
-        {!circlesLoading && profile && (
-          <OnboardingFlow
-            hasAvatar={!!profile.avatar_url}
-            hasBio={!!profile.bio}
-            hasCircles={circles.length > 0}
-          />
-        )}
-        <UpdatePrompt />
-      </div>
-    </TermsAcceptanceGate>
+    <TwoFactorGate>
+      <TermsAcceptanceGate>
+        <div className="min-h-screen bg-background pb-20 md:pb-0">
+          <OfflineBanner />
+          {circlesLoading ? (
+            <CircleHeaderSkeleton />
+          ) : (
+            <CircleHeader
+              circles={circles}
+              selectedCircle={selectedCircle}
+              onCircleChange={setSelectedCircle}
+              onSignOut={handleSignOut}
+              overrideLabel={isProfileRoute ? "All Circles" : undefined}
+              lockCircle={lockCircleSwitcher}
+            />
+          )}
+          <main key={location.pathname} className="animate-page-fade-in">
+            <div className="container mx-auto px-4 mt-4">
+              <TransferBlockBanner />
+            </div>
+            <Outlet />
+          </main>
+          <MobileNavigation />
+          {!circlesLoading && profile && (
+            <OnboardingFlow
+              hasAvatar={!!profile.avatar_url}
+              hasBio={!!profile.bio}
+              hasCircles={circles.length > 0}
+            />
+          )}
+          <UpdatePrompt />
+        </div>
+      </TermsAcceptanceGate>
+    </TwoFactorGate>
   );
+
 }
 
 export function AppLayout() {
