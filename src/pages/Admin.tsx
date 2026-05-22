@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
-import { Loader2, ShieldAlert, ShieldCheck, FileText, AlertTriangle, Clock, Users } from "lucide-react";
+import { Loader2, ShieldAlert, ShieldCheck, FileText, AlertTriangle, Clock, Users, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { AdminsUsersTab } from "@/components/admin/AdminsUsersTab";
 
