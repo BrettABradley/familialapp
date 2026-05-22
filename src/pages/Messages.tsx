@@ -915,10 +915,14 @@ const Messages = () => {
           <button onClick={handleViewMembers} className="text-left hover:underline">
             <h2 className="font-serif text-xl font-bold text-foreground flex-1">{selectedGroup.name}</h2>
           </button>
-          {selectedGroup.created_by === user?.id && (
+          {selectedGroup.created_by === user?.id ? (
             <div className="flex items-center gap-1 ml-auto">
               <Button variant="ghost" size="icon" onClick={handleEditGroup}><Pencil className="w-4 h-4" /></Button>
               <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setIsDeleteGroupOpen(true)}><Trash2 className="w-4 h-4" /></Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 ml-auto">
+              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setIsLeaveGroupOpen(true)} aria-label="Leave group"><LogOut className="w-4 h-4" /></Button>
             </div>
           )}
           </div>
