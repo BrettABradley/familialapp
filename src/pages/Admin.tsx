@@ -159,6 +159,9 @@ const Admin = () => {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 max-w-6xl mx-auto pb-32">
       <div className="flex items-center gap-3 mb-6">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/circles")} aria-label="Back to Familial">
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
         <ShieldCheck className="w-6 h-6 text-primary" />
         <h1 className="font-serif text-2xl font-bold">Moderation Console</h1>
       </div>
