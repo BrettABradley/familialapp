@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Send, MessageSquare, Search, Users, Plus, UsersRound, Pencil, Camera, Trash2, Paperclip, X, ShieldCheck, Download } from "lucide-react";
+import { ArrowLeft, Send, MessageSquare, Search, Users, Plus, UsersRound, Pencil, Camera, Trash2, Paperclip, X, ShieldCheck, Download, LogOut } from "lucide-react";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
@@ -145,6 +145,7 @@ const Messages = () => {
   const [editGroupName, setEditGroupName] = useState("");
   const [isUploadingGroupAvatar, setIsUploadingGroupAvatar] = useState(false);
   const [isDeleteGroupOpen, setIsDeleteGroupOpen] = useState(false);
+  const [isLeaveGroupOpen, setIsLeaveGroupOpen] = useState(false);
   const [groupAvatarCropSrc, setGroupAvatarCropSrc] = useState<string | null>(null);
 
   useEffect(() => {
@@ -485,6 +486,24 @@ const Messages = () => {
       setGroupChats(prev => prev.filter(g => g.id !== selectedGroup.id));
       setIsDeleteGroupOpen(false);
     }
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!selectedGroup || !user) return;
+    const { error } = await supabase
+      .from("group_chat_members")
+      .delete()
+      .eq("group_chat_id", selectedGroup.id)
+      .eq("user_id", user.id);
+    if (error) {
+      toast({ title: "Error", description: error.message || "Failed to leave group chat.", variant: "destructive" });
+      return;
+    }
+    setGroupChats(prev => prev.filter(g => g.id !== selectedGroup.id));
+    setSelectedGroup(null);
+    setChatView("list");
+    setIsLeaveGroupOpen(false);
+    toast({ title: "You left the group" });
   };
 
   const handleDeletePrivateConversation = async () => {
@@ -896,10 +915,14 @@ const Messages = () => {
           <button onClick={handleViewMembers} className="text-left hover:underline">
             <h2 className="font-serif text-xl font-bold text-foreground flex-1">{selectedGroup.name}</h2>
           </button>
-          {selectedGroup.created_by === user?.id && (
+          {selectedGroup.created_by === user?.id ? (
             <div className="flex items-center gap-1 ml-auto">
               <Button variant="ghost" size="icon" onClick={handleEditGroup}><Pencil className="w-4 h-4" /></Button>
               <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setIsDeleteGroupOpen(true)}><Trash2 className="w-4 h-4" /></Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 ml-auto">
+              <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setIsLeaveGroupOpen(true)} aria-label="Leave group"><LogOut className="w-4 h-4" /></Button>
             </div>
           )}
           </div>
@@ -916,6 +939,20 @@ const Messages = () => {
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleDeleteGroup} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Leave Group Confirmation */}
+        <AlertDialog open={isLeaveGroupOpen} onOpenChange={setIsLeaveGroupOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Leave Group Chat</AlertDialogTitle>
+              <AlertDialogDescription>You'll stop receiving messages from "{selectedGroup.name}". You can be re-added by the group creator.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleLeaveGroup} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Leave</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
