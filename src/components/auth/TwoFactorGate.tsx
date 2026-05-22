@@ -93,7 +93,7 @@ export function TwoFactorGate({ children }: { children: ReactNode }) {
       });
       return;
     }
-    sessionStorage.setItem(sessionKey(user.id), "1");
+    localStorage.setItem(sessionKey(user.id), "1");
     setVerified(true);
     toast({ title: "Verified", description: "Welcome back." });
   };
