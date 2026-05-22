@@ -8,8 +8,13 @@ import { useToast } from "@/hooks/use-toast";
 
 const sessionKey = (uid: string) => `twoFactorVerified:${uid}`;
 
+// 2FA verification is persisted per-device in localStorage so users only need
+// to re-verify after an explicit sign-out (not on tab close / app relaunch).
 export function clearTwoFactorVerified() {
   try {
+    Object.keys(localStorage).forEach((k) => {
+      if (k.startsWith("twoFactorVerified:")) localStorage.removeItem(k);
+    });
     Object.keys(sessionStorage).forEach((k) => {
       if (k.startsWith("twoFactorVerified:")) sessionStorage.removeItem(k);
     });
