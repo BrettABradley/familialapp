@@ -39,8 +39,8 @@ export function TwoFactorGate({ children }: { children: ReactNode }) {
         setChecking(false);
         return;
       }
-      // Already verified in this browser session?
-      if (sessionStorage.getItem(sessionKey(user.id))) {
+      // Already verified on this device?
+      if (localStorage.getItem(sessionKey(user.id)) || sessionStorage.getItem(sessionKey(user.id))) {
         if (!cancelled) {
           setVerified(true);
           setChecking(false);
