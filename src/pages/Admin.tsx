@@ -30,6 +30,7 @@ const ACTION_LABELS: Record<ModAction, string> = {
 
 const Admin = () => {
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState("reports");
