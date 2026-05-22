@@ -510,7 +510,8 @@ const Auth = () => {
                 </button>
               </div>
             </>
-          </>
+          )}
+
 
         </CardContent>
       </Card>
