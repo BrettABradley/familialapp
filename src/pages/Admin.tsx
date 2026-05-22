@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
-import { Loader2, ShieldAlert, ShieldCheck, FileText, AlertTriangle, Clock, Users } from "lucide-react";
+import { Loader2, ShieldAlert, ShieldCheck, FileText, AlertTriangle, Clock, Users, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { AdminsUsersTab } from "@/components/admin/AdminsUsersTab";
 
@@ -29,6 +30,7 @@ const ACTION_LABELS: Record<ModAction, string> = {
 
 const Admin = () => {
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState("reports");
@@ -157,6 +159,9 @@ const Admin = () => {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 max-w-6xl mx-auto pb-32">
       <div className="flex items-center gap-3 mb-6">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/circles")} aria-label="Back to Familial">
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
         <ShieldCheck className="w-6 h-6 text-primary" />
         <h1 className="font-serif text-2xl font-bold">Moderation Console</h1>
       </div>
