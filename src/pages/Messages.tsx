@@ -943,6 +943,20 @@ const Messages = () => {
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* Leave Group Confirmation */}
+        <AlertDialog open={isLeaveGroupOpen} onOpenChange={setIsLeaveGroupOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Leave Group Chat</AlertDialogTitle>
+              <AlertDialogDescription>You'll stop receiving messages from "{selectedGroup.name}". You can be re-added by the group creator.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleLeaveGroup} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Leave</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {/* Edit Group Dialog — z-[70] to render above the z-[60] chat view */}
         <Dialog open={isEditGroupOpen} onOpenChange={setIsEditGroupOpen}>
           <DialogContent className="z-[80]">
