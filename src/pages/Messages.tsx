@@ -488,6 +488,24 @@ const Messages = () => {
     }
   };
 
+  const handleLeaveGroup = async () => {
+    if (!selectedGroup || !user) return;
+    const { error } = await supabase
+      .from("group_chat_members")
+      .delete()
+      .eq("group_chat_id", selectedGroup.id)
+      .eq("user_id", user.id);
+    if (error) {
+      toast({ title: "Error", description: error.message || "Failed to leave group chat.", variant: "destructive" });
+      return;
+    }
+    setGroupChats(prev => prev.filter(g => g.id !== selectedGroup.id));
+    setSelectedGroup(null);
+    setChatView("list");
+    setIsLeaveGroupOpen(false);
+    toast({ title: "You left the group" });
+  };
+
   const handleDeletePrivateConversation = async () => {
     if (!selectedUser) return;
     const { error } = await (supabase as any).rpc("delete_private_conversation_as_creator", { _other_user_id: selectedUser.user_id });
