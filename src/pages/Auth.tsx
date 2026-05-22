@@ -32,8 +32,8 @@ const Auth = () => {
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; age?: string }>({});
-  const [showEmailChallenge, setShowEmailChallenge] = useState(false);
-  const [mfaCode, setMfaCode] = useState("");
+  const checkoutTriggered = useRef(false);
+
   const checkoutTriggered = useRef(false);
 
   // Rate limiting state
