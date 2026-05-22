@@ -145,6 +145,7 @@ const Messages = () => {
   const [editGroupName, setEditGroupName] = useState("");
   const [isUploadingGroupAvatar, setIsUploadingGroupAvatar] = useState(false);
   const [isDeleteGroupOpen, setIsDeleteGroupOpen] = useState(false);
+  const [isLeaveGroupOpen, setIsLeaveGroupOpen] = useState(false);
   const [groupAvatarCropSrc, setGroupAvatarCropSrc] = useState<string | null>(null);
 
   useEffect(() => {
