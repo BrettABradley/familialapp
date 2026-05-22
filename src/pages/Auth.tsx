@@ -34,7 +34,7 @@ const Auth = () => {
   const [errors, setErrors] = useState<{ email?: string; password?: string; age?: string }>({});
   const checkoutTriggered = useRef(false);
 
-  const checkoutTriggered = useRef(false);
+
 
   // Rate limiting state
   const [failedAttempts, setFailedAttempts] = useState(0);
