@@ -36,14 +36,18 @@ export function blobToVoiceNoteFile(blob: Blob): {
   } else if (rawMime.includes("ogg")) {
     ext = "ogg";
     contentType = "audio/ogg";
+  } else if (rawMime === "audio/aac" || rawMime === "audio/aacp") {
+    // iOS `capacitor-voice-recorder` returns RAW AAC (ADTS) bytes with this
+    // mime — NOT an MP4 container. Saving as .m4a/audio/mp4 makes browsers
+    // unable to decode (no moov atom → duration 0:00 and no playback).
+    // Keep it as .aac/audio/aac so Safari/Chrome decode it natively.
+    ext = "aac";
+    contentType = "audio/aac";
   } else if (
     rawMime.includes("mp4") ||
-    rawMime.includes("aac") ||
     rawMime.includes("m4a") ||
     rawMime === ""
   ) {
-    // iOS native recorder returns .m4a (AAC-in-MP4) — normalize to audio/mp4
-    // so the <audio> element can read the container and the duration.
     ext = "m4a";
     contentType = "audio/mp4";
   }
