@@ -1,6 +1,8 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
+import { getRegisteredDeviceToken, resetPushRegistrationState } from "@/lib/pushNotifications";
 
 interface AuthContextType {
   user: User | null;
@@ -70,6 +72,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    // BEFORE clearing the session: tell the server to remove this device's
+    // push token row so the signed-out phone stops receiving notifications.
+    // Bounded to 2s so a slow network never blocks sign-out UX.
+    if (Capacitor.isNativePlatform()) {
+      const deviceToken = getRegisteredDeviceToken();
+      if (deviceToken) {
+        try {
+          await Promise.race([
+            supabase.functions.invoke("unregister-push-token", {
+              body: { device_token: deviceToken },
+            }),
+            new Promise((resolve) => setTimeout(resolve, 2000)),
+          ]);
+        } catch {
+          // Non-fatal: register-push-token's reclaim logic will clean
+          // this row up the next time anyone registers this device token.
+        }
+      }
+    }
+    resetPushRegistrationState();
+
     try {
       await supabase.auth.signOut();
     } catch {
