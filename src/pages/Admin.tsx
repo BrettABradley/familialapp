@@ -128,11 +128,10 @@ const Admin = () => {
     const { error } = await supabase.from("user_appeals" as any).update(updates).eq("id", appeal.id);
     if (error) { toast({ title: "Failed", variant: "destructive" }); return; }
     if (grant && appeal.user_id) {
-      // Unban via service-role edge function (user_private cannot be edited by clients).
-      await supabase.functions.invoke("moderation-action", {
-        body: { action: "restore", targetUserId: appeal.user_id },
+      await supabase.functions.invoke("admin-manage-users", {
+        body: { action: "restore_user", user_id: appeal.user_id },
       });
-      toast({ title: "Appeal granted", description: "Profile re-activated. Auth account requires manual unban." });
+      toast({ title: "Appeal granted", description: "Profile re-activated." });
     } else {
       toast({ title: grant ? "Appeal granted" : "Appeal denied" });
     }

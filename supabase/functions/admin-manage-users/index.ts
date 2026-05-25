@@ -495,6 +495,24 @@ Deno.serve(async (req: Request) => {
         return jsonResponse({ ok: true });
       }
 
+      // ============ APPEALS / RESTORE ============
+      case "restore_user": {
+        const target_user_id = String(body.user_id ?? "");
+        if (!target_user_id) return jsonResponse({ error: "user_id required" }, 400);
+        await supabaseAdmin.from("user_private").upsert({
+          user_id: target_user_id,
+          account_status: "active",
+          suspended_until: null,
+        }, { onConflict: "user_id" });
+        try {
+          await supabaseAdmin.auth.admin.updateUserById(target_user_id, { ban_duration: "none" });
+        } catch (e) {
+          console.error("auth unban failed", e);
+        }
+        await logAdminAction(supabaseAdmin, adminEmail, "restore_user", { target_user_id });
+        return jsonResponse({ ok: true });
+      }
+
       default:
         return jsonResponse({ error: `Unknown action: ${action}` }, 400);
     }
