@@ -392,50 +392,6 @@ const Settings = () => {
               }}
             />
           </div>
-          {isIOSNative() && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={async () => {
-                toast({ title: "Checking this device…" });
-                const registration = await registerForPushNotifications({ force: true });
-                if (!registration.ok) {
-                  toast({ title: "No registered devices", description: registration.message, variant: "destructive" });
-                  return;
-                }
-                toast({ title: "Sending test push…" });
-                // Refresh session so the edge function gets a valid JWT
-                const { data: sessionData } = await supabase.auth.getSession();
-                if (!sessionData.session) {
-                  toast({ title: "Not signed in", description: "Please sign in again and retry.", variant: "destructive" });
-                  return;
-                }
-                const { data, error } = await supabase.functions.invoke('push-self-test', {
-                  headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
-                });
-                if (error) {
-                  toast({ title: "Test failed", description: error.message, variant: "destructive" });
-                  return;
-                }
-                const d = data as { ok: boolean; reason?: string; hint?: string; sent?: number; token_count?: number; apns_environment?: string };
-                if (d.ok) {
-                  toast({ title: `Sent to ${d.sent}/${d.token_count} device(s)`, description: "If you don't see a banner within a few seconds, check iOS Settings → Familial → Notifications." });
-                } else {
-                  const hasRegisteredDevice = typeof d.token_count === 'number' && d.token_count > 0;
-                  toast({
-                    title: hasRegisteredDevice ? "Push delivery failed" : "No registered devices",
-                    description: [d.reason, d.apns_environment ? `APNs: ${d.apns_environment}` : null, d.hint]
-                      .filter(Boolean)
-                      .join(" — ") || "Unknown",
-                    variant: "destructive",
-                  });
-                }
-              }}
-            >
-              Send test push to this device
-            </Button>
-          )}
           <div className="border-t pt-3">
             <p className="text-sm text-muted-foreground mb-3">Mute specific notification types:</p>
             {["comments", "mentions", "events", "fridge_pins", "direct_messages", "campfire_stories"].map(type => (
