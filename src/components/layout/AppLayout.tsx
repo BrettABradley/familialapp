@@ -11,11 +11,13 @@ import { OfflineBanner } from "@/components/shared/OfflineBanner";
 import { OnboardingFlow } from "@/components/shared/OnboardingFlow";
 import { UpdatePrompt } from "@/components/shared/UpdatePrompt";
 import { TwoFactorGate, clearTwoFactorVerified } from "@/components/auth/TwoFactorGate";
+import { useDeepLinkCircleSync } from "@/hooks/useDeepLinkCircleSync";
 
 
 function AppLayoutContent() {
   const { user, loading: authLoading, signOut } = useAuth();
   const { circles, selectedCircle, setSelectedCircle, isLoading: circlesLoading, profile, lockCircleSwitcher } = useCircleContext();
+  useDeepLinkCircleSync();
   const navigate = useNavigate();
   const location = useLocation();
   

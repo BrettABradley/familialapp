@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -204,6 +204,19 @@ const Messages = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, groupMessages]);
+
+  // Deep-link: ?thread=<userId> opens that DM thread once conversations
+  // (or circle members) have loaded. Falls back gracefully if the user
+  // isn't found in either list yet.
+  const [searchParams] = useSearchParams();
+  const threadParam = searchParams.get("thread");
+  useEffect(() => {
+    if (!threadParam || selectedUser?.user_id === threadParam) return;
+    const fromConvos = conversations.find(c => c.user.user_id === threadParam)?.user;
+    const fromMembers = circleMembers.find(m => m.user_id === threadParam);
+    const target = fromConvos || fromMembers;
+    if (target) setSelectedUser(target);
+  }, [threadParam, conversations, circleMembers, selectedUser]);
 
   // Lock the circle switcher whenever a chat is open so users can't switch
   // circles mid-conversation (chats are circle-scoped).

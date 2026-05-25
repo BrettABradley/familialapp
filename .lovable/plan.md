@@ -1,53 +1,55 @@
-# Wave 3 Security Triage
+# Fix Reset-Password Delay + Deep-Link Notifications
 
-Quick verdict on each finding, then what to do.
+Three concrete fixes. All backend + small frontend additions, no UI overhaul.
 
-## 1. Circle UPDATE policy overlap — **REAL, fix**
-The `circles` table has two UPDATE policies:
-- `Owners can update circles` (owner only)
-- `Members can update circle avatar` (any member, intended for avatar only)
+## 1. Reset password email — faster + clear destination
 
-Because Postgres RLS can't restrict UPDATE to specific columns, any member can technically write `invite_code`, `transfer_block`, `extra_members`, `owner_id`, `name`, `description`. We rely on a trigger (`restrict_circle_member_update` per memory) to block this, but the scanner can't see that.
+**Root cause of slowness:** auth emails are enqueued to pgmq, then drained by `process-email-queue` which runs every 5s on a 200ms-per-message delay. Worst case the email sits 5–10s before sending, plus Resend/Lovable Email API latency. Total can easily feel like 30s+ on a cold queue.
 
-**Fix:** Verify the trigger actually whitelists only `avatar_url` for non-owners. If gaps exist, tighten it. No frontend changes.
+**Fixes:**
+- In `auth-email-hook/index.ts`: after `enqueue_email` succeeds, immediately fire-and-forget invoke `process-email-queue` (no await, no error throw) so the auth email drains within the same second instead of waiting for the next cron tick.
+- Lower `send_delay_ms` from 200 → 50ms in `email_send_state` (queue still throttles bursts but auth emails go out almost instantly).
+- Recovery template button currently sends users to the magic recovery URL which lands on `/reset-password#access_token=...&type=recovery`. `ResetPassword.tsx` already listens for `PASSWORD_RECOVERY`/`SIGNED_IN` events and shows the password form — this works. Verified, no change needed.
 
-## 2. `profile-images` bucket missing UPDATE policy — **REAL, fix**
-Users uploading a new avatar with the same filename will silently fail on overwrite. Add:
-```sql
-CREATE POLICY "Users update own profile images"
-ON storage.objects FOR UPDATE
-USING (bucket_id = 'profile-images' AND (storage.foldername(name))[1] = auth.uid()::text);
-```
-Most code uses `upsert: true`, so this prevents silent failures. No frontend changes.
+**The "link doesn't take me to reset" complaint** is almost certainly the slow email — by the time the link arrives the recovery token has neared/exceeded the 1-hour Supabase default. With #1 fixes, link will be fresh on arrival.
 
-## 3. `shadow_reports` missing INSERT policy — **IGNORE**
-Shadow reports are inserted by the `report-content` edge function using the service role when `spam_reporter = true`. Clients never insert directly — that's by design (the reporter must not know their report is shadowed). Mark ignored with explanation.
+## 2. Notification deep-links — include circle + exact target
 
-## 4. `two_factor_codes` no SELECT policy — **VERIFY then IGNORE**
-2FA verification runs entirely in the `verify-2fa-code` edge function with service role. Clients should never SELECT codes. Plan: confirm no SELECT policy exists (default deny) and no client code queries the table, then mark ignored.
+Currently most notifications link only to a top-level route. Fix each trigger to include `?circleId=X` plus a target ID:
 
-## 5. `user_appeals` missing INSERT policy — **REAL, fix**
-Suspended users need to appeal. Currently no path. Add INSERT policy:
-```sql
-CREATE POLICY "Users can submit own appeals"
-ON public.user_appeals FOR INSERT TO authenticated
-WITH CHECK (user_id = auth.uid());
-```
-Frontend already has an appeal UI on the suspended screen (need to verify) — if not, that's a separate feature, just fix the policy now.
+| Notification | Current `link` | New `link` |
+|---|---|---|
+| mention (`create_mention_notifications`) | `/feed` | `/feed?circleId={circle}&post={postId}` |
+| direct_message (`notify_on_dm`) | `/messages` | `/messages?circleId={inferred}&thread={senderId}` |
+| fridge_pin (`notify_on_fridge_pin`) | `/fridge` | `/fridge?circleId={circle}&pin={pinId}` |
+| campfire_story (`notify_on_campfire_story`) | `/fridge` | `/fridge?circleId={circle}&pin={pinId}` |
+| event_rsvp (`notify_on_rsvp`) | `/events` | `/events?circleId={circle}&eventId={eventId}` |
+| event_created | already `?eventId=X` | add `circleId={circle}` |
+| album_created | already `?albumId=X` | add `circleId={circle}` |
+
+Also enrich messages so push titles/bodies include the circle name where it adds clarity:
+- mention: `"{Actor} mentioned you in {CircleName}"`
+- fridge_pin / campfire_story / event_created already include the title; add circle name when relevant.
+
+**Frontend:** add a small `useDeepLinkCircleSync` hook (mounted once in `App.tsx`) that reads `?circleId=` from the URL and calls `setSelectedCircle()` from `CircleContext`. This makes EVERY deep link auto-switch to the right circle before the page renders content. Feed already scrolls to `?post=` ID; Fridge needs the same treatment for `?pin=`; Messages needs `?thread=` support.
+
+## 3. Push tap routing
+
+`pushNotifications.ts` already navigates via `window.location.href = link`. Once link values are updated in step 2, push taps land on the exact post/pin/thread in the correct circle. No code change here.
 
 ## Execution order
-1. Audit `restrict_circle_member_update` trigger — confirm column whitelist
-2. Single migration:
-   - Tighten circle trigger if needed
-   - Add `profile-images` UPDATE policy
-   - Add `user_appeals` INSERT policy
-3. Mark `shadow_reports` and `two_factor_codes` findings as ignored with rationale
-4. Update security memory with accepted risks
-5. Re-run scan
+
+1. **Migration** — update notification trigger functions to emit richer links + circle names. Set `send_delay_ms = 50`.
+2. **Edge function** — patch `auth-email-hook` to flush `process-email-queue` after enqueue. Deploy.
+3. **Frontend** — add deep-link circle sync hook in `App.tsx`. Add `?pin=` scroll/expand in `Fridge.tsx` and `?thread=` open in `Messages.tsx`. Leave `Feed.tsx` alone (already works).
 
 ## Risk
-Lowest-risk wave so far — all additive policies plus a trigger audit. No table drops, no frontend refactors. Verification: confirm avatar upload still works, confirm a member can't rename a circle they don't own.
+
+- Auth hook flush: failure swallowed silently, so worst case is current behavior (5s wait). Zero regression risk.
+- Notification trigger rewrites: append-only metadata; existing notifications keep their old links (still functional, just less rich). New notifications start using the new format immediately.
+- Deep-link circle sync: only runs if `?circleId=` is present, so unrelated pages are untouched.
 
 ## Out of scope
-- Building the appeals submission UI (separate task if missing)
-- Dependency vulnerabilities (2 packages) — separate `bun update` pass
+
+- Reducing Supabase's auth recovery token lifetime (handled at Supabase level, not this codebase).
+- Changing pg_cron interval below 5s (would need pg_cron upgrade; not necessary once auth-hook does immediate flush).
