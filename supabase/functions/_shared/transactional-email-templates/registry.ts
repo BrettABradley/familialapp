@@ -15,6 +15,7 @@ import { template as newAlbum } from './new-album.tsx'
 import { template as founderGift } from './founder-gift.tsx'
 import { template as enterpriseWelcome } from './enterprise-welcome.tsx'
 import { template as enterpriseInvoiceReminder } from './enterprise-invoice-reminder.tsx'
+import { template as eventOnMyWay } from './event-on-my-way.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'mention-notification': mentionNotification,
@@ -23,4 +24,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'founder-gift': founderGift,
   'enterprise-welcome': enterpriseWelcome,
   'enterprise-invoice-reminder': enterpriseInvoiceReminder,
+  'event-on-my-way': eventOnMyWay,
 }
