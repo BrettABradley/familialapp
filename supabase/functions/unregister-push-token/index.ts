@@ -40,10 +40,8 @@ serve(async (req: Request) => {
       });
     }
 
-    const body = await req.json();
-    // Accept either `device_token` (new) or `expo_token` (legacy alias) for one release
-    // so cached app sessions don't break during rollout.
-    const device_token: string | undefined = body?.device_token ?? body?.expo_token;
+    const body = await req.json().catch(() => ({}));
+    const device_token: string | undefined = body?.device_token;
 
     if (!device_token || typeof device_token !== "string") {
       return new Response(
@@ -60,31 +58,18 @@ serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Reclaim this device token: remove any rows where it's still attached
-    // to a different user (e.g. previous account on a shared device, or a
-    // user who signed out without the unregister call reaching the server).
-    // Guarantees one APNs token → exactly one user_id.
-    const { error: reclaimError } = await admin
+    // Only delete the row belonging to the caller for this device token.
+    // Idempotent — succeeds even if no row exists.
+    const { error: deleteError } = await admin
       .from("push_tokens")
       .delete()
-      .eq("device_token", device_token)
-      .neq("user_id", user.id);
+      .eq("user_id", user.id)
+      .eq("device_token", device_token);
 
-    if (reclaimError) {
-      console.error("Reclaim error (non-fatal):", reclaimError);
-    }
-
-    const { error: upsertError } = await admin
-      .from("push_tokens")
-      .upsert(
-        { user_id: user.id, device_token },
-        { onConflict: "user_id,device_token" }
-      );
-
-    if (upsertError) {
-      console.error("Upsert error:", upsertError);
+    if (deleteError) {
+      console.error("Delete error:", deleteError);
       return new Response(
-        JSON.stringify({ error: "Failed to register token" }),
+        JSON.stringify({ error: "Failed to unregister token" }),
         {
           status: 500,
           headers: { "Content-Type": "application/json", ...corsHeaders },

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 let registrationAttempted = false;
 let lastRegisteredUserId: string | null = null;
+let lastRegisteredDeviceToken: string | null = null;
 let registrationWatchdog: number | null = null;
 let activeRegistration: Promise<PushRegistrationResult> | null = null;
 
@@ -22,6 +23,16 @@ export type PushRegistrationResult = {
 };
 
 /**
+ * Most recently uploaded APNs device token for this app session, or null
+ * if registration hasn't completed. Used at sign-out to tell the server
+ * which row to remove from push_tokens so the device stops receiving
+ * pushes for the user that just signed out.
+ */
+export function getRegisteredDeviceToken(): string | null {
+  return lastRegisteredDeviceToken;
+}
+
+/**
  * Reset the in-memory registration guard. Called on sign-out / user-switch
  * so the next sign-in re-runs registration. Without this, a second account
  * signing in on the same device session would silently no-op.
@@ -29,6 +40,7 @@ export type PushRegistrationResult = {
 export function resetPushRegistrationState() {
   registrationAttempted = false;
   lastRegisteredUserId = null;
+  lastRegisteredDeviceToken = null;
 }
 
 /**
@@ -131,6 +143,7 @@ async function runPushRegistration(): Promise<PushRegistrationResult> {
             settle({ ok: false, status: 'upload_failed', message: error.message || 'The device token could not be saved.' });
           } else {
             console.log('[push] token-uploaded ✅');
+            lastRegisteredDeviceToken = token.value ?? null;
             settle({ ok: true, status: 'registered', message: 'This iPhone is registered for push notifications.' });
           }
         } catch (e) {
