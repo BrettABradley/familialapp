@@ -133,11 +133,12 @@ const Pricing = () => {
       setCancelAtPeriodEnd(false);
       setCurrentPeriodEnd(null);
       setPendingPlan(null);
+      setPlanSource(null);
       return;
     }
     supabase
       .from("user_plans")
-      .select("plan, cancel_at_period_end, current_period_end, pending_plan")
+      .select("plan, cancel_at_period_end, current_period_end, pending_plan, source")
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => {
@@ -145,6 +146,7 @@ const Pricing = () => {
         setCancelAtPeriodEnd(data?.cancel_at_period_end ?? false);
         setCurrentPeriodEnd(data?.current_period_end ?? null);
         setPendingPlan((data as any)?.pending_plan ?? null);
+        setPlanSource((data as any)?.source ?? null);
       });
   }, [user]);
 
