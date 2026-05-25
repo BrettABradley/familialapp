@@ -1,57 +1,42 @@
 
-## Build version to use
+## Bug
 
-Set `package.json` → `"version": "66.0.1"` **right now** (matches the build currently live in the App Store). When you upload 67.0.1 to Apple, bump `package.json` to `"66.0.1"` → `"67.0.1"` in the **same commit** as the Xcode `CFBundleShortVersionString` bump. That way:
+After rotating iOS landscape → portrait, the bottom mobile nav disappears.
 
-- Users on 66.0.1 (current store build) won't see a prompt until 67.0.1 is **approved and live** in the store.
-- The moment Apple flips 67.0.1 to "Ready for Sale", iTunes Lookup returns `"version": "67.0.1"`, and every user still on 66.0.1 sees the dialog on next app launch.
+## Root cause
 
-Rule going forward: **bump `package.json` version to match the App Store build number on every release.** Never let them drift.
+`src/components/layout/MobileNavigation.tsx` has the class `keyboard-hide`. In `src/index.css`:
 
----
+```css
+.keyboard-open .keyboard-hide { display: none !important; }
+```
 
-## Implementation steps
+`.keyboard-open` is added on `<html>` by the `keyboardWillShow` Capacitor listener in `src/lib/capacitorInit.ts`, and removed only by `keyboardWillHide`. On iOS, rotation events can fire `keyboardWillShow` without a matching `keyboardWillHide` (Apple bug, well documented), so the class gets stuck and the nav stays hidden permanently.
 
-### 1. Update `package.json`
-- Change `"version": "0.0.0"` → `"version": "66.0.1"`.
+## Fix
 
-### 2. New file: `src/hooks/useAppUpdateCheck.ts`
-- On mount, only run if `Capacitor.isNativePlatform()` is true.
-- Read installed version via `App.getInfo()` (already have `@capacitor/app` installed).
-- Check cache key `app_update_check` in `localStorage` — skip network call if checked < 6 hours ago.
-- Fetch `https://itunes.apple.com/lookup?bundleId=app.lovable.f745440093af4f4390a60d52ff08c778&country=us`.
-- Parse `results[0].version` and `results[0].trackViewUrl`.
-- Semver-compare (simple `a.b.c` split + numeric compare — no extra dep needed).
-- Return `{ updateAvailable: boolean, storeVersion: string, storeUrl: string }`.
-- Silently swallow network errors (offline, App Store API hiccups) — never block the app.
+Make `keyboard-open` self-correcting: clear it whenever there's no real keyboard present.
 
-### 3. New file: `src/components/UpdateAvailableDialog.tsx`
-- shadcn `AlertDialog`. Soft prompt (Later + Update buttons).
-- Copy: *"A new version of Familial is available (v{storeVersion}). Update now for the latest features and fixes."*
-- "Later" → dismiss + write `update_dismissed_for_version` in `localStorage` so we don't re-prompt for that same version this session.
-- "Update" → `Browser.open({ url: storeUrl })` from `@capacitor/browser` (already installed).
-- Don't show again in this session once dismissed; show again on next cold launch.
+### File: `src/lib/capacitorInit.ts`
 
-### 4. Mount in `src/components/layout/AppLayout.tsx`
-- Add `<UpdateAvailableDialog />` once, near the root. Hook handles all logic — component renders nothing unless `updateAvailable && !dismissedForThisVersion`.
+Add **inside** the existing `try { const { Keyboard } = await import('@capacitor/keyboard') ... }` block, after the two existing listeners:
 
-### 5. Remove "Send test push" button — `src/pages/Settings.tsx`
-- Delete lines 395–438 (the `isIOSNative() && (<Button>…</Button>)` block).
-- Leave the `push-self-test` edge function deployed (no UI references it; idle cost is zero, useful for future diagnostics).
+1. **`screenOrientation` `change` listener** on `window` — wait 300ms (let iOS settle), then if `window.visualViewport.height >= window.innerHeight - 100`, force-clear:
+   - remove `.keyboard-open` class from `documentElement`
+   - reset `--keyboard-height` to `0px`
+   - reset `--visual-viewport-height` to `window.innerHeight`
 
----
+2. **`visualViewport` `resize` listener** — same self-correction. If the visual viewport returns to roughly the full window height, the keyboard is gone regardless of whether the Capacitor listener fired. This catches the rotation case AND any other edge case where `keyboardWillHide` never arrives.
 
-## After approval, you'll need to:
+Keep both — orientation is the primary trigger but visualViewport is the belt-and-suspenders catch.
 
-1. `git pull` your repo.
-2. `npm install --legacy-peer-deps` (no new deps, but safe).
-3. `npm run build`
-4. `npx cap sync ios --legacy-peer-deps`
-5. In Xcode, set **Version** to `67.0.1` (matches what's in `package.json` for that release), bump **Build** as usual, archive, upload.
-6. Once Apple approves and the build is "Ready for Sale", existing 66.0.1 users see the prompt on their next launch.
+### Why this is safe
 
-## What this does NOT do
+- It only **removes** the stuck class; it never adds one. The existing `keyboardWillShow` is still the only thing that sets `keyboard-open`, so the keyboard-hide behaviour for messaging / chat input is unaffected.
+- The 100px tolerance handles iOS's small URL-bar / safe-area discrepancies on the visual viewport.
+- Pure addition — no existing logic changes.
 
-- No force-update mode (can add later as a flag if you ever ship a breaking schema change).
-- No Android logic (iOS-only — Play Store lookup is different; we'll add it when you ship Android).
-- No telemetry on update-prompt impressions/clicks (matches no-tracking policy).
+## Out of scope
+
+- Not touching `useIsMobile` (works correctly).
+- Not removing `.keyboard-hide` from the nav — hiding the nav while the keyboard is up is intentional behaviour.
