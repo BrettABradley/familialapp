@@ -507,6 +507,21 @@ const Pricing = () => {
       );
     }
 
+    const isApple = planSource === "apple" || isIOSNative();
+
+    if (isApple) {
+      return (
+        <Button
+          variant="outline"
+          className="w-full"
+          size="lg"
+          onClick={() => openAppleSubscriptionManagement()}
+        >
+          Manage in App Store
+        </Button>
+      );
+    }
+
     const label = tierPlan === "free" ? "Cancel Membership" : "Downgrade";
     return (
       <Button
