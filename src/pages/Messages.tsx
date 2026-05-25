@@ -588,7 +588,7 @@ const Messages = () => {
       const { error } = await supabase.storage.from("post-media").upload(fileName, file, {
         contentType: file.type || undefined,
       });
-      const { error } = await supabase.storage.from("post-media").upload(fileName, file);
+      
       if (error) continue;
       const { data } = supabase.storage.from("post-media").getPublicUrl(fileName);
       uploadedUrls.push(data.publicUrl);
