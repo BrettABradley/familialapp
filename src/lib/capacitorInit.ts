@@ -39,19 +39,39 @@ export async function initCapacitorPlugins() {
   // anything tagged `.keyboard-hide` (e.g. the bottom nav).
   // Registered OUTSIDE the Keyboard try/catch so it runs even if the
   // Capacitor Keyboard plugin fails to load.
+  const forceClearKeyboardState = () => {
+    try {
+      document.documentElement.classList.remove('keyboard-open');
+      document.documentElement.style.setProperty('--keyboard-height', '0px');
+      document.documentElement.style.setProperty(
+        '--visual-viewport-height',
+        `${window.innerHeight}px`
+      );
+    } catch (e) {
+      console.warn('[boot] forceClearKeyboardState failed', e);
+    }
+  };
+
+  const isEditableFocused = () => {
+    const el = document.activeElement as HTMLElement | null;
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable === true;
+  };
+
   const clearIfKeyboardGone = () => {
     try {
+      // If nothing editable is focused, the keyboard cannot be open — clear
+      // unconditionally. This is the rotation case.
+      if (!isEditableFocused()) {
+        forceClearKeyboardState();
+        return;
+      }
+      // Otherwise fall back to the viewport heuristic (e.g. user dismissed
+      // keyboard via swipe without blurring the input).
       const visualH = window.visualViewport?.height ?? window.innerHeight;
-      // Generous tolerance to handle iOS URL-bar / safe-area discrepancies
-      // after rotation. If we're within 150px of full window height, no
-      // keyboard is actually present.
       if (visualH >= window.innerHeight - 150) {
-        document.documentElement.classList.remove('keyboard-open');
-        document.documentElement.style.setProperty('--keyboard-height', '0px');
-        document.documentElement.style.setProperty(
-          '--visual-viewport-height',
-          `${window.innerHeight}px`
-        );
+        forceClearKeyboardState();
       }
     } catch (e) {
       console.warn('[boot] clearIfKeyboardGone failed', e);
@@ -64,6 +84,7 @@ export async function initCapacitorPlugins() {
     setTimeout(clearIfKeyboardGone, 300);
     setTimeout(clearIfKeyboardGone, 800);
     setTimeout(clearIfKeyboardGone, 1500);
+    setTimeout(clearIfKeyboardGone, 2500);
   };
 
   try {
@@ -80,6 +101,7 @@ export async function initCapacitorPlugins() {
   } catch (e) {
     console.warn('[boot] rotation cleanup listeners failed', e);
   }
+
 
   // Keyboard listeners — non-fatal if plugin is missing
   try {
