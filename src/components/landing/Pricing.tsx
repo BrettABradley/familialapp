@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Phone, Mail, ArrowRight, Loader2, Camera, Calendar, MessageCircle, Smartphone, Users, Bell, Shield, Image, Video, Settings, Globe, StickyNote } from "lucide-react";
 import { openExternalUrl } from "@/lib/externalUrl";
-import { isIOSNative, purchaseSubscription, restorePurchases, prewarmProducts, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import { isIOSNative, purchaseSubscription, restorePurchases, prewarmProducts, APPLE_PRODUCTS, openAppleSubscriptionManagement } from "@/lib/iapPurchase";
 import SubscriptionDisclosure from "@/components/shared/SubscriptionDisclosure";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -91,6 +91,7 @@ const Pricing = () => {
   const [cancelingPlan, setCancelingPlan] = useState(false);
   const [cancelDowngradeLoading, setCancelDowngradeLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
+  const [planSource, setPlanSource] = useState<string | null>(null);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const [currentPeriodEnd, setCurrentPeriodEnd] = useState<string | null>(null);
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
@@ -132,11 +133,12 @@ const Pricing = () => {
       setCancelAtPeriodEnd(false);
       setCurrentPeriodEnd(null);
       setPendingPlan(null);
+      setPlanSource(null);
       return;
     }
     supabase
       .from("user_plans")
-      .select("plan, cancel_at_period_end, current_period_end, pending_plan")
+      .select("plan, cancel_at_period_end, current_period_end, pending_plan, source")
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => {
@@ -144,6 +146,7 @@ const Pricing = () => {
         setCancelAtPeriodEnd(data?.cancel_at_period_end ?? false);
         setCurrentPeriodEnd(data?.current_period_end ?? null);
         setPendingPlan((data as any)?.pending_plan ?? null);
+        setPlanSource((data as any)?.source ?? null);
       });
   }, [user]);
 
@@ -341,6 +344,12 @@ const Pricing = () => {
   };
 
   const handleCancelConfirm = async () => {
+    // Apple-managed subscriptions can't be cancelled via Stripe — hand off to App Store
+    if (planSource === "apple" || isIOSNative()) {
+      setConfirmDialog(null);
+      openAppleSubscriptionManagement();
+      return;
+    }
     setCancelingPlan(true);
     try {
       await createRescueOffers();
@@ -500,6 +509,21 @@ const Pricing = () => {
       return (
         <Button variant="secondary" className="w-full" size="lg" disabled>
           Cancel Pending
+        </Button>
+      );
+    }
+
+    const isApple = planSource === "apple" || isIOSNative();
+
+    if (isApple) {
+      return (
+        <Button
+          variant="outline"
+          className="w-full"
+          size="lg"
+          onClick={() => openAppleSubscriptionManagement()}
+        >
+          Manage in App Store
         </Button>
       );
     }
