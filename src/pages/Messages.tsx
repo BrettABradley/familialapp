@@ -555,7 +555,7 @@ const Messages = () => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleVoiceRecording = (blob: Blob) => {
+  const handleVoiceRecording = async (blob: Blob) => {
     if (selectedFiles.length >= 4) {
       toast({ title: "Too many files", description: "You can attach up to 4 files per message.", variant: "destructive" });
       return;
