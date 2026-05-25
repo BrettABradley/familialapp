@@ -488,9 +488,8 @@ const Settings = () => {
                 onClick={async () => {
                   setMfaLoading(true);
                   await supabase
-                    .from("profiles")
-                    .update({ two_factor_enabled: false } as any)
-                    .eq("user_id", user!.id);
+                    .from("user_private" as any)
+                    .upsert({ user_id: user!.id, two_factor_enabled: false } as any, { onConflict: "user_id" });
                   setMfaEnabled(false);
                   refetchProfile();
                   toast({ title: "2FA disabled" });
@@ -533,9 +532,8 @@ const Settings = () => {
                       toast({ title: "Invalid code", description: data?.error || "Please check your email and try again.", variant: "destructive" });
                     } else {
                       await supabase
-                        .from("profiles")
-                        .update({ two_factor_enabled: true } as any)
-                        .eq("user_id", user!.id);
+                        .from("user_private" as any)
+                        .upsert({ user_id: user!.id, two_factor_enabled: true } as any, { onConflict: "user_id" });
                       setMfaEnabled(true);
                       setMfaEnrolling(false);
                       setMfaVerifyCode("");

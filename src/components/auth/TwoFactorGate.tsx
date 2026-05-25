@@ -48,7 +48,7 @@ export function TwoFactorGate({ children }: { children: ReactNode }) {
         return;
       }
       const { data } = await supabase
-        .from("profiles")
+        .from("user_private" as any)
         .select("two_factor_enabled")
         .eq("user_id", user.id)
         .maybeSingle();
