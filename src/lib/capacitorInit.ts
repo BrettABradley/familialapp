@@ -144,9 +144,9 @@ export async function initCapacitorPlugins() {
   // Push notifications — entirely optional. If the entitlement is missing
   // or the device can't register, swallow the error so launch completes.
   try {
-    const tryRegister = () => {
+    const tryRegister = (force = false) => {
       try {
-        registerForPushNotifications().catch((e) => console.warn('[boot] push registration rejected', e));
+        registerForPushNotifications({ force }).catch((e) => console.warn('[boot] push registration rejected', e));
       } catch (e) {
         console.warn('[boot] push registration threw', e);
       }
@@ -158,7 +158,13 @@ export async function initCapacitorPlugins() {
       .catch((e) => console.warn('[boot] getSession failed', e));
 
     supabase.auth.onAuthStateChange((event, session) => {
-      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+      if (!session) return;
+      if (event === 'SIGNED_IN') {
+        // Force re-registration so a different user signing in on the same
+        // device immediately rewrites the push_tokens row to their user_id
+        // (via register-push-token's server-side reclaim step).
+        tryRegister(true);
+      } else if (event === 'TOKEN_REFRESHED') {
         tryRegister();
       }
     });
