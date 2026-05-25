@@ -147,7 +147,7 @@ Deno.serve(async (req: Request) => {
         if (!q) return jsonResponse({ users: [] });
         // Search profiles by display_name
         const { data: profileMatches } = await supabaseAdmin.from("profiles")
-          .select("user_id, display_name, account_status")
+          .select("user_id, display_name")
           .ilike("display_name", `%${q}%`).limit(20);
         // Search auth users by email
         const { data: authList } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
@@ -162,7 +162,9 @@ Deno.serve(async (req: Request) => {
         const results = await Promise.all(Array.from(userIds).slice(0, 25).map(async (uid) => {
           const authUser = (authList?.users ?? []).find((u: any) => u.id === uid);
           const { data: profile } = await supabaseAdmin.from("profiles")
-            .select("display_name, account_status").eq("user_id", uid).maybeSingle();
+            .select("display_name").eq("user_id", uid).maybeSingle();
+          const { data: priv } = await supabaseAdmin.from("user_private")
+            .select("account_status").eq("user_id", uid).maybeSingle();
           const { data: plan } = await supabaseAdmin.from("user_plans")
             .select("*").eq("user_id", uid).maybeSingle();
           const { count: circlesOwned } = await supabaseAdmin.from("circles")
@@ -172,7 +174,7 @@ Deno.serve(async (req: Request) => {
             user_id: uid,
             email: authUser?.email,
             display_name: profile?.display_name,
-            account_status: profile?.account_status,
+            account_status: priv?.account_status ?? "active",
             created_at: authUser?.created_at,
             plan: plan?.plan ?? "free",
             comped_by_admin_at: plan?.comped_by_admin_at ?? null,
@@ -492,6 +494,24 @@ Deno.serve(async (req: Request) => {
           updated_at: new Date().toISOString(),
         }).eq("user_id", target_user_id);
         await logAdminAction(supabaseAdmin, adminEmail, "remove_enterprise", { target_user_id });
+        return jsonResponse({ ok: true });
+      }
+
+      // ============ APPEALS / RESTORE ============
+      case "restore_user": {
+        const target_user_id = String(body.user_id ?? "");
+        if (!target_user_id) return jsonResponse({ error: "user_id required" }, 400);
+        await supabaseAdmin.from("user_private").upsert({
+          user_id: target_user_id,
+          account_status: "active",
+          suspended_until: null,
+        }, { onConflict: "user_id" });
+        try {
+          await supabaseAdmin.auth.admin.updateUserById(target_user_id, { ban_duration: "none" });
+        } catch (e) {
+          console.error("auth unban failed", e);
+        }
+        await logAdminAction(supabaseAdmin, adminEmail, "restore_user", { target_user_id });
         return jsonResponse({ ok: true });
       }
 

@@ -28,12 +28,12 @@ export const TermsAcceptanceGate = ({ children }: { children: React.ReactNode })
 
     const checkTerms = async () => {
       const { data } = await supabase
-        .from("profiles")
+        .from("user_private" as any)
         .select("accepted_terms_at, accepted_terms_version")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
-      if (data && (!(data as any).accepted_terms_at || (data as any).accepted_terms_version !== CURRENT_TERMS_VERSION)) {
+      if (!data || !(data as any).accepted_terms_at || (data as any).accepted_terms_version !== CURRENT_TERMS_VERSION) {
         setNeedsAcceptance(true);
       }
       setLoaded(true);
@@ -47,12 +47,12 @@ export const TermsAcceptanceGate = ({ children }: { children: React.ReactNode })
     setSubmitting(true);
 
     await supabase
-      .from("profiles")
-      .update({
+      .from("user_private" as any)
+      .upsert({
+        user_id: user.id,
         accepted_terms_at: new Date().toISOString(),
         accepted_terms_version: CURRENT_TERMS_VERSION,
-      } as any)
-      .eq("user_id", user.id);
+      } as any, { onConflict: "user_id" });
 
     setNeedsAcceptance(false);
     setSubmitting(false);

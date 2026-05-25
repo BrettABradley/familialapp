@@ -121,14 +121,13 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const [{ data, error }, { data: priv }] = await Promise.all([
+      supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle(),
+      supabase.from("user_private" as any).select("*").eq("user_id", user.id).maybeSingle(),
+    ]);
 
     if (!error && data) {
-      setProfile(data);
+      setProfile({ ...(data as any), ...((priv as any) || {}) });
     }
   };
 
