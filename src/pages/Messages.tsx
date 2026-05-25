@@ -585,6 +585,9 @@ const Messages = () => {
       setUploadProgress(Math.round((i / selectedFiles.length) * 100));
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+      const { error } = await supabase.storage.from("post-media").upload(fileName, file, {
+        contentType: file.type || undefined,
+      });
       const { error } = await supabase.storage.from("post-media").upload(fileName, file);
       if (error) continue;
       const { data } = supabase.storage.from("post-media").getPublicUrl(fileName);
