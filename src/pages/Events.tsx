@@ -22,6 +22,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, CalendarDays, MapPin, Clock, Trash2, Loader2, Image, Pencil, Check, X, UserCheck, HelpCircle, XCircle, Users } from "lucide-react";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
+import { EventLocationPopover } from "@/components/events/EventLocationPopover";
 import { format, parse } from "date-fns";
 
 /** Parse "YYYY-MM-DD" as local date (avoids UTC-midnight timezone shift). */
@@ -540,34 +541,11 @@ const Events = () => {
                 </span>
               )}
               {event.location && (
-                <Popover>
-                  <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <button className="flex items-center gap-1 text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer">
-                      <MapPin className="w-4 h-4 shrink-0" />
-                      {event.location}
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-48 p-2" align="start" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex flex-col gap-1">
-                      <a
-                        href={`https://maps.apple.com/?q=${encodeURIComponent(event.location)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
-                      >
-                        Open in Apple Maps
-                      </a>
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
-                      >
-                        Open in Google Maps
-                      </a>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                <EventLocationPopover
+                  location={event.location}
+                  eventId={event.id}
+                  isHost={event.created_by === user?.id}
+                />
               )}
             </div>
             {event.description && (
