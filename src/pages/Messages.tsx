@@ -20,6 +20,7 @@ import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import { validateFileSize, getFileMediaType, getMediaType } from "@/lib/mediaUtils";
+import { blobToVoiceNoteFile } from "@/lib/voiceNoteFile";
 import { convertHeicFiles, convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
