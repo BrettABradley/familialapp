@@ -1,42 +1,33 @@
+## Problem
 
-## Bug
+After rotating to landscape and back to portrait, the bottom mobile nav disappears. CSS rule `.keyboard-open .keyboard-hide { display: none }` is hiding it, which means `.keyboard-open` is stuck on `<html>` even though no keyboard is showing.
 
-After rotating iOS landscape → portrait, the bottom mobile nav disappears.
+We already added a self-correcting safety net in `src/lib/capacitorInit.ts` (orientationchange + visualViewport resize listeners that clear `.keyboard-open` when the viewport is back to ~full height). The user is still hitting the bug, so that net isn't catching every case.
 
-## Root cause
+## Why the current fix can miss
 
-`src/components/layout/MobileNavigation.tsx` has the class `keyboard-hide`. In `src/index.css`:
-
-```css
-.keyboard-open .keyboard-hide { display: none !important; }
-```
-
-`.keyboard-open` is added on `<html>` by the `keyboardWillShow` Capacitor listener in `src/lib/capacitorInit.ts`, and removed only by `keyboardWillHide`. On iOS, rotation events can fire `keyboardWillShow` without a matching `keyboardWillHide` (Apple bug, well documented), so the class gets stuck and the nav stays hidden permanently.
+1. **Listeners live inside the Keyboard `try` block.** If `@capacitor/keyboard` import is slow or fails on that launch, the safety net is never registered.
+2. **`orientationchange` is unreliable on iOS WebView.** The modern `screen.orientation.change` event fires more consistently.
+3. **No fallback if visualViewport never resizes back.** On some iOS rotations the visualViewport `resize` event fires while the WebView is still mid-rotation, so the measurement misses by more than the 100px tolerance and the class is never cleared.
 
 ## Fix
 
-Make `keyboard-open` self-correcting: clear it whenever there's no real keyboard present.
+Edit only `src/lib/capacitorInit.ts`:
 
-### File: `src/lib/capacitorInit.ts`
+1. **Move the `clearIfKeyboardGone` helper and its listeners OUT of the Keyboard try/catch** so they always register, even if the Capacitor Keyboard plugin fails to load.
+2. **Add `screen.orientation.addEventListener('change', ...)`** alongside the existing `orientationchange` listener (both, for older/newer iOS).
+3. **Add a third deferred check at ~1500ms** after rotation, since the visualViewport sometimes settles late on iOS.
+4. **Loosen the tolerance to 150px** to handle iOS URL-bar/safe-area discrepancies after rotation.
+5. **Add a `pageshow` / `visibilitychange` check** so returning to the app after backgrounding also runs the cleanup — covers the case where the user rotates while the app is briefly suspended.
 
-Add **inside** the existing `try { const { Keyboard } = await import('@capacitor/keyboard') ... }` block, after the two existing listeners:
-
-1. **`screenOrientation` `change` listener** on `window` — wait 300ms (let iOS settle), then if `window.visualViewport.height >= window.innerHeight - 100`, force-clear:
-   - remove `.keyboard-open` class from `documentElement`
-   - reset `--keyboard-height` to `0px`
-   - reset `--visual-viewport-height` to `window.innerHeight`
-
-2. **`visualViewport` `resize` listener** — same self-correction. If the visual viewport returns to roughly the full window height, the keyboard is gone regardless of whether the Capacitor listener fired. This catches the rotation case AND any other edge case where `keyboardWillHide` never arrives.
-
-Keep both — orientation is the primary trigger but visualViewport is the belt-and-suspenders catch.
-
-### Why this is safe
-
-- It only **removes** the stuck class; it never adds one. The existing `keyboardWillShow` is still the only thing that sets `keyboard-open`, so the keyboard-hide behaviour for messaging / chat input is unaffected.
-- The 100px tolerance handles iOS's small URL-bar / safe-area discrepancies on the visual viewport.
-- Pure addition — no existing logic changes.
+No CSS changes. No changes to `MobileNavigation.tsx`. The `.keyboard-open` class is still only ADDED by `keyboardWillShow` — we just make REMOVAL more aggressive.
 
 ## Out of scope
 
-- Not touching `useIsMobile` (works correctly).
-- Not removing `.keyboard-hide` from the nav — hiding the nav while the keyboard is up is intentional behaviour.
+- Not touching `.keyboard-hide` on the nav (intentional behavior when keyboard is up).
+- Not changing `useIsMobile` or any layout component.
+- Not changing `index.css`.
+
+## Risk
+
+Very low. The new logic only removes a class when it can confirm the keyboard isn't present. Worst case: `.keyboard-open` is cleared one frame earlier than today in some edge case, which would briefly show the nav while the keyboard is dismissing — acceptable.
