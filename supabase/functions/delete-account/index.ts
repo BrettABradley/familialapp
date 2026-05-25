@@ -239,6 +239,7 @@ Deno.serve(async (req) => {
     await adminClient.from("member_aliases").delete().eq("target_user_id", userId);
     await adminClient.from("store_offers").delete().eq("submitted_by", userId);
     await adminClient.from("user_roles").delete().eq("user_id", userId);
+    await adminClient.from("user_private").delete().eq("user_id", userId);
     await adminClient.from("profiles").delete().eq("user_id", userId);
 
     // ──────────────────────────────────────────────

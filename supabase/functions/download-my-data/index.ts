@@ -45,9 +45,10 @@ serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const [profile, posts, comments, privateMessages, events, fridgePins, familyTree, profileImages] =
+    const [profile, userPrivate, posts, comments, privateMessages, events, fridgePins, familyTree, profileImages] =
       await Promise.all([
         admin.from("profiles").select("*").eq("user_id", userId).single(),
+        admin.from("user_private").select("*").eq("user_id", userId).maybeSingle(),
         admin.from("posts").select("*").eq("author_id", userId).order("created_at", { ascending: false }),
         admin.from("comments").select("*").eq("author_id", userId).order("created_at", { ascending: false }),
         admin.from("private_messages").select("*").or(`sender_id.eq.${userId},recipient_id.eq.${userId}`).order("created_at", { ascending: false }).limit(1000),
@@ -59,7 +60,7 @@ serve(async (req: Request) => {
 
     const exportData = {
       exported_at: new Date().toISOString(),
-      profile: profile.data,
+      profile: { ...(profile.data ?? {}), ...((userPrivate as any).data ?? {}) },
       posts: posts.data || [],
       comments: comments.data || [],
       private_messages: privateMessages.data || [],
