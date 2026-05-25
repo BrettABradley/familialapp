@@ -369,7 +369,7 @@ const Albums = () => {
     if (!selectedAlbum || !user) return;
     setCoverCropSrc(null);
     setIsUploadingCover(true);
-    const fileName = `covers/${selectedAlbum.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
+    const fileName = `${user.id}/covers/${selectedAlbum.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.jpg`;
 
     const { error: uploadError } = await supabase.storage
       .from("post-media")
