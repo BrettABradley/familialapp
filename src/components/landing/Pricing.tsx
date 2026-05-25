@@ -91,6 +91,7 @@ const Pricing = () => {
   const [cancelingPlan, setCancelingPlan] = useState(false);
   const [cancelDowngradeLoading, setCancelDowngradeLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
+  const [planSource, setPlanSource] = useState<string | null>(null);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
   const [currentPeriodEnd, setCurrentPeriodEnd] = useState<string | null>(null);
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
