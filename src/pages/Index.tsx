@@ -34,17 +34,33 @@ const Index = () => {
   const { user, loading } = useAuth();
 
   useEffect(() => {
-    // Detect recovery tokens in URL hash and redirect to reset-password page
+    // Detect recovery tokens in URL hash and redirect to reset-password page.
+    // Supabase's detectSessionInUrl may strip the hash before this effect
+    // runs, so we ALSO listen for the PASSWORD_RECOVERY event as a fallback.
     const hash = window.location.hash;
-    if (hash.includes("type=recovery") || hash.includes("type=signup")) {
-      const targetPath = hash.includes("type=recovery") ? "/reset-password" : "/auth";
-      navigate(`${targetPath}${hash}`, { replace: true });
+    const search = window.location.search;
+    if (
+      hash.includes("type=recovery") ||
+      hash.includes("type=signup") ||
+      search.includes("type=recovery")
+    ) {
+      const isRecovery = hash.includes("type=recovery") || search.includes("type=recovery");
+      const targetPath = isRecovery ? "/reset-password" : "/auth";
+      navigate(`${targetPath}${hash || search}`, { replace: true });
       return;
     }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        navigate("/reset-password", { replace: true });
+      }
+    });
 
     if (Capacitor.isNativePlatform() && !loading) {
       navigate(user ? "/circles" : "/auth", { replace: true });
     }
+
+    return () => subscription.unsubscribe();
   }, [user, loading, navigate]);
 
   if (Capacitor.isNativePlatform()) {
