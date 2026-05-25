@@ -117,15 +117,15 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     for (let i = 0; i < selectedFiles.length; i++) {
       const file = selectedFiles[i];
       setUploadProgress(Math.round(((i) / selectedFiles.length) * 100));
-      // For audio blobs, ALWAYS write the file with an .m4a extension so the
-      // public URL can be detected as audio later (iOS recorders sometimes
-      // hand us files whose extension is .mp4 even though the contents are
-      // AAC-in-MP4-audio, which would otherwise render as a black video).
+      // Audio files: trust the file's own type/extension (already normalized
+      // by blobToVoiceNoteFile). Don't force audio/mp4 — iOS raw-AAC bytes
+      // would become undecodable.
       const isAudio = (file.type || "").startsWith("audio") || /voice-note[-_]/i.test(file.name);
-      const fileExt = isAudio ? "m4a" : (file.name.split(".").pop() || "bin");
+      const nameExt = file.name.split(".").pop()?.toLowerCase();
+      const fileExt = isAudio ? (nameExt || "m4a") : (nameExt || "bin");
       const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
       const { error } = await supabase.storage.from("post-media").upload(fileName, file, {
-        contentType: isAudio ? "audio/mp4" : file.type || undefined,
+        contentType: file.type || undefined,
       });
       if (error) { continue; }
       const { data } = supabase.storage.from("post-media").getPublicUrl(fileName);
