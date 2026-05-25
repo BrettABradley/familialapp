@@ -474,7 +474,9 @@ const Fridge = () => {
                       ) : (
                         <div className="space-y-2">
                           <VoiceRecorder onRecordingComplete={(blob) => {
-                            const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
+                            // Normalize so iOS m4a/aac plays back with a real duration
+                            // (otherwise <audio> reports 0:00 / 0:00).
+                            const { file } = blobToVoiceNoteFile(blob);
                             setSelectedImage(file);
                             setImagePreview(URL.createObjectURL(file));
                           }} />
