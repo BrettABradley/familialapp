@@ -150,10 +150,11 @@ serve(async (req: Request) => {
     if (action === "suspend_7d" && targetUserId) {
       const until = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       await admin.auth.admin.updateUserById(targetUserId, { ban_duration: "168h" });
-      await admin.from("profiles").update({
+      await admin.from("user_private").upsert({
+        user_id: targetUserId,
         account_status: "suspended",
         suspended_until: until,
-      }).eq("user_id", targetUserId);
+      }, { onConflict: "user_id" });
       await admin.from("user_strikes").insert({
         user_id: targetUserId,
         report_id: reportId,
@@ -196,10 +197,11 @@ serve(async (req: Request) => {
         );
       }
       await admin.auth.admin.updateUserById(targetUserId, { ban_duration: "876600h" });
-      await admin.from("profiles").update({
+      await admin.from("user_private").upsert({
+        user_id: targetUserId,
         account_status: "banned",
         suspended_until: null,
-      }).eq("user_id", targetUserId);
+      }, { onConflict: "user_id" });
 
       // Delete the reported content
       if (report.post_id) await admin.from("posts").delete().eq("id", report.post_id);
@@ -216,8 +218,10 @@ serve(async (req: Request) => {
 
     // === MARK REPORTER AS SPAM ===
     if (action === "mark_spam_reporter") {
-      await admin.from("profiles").update({ spam_reporter: true })
-        .eq("user_id", report.reporter_id);
+      await admin.from("user_private").upsert({
+        user_id: report.reporter_id,
+        spam_reporter: true,
+      }, { onConflict: "user_id" });
       // Restore content (this report is bogus)
       if (report.post_id) await admin.from("posts").update({ is_hidden: false }).eq("id", report.post_id);
       if (report.comment_id) await admin.from("comments").update({ is_hidden: false }).eq("id", report.comment_id);
@@ -265,15 +269,19 @@ serve(async (req: Request) => {
       const strikes = count ?? 0;
       if (strikes >= 5) {
         await admin.auth.admin.updateUserById(targetUserId, { ban_duration: "876600h" });
-        await admin.from("profiles").update({ account_status: "banned" }).eq("user_id", targetUserId);
+        await admin.from("user_private").upsert({
+          user_id: targetUserId,
+          account_status: "banned",
+        }, { onConflict: "user_id" });
         results.push(`Auto-ban (${strikes} strikes)`);
       } else if (strikes >= 3) {
         const until = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
         await admin.auth.admin.updateUserById(targetUserId, { ban_duration: "168h" });
-        await admin.from("profiles").update({
+        await admin.from("user_private").upsert({
+          user_id: targetUserId,
           account_status: "suspended",
           suspended_until: until,
-        }).eq("user_id", targetUserId);
+        }, { onConflict: "user_id" });
         results.push(`Auto-suspend 7d (${strikes} strikes)`);
       }
     }

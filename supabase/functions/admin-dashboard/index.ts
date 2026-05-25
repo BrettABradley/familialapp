@@ -70,11 +70,17 @@ serve(async (req: Request) => {
 
       // Enrich with reporter / target info + content snippet
       const enriched = await Promise.all((reports ?? []).map(async (r: any) => {
-        const [reporterP, targetP, post, comment, strikes] = await Promise.all([
-          supabaseAdmin.from("profiles").select("display_name,spam_reporter")
+        const [reporterP, reporterPriv, targetP, targetPriv, post, comment, strikes] = await Promise.all([
+          supabaseAdmin.from("profiles").select("display_name")
+            .eq("user_id", r.reporter_id).maybeSingle(),
+          supabaseAdmin.from("user_private").select("spam_reporter")
             .eq("user_id", r.reporter_id).maybeSingle(),
           r.reported_user_id
-            ? supabaseAdmin.from("profiles").select("display_name,account_status")
+            ? supabaseAdmin.from("profiles").select("display_name")
+                .eq("user_id", r.reported_user_id).maybeSingle()
+            : Promise.resolve({ data: null }),
+          r.reported_user_id
+            ? supabaseAdmin.from("user_private").select("account_status")
                 .eq("user_id", r.reported_user_id).maybeSingle()
             : Promise.resolve({ data: null }),
           r.post_id
@@ -95,9 +101,9 @@ serve(async (req: Request) => {
         return {
           ...r,
           reporter_name: reporterP.data?.display_name ?? null,
-          reporter_is_spam: reporterP.data?.spam_reporter ?? false,
+          reporter_is_spam: (reporterPriv as any).data?.spam_reporter ?? false,
           target_name: (targetP as any).data?.display_name ?? null,
-          target_status: (targetP as any).data?.account_status ?? null,
+          target_status: (targetPriv as any).data?.account_status ?? null,
           target_active_strikes: (strikes as any).count ?? 0,
           post_snippet: (post as any).data?.content ?? null,
           post_media: (post as any).data?.media_urls ?? null,
