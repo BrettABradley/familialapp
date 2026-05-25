@@ -66,6 +66,36 @@ export async function initCapacitorPlugins() {
         console.warn('[boot] keyboardWillHide handler failed', e);
       }
     });
+
+    // Self-correct stuck `.keyboard-open` after iOS rotation.
+    // iOS sometimes fires `keyboardWillShow` without a matching
+    // `keyboardWillHide` when the device is rotated, which permanently
+    // hides anything tagged `.keyboard-hide` (e.g. the bottom nav).
+    // If the visual viewport is back to ~full window height, no keyboard
+    // is actually present — clear the class regardless.
+    const clearIfKeyboardGone = () => {
+      try {
+        const visualH = window.visualViewport?.height ?? window.innerHeight;
+        if (visualH >= window.innerHeight - 100) {
+          document.documentElement.classList.remove('keyboard-open');
+          document.documentElement.style.setProperty('--keyboard-height', '0px');
+          document.documentElement.style.setProperty(
+            '--visual-viewport-height',
+            `${window.innerHeight}px`
+          );
+        }
+      } catch (e) {
+        console.warn('[boot] clearIfKeyboardGone failed', e);
+      }
+    };
+
+    window.addEventListener('orientationchange', () => {
+      // Let iOS settle the viewport after rotation before measuring.
+      setTimeout(clearIfKeyboardGone, 300);
+      setTimeout(clearIfKeyboardGone, 800);
+    });
+
+    window.visualViewport?.addEventListener('resize', clearIfKeyboardGone);
   } catch (e) {
     console.warn('[boot] Keyboard plugin load failed', e);
   }
