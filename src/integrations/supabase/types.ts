@@ -1404,62 +1404,41 @@ export type Database = {
       }
       profiles: {
         Row: {
-          accepted_terms_at: string | null
-          accepted_terms_version: string | null
-          account_status: string
           avatar_url: string | null
           bio: string | null
           created_at: string
-          date_of_birth: string | null
           display_name: string | null
           email_on_mention: boolean
           email_on_new_album: boolean
           email_on_unread_dm: boolean
           id: string
           location: string | null
-          spam_reporter: boolean
-          suspended_until: string | null
-          two_factor_enabled: boolean
           updated_at: string
           user_id: string
         }
         Insert: {
-          accepted_terms_at?: string | null
-          accepted_terms_version?: string | null
-          account_status?: string
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
-          date_of_birth?: string | null
           display_name?: string | null
           email_on_mention?: boolean
           email_on_new_album?: boolean
           email_on_unread_dm?: boolean
           id?: string
           location?: string | null
-          spam_reporter?: boolean
-          suspended_until?: string | null
-          two_factor_enabled?: boolean
           updated_at?: string
           user_id: string
         }
         Update: {
-          accepted_terms_at?: string | null
-          accepted_terms_version?: string | null
-          account_status?: string
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
-          date_of_birth?: string | null
           display_name?: string | null
           email_on_mention?: boolean
           email_on_new_album?: boolean
           email_on_unread_dm?: boolean
           id?: string
           location?: string | null
-          spam_reporter?: boolean
-          suspended_until?: string | null
-          two_factor_enabled?: boolean
           updated_at?: string
           user_id?: string
         }
@@ -1756,6 +1735,45 @@ export type Database = {
           pending_plan?: string | null
           plan?: string
           source?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_private: {
+        Row: {
+          accepted_terms_at: string | null
+          accepted_terms_version: string | null
+          account_status: string
+          created_at: string
+          date_of_birth: string | null
+          spam_reporter: boolean
+          suspended_until: string | null
+          two_factor_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accepted_terms_at?: string | null
+          accepted_terms_version?: string | null
+          account_status?: string
+          created_at?: string
+          date_of_birth?: string | null
+          spam_reporter?: boolean
+          suspended_until?: string | null
+          two_factor_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accepted_terms_at?: string | null
+          accepted_terms_version?: string | null
+          account_status?: string
+          created_at?: string
+          date_of_birth?: string | null
+          spam_reporter?: boolean
+          suspended_until?: string | null
+          two_factor_enabled?: boolean
           updated_at?: string
           user_id?: string
         }
