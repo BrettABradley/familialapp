@@ -195,7 +195,9 @@ const Fridge = () => {
       const fileExt = selectedImage.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage.from("post-media").upload(fileName, selectedImage);
+      const { error: uploadError } = await supabase.storage.from("post-media").upload(fileName, selectedImage, {
+        contentType: selectedImage.type || undefined,
+      });
 
       if (!uploadError) {
         const { data: publicUrlData } = supabase.storage.from("post-media").getPublicUrl(fileName);
