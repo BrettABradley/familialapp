@@ -112,7 +112,7 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
       const ext = mime.includes("mp4") || mime.includes("aac")
         ? "m4a"
         : mime.includes("webm") ? "webm" : "audio";
-      const fileName = `campfire/${pinId}/${user.id}_${Date.now()}.${ext}`;
+      const fileName = `${user.id}/campfire/${pinId}/${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from("post-media")
         .upload(fileName, audioBlob, { contentType: mime });
