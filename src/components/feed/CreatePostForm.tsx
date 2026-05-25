@@ -14,6 +14,7 @@ import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import { MentionInput } from "@/components/shared/MentionInput";
 import { useCircleMembers } from "@/hooks/useCircleMembers";
 import { validateFileSize, getFileMediaType } from "@/lib/mediaUtils";
+import { blobToVoiceNoteFile } from "@/lib/voiceNoteFile";
 import { convertHeicFiles } from "@/lib/heicConverter";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 
