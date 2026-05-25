@@ -20,6 +20,7 @@ import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import { validateFileSize, getFileMediaType, getMediaType } from "@/lib/mediaUtils";
+import { blobToVoiceNoteFile } from "@/lib/voiceNoteFile";
 import { convertHeicFiles, convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
@@ -563,17 +564,9 @@ const Messages = () => {
       toast({ title: "No audio recorded", description: "The recording was empty. Please try again.", variant: "destructive" });
       return;
     }
-    // Derive a sensible file extension from the actual blob mime type so the
-    // upload + playback uses the right container (iOS = m4a/aac, web = webm).
-    const mime = blob.type || "audio/webm";
-    const ext = mime.includes("mp4") || mime.includes("aac") || mime.includes("m4a")
-      ? "m4a"
-      : mime.includes("webm")
-        ? "webm"
-        : mime.includes("wav")
-          ? "wav"
-          : "m4a";
-    const file = new File([blob], `voice-note-${Date.now()}.${ext}`, { type: mime });
+    // Normalize so extension, blob type and upload contentType agree —
+    // otherwise iOS reports duration 0:00/0:00 and the audio won't play.
+    const { file } = blobToVoiceNoteFile(blob);
     setSelectedFiles(prev => [...prev, file]);
     setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]);
   };
@@ -592,7 +585,10 @@ const Messages = () => {
       setUploadProgress(Math.round((i / selectedFiles.length) * 100));
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-      const { error } = await supabase.storage.from("post-media").upload(fileName, file);
+      const { error } = await supabase.storage.from("post-media").upload(fileName, file, {
+        contentType: file.type || undefined,
+      });
+      
       if (error) continue;
       const { data } = supabase.storage.from("post-media").getPublicUrl(fileName);
       uploadedUrls.push(data.publicUrl);

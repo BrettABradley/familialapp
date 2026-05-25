@@ -19,6 +19,7 @@ import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
+import { blobToVoiceNoteFile } from "@/lib/voiceNoteFile";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 
@@ -194,7 +195,9 @@ const Fridge = () => {
       const fileExt = selectedImage.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage.from("post-media").upload(fileName, selectedImage);
+      const { error: uploadError } = await supabase.storage.from("post-media").upload(fileName, selectedImage, {
+        contentType: selectedImage.type || undefined,
+      });
 
       if (!uploadError) {
         const { data: publicUrlData } = supabase.storage.from("post-media").getPublicUrl(fileName);
@@ -474,7 +477,9 @@ const Fridge = () => {
                       ) : (
                         <div className="space-y-2">
                           <VoiceRecorder onRecordingComplete={(blob) => {
-                            const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: "audio/webm" });
+                            // Normalize so iOS m4a/aac plays back with a real duration
+                            // (otherwise <audio> reports 0:00 / 0:00).
+                            const { file } = blobToVoiceNoteFile(blob);
                             setSelectedImage(file);
                             setImagePreview(URL.createObjectURL(file));
                           }} />
