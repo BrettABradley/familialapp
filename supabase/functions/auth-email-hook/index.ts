@@ -286,6 +286,25 @@ async function handleWebhook(req: Request): Promise<Response> {
 
   console.log('Auth email enqueued', { emailType, email: payload.data.email, run_id })
 
+  // Fire-and-forget flush — drain the auth queue immediately instead of
+  // waiting for the next 5s cron tick. Crucial for password-reset latency.
+  try {
+    const flushUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-email-queue`
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    // No await — let the response return immediately.
+    fetch(flushUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+      },
+      body: JSON.stringify({ trigger: 'auth-hook', queue: 'auth_emails' }),
+    }).catch((e) => console.warn('Immediate flush failed (queue will retry):', e))
+  } catch (e) {
+    console.warn('Immediate flush setup failed:', e)
+  }
+
   return new Response(
     JSON.stringify({ success: true, queued: true }),
     { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
