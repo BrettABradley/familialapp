@@ -566,7 +566,7 @@ const Messages = () => {
     }
     // Normalize so extension, blob type and upload contentType agree —
     // otherwise iOS reports duration 0:00/0:00 and the audio won't play.
-    const { file } = blobToVoiceNoteFile(blob);
+    const { file } = await blobToVoiceNoteFile(blob);
     setSelectedFiles(prev => [...prev, file]);
     setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]);
   };
