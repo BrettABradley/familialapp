@@ -1,55 +1,57 @@
-# Fix Reset-Password Delay + Deep-Link Notifications
 
-Three concrete fixes. All backend + small frontend additions, no UI overhaul.
+## Build version to use
 
-## 1. Reset password email — faster + clear destination
+Set `package.json` → `"version": "66.0.1"` **right now** (matches the build currently live in the App Store). When you upload 67.0.1 to Apple, bump `package.json` to `"66.0.1"` → `"67.0.1"` in the **same commit** as the Xcode `CFBundleShortVersionString` bump. That way:
 
-**Root cause of slowness:** auth emails are enqueued to pgmq, then drained by `process-email-queue` which runs every 5s on a 200ms-per-message delay. Worst case the email sits 5–10s before sending, plus Resend/Lovable Email API latency. Total can easily feel like 30s+ on a cold queue.
+- Users on 66.0.1 (current store build) won't see a prompt until 67.0.1 is **approved and live** in the store.
+- The moment Apple flips 67.0.1 to "Ready for Sale", iTunes Lookup returns `"version": "67.0.1"`, and every user still on 66.0.1 sees the dialog on next app launch.
 
-**Fixes:**
-- In `auth-email-hook/index.ts`: after `enqueue_email` succeeds, immediately fire-and-forget invoke `process-email-queue` (no await, no error throw) so the auth email drains within the same second instead of waiting for the next cron tick.
-- Lower `send_delay_ms` from 200 → 50ms in `email_send_state` (queue still throttles bursts but auth emails go out almost instantly).
-- Recovery template button currently sends users to the magic recovery URL which lands on `/reset-password#access_token=...&type=recovery`. `ResetPassword.tsx` already listens for `PASSWORD_RECOVERY`/`SIGNED_IN` events and shows the password form — this works. Verified, no change needed.
+Rule going forward: **bump `package.json` version to match the App Store build number on every release.** Never let them drift.
 
-**The "link doesn't take me to reset" complaint** is almost certainly the slow email — by the time the link arrives the recovery token has neared/exceeded the 1-hour Supabase default. With #1 fixes, link will be fresh on arrival.
+---
 
-## 2. Notification deep-links — include circle + exact target
+## Implementation steps
 
-Currently most notifications link only to a top-level route. Fix each trigger to include `?circleId=X` plus a target ID:
+### 1. Update `package.json`
+- Change `"version": "0.0.0"` → `"version": "66.0.1"`.
 
-| Notification | Current `link` | New `link` |
-|---|---|---|
-| mention (`create_mention_notifications`) | `/feed` | `/feed?circleId={circle}&post={postId}` |
-| direct_message (`notify_on_dm`) | `/messages` | `/messages?circleId={inferred}&thread={senderId}` |
-| fridge_pin (`notify_on_fridge_pin`) | `/fridge` | `/fridge?circleId={circle}&pin={pinId}` |
-| campfire_story (`notify_on_campfire_story`) | `/fridge` | `/fridge?circleId={circle}&pin={pinId}` |
-| event_rsvp (`notify_on_rsvp`) | `/events` | `/events?circleId={circle}&eventId={eventId}` |
-| event_created | already `?eventId=X` | add `circleId={circle}` |
-| album_created | already `?albumId=X` | add `circleId={circle}` |
+### 2. New file: `src/hooks/useAppUpdateCheck.ts`
+- On mount, only run if `Capacitor.isNativePlatform()` is true.
+- Read installed version via `App.getInfo()` (already have `@capacitor/app` installed).
+- Check cache key `app_update_check` in `localStorage` — skip network call if checked < 6 hours ago.
+- Fetch `https://itunes.apple.com/lookup?bundleId=app.lovable.f745440093af4f4390a60d52ff08c778&country=us`.
+- Parse `results[0].version` and `results[0].trackViewUrl`.
+- Semver-compare (simple `a.b.c` split + numeric compare — no extra dep needed).
+- Return `{ updateAvailable: boolean, storeVersion: string, storeUrl: string }`.
+- Silently swallow network errors (offline, App Store API hiccups) — never block the app.
 
-Also enrich messages so push titles/bodies include the circle name where it adds clarity:
-- mention: `"{Actor} mentioned you in {CircleName}"`
-- fridge_pin / campfire_story / event_created already include the title; add circle name when relevant.
+### 3. New file: `src/components/UpdateAvailableDialog.tsx`
+- shadcn `AlertDialog`. Soft prompt (Later + Update buttons).
+- Copy: *"A new version of Familial is available (v{storeVersion}). Update now for the latest features and fixes."*
+- "Later" → dismiss + write `update_dismissed_for_version` in `localStorage` so we don't re-prompt for that same version this session.
+- "Update" → `Browser.open({ url: storeUrl })` from `@capacitor/browser` (already installed).
+- Don't show again in this session once dismissed; show again on next cold launch.
 
-**Frontend:** add a small `useDeepLinkCircleSync` hook (mounted once in `App.tsx`) that reads `?circleId=` from the URL and calls `setSelectedCircle()` from `CircleContext`. This makes EVERY deep link auto-switch to the right circle before the page renders content. Feed already scrolls to `?post=` ID; Fridge needs the same treatment for `?pin=`; Messages needs `?thread=` support.
+### 4. Mount in `src/components/layout/AppLayout.tsx`
+- Add `<UpdateAvailableDialog />` once, near the root. Hook handles all logic — component renders nothing unless `updateAvailable && !dismissedForThisVersion`.
 
-## 3. Push tap routing
+### 5. Remove "Send test push" button — `src/pages/Settings.tsx`
+- Delete lines 395–438 (the `isIOSNative() && (<Button>…</Button>)` block).
+- Leave the `push-self-test` edge function deployed (no UI references it; idle cost is zero, useful for future diagnostics).
 
-`pushNotifications.ts` already navigates via `window.location.href = link`. Once link values are updated in step 2, push taps land on the exact post/pin/thread in the correct circle. No code change here.
+---
 
-## Execution order
+## After approval, you'll need to:
 
-1. **Migration** — update notification trigger functions to emit richer links + circle names. Set `send_delay_ms = 50`.
-2. **Edge function** — patch `auth-email-hook` to flush `process-email-queue` after enqueue. Deploy.
-3. **Frontend** — add deep-link circle sync hook in `App.tsx`. Add `?pin=` scroll/expand in `Fridge.tsx` and `?thread=` open in `Messages.tsx`. Leave `Feed.tsx` alone (already works).
+1. `git pull` your repo.
+2. `npm install --legacy-peer-deps` (no new deps, but safe).
+3. `npm run build`
+4. `npx cap sync ios --legacy-peer-deps`
+5. In Xcode, set **Version** to `67.0.1` (matches what's in `package.json` for that release), bump **Build** as usual, archive, upload.
+6. Once Apple approves and the build is "Ready for Sale", existing 66.0.1 users see the prompt on their next launch.
 
-## Risk
+## What this does NOT do
 
-- Auth hook flush: failure swallowed silently, so worst case is current behavior (5s wait). Zero regression risk.
-- Notification trigger rewrites: append-only metadata; existing notifications keep their old links (still functional, just less rich). New notifications start using the new format immediately.
-- Deep-link circle sync: only runs if `?circleId=` is present, so unrelated pages are untouched.
-
-## Out of scope
-
-- Reducing Supabase's auth recovery token lifetime (handled at Supabase level, not this codebase).
-- Changing pg_cron interval below 5s (would need pg_cron upgrade; not necessary once auth-hook does immediate flush).
+- No force-update mode (can add later as a flag if you ever ship a breaking schema change).
+- No Android logic (iOS-only — Play Store lookup is different; we'll add it when you ship Android).
+- No telemetry on update-prompt impressions/clicks (matches no-tracking policy).
