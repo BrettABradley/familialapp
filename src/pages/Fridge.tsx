@@ -476,10 +476,10 @@ const Fridge = () => {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <VoiceRecorder onRecordingComplete={(blob) => {
+                          <VoiceRecorder onRecordingComplete={async (blob) => {
                             // Normalize so iOS m4a/aac plays back with a real duration
                             // (otherwise <audio> reports 0:00 / 0:00).
-                            const { file } = blobToVoiceNoteFile(blob);
+                            const { file } = await blobToVoiceNoteFile(blob);
                             setSelectedImage(file);
                             setImagePreview(URL.createObjectURL(file));
                           }} />

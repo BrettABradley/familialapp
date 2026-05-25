@@ -89,7 +89,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleVoiceRecording = (blob: Blob) => {
+  const handleVoiceRecording = async (blob: Blob) => {
     if (selectedFiles.length >= MAX_FILES) {
       toast({ title: "Too many files", description: `You can upload up to ${MAX_FILES} files per post.`, variant: "destructive" });
       return;
@@ -100,7 +100,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     }
     // Normalize so extension, blob type and upload contentType agree —
     // otherwise iOS reports duration 0:00/0:00 and the audio won't play.
-    const { file } = blobToVoiceNoteFile(blob);
+    const { file } = await blobToVoiceNoteFile(blob);
     setSelectedFiles(prev => [...prev, file]);
     setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]);
   };
