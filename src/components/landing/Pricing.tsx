@@ -344,6 +344,12 @@ const Pricing = () => {
   };
 
   const handleCancelConfirm = async () => {
+    // Apple-managed subscriptions can't be cancelled via Stripe — hand off to App Store
+    if (planSource === "apple" || isIOSNative()) {
+      setConfirmDialog(null);
+      openAppleSubscriptionManagement();
+      return;
+    }
     setCancelingPlan(true);
     try {
       await createRescueOffers();
