@@ -193,7 +193,11 @@ const Fridge = () => {
 
     if (selectedImage) {
       const fileExt = selectedImage.name.split(".").pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      // Preserve `voice-note-` prefix so the display layer classifies voice
+      // notes as audio (even when the container is .webm on Chrome).
+      const isAudio = (selectedImage.type || "").startsWith("audio") || /voice-note[-_]/i.test(selectedImage.name);
+      const baseName = isAudio ? `voice-note-${Date.now()}` : `${Date.now()}`;
+      const fileName = `${user.id}/${baseName}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage.from("post-media").upload(fileName, selectedImage, {
         contentType: selectedImage.type || undefined,
