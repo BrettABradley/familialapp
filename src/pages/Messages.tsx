@@ -584,7 +584,13 @@ const Messages = () => {
       const file = selectedFiles[i];
       setUploadProgress(Math.round((i / selectedFiles.length) * 100));
       const fileExt = file.name.split(".").pop();
-      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+      // Preserve `voice-note-` prefix so getMediaType() classifies voice notes
+      // as audio even when the container is .webm (Chrome MediaRecorder).
+      const isAudio = (file.type || "").startsWith("audio") || /voice-note[-_]/i.test(file.name);
+      const baseName = isAudio
+        ? `voice-note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const fileName = `${user.id}/${baseName}.${fileExt}`;
       const { error } = await supabase.storage.from("post-media").upload(fileName, file, {
         contentType: file.type || undefined,
       });
