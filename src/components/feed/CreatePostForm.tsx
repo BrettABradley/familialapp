@@ -123,7 +123,13 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
       const isAudio = (file.type || "").startsWith("audio") || /voice-note[-_]/i.test(file.name);
       const nameExt = file.name.split(".").pop()?.toLowerCase();
       const fileExt = isAudio ? (nameExt || "m4a") : (nameExt || "bin");
-      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+      // Preserve `voice-note-` prefix in the storage path so the display-side
+      // heuristic in getMediaType() always classifies it as audio — otherwise
+      // a `.webm` voice note (Chrome) renders as a black <video> element.
+      const baseName = isAudio
+        ? `voice-note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const fileName = `${user.id}/${baseName}.${fileExt}`;
       const { error } = await supabase.storage.from("post-media").upload(fileName, file, {
         contentType: file.type || undefined,
       });
