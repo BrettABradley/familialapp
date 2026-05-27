@@ -27,26 +27,6 @@ export const TermsAcceptanceGate = ({ children }: { children: React.ReactNode })
     if (!user || loading) return;
 
     const checkTerms = async () => {
-      // If the user accepted TOS during signup, honor that stash and persist now.
-      const stash = sessionStorage.getItem("pendingTermsAcceptance");
-      if (stash) {
-        try {
-          const parsed = JSON.parse(stash);
-          if (parsed?.email === user.email && parsed?.accepted_terms_version === CURRENT_TERMS_VERSION) {
-            await supabase
-              .from("user_private" as any)
-              .upsert({
-                user_id: user.id,
-                accepted_terms_at: parsed.accepted_terms_at,
-                accepted_terms_version: CURRENT_TERMS_VERSION,
-              } as any, { onConflict: "user_id" });
-            sessionStorage.removeItem("pendingTermsAcceptance");
-            setLoaded(true);
-            return;
-          }
-        } catch {}
-      }
-
       const { data } = await supabase
         .from("user_private" as any)
         .select("accepted_terms_at, accepted_terms_version")
