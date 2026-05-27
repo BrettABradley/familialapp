@@ -138,6 +138,8 @@ const Auth = () => {
       setConfirmed(true);
       const t = setTimeout(() => {
         sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
+        sessionStorage.removeItem(PENDING_VERIFY_PWD_KEY);
+        pendingPasswordRef.current = null;
         setVerificationSentTo(null);
         setConfirmed(false); // re-runs effect; falls through to normal redirect
       }, 1500);
