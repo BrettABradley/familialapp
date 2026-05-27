@@ -774,9 +774,35 @@ const Messages = () => {
   const renderMediaAttachments = (mediaUrls?: string[]) => (
     <MessageMedia
       mediaUrls={mediaUrls}
-      onOpenLightbox={setLightboxUrl}
-      onDownload={handleMediaDownload}
+      onOpenLightbox={(items, index) => setLightbox({ items, index })}
     />
+  );
+
+  // Shared lightbox JSX — rendered inside each top-level return (list / dm /
+  // group) so it works regardless of which view is active. Keeping it inside
+  // the same render tree (instead of after early returns) prevents the chat
+  // view from unmounting when the lightbox opens/closes.
+  const lightboxNode = lightbox && (
+    <Dialog
+      open={!!lightbox}
+      onOpenChange={(o) => { if (!o) setLightbox(null); }}
+    >
+      <DialogContent
+        className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center z-[100]"
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Photo</DialogTitle>
+          <DialogDescription>Swipe down or tap close to dismiss</DialogDescription>
+        </DialogHeader>
+        <MediaLightbox
+          items={lightbox.items}
+          startIndex={lightbox.index}
+          onIndexChange={(i) => setLightbox((prev) => prev ? { ...prev, index: i } : prev)}
+          onClose={() => setLightbox(null)}
+          onDownload={handleMediaDownload}
+        />
+      </DialogContent>
+    </Dialog>
   );
 
   const renderFilePreviewBar = () => {
