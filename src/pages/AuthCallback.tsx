@@ -69,7 +69,7 @@ const AuthCallback = () => {
         if (isNative) {
           // Inside the app — we want a real session so the user lands in
           // onboarding immediately.
-          const code = url.searchParams.get("code");
+          const code = searchParams.get("code");
           const accessToken = hashParams.get("access_token");
           const refreshToken = hashParams.get("refresh_token");
 
