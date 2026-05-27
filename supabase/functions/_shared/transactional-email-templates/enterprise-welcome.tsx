@@ -12,24 +12,21 @@ interface Props {
   contactEmail?: string
 }
 
-const EnterpriseWelcomeEmail = ({ name, contactEmail }: Props) => (
+const EnterpriseWelcomeEmail = ({ name }: Props) => (
   <Html lang="en" dir="ltr">
     <Head />
-    <Preview>Thank you for choosing {SITE_NAME}</Preview>
+    <Preview>Thank you for choosing {SITE_NAME} Enterprise</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>{name ? `Welcome, ${name}` : 'Welcome'}</Heading>
+        <Heading style={h1}>{name ? `Thank you, ${name}` : `Thank you`}</Heading>
         <Text style={text}>
-          Thank you for choosing {SITE_NAME}. Your Enterprise account is now active, and we genuinely appreciate your business.
+          Thank you so much for choosing {SITE_NAME} Enterprise to help connect your community.
         </Text>
         <Text style={text}>
-          Your account has been configured with the limits we agreed on. You can begin creating circles and inviting members right away. Billing will be handled directly between us, outside of the app.
+          We will not let you down and are always here to support you.
         </Text>
         <Text style={text}>
-          If anything comes up{contactEmail ? ` regarding ${contactEmail}` : ''}, or you need adjustments to your plan, simply reply to this email and we will take care of it.
-        </Text>
-        <Text style={text}>
-          Thank you again for trusting {SITE_NAME} with your community.
+          Please feel free to contact me directly at <a href="mailto:brett@familialmedia.com" style={link}>brett@familialmedia.com</a> if you have any questions or issues — I read every message personally.
         </Text>
         <Text style={signoff}>
           Warm regards,<br />
