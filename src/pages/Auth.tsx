@@ -517,14 +517,19 @@ const Auth = () => {
         </CardHeader>
         <CardContent>
           {confirmed ? (
-            <div className="flex flex-col items-center justify-center py-8 space-y-4">
-              <div className="rounded-full bg-green-500/10 p-4 animate-in zoom-in-50 duration-500">
-                <CheckCircle2 className="h-16 w-16 text-green-600" strokeWidth={2.5} />
+            <PullToRefreshWrapper onRefresh={handleConfirmedPullRefresh}>
+              <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                <div className="rounded-full bg-green-500/10 p-4 animate-in zoom-in-50 duration-500">
+                  <CheckCircle2 className="h-16 w-16 text-green-600" strokeWidth={2.5} />
+                </div>
+                <p className="text-sm text-muted-foreground text-center">
+                  Taking you in...
+                </p>
+                <p className="text-xs text-muted-foreground/70 text-center">
+                  Pull down to refresh if you're not redirected.
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground text-center">
-                Taking you in...
-              </p>
-            </div>
+            </PullToRefreshWrapper>
           ) : verificationSentTo ? (
             <PullToRefreshWrapper onRefresh={handleVerifyPullRefresh}>
               <div className="space-y-5 py-2">
