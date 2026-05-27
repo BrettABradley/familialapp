@@ -10,7 +10,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import logo from "@/assets/logo.png";
 import { isIOSNative, purchaseSubscription, APPLE_PRODUCTS } from "@/lib/iapPurchase";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
+import { Link } from "react-router-dom";
+
+const TOS_VERSION = "2026-05-17";
+const PENDING_VERIFY_EMAIL_KEY = "pendingVerificationEmail";
+const PENDING_TERMS_KEY = "pendingTermsAcceptance";
+const RESEND_VERIFY_KEY = "lastVerificationResendAt";
+const RESEND_VERIFY_COOLDOWN = 60;
 
 const RESET_COOLDOWN_SECONDS = 60;
 const RESET_COOLDOWN_KEY = "lastPasswordResetAt";
