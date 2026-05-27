@@ -324,7 +324,8 @@ export const useFeedPosts = () => {
           ToastAction,
           { altText: "Undo delete", onClick: undoHandler },
           "Undo",
-        ),
+        ) as any,
+
       });
 
 
