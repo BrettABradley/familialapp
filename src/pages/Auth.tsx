@@ -399,7 +399,49 @@ const Auth = () => {
       cancelled = true;
       clearInterval(interval);
     };
+  }, [verificationSentTo, confirmed, user, pollNonce]);
+
+  // Restart the poll whenever the app regains focus / visibility — covers
+  // the case where iOS pauses JS timers while the app is backgrounded
+  // (e.g. user switches to Mail, taps the link, then comes back).
+  useEffect(() => {
+    if (!verificationSentTo || confirmed || user) return;
+    const bump = () => setPollNonce((n) => n + 1);
+    window.addEventListener("focus", bump);
+    document.addEventListener("visibilitychange", bump);
+    return () => {
+      window.removeEventListener("focus", bump);
+      document.removeEventListener("visibilitychange", bump);
+    };
   }, [verificationSentTo, confirmed, user]);
+
+  // Manual pull-to-refresh check — same logic as the poll but with a
+  // user-visible result toast when the link still hasn't been clicked.
+  const handleVerifyPullRefresh = async () => {
+    if (!verificationSentTo) return;
+    setIsManualChecking(true);
+    try {
+      const pwd = pendingPasswordRef.current;
+      if (pwd) {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: verificationSentTo,
+          password: pwd,
+        });
+        if (!error) return; // success — useEffect handles the green check
+      } else {
+        // No stashed password (app relaunched after signup): refresh any
+        // existing session in case Supabase already flipped the flag.
+        await supabase.auth.refreshSession();
+      }
+      toast({
+        title: "Not verified yet",
+        description: "Tap the link in your email, then pull down again.",
+      });
+    } finally {
+      setIsManualChecking(false);
+    }
+  };
+
 
 
 
