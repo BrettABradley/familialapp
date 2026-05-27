@@ -13,7 +13,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
 import { MentionInput } from "@/components/shared/MentionInput";
 import { useCircleMembers } from "@/hooks/useCircleMembers";
-import { validateFileSize, getFileMediaType } from "@/lib/mediaUtils";
+import { validateFileSize, getFileMediaType, getMediaType } from "@/lib/mediaUtils";
 import { blobToVoiceNoteFile } from "@/lib/voiceNoteFile";
 import { convertHeicFiles } from "@/lib/heicConverter";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
@@ -175,40 +175,48 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
         }).then();
       }
 
-      // Silent background moderation — fire-and-forget
+      // Silent background moderation — fire-and-forget.
+      // The Gemini classifier only handles text + images, so filter out
+      // audio (voice notes) and video before signing — otherwise audio
+      // posts get auto-deleted as "community-guideline violations".
       if (newPost) {
         const postId = newPost.id;
         const textToCheck = newPostContent.trim() || undefined;
-        // Sign URLs for the moderation model (it needs reachable http URLs).
-        const signedUrlsToCheck = mediaUrls.length > 0
-          ? (await getPostMediaUrls(mediaUrls)).filter(Boolean)
+        const imageOnlyPaths = mediaUrls.filter(
+          (p) => p && getMediaType(p) === "image",
+        );
+        const signedUrlsToCheck = imageOnlyPaths.length > 0
+          ? (await getPostMediaUrls(imageOnlyPaths)).filter(Boolean)
           : undefined;
 
-        (async () => {
-          try {
-            const { data: modResult, error: modError } = await supabase.functions.invoke("moderate-content", {
-              body: { text: textToCheck, imageUrls: signedUrlsToCheck },
-            });
-
-            if (!modError && modResult && !modResult.allowed) {
-              // Delete the post
-              await supabase.from("posts").delete().eq("id", postId);
-              // Cleanup media from storage — values are bare paths now.
-              for (const path of mediaUrls) {
-                if (path) await supabase.storage.from("post-media").remove([path]);
-              }
-              toast({
-                title: "Post removed",
-                description: "This post was removed because it may violate our community guidelines.",
-                variant: "destructive",
+        // Nothing for the moderator to look at? Skip the call entirely.
+        if (textToCheck || (signedUrlsToCheck && signedUrlsToCheck.length > 0)) {
+          (async () => {
+            try {
+              const { data: modResult, error: modError } = await supabase.functions.invoke("moderate-content", {
+                body: { text: textToCheck, imageUrls: signedUrlsToCheck },
               });
-              onPostCreated(); // Refresh feed to reflect removal
+
+              if (!modError && modResult && !modResult.allowed) {
+                // Delete the post
+                await supabase.from("posts").delete().eq("id", postId);
+                // Cleanup media from storage — values are bare paths now.
+                for (const path of mediaUrls) {
+                  if (path) await supabase.storage.from("post-media").remove([path]);
+                }
+                toast({
+                  title: "Post removed",
+                  description: "This post was removed because it may violate our community guidelines.",
+                  variant: "destructive",
+                });
+                onPostCreated(); // Refresh feed to reflect removal
+              }
+            } catch (err) {
+              console.error("Background moderation failed:", err);
+              // Fail-open: post stays up
             }
-          } catch (err) {
-            console.error("Background moderation failed:", err);
-            // Fail-open: post stays up
-          }
-        })();
+          })();
+        }
       }
     }
     setIsPosting(false);
