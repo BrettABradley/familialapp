@@ -683,85 +683,89 @@ const Messages = () => {
 
   const handleSendMessage = async () => {
     if ((!newMessage.trim() && selectedFiles.length === 0) || !user) return;
+    // Synchronous guard prevents double-sends on iOS when both `touchend` and
+    // `click` fire before React flushes `isSending`.
+    if (isSendingRef.current) return;
+    isSendingRef.current = true;
     setIsSending(true);
 
-    // Refresh session to ensure token is fresh before insert
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session?.user) {
-      toast({ title: "Session expired", description: "Please sign in again.", variant: "destructive" });
+    try {
+      // Refresh session to ensure token is fresh before insert
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.user) {
+        toast({ title: "Session expired", description: "Please sign in again.", variant: "destructive" });
+        return;
+      }
+      const senderId = session.user.id;
+
+      let mediaUrls: string[] = [];
+      if (selectedFiles.length > 0) mediaUrls = await uploadFiles();
+
+      // Media-only messages now persist an empty `content` instead of the
+      // legacy "(attachment)" placeholder. Renderers still hide the legacy
+      // string for back-compat.
+      if (chatView === "dm" && selectedUser) {
+        const optimisticMsg: Message = {
+          id: crypto.randomUUID(),
+          sender_id: senderId,
+          recipient_id: selectedUser.user_id,
+          content: newMessage.trim(),
+          is_read: false,
+          created_at: new Date().toISOString(),
+          media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
+        };
+        const savedContent = newMessage;
+        setMessages(prev => [...prev, optimisticMsg]);
+        clearDraft();
+        setNewMessage("");
+        clearMediaState();
+
+        const { error } = await supabase.from("private_messages").insert({
+          sender_id: senderId,
+          recipient_id: selectedUser.user_id,
+          content: savedContent.trim(),
+          media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+        });
+        if (error) {
+          console.error("DM send error:", JSON.stringify(error));
+          setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+          setNewMessage(savedContent);
+          toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
+        } else {
+          fetchConversations();
+        }
+      } else if (chatView === "group" && selectedGroup) {
+        const optimisticMsg: GroupMessage = {
+          id: crypto.randomUUID(),
+          group_chat_id: selectedGroup.id,
+          sender_id: senderId,
+          content: newMessage.trim(),
+          created_at: new Date().toISOString(),
+          media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
+        };
+        const savedContent = newMessage;
+        setGroupMessages(prev => [...prev, optimisticMsg]);
+        clearDraft();
+        setNewMessage("");
+        clearMediaState();
+
+        const { error } = await supabase.from("group_chat_messages").insert({
+          group_chat_id: selectedGroup.id,
+          sender_id: senderId,
+          content: savedContent.trim(),
+          media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+        });
+        if (error) {
+          console.error("Group send error:", JSON.stringify(error));
+          setGroupMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+          setNewMessage(savedContent);
+          toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
+        }
+      }
+    } finally {
+      isSendingRef.current = false;
       setIsSending(false);
-      return;
     }
-    const senderId = session.user.id;
-
-    let mediaUrls: string[] = [];
-    if (selectedFiles.length > 0) mediaUrls = await uploadFiles();
-
-    if (chatView === "dm" && selectedUser) {
-      // Optimistic: append message locally immediately
-      const optimisticMsg: Message = {
-        id: crypto.randomUUID(),
-        sender_id: senderId,
-        recipient_id: selectedUser.user_id,
-        content: newMessage.trim() || "(attachment)",
-        is_read: false,
-        created_at: new Date().toISOString(),
-        media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
-      };
-      const savedContent = newMessage;
-      setMessages(prev => [...prev, optimisticMsg]);
-      clearDraft();
-      setNewMessage("");
-      clearMediaState();
-
-      const { error } = await supabase.from("private_messages").insert({
-        sender_id: senderId,
-        recipient_id: selectedUser.user_id,
-        content: savedContent.trim() || "(attachment)",
-        media_urls: mediaUrls.length > 0 ? mediaUrls : null,
-      });
-      if (error) {
-        console.error("DM send error:", JSON.stringify(error));
-        // Revert optimistic update
-        setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
-        setNewMessage(savedContent);
-        toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
-      } else {
-        // Silent background sync
-        fetchConversations();
-      }
-    } else if (chatView === "group" && selectedGroup) {
-      // Optimistic: append message locally immediately
-      const optimisticMsg: GroupMessage = {
-        id: crypto.randomUUID(),
-        group_chat_id: selectedGroup.id,
-        sender_id: senderId,
-        content: newMessage.trim() || "(attachment)",
-        created_at: new Date().toISOString(),
-        media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
-      };
-      const savedContent = newMessage;
-      setGroupMessages(prev => [...prev, optimisticMsg]);
-      clearDraft();
-      setNewMessage("");
-      clearMediaState();
-
-      const { error } = await supabase.from("group_chat_messages").insert({
-        group_chat_id: selectedGroup.id,
-        sender_id: senderId,
-        content: savedContent.trim() || "(attachment)",
-        media_urls: mediaUrls.length > 0 ? mediaUrls : null,
-      });
-      if (error) {
-        console.error("Group send error:", JSON.stringify(error));
-        // Revert optimistic update
-        setGroupMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
-        setNewMessage(savedContent);
-        toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
-      }
-    }
-
-    setIsSending(false);
   };
 
   const handleMediaDownload = async (url: string) => {
