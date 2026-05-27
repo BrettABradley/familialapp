@@ -192,12 +192,11 @@ const MediaItem = ({ url, index, onDownload, onImageClick, onVideoClick }: { url
   if (mediaType === 'audio') {
     return (
       <div className="flex items-center gap-2 p-3 bg-secondary rounded-lg">
-        <audio controls className="w-full" preload="metadata">
-          <source src={url} />
-        </audio>
+        <VoiceNotePlayer src={url} className="max-w-full" />
       </div>
     );
   }
+
 
   return (
     <div className="relative group rounded-lg overflow-hidden cursor-pointer bg-card flex items-center justify-center" onClick={() => onImageClick?.(index)}>
@@ -272,11 +271,10 @@ const PostMediaCarousel = ({
                       <VideoThumbnail url={url} onClick={() => onVideoClick(index)} />
                     </button>
                   ) : type === "audio" ? (
-                    <div className="w-full px-4">
-                      <audio controls preload="metadata" className="w-full">
-                        <source src={url} />
-                      </audio>
+                    <div className="w-full px-4 flex items-center justify-center">
+                      <VoiceNotePlayer src={url} className="max-w-full" />
                     </div>
+
                   ) : (
                     <button
                       type="button"

@@ -122,8 +122,9 @@ const MessageMedia = ({
           );
         }
         if (type === "audio") {
-          return <audio key={i} src={url} controls className="w-full max-w-[240px]" />;
+          return <VoiceNotePlayer key={i} src={url} />;
         }
+
         const visualIndex = visualItems.indexOf(url);
         return (
           <button
