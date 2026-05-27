@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, createElement } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
+
 
 export interface Profile {
   id: string;
@@ -297,24 +299,38 @@ export const useFeedPosts = () => {
       if (postToDelete) setPosts(prev => [...prev, postToDelete].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       toast({ title: "Error", description: error.message || "Failed to delete post.", variant: "destructive" });
     } else {
-      // Start a 10-second undo window
-      const undoTimeout = setTimeout(() => {
-        // After 10s, the soft-delete is final (until 30-day purge)
-      }, 10000);
+      // 10-second undo window (after which the soft-delete is final until
+      // the 30-day purge job runs).
+      const undoTimeout = setTimeout(() => {}, 10000);
+
+      const undoHandler = async () => {
+        clearTimeout(undoTimeout);
+        await supabase.from("posts").update({ deleted_at: null } as any).eq("id", postId);
+        if (postToDelete) {
+          setPosts(prev =>
+            [...prev, postToDelete].sort(
+              (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+            ),
+          );
+        }
+        toast({ title: "Post restored" });
+      };
 
       toast({
         title: "Post deleted",
-        description: "Tap to undo within 10 seconds.",
+        description: "Tap undo within 10 seconds.",
         duration: 10000,
+        action: createElement(
+          ToastAction,
+          { altText: "Undo delete", onClick: undoHandler },
+          "Undo",
+        ) as any,
+
       });
-      // Store undo handler on window for potential future use
-      (window as any).__lastDeleteUndo = async () => {
-        clearTimeout(undoTimeout);
-        await supabase.from("posts").update({ deleted_at: null } as any).eq("id", postId);
-        if (postToDelete) setPosts(prev => [...prev, postToDelete].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
-        toast({ title: "Post restored" });
-      };
+
+
     }
+
   };
 
   const handleEditPost = async (postId: string, newContent: string) => {

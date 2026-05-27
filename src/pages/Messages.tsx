@@ -27,6 +27,7 @@ import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import { MediaLightbox } from "@/components/shared/MediaLightbox";
 import { SmartImage } from "@/components/shared/SmartImage";
+import { VoiceNotePlayer } from "@/components/shared/VoiceNotePlayer";
 import { useSignedMediaUrls, getPostMediaUrl } from "@/lib/postMediaUrl";
 import {
   AlertDialog,
@@ -122,8 +123,9 @@ const MessageMedia = ({
           );
         }
         if (type === "audio") {
-          return <audio key={i} src={url} controls className="w-full max-w-[240px]" />;
+          return <VoiceNotePlayer key={i} src={url} />;
         }
+
         const visualIndex = visualItems.indexOf(url);
         return (
           <button
