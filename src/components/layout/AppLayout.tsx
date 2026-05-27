@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { CircleProvider, useCircleContext } from "@/contexts/CircleContext";
 import { CircleHeader } from "@/components/layout/CircleHeader";
@@ -13,8 +14,10 @@ import { UpdatePrompt } from "@/components/shared/UpdatePrompt";
 import { TwoFactorGate, clearTwoFactorVerified } from "@/components/auth/TwoFactorGate";
 import { useDeepLinkCircleSync } from "@/hooks/useDeepLinkCircleSync";
 import { Button } from "@/components/ui/button";
-import { MailCheck } from "lucide-react";
+import { MailCheck, CheckCircle2 } from "lucide-react";
 import logo from "@/assets/logo.png";
+
+const VERIFIED_FLAG = "familial:emailJustVerified";
 
 function UnverifiedEmailGate({ email, onSignOut }: { email: string; onSignOut: () => void }) {
   const { resendVerification } = useAuth();
