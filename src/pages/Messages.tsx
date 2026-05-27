@@ -894,7 +894,7 @@ const Messages = () => {
             messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[70%] rounded-lg px-4 py-2 ${msg.sender_id === user?.id ? 'bg-foreground text-background' : 'bg-secondary text-foreground'}`}>
-                  {msg.content && <p>{msg.content}</p>}
+                  {msg.content && msg.content.toLowerCase() !== '(attachment)' && <p>{msg.content}</p>}
                   {renderMediaAttachments(msg.media_urls)}
                   <p className={`text-xs mt-1 ${msg.sender_id === user?.id ? 'text-background/70' : 'text-muted-foreground'}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
