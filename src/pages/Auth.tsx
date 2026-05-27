@@ -43,6 +43,10 @@ const Auth = () => {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [isResending, setIsResending] = useState(false);
   const checkoutTriggered = useRef(false);
+  // Stashed signup password so we can silently poll signInWithPassword
+  // until Supabase flips email_confirmed_at — auto-advances the app off
+  // the "Check your email" screen as soon as the user clicks the link.
+  const pendingPasswordRef = useRef<string | null>(null);
 
 
 
@@ -307,6 +311,9 @@ const Auth = () => {
           // Show the dedicated "check your email" verification panel.
           sessionStorage.setItem(PENDING_VERIFY_EMAIL_KEY, email);
           setVerificationSentTo(email);
+          // Keep the password in memory (NOT state) so the polling effect
+          // can silently re-attempt sign-in once the email is confirmed.
+          pendingPasswordRef.current = password;
           setPassword("");
           // Start a resend cooldown so they can't immediately re-trigger Supabase rate limits
           sessionStorage.setItem(RESEND_VERIFY_KEY, String(Date.now()));
@@ -339,10 +346,46 @@ const Auth = () => {
   const handleUseDifferentEmail = () => {
     sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
     sessionStorage.removeItem("pendingTermsAcceptance");
+    pendingPasswordRef.current = null;
     setVerificationSentTo(null);
     setIsLogin(false);
     setEmail("");
   };
+
+  // Poll for email verification while sitting on the "Check your email"
+  // panel. As soon as Supabase flips email_confirmed_at server-side
+  // (user clicked the link in their browser), signInWithPassword will
+  // succeed — the existing user-effect then shows the green check and
+  // routes into the app. No manual action required.
+  useEffect(() => {
+    if (!verificationSentTo || confirmed || user) return;
+    const pwd = pendingPasswordRef.current;
+    if (!pwd) return; // No stashed password (e.g. after page reload) — can't poll silently.
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        await supabase.auth.signInWithPassword({
+          email: verificationSentTo,
+          password: pwd,
+        });
+        // On success the onAuthStateChange listener in useAuth fires and
+        // the user-effect above handles the rest. Errors (esp. "Email not
+        // confirmed") are expected and intentionally ignored.
+      } catch {
+        // swallow
+      }
+    };
+    const interval = setInterval(tick, 3000);
+    // Fire one immediate attempt too — covers the case where the user
+    // returns to the app right after clicking the link.
+    tick();
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [verificationSentTo, confirmed, user]);
+
 
 
   if (loading) {

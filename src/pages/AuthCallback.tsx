@@ -147,13 +147,8 @@ const AuthCallback = () => {
     };
   }, [navigate, isNative]);
 
-  const openApp = () => {
-    // Universal link — iOS hands off to the Familial app if installed
-    // (AASA whitelists /auth/callback for the real bundle ID). Otherwise
-    // the browser just stays on this page.
-    window.location.href =
-      "https://familialapp.lovable.app/auth/callback?verified=1";
-  };
+
+
 
   return (
     <div
@@ -179,22 +174,11 @@ const AuthCallback = () => {
           </div>
           <h1 className="font-serif text-3xl text-foreground">Email verified</h1>
           <p className="text-sm text-muted-foreground">
-            You're all set. Open the Familial app on your phone to finish setting up your account.
+            You may proceed back to the app.
           </p>
-          <div className="flex flex-col gap-2 w-full mt-2">
-            <Button onClick={openApp} className="w-full">
-              Open Familial app
-            </Button>
-            <button
-              type="button"
-              onClick={() => navigate("/auth", { replace: true })}
-              className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors"
-            >
-              Continue in browser
-            </button>
-          </div>
         </div>
       )}
+
 
       {status === "error" && (
         <div className="flex flex-col items-center gap-4 max-w-sm animate-in fade-in duration-300">
