@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, createElement } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
+
 
 export interface Profile {
   id: string;
@@ -319,12 +320,13 @@ export const useFeedPosts = () => {
         title: "Post deleted",
         description: "Tap undo within 10 seconds.",
         duration: 10000,
-        action: ToastAction({
-          altText: "Undo delete",
-          onClick: undoHandler,
-          children: "Undo",
-        } as any) as any,
+        action: createElement(
+          ToastAction,
+          { altText: "Undo delete", onClick: undoHandler },
+          "Undo",
+        ),
       });
+
 
     }
 
