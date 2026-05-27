@@ -17,6 +17,7 @@ import { ReportDialog } from "@/components/shared/ReportDialog";
 import { SmartImage } from "@/components/shared/SmartImage";
 import { avatarUrl, presetImage } from "@/lib/imageUrl";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
+import { MediaLightbox } from "@/components/shared/MediaLightbox";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import useEmblaCarousel from "embla-carousel-react";
 import { haptic, typingHaptic } from "@/lib/haptics";
