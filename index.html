@@ -45,14 +45,19 @@
   <body>
     <div id="root"></div>
     <script>
-      // EARLY hash-token interceptor — runs before the module script imports
-      // supabase-js (whose createClient auto-consumes access_token from the
-      // URL hash via detectSessionInUrl). If a verification email link
-      // landed on any path other than /auth/callback or /reset-password,
-      // hard-redirect so the browser never auto-signs-in.
+      // EARLY auth-token interceptor — runs before the module script imports
+      // supabase-js (whose createClient auto-consumes tokens from the URL
+      // via detectSessionInUrl). Two cases:
+      //  1) Hash-style tokens (#access_token=...) on any non-callback path:
+      //     hard-redirect to /auth/callback so the browser never auto-signs.
+      //  2) PKCE code (?code=...) on /auth/callback: strip it from the URL
+      //     and stash it in sessionStorage, so supabase-js sees a clean URL
+      //     on boot and never exchanges the code into a session. The
+      //     AuthCallback page reads the stash for error reporting only.
       (function () {
         try {
           var hash = window.location.hash || "";
+          var search = window.location.search || "";
           var path = window.location.pathname || "/";
           var isAuthLanding =
             path === "/auth/callback" || path === "/reset-password";
@@ -62,17 +67,29 @@
             /type=recovery/.test(hash) ||
             /type=invite/.test(hash) ||
             /type=magiclink/.test(hash);
+
           if (!isAuthLanding && looksLikeAuthHash) {
-            window.location.replace(
-              "/auth/callback" + (window.location.search || "") + hash
-            );
+            window.location.replace("/auth/callback" + search + hash);
+            return;
+          }
+
+          // PKCE code landed on /auth/callback — strip before supabase-js boots
+          if (path === "/auth/callback" && /[?&]code=/.test(search)) {
+            try {
+              sessionStorage.setItem(
+                "familial:pendingVerifyParams",
+                JSON.stringify({ search: search, hash: hash })
+              );
+            } catch (e) { /* non-fatal */ }
+            window.history.replaceState({}, "", "/auth/callback");
           }
         } catch (e) {
           // non-fatal
-          console && console.warn && console.warn("[boot] hash interceptor failed", e);
+          console && console.warn && console.warn("[boot] auth interceptor failed", e);
         }
       })();
     </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
