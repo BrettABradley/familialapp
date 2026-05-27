@@ -11,8 +11,10 @@ import { z } from "zod";
 import logo from "@/assets/logo.png";
 import { isIOSNative, purchaseSubscription, APPLE_PRODUCTS } from "@/lib/iapPurchase";
 import { Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
+import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 
 const PENDING_VERIFY_EMAIL_KEY = "pendingVerificationEmail";
+const PENDING_VERIFY_PWD_KEY = "pendingVerificationPwd";
 const RESEND_VERIFY_KEY = "lastVerificationResendAt";
 const RESEND_VERIFY_COOLDOWN = 60;
 
@@ -46,7 +48,15 @@ const Auth = () => {
   // Stashed signup password so we can silently poll signInWithPassword
   // until Supabase flips email_confirmed_at — auto-advances the app off
   // the "Check your email" screen as soon as the user clicks the link.
-  const pendingPasswordRef = useRef<string | null>(null);
+  // Persisted to sessionStorage so polling survives an app relaunch
+  // between signup and the user tapping the verification link.
+  const pendingPasswordRef = useRef<string | null>(
+    typeof window !== "undefined" ? sessionStorage.getItem(PENDING_VERIFY_PWD_KEY) : null
+  );
+  // Bumped on focus/visibility/manual pull to re-trigger the poll effect.
+  const [pollNonce, setPollNonce] = useState(0);
+  
+
 
 
 
@@ -128,6 +138,8 @@ const Auth = () => {
       setConfirmed(true);
       const t = setTimeout(() => {
         sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
+        sessionStorage.removeItem(PENDING_VERIFY_PWD_KEY);
+        pendingPasswordRef.current = null;
         setVerificationSentTo(null);
         setConfirmed(false); // re-runs effect; falls through to normal redirect
       }, 1500);
@@ -311,9 +323,11 @@ const Auth = () => {
           // Show the dedicated "check your email" verification panel.
           sessionStorage.setItem(PENDING_VERIFY_EMAIL_KEY, email);
           setVerificationSentTo(email);
-          // Keep the password in memory (NOT state) so the polling effect
-          // can silently re-attempt sign-in once the email is confirmed.
+          // Keep the password in memory + sessionStorage so the polling
+          // effect can silently re-attempt sign-in once the email is
+          // confirmed, even if the user backgrounds/relaunches the app.
           pendingPasswordRef.current = password;
+          try { sessionStorage.setItem(PENDING_VERIFY_PWD_KEY, password); } catch { /* non-fatal */ }
           setPassword("");
           // Start a resend cooldown so they can't immediately re-trigger Supabase rate limits
           sessionStorage.setItem(RESEND_VERIFY_KEY, String(Date.now()));
@@ -345,6 +359,7 @@ const Auth = () => {
 
   const handleUseDifferentEmail = () => {
     sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
+    sessionStorage.removeItem(PENDING_VERIFY_PWD_KEY);
     sessionStorage.removeItem("pendingTermsAcceptance");
     pendingPasswordRef.current = null;
     setVerificationSentTo(null);
@@ -384,7 +399,44 @@ const Auth = () => {
       cancelled = true;
       clearInterval(interval);
     };
+  }, [verificationSentTo, confirmed, user, pollNonce]);
+
+  // Restart the poll whenever the app regains focus / visibility — covers
+  // the case where iOS pauses JS timers while the app is backgrounded
+  // (e.g. user switches to Mail, taps the link, then comes back).
+  useEffect(() => {
+    if (!verificationSentTo || confirmed || user) return;
+    const bump = () => setPollNonce((n) => n + 1);
+    window.addEventListener("focus", bump);
+    document.addEventListener("visibilitychange", bump);
+    return () => {
+      window.removeEventListener("focus", bump);
+      document.removeEventListener("visibilitychange", bump);
+    };
   }, [verificationSentTo, confirmed, user]);
+
+  // Manual pull-to-refresh check — same logic as the poll but with a
+  // user-visible result toast when the link still hasn't been clicked.
+  const handleVerifyPullRefresh = async () => {
+    if (!verificationSentTo) return;
+    const pwd = pendingPasswordRef.current;
+    if (pwd) {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: verificationSentTo,
+        password: pwd,
+      });
+      if (!error) return; // success — useEffect handles the green check
+    } else {
+      // No stashed password (app relaunched after signup): refresh any
+      // existing session in case Supabase already flipped the flag.
+      await supabase.auth.refreshSession();
+    }
+    toast({
+      title: "Not verified yet",
+      description: "Tap the link in your email, then pull down again.",
+    });
+  };
+
 
 
 
@@ -453,44 +505,49 @@ const Auth = () => {
               </p>
             </div>
           ) : verificationSentTo ? (
-            <div className="space-y-5 py-2">
-              <div className="flex flex-col items-center text-center space-y-3">
-                <div className="rounded-full bg-primary/10 p-4">
-                  <Mail className="h-10 w-10 text-primary" />
+            <PullToRefreshWrapper onRefresh={handleVerifyPullRefresh}>
+              <div className="space-y-5 py-2">
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="rounded-full bg-primary/10 p-4">
+                    <Mail className="h-10 w-10 text-primary" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    We sent a verification link to
+                  </p>
+                  <p className="font-medium break-all">{verificationSentTo}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Open the email on this device and tap the link. Once confirmed,
+                    you'll be brought right in.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Pull down to check manually.
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  We sent a verification link to
-                </p>
-                <p className="font-medium break-all">{verificationSentTo}</p>
-                <p className="text-sm text-muted-foreground">
-                  Open the email on this device and tap the link. Once confirmed,
-                  you'll be brought right in.
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleResendVerification}
+                  disabled={resendCooldown > 0 || isResending}
+                >
+                  {isResending
+                    ? "Resending..."
+                    : resendCooldown > 0
+                    ? `Resend available in ${resendCooldown}s`
+                    : "Resend verification email"}
+                </Button>
+                <button
+                  type="button"
+                  onClick={handleUseDifferentEmail}
+                  className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Use a different email
+                </button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Didn't get it? Check your spam folder.
                 </p>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handleResendVerification}
-                disabled={resendCooldown > 0 || isResending}
-              >
-                {isResending
-                  ? "Resending..."
-                  : resendCooldown > 0
-                  ? `Resend available in ${resendCooldown}s`
-                  : "Resend verification email"}
-              </Button>
-              <button
-                type="button"
-                onClick={handleUseDifferentEmail}
-                className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Use a different email
-              </button>
-              <p className="text-xs text-muted-foreground text-center">
-                Didn't get it? Check your spam folder.
-              </p>
-            </div>
+            </PullToRefreshWrapper>
           ) : isForgotPassword ? (
             <>
               <form onSubmit={handleForgotPassword} className="space-y-4">
