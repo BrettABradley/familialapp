@@ -785,31 +785,26 @@ const Messages = () => {
     />
   );
 
-  // Shared lightbox JSX — rendered inside each top-level return (list / dm /
-  // group) so it works regardless of which view is active. Keeping it inside
-  // the same render tree (instead of after early returns) prevents the chat
-  // view from unmounting when the lightbox opens/closes.
+  // Shared lightbox JSX — rendered inside each chat view's render tree as a
+  // plain fixed overlay (NOT a Radix Dialog). Radix Dialog opens a portal +
+  // focus trap whose unmount/remount cycle was clobbering the chat view's
+  // `selectedUser` / `chatView` state on close, which dropped the user onto
+  // the home tab when they then hit the back arrow.
   const lightboxNode = lightbox && (
-    <Dialog
-      open={!!lightbox}
-      onOpenChange={(o) => { if (!o) setLightbox(null); }}
+    <div
+      className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Photo viewer"
     >
-      <DialogContent
-        className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center z-[100]"
-      >
-        <DialogHeader className="sr-only">
-          <DialogTitle>Photo</DialogTitle>
-          <DialogDescription>Swipe down or tap close to dismiss</DialogDescription>
-        </DialogHeader>
-        <MediaLightbox
-          items={lightbox.items}
-          startIndex={lightbox.index}
-          onIndexChange={(i) => setLightbox((prev) => prev ? { ...prev, index: i } : prev)}
-          onClose={() => setLightbox(null)}
-          onDownload={handleMediaDownload}
-        />
-      </DialogContent>
-    </Dialog>
+      <MediaLightbox
+        items={lightbox.items}
+        startIndex={lightbox.index}
+        onIndexChange={(i) => setLightbox((prev) => prev ? { ...prev, index: i } : prev)}
+        onClose={() => setLightbox(null)}
+        onDownload={handleMediaDownload}
+      />
+    </div>
   );
 
   const renderFilePreviewBar = () => {
