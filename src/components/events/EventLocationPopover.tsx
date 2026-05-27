@@ -21,7 +21,7 @@ export function EventLocationPopover({ location, eventId, isHost }: Props) {
 
   const openMaps = async (app: MapApp) => {
     try {
-      await openExternalUrl(mapUrl(app, location));
+      await openMapsApp(app, location);
     } catch (e) {
       console.error("open maps failed", e);
     }
