@@ -1,33 +1,35 @@
-# Fix: signed post-media URLs render as broken images everywhere
+# Fix: videos/audio render as broken images after signed-URL switch
 
 ## Root cause
 
-After the private-bucket lockdown, media values resolve to signed URLs:
-`https://<ref>.supabase.co/storage/v1/object/sign/post-media/<path>?token=<jwt>`
+`getMediaType()` in `src/lib/mediaUtils.ts`:
 
-`src/lib/imageUrl.ts` → `transformedImage()` matches both `object/public/` and `object/sign/` and rewrites the path to `/storage/v1/render/image/<...>`, then appends `&width=…&quality=…&resize=…`.
+```ts
+const ext = url.split('.').pop()?.toLowerCase().split('?')[0];
+```
 
-Supabase's render endpoint does **not** accept a token that was signed for the plain `object/sign` path — transformed signed URLs must be requested up-front via `createSignedUrl(path, ttl, { transform: {...} })`. Result: every `<img>` from `post-media` 404s and shows the broken-image icon (the exact UI in the screenshot). Video tiles render the play overlay because they don't go through `presetImage`.
+Signed Supabase URLs end with `?token=<JWT>`, and JWTs always contain two `.` separators (`header.payload.signature`). `split('.').pop()` returns the trailing chunk of the JWT signature, not `mov`/`mp3`/`m4a`, so the function falls through to `'image'`. Every video and audio attachment on the now-private `post-media` bucket is therefore handed to an `<img>` tag → broken-image icon with alt text (the `.mov` in the screenshot).
 
-This affects: Feed (`PostCard`, single + carousel + lightbox preload), Albums grid + covers, Fridge pins, Profile headers, Messages thumbnails, Campfire artwork — every call site that pipes a signed URL through `presetImage`, `transformedImage`, `srcSetFor`, or `avatarUrl`.
+This only became visible after the bucket flip because public URLs had no `?token=` suffix.
 
-## Fix (surgical, frontend-only, no security regression)
+## Fix (1 file, frontend-only)
 
-Edit `src/lib/imageUrl.ts`:
+Edit `src/lib/mediaUtils.ts` → `getMediaType()`: strip the query string **before** taking the extension.
 
-1. `transformedImage()` — when the URL is a signed Storage URL (`/storage/v1/object/sign/`), **return it unchanged** instead of rewriting to the render endpoint. Public-bucket URLs (avatars, profile-images) keep getting the optimized render path.
-2. `srcSetFor()` — when the URL is signed, return `""` so the `<img>` falls back to `src` only (no broken 2x candidate).
-3. Leave `presetImage()` and `avatarUrl()` as-is; they call the two functions above and will inherit the correct behavior.
+```ts
+const clean = url.split('?')[0].split('#')[0];
+const ext = clean.split('.').pop()?.toLowerCase();
+```
 
-That's it. No component changes, no migration, no RLS change. Signed URLs are served at their native resolution (still CDN-cached by Supabase), public-bucket images keep their WebP/resize optimization.
+Everything else (mp3/wav/ogg/m4a/aac/flac → audio, mp4/mov/webm/avi/mkv → video, voice-note name heuristic, heic/heif → image) is unchanged.
 
-## Trade-off the user should know
+## Why this also fixes audio
 
-Until we move to up-front transformed signed URLs, post/fridge/album/DM images download at original resolution (no on-the-fly resize/WebP). Acceptable to ship now to unblock the platform; follow-up can swap `getPostMediaUrl()` to call `createSignedUrl(path, ttl, { transform: { width, quality, resize } })` with per-preset variants and cache them separately, then re-enable transforms for signed URLs in `imageUrl.ts`.
+The audio branch in `PostCard.MediaItem` already renders `<audio controls>` when `getMediaType === 'audio'`. With the extension parsed correctly, `.m4a`/`.mp3`/`.wav` voice notes and clips will hit that branch and show the native player instead of the broken-image fallback.
 
 ## Verification
 
-- Reload feed → images render (no broken-icon placeholders).
-- Confirm Fridge pins, Album covers/photos, Profile headers, DM attachments also render.
-- Network tab: image requests hit `/storage/v1/object/sign/post-media/...` and return 200; no `/render/image/sign/...` 400s.
-- Avatars (public `avatars` bucket) still go through `/render/image/public/avatars/...` — optimization preserved.
+- Reload the post in the screenshot → the first tile renders as `VideoThumbnail` (canvas-captured first frame + play overlay) instead of a broken `<img>`.
+- Open a circle with a voice-note post → native `<audio>` player appears.
+- Single-video post and multi-media carousels both classify correctly.
+- No backend, RLS, or migration changes; no other components touched.
