@@ -64,6 +64,14 @@ function AppLayoutContent() {
     return null;
   }
 
+  // Email verification gate. Existing accounts all have email_confirmed_at set
+  // by Supabase backfill, so they pass straight through. New accounts that
+  // somehow obtain a session without confirming see this screen instead of
+  // the app. Pairs with the signUp() safety-net signOut in useAuth.
+  if (!user.email_confirmed_at) {
+    return <UnverifiedEmailGate email={user.email ?? ""} onSignOut={handleSignOut} />;
+  }
+
   return (
     <TwoFactorGate>
       <TermsAcceptanceGate>
