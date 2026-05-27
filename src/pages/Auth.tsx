@@ -289,7 +289,7 @@ const Auth = () => {
   const needsScrollRoom = !isLogin || isForgotPassword;
   return (
     <div
-      className={`min-h-[100dvh] bg-background flex flex-col items-center justify-start pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] sm:justify-center sm:pt-0 px-4 ${needsScrollRoom ? "" : "overflow-hidden"}`}
+      className={`min-h-[100dvh] bg-background flex flex-col items-center justify-start pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] sm:justify-center sm:pt-0 px-4 ${needsScrollRoom ? "overflow-y-auto" : "overflow-hidden"}`}
       style={{
         paddingBottom: needsScrollRoom
           ? "calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-height, 0px) + 10rem)"
