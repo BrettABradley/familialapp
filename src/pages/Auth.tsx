@@ -311,6 +311,9 @@ const Auth = () => {
           // Show the dedicated "check your email" verification panel.
           sessionStorage.setItem(PENDING_VERIFY_EMAIL_KEY, email);
           setVerificationSentTo(email);
+          // Keep the password in memory (NOT state) so the polling effect
+          // can silently re-attempt sign-in once the email is confirmed.
+          pendingPasswordRef.current = password;
           setPassword("");
           // Start a resend cooldown so they can't immediately re-trigger Supabase rate limits
           sessionStorage.setItem(RESEND_VERIFY_KEY, String(Date.now()));
