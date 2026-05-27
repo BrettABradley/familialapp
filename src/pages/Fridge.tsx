@@ -22,6 +22,7 @@ import { convertHeicToJpeg } from "@/lib/heicConverter";
 import { blobToVoiceNoteFile } from "@/lib/voiceNoteFile";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
+import { getPostMediaUrl } from "@/lib/postMediaUrl";
 
 interface Circle {
   id: string;
@@ -87,7 +88,14 @@ const Fridge = () => {
       .limit(8);
 
     if (!error && data) {
-      setPins(data as unknown as FridgePin[]);
+      // Resolve stored paths / legacy public URLs to signed URLs for display.
+      const resolved = await Promise.all(
+        (data as unknown as FridgePin[]).map(async (pin) => ({
+          ...pin,
+          image_url: pin.image_url ? await getPostMediaUrl(pin.image_url) : null,
+        })),
+      );
+      setPins(resolved);
     }
     setIsLoadingPins(false);
   };
@@ -204,8 +212,8 @@ const Fridge = () => {
       });
 
       if (!uploadError) {
-        const { data: publicUrlData } = supabase.storage.from("post-media").getPublicUrl(fileName);
-        imageUrl = publicUrlData.publicUrl;
+        // Store the bare storage path; renderers resolve to signed URLs.
+        imageUrl = fileName;
       }
     }
 
