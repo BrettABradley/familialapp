@@ -34,9 +34,8 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
-  const [tosAccepted, setTosAccepted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; age?: string; tos?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; age?: string }>({});
   const [verificationSentTo, setVerificationSentTo] = useState<string | null>(() =>
     typeof window !== "undefined" ? sessionStorage.getItem(PENDING_VERIFY_EMAIL_KEY) : null
   );
