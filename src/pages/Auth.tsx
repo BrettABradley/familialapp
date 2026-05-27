@@ -539,6 +539,32 @@ const Auth = () => {
                   {errors.age && (
                     <p className="text-sm text-destructive">{errors.age}</p>
                   )}
+                  <div className="flex items-start gap-2">
+                    <input
+                      id="tos-accept"
+                      type="checkbox"
+                      checked={tosAccepted}
+                      onChange={(e) => {
+                        setTosAccepted(e.target.checked);
+                        setErrors((prev) => ({ ...prev, tos: undefined }));
+                      }}
+                      className="mt-1 h-4 w-4 accent-primary"
+                    />
+                    <Label htmlFor="tos-accept" className="text-sm font-normal leading-snug cursor-pointer">
+                      I agree to the{" "}
+                      <Link to="/terms" target="_blank" className="text-primary underline">
+                        Terms of Service
+                      </Link>{" "}
+                      and{" "}
+                      <Link to="/privacy" target="_blank" className="text-primary underline">
+                        Privacy Policy
+                      </Link>
+                      .
+                    </Label>
+                  </div>
+                  {errors.tos && (
+                    <p className="text-sm text-destructive">{errors.tos}</p>
+                  )}
                   </>
                 )}
                 <div className="space-y-2">
