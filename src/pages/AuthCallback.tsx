@@ -178,15 +178,7 @@ const AuthCallback = () => {
           </p>
         </div>
       )}
-              type="button"
-              onClick={() => navigate("/auth", { replace: true })}
-              className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors"
-            >
-              Continue in browser
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {status === "error" && (
         <div className="flex flex-col items-center gap-4 max-w-sm animate-in fade-in duration-300">
