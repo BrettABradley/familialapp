@@ -346,10 +346,46 @@ const Auth = () => {
   const handleUseDifferentEmail = () => {
     sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
     sessionStorage.removeItem("pendingTermsAcceptance");
+    pendingPasswordRef.current = null;
     setVerificationSentTo(null);
     setIsLogin(false);
     setEmail("");
   };
+
+  // Poll for email verification while sitting on the "Check your email"
+  // panel. As soon as Supabase flips email_confirmed_at server-side
+  // (user clicked the link in their browser), signInWithPassword will
+  // succeed — the existing user-effect then shows the green check and
+  // routes into the app. No manual action required.
+  useEffect(() => {
+    if (!verificationSentTo || confirmed || user) return;
+    const pwd = pendingPasswordRef.current;
+    if (!pwd) return; // No stashed password (e.g. after page reload) — can't poll silently.
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        await supabase.auth.signInWithPassword({
+          email: verificationSentTo,
+          password: pwd,
+        });
+        // On success the onAuthStateChange listener in useAuth fires and
+        // the user-effect above handles the rest. Errors (esp. "Email not
+        // confirmed") are expected and intentionally ignored.
+      } catch {
+        // swallow
+      }
+    };
+    const interval = setInterval(tick, 3000);
+    // Fire one immediate attempt too — covers the case where the user
+    // returns to the app right after clicking the link.
+    tick();
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [verificationSentTo, confirmed, user]);
+
 
 
   if (loading) {
