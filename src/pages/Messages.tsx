@@ -956,7 +956,7 @@ const Messages = () => {
       <div className="fixed inset-0 z-[60] bg-background flex flex-col md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]" style={{ height: 'calc(100% - var(--keyboard-height, 0px))' }}>
         <div className="flex-shrink-0 bg-background border-b border-border" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 3.25rem)' }}>
           <div className="flex items-center gap-3 px-4 py-3 min-h-[3.5rem]">
-          <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
+          <Button type="button" variant="ghost" size="sm" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleExitChat(); }} className="min-h-[44px] min-w-[44px]" aria-label="Back to messages"><ArrowLeft className="w-4 h-4" /></Button>
           <Link to={`/profile/${selectedUser.user_id}`}>
             <Avatar><AvatarImage src={selectedUser.avatar_url || undefined} /><AvatarFallback>{selectedUser.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback></Avatar>
           </Link>
