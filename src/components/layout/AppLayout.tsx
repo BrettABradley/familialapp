@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { CircleProvider, useCircleContext } from "@/contexts/CircleContext";
@@ -12,6 +12,47 @@ import { OnboardingFlow } from "@/components/shared/OnboardingFlow";
 import { UpdatePrompt } from "@/components/shared/UpdatePrompt";
 import { TwoFactorGate, clearTwoFactorVerified } from "@/components/auth/TwoFactorGate";
 import { useDeepLinkCircleSync } from "@/hooks/useDeepLinkCircleSync";
+import { Button } from "@/components/ui/button";
+import { MailCheck } from "lucide-react";
+import logo from "@/assets/logo.png";
+
+function UnverifiedEmailGate({ email, onSignOut }: { email: string; onSignOut: () => void }) {
+  const { resendVerification } = useAuth();
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const resend = async () => {
+    setSending(true); setError(null);
+    const { error } = await resendVerification(email);
+    setSending(false);
+    if (error) setError(error.message); else setSent(true);
+  };
+
+  return (
+    <div
+      className="min-h-[100dvh] bg-background flex flex-col items-center justify-center px-6 text-center"
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+    >
+      <img src={logo} alt="Familial" className="h-16 w-auto mb-6 opacity-80" />
+      <div className="rounded-full bg-muted p-4 mb-4">
+        <MailCheck className="h-10 w-10 text-foreground" strokeWidth={1.5} />
+      </div>
+      <h1 className="font-serif text-2xl text-foreground mb-2">Verify your email</h1>
+      <p className="text-sm text-muted-foreground max-w-sm mb-6">
+        We sent a verification link to <span className="font-medium text-foreground">{email}</span>. Tap it to finish setting up your account.
+      </p>
+      <div className="flex flex-col gap-3 w-full max-w-xs">
+        <Button onClick={resend} disabled={sending || sent} variant="outline">
+          {sent ? "Email sent — check your inbox" : sending ? "Sending…" : "Resend verification email"}
+        </Button>
+        <Button onClick={onSignOut} variant="ghost">Use a different email</Button>
+      </div>
+      {error && <p className="text-sm text-destructive mt-4 max-w-sm">{error}</p>}
+    </div>
+  );
+}
+
 
 
 function AppLayoutContent() {
