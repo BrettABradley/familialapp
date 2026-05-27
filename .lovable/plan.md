@@ -1,54 +1,25 @@
-## What's actually happening
+## What's already working
 
-Today the verify link does land on `/auth/callback`, but Chrome still ends up signed in. Root cause:
+Supabase's `/auth/v1/verify` endpoint marks `email_confirmed_at` on the user **server-side** *before* it redirects to `/auth/callback?code=…`. The auth logs confirm this: `user_signedup` (action) fires on `/verify` with a 303 response. So by the time the green check page paints, the email is already verified in the database — the green page is truthful proof, not just a visual.
 
-- Supabase's verify endpoint redirects to `/auth/callback?code=…` (PKCE flow — token in the **query string**, not the hash).
-- Our `index.html` early interceptor only looks for hash tokens (`access_token=`, `type=signup`). It never fires.
-- `supabase-js` is created with `detectSessionInUrl: true`, so the moment `main.tsx` boots it sees `?code=` and silently calls `exchangeCodeForSession` → fires `SIGNED_IN` → `AuthProvider` sets `user`.
-- The AppLayout / route guards see an authenticated user and navigate away from `/auth/callback` before its success screen can render. Hence "auto-signed into Chrome, no green check."
+The PKCE `?code=…` we strip is only for creating a *browser session*. Discarding it does not affect verification state.
 
-The `AuthCallback.tsx` web-path `signOut()` runs too late — it races a navigation that already happened.
+When the user returns to the iOS app and signs in, Supabase issues a fresh JWT whose `user.email_confirmed_at` is populated, so `AppLayout`'s `UnverifiedEmailGate` is bypassed and the `familial:emailJustVerified` flag triggers the green-check toast → onboarding continues.
 
-## The fix
+## What's missing (small gap)
 
-Intercept the PKCE code **before** `supabase-js` ever sees it, the same way we already do for hash tokens.
+If the user was *already signed in on the device* before tapping the verify link in the email (e.g. they hit "Resend verification" from `UnverifiedEmailGate` and verified in another tab/browser), their cached JWT still has `email_confirmed_at = null`. They'd be stuck on the "Verify your email" gate until they manually sign out and back in.
 
-### 1. `index.html` — extend the early inline script
+## Fix
 
-In the existing IIFE, before the module script loads:
+**`src/components/layout/AppLayout.tsx`** — In `UnverifiedEmailGate`, on mount and on window `focus`, call `supabase.auth.refreshSession()`. If the refreshed user has `email_confirmed_at` set, the parent re-renders (because `useAuth` propagates the new user) and the gate disappears automatically — the green-check flash effect already in place then fires.
 
-- If `location.pathname === "/auth/callback"` AND `location.search` contains `code=` (and we're not native — `index.html` only runs in real web browsers, so this is implicit):
-  - Stash the full original query string (`window.location.search`) and hash in `sessionStorage` under `familial:pendingVerifyParams`.
-  - `history.replaceState({}, "", "/auth/callback")` to wipe `?code=…` from the URL so `detectSessionInUrl` finds nothing.
-- Keep the existing hash-token branch for `/`, `/index.html`, etc.
+Also add a "I already verified — refresh" button on the gate as an explicit manual escape hatch, calling the same refresh.
 
-This guarantees supabase-js boots into a clean URL on `/auth/callback` and never creates a session.
-
-### 2. `src/pages/AuthCallback.tsx` — read the stashed params on web
-
-In the web branch only:
-
-- Read `sessionStorage.getItem("familial:pendingVerifyParams")` to recover the original `?code=…` / hash for error detection (so we can still show "Link expired" if Supabase returned `error_description`).
-- Do **not** call `exchangeCodeForSession` (unchanged).
-- Still set `familial:emailJustVerified = "1"`, still belt-and-suspenders `signOut()` + clear `sb-*-auth-token` keys (harmless no-op now), and render the green-check screen.
-- Delete the stash key after reading.
-
-Native branch is unchanged — Capacitor receives the deep link through `appUrlOpen` and `AuthCallback` exchanges the code normally so onboarding starts immediately.
-
-### 3. Verify (no other changes)
-
-- `useAuth.signUp` already pins `emailRedirectTo` to `https://familialapp.lovable.app/auth/callback` — keep as is.
-- `AppLayout` already flashes the green-check toast when `familial:emailJustVerified === "1"` after sign-in — keep as is.
-- No DB / edge function / email template changes needed.
-
-## Expected flow after the fix
-
-1. User taps **Verify Email** in Gmail on their phone/desktop.
-2. Supabase verifies server-side, redirects to `https://familialapp.lovable.app/auth/callback?code=…`.
-3. `index.html` strips `?code=…` instantly, before React/supabase-js mount. No session is ever created in this browser.
-4. Green check + "Email verified — open the Familial app" renders. Browser stays signed out.
-5. User opens the Familial app, signs in once → `AppLayout` mounts, sees the `emailJustVerified` flag, flashes a green-check toast, and the onboarding gate continues to circle creation.
+That's it. No changes to `AuthCallback.tsx`, `index.html`, `useAuth.tsx`, or any backend/edge code. The verification itself is already guaranteed by Supabase before the green page renders.
 
 ## Out of scope
 
-Auth email templates, rate-limit handling, Supabase auth config, and the `auth-email-hook` itself. This is purely a client-side URL-handoff fix.
+- Email template / auth-email-hook
+- PKCE stripping (already in place from prior step)
+- Onboarding flow itself
