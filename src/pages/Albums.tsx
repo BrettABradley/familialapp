@@ -26,6 +26,7 @@ import useEmblaCarousel from "embla-carousel-react";
 import { useSwipeDownClose } from "@/hooks/useSwipeDownClose";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { pickImage } from "@/lib/imagePicker";
+import { getPostMediaUrl, getPostMediaUrls, toPostMediaPath } from "@/lib/postMediaUrl";
 
 interface Circle {
   id: string;
@@ -310,10 +311,12 @@ const Albums = () => {
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setAlbums(data.map((a: any) => ({
+      const resolved = await Promise.all(data.map(async (a: any) => ({
         ...a,
+        cover_photo_url: a.cover_photo_url ? await getPostMediaUrl(a.cover_photo_url) : null,
         creator_name: a.profiles?.display_name || "Unknown",
       })));
+      setAlbums(resolved);
     }
     setIsLoadingAlbums(false);
   };
@@ -328,7 +331,11 @@ const Albums = () => {
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setPhotos(data);
+      const resolved = await Promise.all(data.map(async (p: any) => ({
+        ...p,
+        photo_url: await getPostMediaUrl(p.photo_url),
+      })));
+      setPhotos(resolved);
     }
   };
 
@@ -381,17 +388,17 @@ const Albums = () => {
       return;
     }
 
-    const { data: publicUrlData } = supabase.storage.from("post-media").getPublicUrl(fileName);
-
+    // Store bare storage path; renderer resolves to signed URL.
     const { error: updateError } = await supabase
       .from("photo_albums")
-      .update({ cover_photo_url: publicUrlData.publicUrl })
+      .update({ cover_photo_url: fileName })
       .eq("id", selectedAlbum.id);
 
     if (updateError) {
       toast({ title: "Error", description: "Failed to update cover photo.", variant: "destructive" });
     } else {
-      setSelectedAlbum({ ...selectedAlbum, cover_photo_url: publicUrlData.publicUrl });
+      const signed = await getPostMediaUrl(fileName);
+      setSelectedAlbum({ ...selectedAlbum, cover_photo_url: signed });
       fetchAlbums();
       toast({ title: "Cover updated!" });
     }
@@ -427,13 +434,10 @@ const Albums = () => {
 
       if (uploadError) continue;
 
-      const { data: publicUrlData } = supabase.storage
-        .from("post-media")
-        .getPublicUrl(fileName);
-
+      // Store the bare storage path; renderers resolve to signed URLs.
       await supabase.from("album_photos").insert({
         album_id: selectedAlbum.id,
-        photo_url: publicUrlData.publicUrl,
+        photo_url: fileName,
         uploaded_by: user.id,
       });
     }
@@ -520,14 +524,9 @@ const Albums = () => {
     setIsDownloadingAll(false);
   };
 
-  const extractStoragePath = (publicUrl: string): string | null => {
-    try {
-      const url = new URL(publicUrl);
-      const match = url.pathname.match(/\/storage\/v1\/object\/public\/post-media\/(.+)/);
-      return match ? match[1] : null;
-    } catch {
-      return null;
-    }
+  const extractStoragePath = (value: string): string | null => {
+    // Handles bare paths, legacy public URLs, and signed URLs.
+    return toPostMediaPath(value);
   };
 
   const handleDeletePhoto = async (photo: AlbumPhoto) => {
