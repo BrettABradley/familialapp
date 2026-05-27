@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,19 +8,31 @@ import logo from "@/assets/logo.png";
 
 type Status = "verifying" | "success" | "error";
 
+const VERIFIED_FLAG = "familial:emailJustVerified";
+
 /**
  * /auth/callback — landing page for the email verification link.
  *
- * On success we deliberately DO NOT auto-sign-in the browser. The user
- * almost always signed up inside the native iOS app; we just want to
- * confirm the email server-side, then tell them to return to the app.
- * The web session created by exchangeCodeForSession is immediately
- * cleared so Chrome/Safari doesn't end up logged in.
+ * Branches by platform:
+ *
+ * - **Web**: Supabase's /auth/v1/verify endpoint already set
+ *   email_confirmed_at server-side before redirecting here. We don't need
+ *   a browser session to "prove" the verification, so we deliberately skip
+ *   exchangeCodeForSession entirely. Just strip the URL, set a flag for
+ *   the post-login flash, and render the green check. The browser stays
+ *   signed out — user is expected to return to the iOS app.
+ *
+ * - **Native (Capacitor)**: Tapping the email link opens the app via
+ *   Universal Link (AASA whitelists /auth/callback). Here we DO want to
+ *   exchange the code so the user is signed in immediately, then route to
+ *   /circles where the onboarding gate continues the funnel and the
+ *   "Email verified" flash fires once.
  */
 const AuthCallback = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState<Status>("verifying");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const isNative = Capacitor.isNativePlatform();
 
   useEffect(() => {
     let cancelled = false;
@@ -27,45 +40,72 @@ const AuthCallback = () => {
     const run = async () => {
       try {
         const url = new URL(window.location.href);
-        const code = url.searchParams.get("code");
         const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
-        const accessToken = hashParams.get("access_token");
-        const refreshToken = hashParams.get("refresh_token");
-        const hashError = hashParams.get("error_description") || url.searchParams.get("error_description");
+        const hashError =
+          hashParams.get("error_description") ||
+          url.searchParams.get("error_description");
 
         if (hashError) {
           throw new Error(hashError.replace(/\+/g, " "));
         }
 
-        if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) throw error;
-        } else if (accessToken && refreshToken) {
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          if (error) throw error;
-        } else {
-          // No token — likely opened /auth/callback directly. Treat as success
-          // if there's already a session, otherwise error.
-          const { data } = await supabase.auth.getSession();
-          if (!data.session) {
-            throw new Error("This verification link is incomplete or expired.");
+        if (isNative) {
+          // Inside the app — we want a real session so the user lands in
+          // onboarding immediately.
+          const code = url.searchParams.get("code");
+          const accessToken = hashParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token");
+
+          if (code) {
+            const { error } = await supabase.auth.exchangeCodeForSession(code);
+            if (error) throw error;
+          } else if (accessToken && refreshToken) {
+            const { error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            if (error) throw error;
+          } else {
+            const { data } = await supabase.auth.getSession();
+            if (!data.session) {
+              throw new Error("This verification link is incomplete or expired.");
+            }
           }
+
+          try {
+            localStorage.setItem(VERIFIED_FLAG, "1");
+          } catch {
+            // non-fatal
+          }
+
+          if (cancelled) return;
+          // Hand off to the authenticated app — AppLayout will show the
+          // green-check flash and route through onboarding gates.
+          navigate("/circles", { replace: true });
+          return;
         }
 
-        // Strip tokens from the URL so they don't sit in history.
-        window.history.replaceState({}, "", "/auth/callback");
-
-        // Immediately drop the web session so the browser isn't signed in.
-        // Email confirmation is already persisted server-side at this point.
+        // ----- Web path -----
+        // Do NOT exchange the code. Supabase already confirmed the email
+        // server-side. Creating a session here would auto-sign-in the
+        // browser, which is exactly what we're trying to avoid.
         try {
-          await supabase.auth.signOut();
+          localStorage.setItem(VERIFIED_FLAG, "1");
         } catch {
           // non-fatal
         }
+
+        // Strip any tokens from the URL so they don't sit in history.
+        window.history.replaceState({}, "", "/auth/callback");
+
+        // Belt-and-suspenders: if supabase-js managed to slip a session into
+        // localStorage before this page ran (shouldn't happen now that the
+        // index.html interceptor reroutes hash tokens), drop it.
         try {
+          const { data } = await supabase.auth.getSession();
+          if (data.session) {
+            await supabase.auth.signOut();
+          }
           Object.keys(localStorage).forEach((key) => {
             if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
               localStorage.removeItem(key);
@@ -88,13 +128,14 @@ const AuthCallback = () => {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, isNative]);
 
   const openApp = () => {
     // Universal link — iOS hands off to the Familial app if installed
     // (AASA whitelists /auth/callback for the real bundle ID). Otherwise
     // the browser just stays on this page.
-    window.location.href = "https://familialapp.lovable.app/auth/callback?verified=1";
+    window.location.href =
+      "https://familialapp.lovable.app/auth/callback?verified=1";
   };
 
   return (
@@ -121,7 +162,7 @@ const AuthCallback = () => {
           </div>
           <h1 className="font-serif text-3xl text-foreground">Email verified</h1>
           <p className="text-sm text-muted-foreground">
-            You're all set. Open the Familial app on your phone and sign in to finish setting up your account.
+            You're all set. Open the Familial app on your phone to finish setting up your account.
           </p>
           <div className="flex flex-col gap-2 w-full mt-2">
             <Button onClick={openApp} className="w-full">
