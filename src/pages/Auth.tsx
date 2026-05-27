@@ -102,8 +102,40 @@ const Auth = () => {
     return () => clearInterval(t);
   }, [resetCooldown]);
 
+  // Resend cooldown countdown
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [resendCooldown]);
+
+  // Initialize resend cooldown from sessionStorage
+  useEffect(() => {
+    const last = Number(sessionStorage.getItem(RESEND_VERIFY_KEY) || 0);
+    if (last) {
+      const remaining = Math.ceil((last + RESEND_VERIFY_COOLDOWN * 1000 - Date.now()) / 1000);
+      if (remaining > 0) setResendCooldown(remaining);
+    }
+  }, []);
+
   // After login, if there's a plan param, trigger checkout
   useEffect(() => {
+    if (loading || !user) return;
+
+    // Email-verification success: show green check for 1.5s, then continue.
+    const pendingEmail = sessionStorage.getItem(PENDING_VERIFY_EMAIL_KEY);
+    if (pendingEmail && pendingEmail === user.email && !confirmed) {
+      setConfirmed(true);
+      const t = setTimeout(() => {
+        sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
+        setVerificationSentTo(null);
+        setConfirmed(false); // re-runs effect; falls through to normal redirect
+      }, 1500);
+      return () => clearTimeout(t);
+    }
+    if (confirmed) return; // wait for timeout
+
+
     if (!loading && user && planParam && PLAN_PRICES[planParam] && !checkoutTriggered.current) {
       checkoutTriggered.current = true;
 
