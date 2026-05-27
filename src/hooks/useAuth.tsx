@@ -45,7 +45,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Verification gate (added after launch): every new signup must click the
     // confirmation link before they can use the app. /auth/callback exchanges
     // the token, shows a green check, and signs them in officially.
-    const redirectUrl = `${window.location.origin}/auth/callback`;
+    //
+    // Pinned to the production web origin so the link always lands on our
+    // handler regardless of where signup happened (web, iOS sim, TestFlight
+    // — capacitor://localhost would otherwise fall back to Site URL).
+    const redirectUrl = "https://familialapp.lovable.app/auth/callback";
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -75,7 +79,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const resendVerification = async (email: string) => {
-    const redirectUrl = `${window.location.origin}/auth/callback`;
+    const redirectUrl = "https://familialapp.lovable.app/auth/callback";
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,

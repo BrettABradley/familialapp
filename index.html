@@ -44,6 +44,35 @@
 
   <body>
     <div id="root"></div>
+    <script>
+      // EARLY hash-token interceptor — runs before the module script imports
+      // supabase-js (whose createClient auto-consumes access_token from the
+      // URL hash via detectSessionInUrl). If a verification email link
+      // landed on any path other than /auth/callback or /reset-password,
+      // hard-redirect so the browser never auto-signs-in.
+      (function () {
+        try {
+          var hash = window.location.hash || "";
+          var path = window.location.pathname || "/";
+          var isAuthLanding =
+            path === "/auth/callback" || path === "/reset-password";
+          var looksLikeAuthHash =
+            /access_token=/.test(hash) ||
+            /type=signup/.test(hash) ||
+            /type=recovery/.test(hash) ||
+            /type=invite/.test(hash) ||
+            /type=magiclink/.test(hash);
+          if (!isAuthLanding && looksLikeAuthHash) {
+            window.location.replace(
+              "/auth/callback" + (window.location.search || "") + hash
+            );
+          }
+        } catch (e) {
+          // non-fatal
+          console && console.warn && console.warn("[boot] hash interceptor failed", e);
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
