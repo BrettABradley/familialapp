@@ -27,6 +27,7 @@ import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import { MediaLightbox } from "@/components/shared/MediaLightbox";
 import { SmartImage } from "@/components/shared/SmartImage";
+import { VoiceNotePlayer } from "@/components/shared/VoiceNotePlayer";
 import { useSignedMediaUrls, getPostMediaUrl } from "@/lib/postMediaUrl";
 import {
   AlertDialog,

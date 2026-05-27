@@ -15,6 +15,7 @@ import { getMediaType } from "@/lib/mediaUtils";
 import type { Post } from "@/hooks/useFeedPosts";
 import { ReportDialog } from "@/components/shared/ReportDialog";
 import { SmartImage } from "@/components/shared/SmartImage";
+import { VoiceNotePlayer } from "@/components/shared/VoiceNotePlayer";
 import { avatarUrl, presetImage } from "@/lib/imageUrl";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
 import { MediaLightbox } from "@/components/shared/MediaLightbox";
