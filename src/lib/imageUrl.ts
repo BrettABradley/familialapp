@@ -26,6 +26,10 @@ function isSupabaseStorageUrl(url: string): boolean {
   return /\/storage\/v1\/object\/(public|sign)\//.test(url);
 }
 
+function isSignedStorageUrl(url: string): boolean {
+  return /\/storage\/v1\/object\/sign\//.test(url);
+}
+
 export interface TransformOpts {
   width?: number;
   height?: number;
@@ -33,10 +37,13 @@ export interface TransformOpts {
   resize?: "cover" | "contain" | "fill";
 }
 
-/** Build a transformed Supabase Storage URL. No-op for non-Supabase URLs. */
+/** Build a transformed Supabase Storage URL. No-op for non-Supabase URLs.
+ *  Signed URLs are returned as-is because their token is bound to the
+ *  /object/sign/ path and won't validate on the /render/image/ endpoint. */
 export function transformedImage(url: string | null | undefined, opts: TransformOpts = {}): string {
   if (!url) return "";
   if (!isSupabaseStorageUrl(url)) return url;
+  if (isSignedStorageUrl(url)) return url;
 
   const { width, height, quality = 75, resize = "contain" } = opts;
   const rewritten = url.replace("/storage/v1/object/", "/storage/v1/render/image/");
@@ -58,6 +65,7 @@ export function presetImage(url: string | null | undefined, preset: ImagePreset)
 /** Build a 1x/2x srcSet for a given preset width. */
 export function srcSetFor(url: string | null | undefined, baseWidth: number, quality = 75): string {
   if (!url || !isSupabaseStorageUrl(url)) return "";
+  if (isSignedStorageUrl(url)) return "";
   const x1 = transformedImage(url, { width: baseWidth, quality });
   const x2 = transformedImage(url, { width: baseWidth * 2, quality });
   return `${x1} 1x, ${x2} 2x`;
