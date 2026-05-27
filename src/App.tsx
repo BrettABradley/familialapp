@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { useEffect } from "react";
@@ -13,6 +13,7 @@ import { UpdateGate } from "@/components/UpdateGate";
 import Index from "./pages/Index";
 import Unsubscribe from "./pages/Unsubscribe";
 import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
 import Feed from "./pages/Feed";
 import Circles from "./pages/Circles";
 import Store from "./pages/Store";
@@ -40,6 +41,37 @@ import Support from "./pages/Support";
 
 const queryClient = new QueryClient();
 
+const NativeUrlOpenBridge = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let remove: (() => void) | undefined;
+    (async () => {
+      try {
+        const { App: CapApp } = await import("@capacitor/app");
+        const handle = await CapApp.addListener("appUrlOpen", (event) => {
+          try {
+            const u = new URL(event.url);
+            // Universal link: https://www.familialmedia.com/auth/callback?...
+            // Custom scheme fallback also routes through here.
+            if (u.pathname.startsWith("/auth/callback")) {
+              const target = u.pathname + u.search + u.hash;
+              navigate(target, { replace: true });
+            }
+          } catch (e) {
+            console.warn("[appUrlOpen] could not parse URL", event.url, e);
+          }
+        });
+        remove = () => handle.remove();
+      } catch (e) {
+        console.warn("[appUrlOpen] listener setup failed", e);
+      }
+    })();
+    return () => { remove?.(); };
+  }, [navigate]);
+  return null;
+};
+
 const App = () => {
   useVisualViewport();
   useEffect(() => {
@@ -60,11 +92,13 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <NativeUrlOpenBridge />
           <UpdateGate>
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />

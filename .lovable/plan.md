@@ -1,106 +1,78 @@
-# Big Batch Fixes
+## Goal
+Cut down on bot signups without disrupting any current user, and fix the keyboard covering the Sign in button on Auth.tsx — all without breaking the live submission build.
 
-## 1. Maps deep link opens web instead of Apple/Google Maps app
-**Where:** `src/lib/externalUrl.ts` / `EventLocationPopover.tsx`
-
-On iOS, `https://maps.apple.com` is supposed to be a universal link, but Capacitor's `App.openUrl` with `https://` often gets handed to the in-app webview / Safari instead of the Maps app. Same with Google Maps.
-
-**Fix:**
-- Add a new helper `openMapsApp(app: "apple" | "google", query)` that uses native URL schemes first:
-  - Apple Maps: `maps://?q=<query>` (iOS only)
-  - Google Maps: `comgooglemaps://?q=<query>&views=traffic` on iOS, `geo:0,0?q=<query>` on Android
-- Use `Capacitor.getPlatform()` + `App.canOpenUrl({ url })` to detect availability.
-- Fallbacks (in order):
-  - Apple Maps unavailable on Android → use Google Maps web/app instead.
-  - Google Maps app unavailable → open App Store / Play Store deep link (`itms-apps://apps.apple.com/app/id585027354` for Google Maps, store page for Apple Maps doesn't apply since it's preinstalled on iOS).
-  - Final fallback: `https://maps.apple.com/?q=` or `https://www.google.com/maps/search/?api=1&query=`.
-- Update `EventLocationPopover.openMaps()` to call this new helper.
-
-## 2. Push notification to messages traps the user
-**Where:** `src/pages/Messages.tsx` chat view (DM + group), `src/lib/capacitorInit.ts` (deep-link handler)
-
-When a push notification opens a chat directly via deep link, `chatView` is set to `"dm"` / `"group"` but the bottom nav and back button stop working because the chat is rendered as `fixed inset-0 z-[60]`. There is no Android hardware-back handler or fallback navigation.
-
-**Fix:**
-- In the chat view headers, ensure the back button always:
-  - Clears `selectedUser` / `selectedGroup` and sets `chatView="list"`.
-  - If opened directly via deep-link (no prior list state), `navigate("/messages")` and then to `/circles` as a fallback.
-- Add a Capacitor `App.addListener('backButton', ...)` in `Messages.tsx` (active only when `chatView !== "list"`) that calls the same back handler. This is the actual cause of the "trapped" feeling on Android and on iOS when the gesture is intercepted.
-- Make sure the deep-link handler in `capacitorInit.ts` doesn't block the bottom nav by routing to `/messages?dm=<id>` (route-based) instead of locking state; `Messages.tsx` reads the query param and opens the chat — then the user can navigate away normally.
-
-## 3. Cannot leave message chats (even when alone)
-**Where:** `handleLeaveGroup` in `Messages.tsx`, plus RLS on `group_chat_members`
-
-The current implementation does a direct `DELETE` on `group_chat_members`. If RLS doesn't allow the user to delete themselves, this silently freezes (no error toast triggers because policy rejects). We also need the creator-only case where the user is the only member.
-
-**Fix:**
-- Add a SECURITY DEFINER RPC `leave_group_chat(_group_chat_id uuid)` that:
-  - Removes `auth.uid()` from `group_chat_members`.
-  - If the chat now has 0 members, deletes the `group_chats` row and any messages.
-- Update `handleLeaveGroup` to call this RPC.
-- Add proper error toast + closing of the leave dialog before navigation so the UI never freezes.
-- Also wrap the dialog close in `try/finally` so a network error still re-enables the button.
-
-## 4. Messages: images/voice notes show as "(Attachment)" and download instead of opening
-**Where:** `renderMediaAttachments` in `Messages.tsx`
-
-Two issues:
-- Text shows "(attachment)" when there is media — should be hidden if media exists and content is the default.
-- Tapping an image calls `handleMediaDownload` instead of opening a lightbox. On iOS Capacitor this triggers a save to Camera Roll.
-
-**Fix:**
-- Hide the message text when `content === "(attachment)"` (case-insensitive) and `media_urls.length > 0`.
-- Replace the image `onClick={handleMediaDownload}` with a `ZoomableImage`/lightbox open (re-use `src/components/shared/ZoomableImage.tsx` pattern already used in Feed/Albums). Add a separate explicit Download button inside the lightbox (long-press friendly).
-- Voice notes already render `<audio controls>` — confirm `getMediaType` correctly tags `voice-note-*` blobs as `audio`. The previous fix already addresses MP4-as-audio detection; verify it covers `audio/webm`, `audio/mp4`, `audio/m4a`.
-
-## 5. Email verification required before access (magic link → app)
-**Where:** `useAuth.tsx`, `Auth.tsx`, `capacitorInit.ts`, Supabase auth config, `auth-email-hook`
-
-We need to actually require email confirmation for new signups, and the magic link must deep-link back into the iOS app.
-
-**Fix:**
-- Disable `auto_confirm_email` in Supabase auth config (currently signups are auto-confirmed).
-- Signup flow:
-  - `signUp()` sets `emailRedirectTo: "https://familialmedia.com/auth/callback"` (universal link configured in iOS `apple-app-site-association` → already deep-links to app via existing Capacitor universal links setup).
-  - On success → show a "Check your email" screen explaining the verification flow.
-- Add a `/auth/callback` route that:
-  - On web: shows a confirmation card "Your email is verified — open Familial in the app or [Continue to web]".
-  - On native (via deep-link): Capacitor's `appUrlOpen` already handles this; route to `/circles`.
-- Gate the app: `AppLayout` / `RequireAuth` already checks session, but add a check on `user.email_confirmed_at`. If missing → redirect to `/auth?unverified=1` with a "Resend verification email" button.
-- Keep the auth email branded by re-using existing `auth-email-hook` and the `signup.tsx` template — confirm the template's `confirmationUrl` points to the universal link.
-- Address keyboard issues in `Auth.tsx`:
-  - Wrap auth form in `ScrollArea` with `pb-32` so submit button stays above keyboard.
-  - Use `scroll-margin-bottom` on inputs as we do elsewhere.
-
-## 6. Cannot decline circle invitation
-**Where:** `PendingInvites.tsx` + RLS on `public.circle_invites`
-
-The decline UPDATE is being silently blocked by RLS — the invitee likely has no UPDATE policy (only the inviter does). Currently the error toast may fire but the row never updates.
-
-**Fix:**
-- Add a SECURITY DEFINER RPC `decline_circle_invite(_invite_id uuid)` that:
-  - Verifies the calling user's email matches `circle_invites.invitee_email`.
-  - Sets `status = 'declined'`.
-- Update `handleDecline` to call the RPC.
-- Same treatment for accept if it has the same issue (will verify during implementation).
-
-## 7. Enterprise welcome email
-**Where:** new template under `supabase/functions/_shared/transactional-email-templates/`, plus trigger point
-
-We already have `enterprise-welcome.tsx`. It is not actually sent anywhere.
-
-**Fix:**
-- Update copy to match the requested wording: "Thank you so much for choosing Familial Enterprise to help connect your community. We will not let you down and are always here to support. Contact me directly at brett@familialmedia.com if you have any questions or issues."
-- Add a trigger: when an admin marks a user's plan as `enterprise` via the admin dashboard, call `send-transactional-email` with `templateName: "enterprise-welcome"`. (Confirm exact admin code path during implementation — likely `admin-manage-users` or a subscription update edge function.)
+## Guardrails (what we will NOT do)
+- We will NOT force re-verification on existing accounts.
+- We will NOT touch the 2FA flow.
+- We will NOT block sign-in for any account that already has `email_confirmed_at` set.
+- We will NOT change `supabase/config.toml` project settings.
 
 ---
 
-## Technical Notes
+## Part 1 — Email verification gate (signups only)
 
-- All RPCs use `SECURITY DEFINER` with `SET search_path = public` and explicit GRANT to `authenticated`.
-- New `/auth/callback` page must be in the SPA router (works automatically via Lovable SPA fallback).
-- Plist (`scripts/ios-post-sync.sh`) needs `LSApplicationQueriesSchemes` entries for `maps`, `comgooglemaps`, `itms-apps` so `App.canOpenUrl` returns true on iOS — will add to that script.
-- For the email gate, `email_confirmed_at` is on `auth.users` and accessible via `session.user.email_confirmed_at`, so no DB changes needed.
+### 1a. Turn off auto-confirm
+Disable `auto_confirm_email` so new signups get a verification email. Existing users are unaffected (they already have `email_confirmed_at` set, so the gate we add later treats them as verified).
 
-## Out of Scope (for this batch)
-Anything not listed above — including the additional issues you mentioned saving for the next round.
+### 1b. Signup flow change in `useAuth.tsx` / `Auth.tsx`
+- After `supabase.auth.signUp(...)`, do NOT treat the returned session as "logged in."
+- Show a clean "Check your email to verify" screen with: the email address, a "Resend verification email" button (calls `supabase.auth.resend({ type: 'signup', email })`), and a "Use a different email" link.
+- If `signUp` returns a session anyway (race condition), immediately `signOut()` so they cannot get in unverified.
+
+### 1c. Verification landing — works for web AND native, ends with "Verified ✓"
+- Add a new public route `/auth/callback`.
+- The verification email's `confirmationUrl` already points to a Supabase action URL that 302-redirects to whatever we set as `emailRedirectTo`. We set `emailRedirectTo` to `https://www.familialmedia.com/auth/callback?next=<original-path>` and store `next` in `localStorage.postAuthRedirect` at signup time (we already use this key for OAuth — same pattern).
+- The `/auth/callback` page:
+  1. Reads the URL hash / query for `access_token` + `refresh_token` (Supabase appends these on the redirect).
+  2. Calls `supabase.auth.setSession({ access_token, refresh_token })` — this both verifies the email and signs them in officially.
+  3. Renders a centered green checkmark + "Verified" with a soft fade-in (1.5s), then `navigate(next || '/circles', { replace: true })`.
+  4. On error (expired/invalid link), shows "This link expired" with a Resend button.
+
+### 1d. Native (iOS) — same UX, opens the app
+- Capacitor already registers `app.lovable.f745440093af4f4390a60d52ff08c778` as the bundle id. We add Universal Links so the verification URL opens the installed app instead of Safari:
+  - Add `Associated Domains` entitlement `applinks:www.familialmedia.com` and `applinks:familialmedia.com` via `scripts/ios-post-sync.sh` (PlistBuddy + entitlements file — same self-healing pattern we use for `aps-environment`).
+  - Publish `apple-app-site-association` at `https://www.familialmedia.com/.well-known/apple-app-site-association` (served from `public/.well-known/` as static JSON, no extension, content-type forced by Lovable hosting):
+    ```json
+    { "applinks": { "details": [{ "appID": "<TEAMID>.app.lovable.f745440093af4f4390a60d52ff08c778", "paths": ["/auth/callback", "/auth/callback*"] }] } }
+    ```
+    (We'll need the Apple Team ID from the user — placeholder until then; if missing on first deploy, the link just falls back to Safari, which still works.)
+  - When iOS opens the app via the universal link, Capacitor's `App.addListener('appUrlOpen', ...)` fires. We add a listener in `App.tsx` that pushes `/auth/callback?...` into React Router, so the same green-check screen runs.
+- Net result: tap link on iPhone → app opens → "Verified ✓" → routed into `/circles` already signed in. If the app isn't installed, Safari opens the same `/auth/callback` web page, same UX.
+
+### 1e. Gate in `AppLayout`
+- After session loads, if `user && !user.email_confirmed_at`, render the "Check your email to verify" screen instead of children. This is the safety net so even if someone gets a session before verifying (e.g. across devices), they cannot use the app.
+- Existing accounts all have `email_confirmed_at` set → they hit this code path and pass through immediately. Zero disruption.
+
+### 1f. Email template
+- The existing `signup.tsx` template already includes the confirmation button. We update the button copy to "Verify your email" and the body to match the app's tone. No new template needed.
+
+---
+
+## Part 2 — Auth.tsx keyboard ScrollArea retrofit (minimal)
+
+- Wrap the form card in a `ScrollArea` with `pb-32` so the Sign in button always scrolls above the keyboard.
+- Add `scroll-margin-bottom: 120px` to each `Input` so focus auto-scrolls them into view (this is the exact pattern from `mem://tech/mobile-keyboard-ux-patterns`).
+- Do NOT change layout, do NOT switch to a sheet, do NOT add listeners.
+
+---
+
+## Rollback story (in case anything misbehaves at submission)
+- If verification breaks signup: re-enable `auto_confirm_email` from Cloud → Users → Auth Settings. Existing users keep working, new users skip the gate. One toggle, zero code revert.
+- The `/auth/callback` page and `AppLayout` gate are no-ops for verified users, so leaving them in place is safe.
+- Universal Links are additive — if the AASA file is wrong, links just open in Safari. No crash, no broken flow.
+
+---
+
+## Files touched
+- `src/hooks/useAuth.tsx` — adjust signUp behavior, expose `resendVerification`.
+- `src/pages/Auth.tsx` — "Check your email" state + ScrollArea + scroll-margin-bottom.
+- `src/pages/AuthCallback.tsx` — NEW.
+- `src/App.tsx` — register `/auth/callback`, add Capacitor `appUrlOpen` listener.
+- `src/components/layout/AppLayout.tsx` — email_confirmed_at gate.
+- `public/.well-known/apple-app-site-association` — NEW.
+- `scripts/ios-post-sync.sh` — add `com.apple.developer.associated-domains` to entitlements.
+- `supabase/functions/_shared/email-templates/signup.tsx` — copy tweak.
+- `supabase/auth` settings — `auto_confirm_email: false`.
+
+## What I need from you before I build
+1. Confirm your **Apple Developer Team ID** (10-char string, e.g. `ABCDE12345`) so the AASA file is correct on first deploy. If you'd rather ship without Universal Links for now, I'll skip 1d's iOS pieces and the email will open Safari → `/auth/callback` on the phone, which still verifies and signs them in (just not inside the app).

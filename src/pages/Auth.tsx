@@ -262,9 +262,12 @@ const Auth = () => {
           }
         } else {
           toast({
-            title: "Account created!",
-            description: "Welcome to Familial. Let's set up your first circle.",
+            title: "Check your email",
+            description: `We sent a verification link to ${email}. Tap it to finish setting up your account.`,
           });
+          // Flip to login so they have somewhere to land when they come back.
+          setIsLogin(true);
+          setPassword("");
         }
       }
     } finally {
