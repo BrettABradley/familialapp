@@ -903,7 +903,7 @@ const Messages = () => {
       {renderFilePreviewBar()}
       {renderUploadProgress()}
       <div className="flex items-end gap-1">
-        <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.heic,.heif" multiple onChange={handleFileSelect} className="hidden" />
+        <input ref={fileInputRef} type="file" accept="image/*,.heic,.heif" onChange={handleFileSelect} className="hidden" />
         <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isSending} className="flex-shrink-0 h-9 w-9">
           <Paperclip className="w-4 h-4" />
         </Button>
