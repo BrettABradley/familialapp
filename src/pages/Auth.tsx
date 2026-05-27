@@ -510,44 +510,49 @@ const Auth = () => {
               </p>
             </div>
           ) : verificationSentTo ? (
-            <div className="space-y-5 py-2">
-              <div className="flex flex-col items-center text-center space-y-3">
-                <div className="rounded-full bg-primary/10 p-4">
-                  <Mail className="h-10 w-10 text-primary" />
+            <PullToRefreshWrapper onRefresh={handleVerifyPullRefresh}>
+              <div className="space-y-5 py-2">
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="rounded-full bg-primary/10 p-4">
+                    <Mail className="h-10 w-10 text-primary" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    We sent a verification link to
+                  </p>
+                  <p className="font-medium break-all">{verificationSentTo}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Open the email on this device and tap the link. Once confirmed,
+                    you'll be brought right in.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Pull down to check manually.
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  We sent a verification link to
-                </p>
-                <p className="font-medium break-all">{verificationSentTo}</p>
-                <p className="text-sm text-muted-foreground">
-                  Open the email on this device and tap the link. Once confirmed,
-                  you'll be brought right in.
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleResendVerification}
+                  disabled={resendCooldown > 0 || isResending}
+                >
+                  {isResending
+                    ? "Resending..."
+                    : resendCooldown > 0
+                    ? `Resend available in ${resendCooldown}s`
+                    : "Resend verification email"}
+                </Button>
+                <button
+                  type="button"
+                  onClick={handleUseDifferentEmail}
+                  className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Use a different email
+                </button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Didn't get it? Check your spam folder.
                 </p>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={handleResendVerification}
-                disabled={resendCooldown > 0 || isResending}
-              >
-                {isResending
-                  ? "Resending..."
-                  : resendCooldown > 0
-                  ? `Resend available in ${resendCooldown}s`
-                  : "Resend verification email"}
-              </Button>
-              <button
-                type="button"
-                onClick={handleUseDifferentEmail}
-                className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Use a different email
-              </button>
-              <p className="text-xs text-muted-foreground text-center">
-                Didn't get it? Check your spam folder.
-              </p>
-            </div>
+            </PullToRefreshWrapper>
           ) : isForgotPassword ? (
             <>
               <form onSubmit={handleForgotPassword} className="space-y-4">
