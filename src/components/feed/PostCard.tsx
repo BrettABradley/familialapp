@@ -546,10 +546,12 @@ export const PostCard = ({
     setIsEditing(false);
   };
 
+  // Resolve stored paths/URLs to signed URLs (post-media bucket is private).
+  const { urls: resolvedMedia } = useSignedMediaUrls(post.media_urls || []);
   // Separate media by type for layout
-  const visualMedia = post.media_urls?.filter(u => getMediaType(u) === 'image' || getMediaType(u) === 'video') || [];
-  const audioMedia = post.media_urls?.filter(u => getMediaType(u) === 'audio') || [];
-  const imageUrls = post.media_urls?.filter(u => getMediaType(u) === 'image') || [];
+  const visualMedia = resolvedMedia.filter(u => u && (getMediaType(u) === 'image' || getMediaType(u) === 'video'));
+  const audioMedia = resolvedMedia.filter(u => u && getMediaType(u) === 'audio');
+  const imageUrls = resolvedMedia.filter(u => u && getMediaType(u) === 'image');
 
   // Extract first URL from post content for link preview
   const firstUrl = post.content?.match(/(https?:\/\/[^\s]+)/)?.[0] || null;
