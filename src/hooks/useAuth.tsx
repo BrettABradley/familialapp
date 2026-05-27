@@ -42,8 +42,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, displayName?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
+    // Verification gate (added after launch): every new signup must click the
+    // confirmation link before they can use the app. /auth/callback exchanges
+    // the token, shows a green check, and signs them in officially.
+    const redirectUrl = `${window.location.origin}/auth/callback`;
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -61,6 +64,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: new Error("User already registered") };
     }
 
+    // Safety net: if Supabase ever hands back a session before the email is
+    // verified (race / config drift), drop it immediately so the unverified
+    // account can't bypass the gate.
+    if (!error && data?.session && !data.user?.email_confirmed_at) {
+      try { await supabase.auth.signOut(); } catch {}
+    }
+
+    return { error: error as Error | null, needsVerification: !error };
+  };
+
+  const resendVerification = async (email: string) => {
+    const redirectUrl = `${window.location.origin}/auth/callback`;
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: redirectUrl },
+    });
     return { error: error as Error | null };
   };
 
