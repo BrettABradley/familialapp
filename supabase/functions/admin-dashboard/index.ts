@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.0";
+import { signPostMediaUrls } from "../_shared/post-media-url.ts";
 
 const FOUNDER_EMAIL = "brettbradley007@gmail.com";
 
@@ -106,7 +107,7 @@ serve(async (req: Request) => {
           target_status: (targetPriv as any).data?.account_status ?? null,
           target_active_strikes: (strikes as any).count ?? 0,
           post_snippet: (post as any).data?.content ?? null,
-          post_media: (post as any).data?.media_urls ?? null,
+          post_media: await signPostMediaUrls(supabaseAdmin, (post as any).data?.media_urls ?? null),
           comment_snippet: (comment as any).data?.content ?? null,
           overdue: r.status === "pending" && new Date(r.sla_due_at) < new Date(),
         };

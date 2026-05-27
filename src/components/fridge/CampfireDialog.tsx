@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Send, X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getPostMediaUrl } from "@/lib/postMediaUrl";
 
 interface CampfireStory {
   id: string;
@@ -76,10 +77,11 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
         .in("user_id", authorIds);
 
       const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
-      const enriched: CampfireStory[] = (data as any[]).map((s: any) => ({
+      const enriched: CampfireStory[] = await Promise.all((data as any[]).map(async (s: any) => ({
         ...s,
+        audio_url: s.audio_url ? await getPostMediaUrl(s.audio_url) : null,
         profiles: profileMap.get(s.author_id) || null,
-      }));
+      })));
       setStories(enriched);
     }
     setIsLoading(false);
@@ -123,8 +125,8 @@ export function CampfireDialog({ open, onOpenChange, pinId, pinTitle, prompt }: 
         return;
       }
 
-      const { data: urlData } = supabase.storage.from("post-media").getPublicUrl(fileName);
-      audioUrl = urlData.publicUrl;
+      // Store the bare storage path; renderers resolve to signed URLs.
+      audioUrl = fileName;
     }
 
     const { error } = await supabase

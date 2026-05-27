@@ -26,6 +26,7 @@ import { pickImage } from "@/lib/imagePicker";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
+import { useSignedMediaUrls, getPostMediaUrl } from "@/lib/postMediaUrl";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,6 +81,48 @@ interface GroupMessage {
 }
 
 type ChatView = "list" | "dm" | "group";
+
+// Resolves stored paths / legacy public URLs to signed URLs before render.
+const MessageMedia = ({
+  mediaUrls,
+  onOpenLightbox,
+  onDownload,
+}: {
+  mediaUrls?: string[];
+  onOpenLightbox: (url: string) => void;
+  onDownload: (url: string) => void;
+}) => {
+  const { urls } = useSignedMediaUrls(mediaUrls || []);
+  if (!mediaUrls || mediaUrls.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-2">
+      {urls.map((url, i) => {
+        if (!url) return null;
+        const type = getMediaType(url);
+        if (type === 'video') return <video key={i} src={url} controls playsInline className="rounded-md max-w-full max-h-48" />;
+        if (type === 'audio') return <audio key={i} src={url} controls className="w-full max-w-[240px]" />;
+        return (
+          <div key={i} className="relative inline-block group">
+            <img
+              src={url}
+              alt="attachment"
+              className="rounded-md max-w-full max-h-48 cursor-zoom-in"
+              onClick={() => onOpenLightbox(url)}
+            />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDownload(url); }}
+              className="absolute top-1 right-1 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm"
+              aria-label="Download photo"
+            >
+              <Download className="h-4 w-4" />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 const Messages = () => {
   const { user } = useAuth();
@@ -596,8 +639,8 @@ const Messages = () => {
       });
       
       if (error) continue;
-      const { data } = supabase.storage.from("post-media").getPublicUrl(fileName);
-      uploadedUrls.push(data.publicUrl);
+      // Store the bare storage path; renderers resolve to signed URLs.
+      uploadedUrls.push(fileName);
     }
     setUploadProgress(100);
     return uploadedUrls;
@@ -703,36 +746,13 @@ const Messages = () => {
     }
   };
 
-  const renderMediaAttachments = (mediaUrls?: string[]) => {
-    if (!mediaUrls || mediaUrls.length === 0) return null;
-    return (
-      <div className="mt-2 space-y-2">
-        {mediaUrls.map((url, i) => {
-          const type = getMediaType(url);
-          if (type === 'video') return <video key={i} src={url} controls playsInline className="rounded-md max-w-full max-h-48" />;
-          if (type === 'audio') return <audio key={i} src={url} controls className="w-full max-w-[240px]" />;
-          return (
-            <div key={i} className="relative inline-block group">
-              <img
-                src={url}
-                alt="attachment"
-                className="rounded-md max-w-full max-h-48 cursor-zoom-in"
-                onClick={() => setLightboxUrl(url)}
-              />
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleMediaDownload(url); }}
-                className="absolute top-1 right-1 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm"
-                aria-label="Download photo"
-              >
-                <Download className="h-4 w-4" />
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+  const renderMediaAttachments = (mediaUrls?: string[]) => (
+    <MessageMedia
+      mediaUrls={mediaUrls}
+      onOpenLightbox={setLightboxUrl}
+      onDownload={handleMediaDownload}
+    />
+  );
 
   const renderFilePreviewBar = () => {
     if (previewUrls.length === 0) return null;

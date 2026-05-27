@@ -1,119 +1,86 @@
+# Finish `post-media` Private Lockdown
 
-## Goal
+Goal: complete the migration started in the previous PR so `post-media` can flip to private with zero broken images across Feed, Fridge, Campfire, Albums, Messages, admin tools, and data export.
 
-Fix both scanner findings on the `post-media` bucket without breaking feed posts, albums, fridge pins, campfire responses, or direct-message attachments.
-
-1. **Error — public read:** flip `post-media` to private; only authenticated users who share a circle (or DM thread) with the uploader can read.
-2. **Warning — missing UPDATE policy:** add an UPDATE policy on `storage.objects` for `post-media` scoped to the uploader's own folder (mirrors existing DELETE policy).
+The signed-URL helper (`src/lib/postMediaUrl.ts`) and the Feed path (`CreatePostForm` + `PostCard`) already use the new pattern. This plan covers everything still on `getPublicUrl`, then flips the bucket.
 
 ---
 
-## Strategy
+## 1. Upload + render swaps (mirror Feed pattern)
 
-All files in `post-media` are stored under `{uploader_uid}/{filename}`. We gate reads by parsing the first path segment as the uploader and checking that the requester is the uploader, shares a circle with them, or has an existing private-message thread with them. This matches who can see the media in-app today.
+For each site: **upload** stores the bare storage path (no `getPublicUrl`); **render** resolves via `useSignedMediaUrl` / `useSignedMediaUrls`; **delete** uses the stored path directly (drop URL-splitting).
 
-Going forward, new uploads store **storage paths** in DB columns (`posts.media_urls`, `fridge_pins.image_url`, `campfire_stories.image_url`, `album_photos.url`, `private_messages.media_urls`). At render time a helper resolves each path to a short-lived signed URL with a small in-memory cache. Legacy rows that still contain full public URLs are detected and the path is extracted (`split('/post-media/')[1]`) so nothing breaks during rollout.
+- **`src/pages/Fridge.tsx`** — pin image upload + grid/lightbox render + delete.
+- **`src/components/fridge/CampfireDialog.tsx`** — story image upload + render in dialog and pin detail view.
+- **`src/pages/Albums.tsx`** — album cover, photo upload, grid thumbnails, lightbox, ZIP download (sign each path on the fly), bulk delete.
+- **`src/pages/Messages.tsx`** — DM attachment upload + `renderMediaAttachments` for images/videos/audio.
 
-No data backfill is required — the resolver handles both formats. Optionally we can run a one-shot script later to normalize stored values to paths.
+Shared touch-ups:
+- `src/components/shared/ZoomableImage.tsx`, `SmartImage.tsx`, `VideoThumbnail.tsx` — accept an already-resolved URL from the parent (no helper calls inside; keeps them generic and avoids double signing).
 
----
+Legacy DB rows with full public URLs continue to render because `toPostMediaPath()` extracts the path from `…/post-media/<path>` URLs. No backfill needed.
 
-## Migration (single file)
+## 2. Edge functions — sign server-side with service role
+
+- **`supabase/functions/admin-dashboard/index.ts`** — when returning reported posts/pins/albums/messages for moderator review, call `admin.storage.from('post-media').createSignedUrl(path, 60*60)` for each media reference before returning.
+- **`supabase/functions/download-my-data/index.ts`** — for `posts`, `fridge_pins`, `private_messages` (and any other rows with media), replace stored values with 24h signed URLs in the export JSON so the user can actually download their media.
+- **`supabase/functions/send-push-notification/index.ts`** — APNs payload doesn't embed media today (only `title`/`body`/`link`), so no change needed. Verify no email preview template pulls a raw `post-media` URL; if any do (e.g., `mention-notification`, `new-album`, `unseen-message`), sign with service role before passing into the template payload.
+
+Shared helper: add a small `signPostMediaPath(admin, value, ttl)` in `supabase/functions/_shared/` that mirrors `toPostMediaPath` + `createSignedUrl` so the three functions share one implementation.
+
+## 3. Re-apply the private-bucket migration
+
+Single migration:
 
 ```sql
--- 1. Bucket private
+-- Flip private
 UPDATE storage.buckets SET public = false WHERE id = 'post-media';
 
--- 2. Drop the unrestricted public SELECT policy
+-- Drop the unrestricted public SELECT
 DROP POLICY IF EXISTS "Public can view post media" ON storage.objects;
+DROP POLICY IF EXISTS "Anyone can view post media" ON storage.objects;
 
--- 3. New gated SELECT policy
-CREATE POLICY "post-media authenticated members can read"
+-- Gated SELECT: own folder, shared circle, or DM thread with uploader
+CREATE POLICY "post-media members can read"
 ON storage.objects FOR SELECT
 TO authenticated
 USING (
   bucket_id = 'post-media'
   AND (
-    -- Own folder
     auth.uid()::text = (storage.foldername(name))[1]
-    -- Shares a circle with uploader
     OR public.shares_circle_with(auth.uid(), ((storage.foldername(name))[1])::uuid)
-    -- Has a DM thread with uploader (either direction)
     OR EXISTS (
       SELECT 1 FROM public.private_messages pm
-      WHERE (
-        (pm.sender_id = auth.uid()    AND pm.recipient_id = ((storage.foldername(name))[1])::uuid)
-        OR (pm.recipient_id = auth.uid() AND pm.sender_id    = ((storage.foldername(name))[1])::uuid)
-      )
+      WHERE (pm.sender_id = auth.uid() AND pm.recipient_id = ((storage.foldername(name))[1])::uuid)
+         OR (pm.recipient_id = auth.uid() AND pm.sender_id = ((storage.foldername(name))[1])::uuid)
     )
   )
 );
-
--- 4. UPDATE policy — folder-scoped (fixes the warning)
-CREATE POLICY "post-media uploader can update own files"
-ON storage.objects FOR UPDATE
-TO authenticated
-USING (bucket_id = 'post-media' AND auth.uid()::text = (storage.foldername(name))[1])
-WITH CHECK (bucket_id = 'post-media' AND auth.uid()::text = (storage.foldername(name))[1]);
 ```
 
----
+(The folder-scoped UPDATE policy from the previous PR stays in place.)
 
-## Client helper — `src/lib/postMediaUrl.ts` (new)
+## 4. QA checklist (test circle `ff8b3fee…`)
 
-```ts
-// Resolve a stored value (path OR legacy public URL) to a signed URL.
-// In-memory cache; signs for 1 hour, refreshes at ~50 min.
-export function toPostMediaPath(value: string): string { ... }
-export async function getPostMediaUrl(value: string): Promise<string> { ... }
-export async function getPostMediaUrls(values: string[]): Promise<string[]> { ... }
-```
+- Feed: single image, multi-image carousel, video, audio note — own + other member's posts.
+- Fridge: pin with image renders; tap to enlarge.
+- Campfire: story image renders in dialog + pin detail.
+- Albums: grid thumbs, lightbox swipe, ZIP download contains real bytes.
+- Messages: image/video/audio attachments render both directions of a DM.
+- Admin dashboard: reported media renders for moderator.
+- Download My Data: JSON contains working signed URLs; user can fetch each.
+- Negative check: signed-out user and non-member get 400 on a direct storage URL.
+- Re-run security scanner → both `post-media` findings clear.
 
-Plus a tiny React hook `useSignedMediaUrl(value)` that returns `{ url, loading }` so render components can swap in cleanly.
+## 5. Rollout order (single PR)
 
----
-
-## Files to update
-
-**Uploads** — store path only (no `getPublicUrl`):
-- `src/components/feed/CreatePostForm.tsx`
-- `src/components/fridge/CampfireDialog.tsx`
-- `src/pages/Fridge.tsx`
-- `src/pages/Albums.tsx` (cover + photos)
-- `src/pages/Messages.tsx` (DM attachments)
-
-**Render sites** — resolve via helper/hook:
-- `src/components/feed/PostCard.tsx` (image carousel, video, audio)
-- `src/components/shared/ZoomableImage.tsx` (accept resolved URL via parent)
-- `src/components/shared/SmartImage.tsx` / `VideoThumbnail.tsx` (accept resolved URL)
-- `src/pages/Albums.tsx` (grid + lightbox + zip download — sign each path on the fly)
-- `src/pages/Fridge.tsx` (pin image, campfire story image)
-- `src/pages/Messages.tsx` (`renderMediaAttachments`)
-
-**Deletes** — paths are already the natural input; just stop the URL-splitting and use the stored path directly:
-- `src/components/feed/CreatePostForm.tsx` (remove-on-cancel)
-- `src/pages/Albums.tsx` (delete photo, delete album bulk remove)
-
-**Edge functions** — use service role to generate signed URLs (or omit image previews):
-- `supabase/functions/admin-dashboard/index.ts` — for moderator review, generate signed URLs server-side.
-- `supabase/functions/download-my-data/index.ts` — include signed URLs (longer TTL, e.g. 24h) in export.
-- `supabase/functions/send-push-notification/index.ts` and any email previews — skip embedded post-media or sign server-side.
-
-**Legacy compatibility:** the resolver handles full URLs (`https://…/post-media/uid/file.jpg`) by extracting the path, so existing DB rows render correctly after the bucket flips to private.
-
----
-
-## Rollout
-
-1. Land the migration + client helper + all upload/render swaps in a single PR.
-2. Verify against test circle (`ff8b3fee…`) in the demo: feed image post, multi-image carousel, video, audio note, album upload + lightbox + zip download, fridge pin, campfire response, DM image to a friend.
-3. Spot-check non-member: confirm they get 400 on a direct storage URL while a member still loads it via signed URL.
-4. Re-run the security scanner — both findings should clear.
-
----
+1. Land client swaps (section 1) while bucket is still public — zero user impact, just changes what gets stored going forward and how renders resolve.
+2. Land edge function changes (section 2).
+3. Land the migration (section 3) **last**, after manual smoke test against staging/demo.
+4. If anything regresses post-flip, revert only the migration — client + edge code remain forward-compatible with both public and private buckets.
 
 ## Out of scope
 
-- Backfilling `media_urls`/`image_url` columns from full URLs to bare paths (resolver handles both; can be done later as a cleanup).
-- Avatars, profile-images buckets (separate scanner targets, not in these findings).
-- Caching/CDN tuning for signed URLs.
+- Backfilling existing DB rows from full URLs to bare paths (resolver handles both; optional cleanup later).
+- `avatars` / `profile-images` buckets.
+- CDN/caching tuning for signed URLs.
