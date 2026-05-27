@@ -300,7 +300,7 @@ const Messages = () => {
   // Bulletproof chat-exit: always returns to the conversations list.
   // Used by every back/close affordance so we never rely on Radix portal
   // onOpenChange (which previously bounced the user to the home tab).
-  const handleExitChat = useCallbackRef(() => {
+  const handleExitChat = () => {
     setLightbox(null);
     setSelectedUser(null);
     setSelectedGroup(null);
@@ -308,7 +308,9 @@ const Messages = () => {
     setMessages([]);
     setGroupMessages([]);
     clearMediaState();
-  });
+  };
+  const handleExitChatRef = useRef(handleExitChat);
+  handleExitChatRef.current = handleExitChat;
 
   // Android hardware back / browser back: pop out of the open chat instead of
   // leaving the Messages page entirely. Push a sentinel history entry when a
@@ -317,10 +319,10 @@ const Messages = () => {
     const inChat = (chatView === "dm" && !!selectedUser) || (chatView === "group" && !!selectedGroup);
     if (!inChat) return;
     window.history.pushState({ familialChat: true }, "");
-    const onPop = () => { handleExitChat(); };
+    const onPop = () => { handleExitChatRef.current(); };
     window.addEventListener("popstate", onPop);
     return () => { window.removeEventListener("popstate", onPop); };
-  }, [chatView, selectedUser, selectedGroup, handleExitChat]);
+  }, [chatView, selectedUser, selectedGroup]);
 
   const fetchCircleMembers = async () => {
     if (!user || !selectedCircle) return;
