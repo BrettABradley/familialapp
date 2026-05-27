@@ -134,8 +134,8 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
         contentType: file.type || undefined,
       });
       if (error) { continue; }
-      const { data } = supabase.storage.from("post-media").getPublicUrl(fileName);
-      uploadedUrls.push(data.publicUrl);
+      // Store the storage path; render sites resolve to signed URLs on demand.
+      uploadedUrls.push(fileName);
     }
     setUploadProgress(100);
     return uploadedUrls;
