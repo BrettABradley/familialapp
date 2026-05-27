@@ -1,51 +1,45 @@
-## Goal
-Land all 5 fixes from the prior plan, with extra emphasis on the chat back button always returning to the Messages list.
+## 1. Tap-to-undo button doesn't work
 
-## 1. Back button — make it bulletproof (priority)
-**Root cause:** the lightbox `<Dialog>` was rendered as a sibling of the chat view, mounted under `PullToRefreshWrapper`. Radix Dialog opens a portal + focus trap that re-renders the parent and clobbers `selectedUser` / `chatView` state, so back/X sometimes drops the user to the home tab instead of the Messages list.
+**Root cause:** `useFeedPosts.handleDeletePost` shows a toast with the copy "Tap to undo within 10 seconds" but never attaches an actual `action`. The undo handler is stashed on `window.__lastDeleteUndo`, which nothing in the UI calls. Tapping the toast does nothing.
 
-**Fix:**
-- Replace Radix Dialog usage in Messages with the shared `MediaLightbox` (already extracted) mounted **inside** the chat view tree (DM and Group views), so opening/closing it never unmounts the chat.
-- Dedicated `handleExitChat()` helper used by every back/close affordance: synchronously `setSelectedUser(null); setChatView("list"); setLightbox(null); setMessages([]);` — never relies on Radix `onOpenChange`.
-- Back arrow button: `type="button"`, `onClick` with `e.stopPropagation()` + `e.preventDefault()`, `min-h-[44px] min-w-[44px]` hit area, and an `onTouchEnd` fallback to defeat iOS ghost-click swallowing.
-- Lightbox `onClose` only clears `lightbox` state — it must never touch `selectedUser` or `chatView`.
-- Guard against Android hardware back / browser back leaving the user on a blank screen: when `selectedUser` is set, push a history entry on chat-enter and pop it on exit (same pattern already used elsewhere).
+**Fix:** Attach a real `ToastAction` to the delete toast so tapping it invokes the restore logic.
 
-## 2. Double-send on iOS
-- Add `const isSendingRef = useRef(false)` in `Messages.tsx`.
-- At the top of `handleSendMessage`: if `isSendingRef.current` → return; else set it to true synchronously. Reset in a `finally` block.
-- Send button: `type="button"`, single `onClick` that fires haptics then calls handler.
+- In `src/hooks/useFeedPosts.ts`, replace the window stash with a local `undoHandler` and pass it to the toast via `action: <ToastAction altText="Undo" onClick={undoHandler}>Undo</ToastAction>`.
+- The undo handler clears the timeout, sets `deleted_at = null`, re-inserts `postToDelete` into local state (sorted), and shows a "Post restored" toast.
+- Add the missing `ToastAction` import (already used elsewhere).
 
-## 3. Audio posts wrongly blocked
-- In `CreatePostForm.tsx`, before calling `moderate-content`, filter `mediaUrls` to images only (`getMediaType(path) === 'image'`).
-- If `imageUrls.length === 0` and `text.trim() === ''` → skip the moderation call entirely.
-- Audio/video remain unmoderated (unchanged from current intent).
+## 2. Audio post never finishes loading / no playback
 
-## 4. Messages lightbox + “(attachment)” label + quality
-- Use shared `src/components/shared/MediaLightbox.tsx` in both DM and Group chat views (already created).
-- Replace inline `<img>` with `SmartImage preset="card"` so retina is crisp.
-- Stop writing `"(attachment)"` as content when sending media-only messages — store empty string.
-- Renderers (DM + Group): only render the `<p>{content}</p>` bubble text when `content?.trim()` is non-empty AND not the legacy literal `"(attachment)"`.
+**Root cause:** Both `PostCard` (feed) and `Messages` render voice notes with `<audio controls><source src={url} /></audio>`. On iOS Safari/WKWebView:
 
-## 5. One image per message
-- Drop `multiple` from the hidden file input; tighten `accept` to single image/* (voice notes still work — they go through `VoiceRecorder`, not the file input).
-- `handleFileSelect`: cap to 1; if a pending attachment exists, replace it and toast "Replaced pending photo".
-- Update the old "up to 4 files" toast copy to reflect 1-at-a-time.
+- `<source>` is parsed once at mount. When `useSignedMediaUrl` resolves and the parent re-renders with the real URL, the `<source>` child does not trigger a reload, so the player sits in "loading" forever.
+- `<source>` without an explicit `type` makes iOS refuse to pick a codec for signed Supabase URLs (the `?token=...` JWT hides the `.m4a` extension from the sniffer).
 
-## Files touched
-- `src/pages/Messages.tsx` — lightbox swap, back-button hardening, send guard, one-image cap, `(attachment)` cleanup.
-- `src/components/feed/CreatePostForm.tsx` — moderation payload filter.
-- (Already in place) `src/components/shared/MediaLightbox.tsx`, `src/components/feed/PostCard.tsx`.
+**Fix:** Switch to direct `<audio src={url} preload="metadata">` and pass an explicit `type` derived from the storage path extension (not from the signed URL). Add `playsInline` and a `key={url}` so the element fully remounts when the signed URL arrives.
 
-## Out of scope
-- No DB, RLS, or edge-function changes.
-- No redesign of Feed lightbox (just reused).
-- No new audio/video moderation.
+- Create a tiny shared component `src/components/shared/VoiceNotePlayer.tsx` that:
+  - Takes a stored path (or already-resolved URL).
+  - Uses `useSignedMediaUrl` to resolve.
+  - Derives `mimeType` from the original path extension (`m4a`→`audio/mp4`, `mp3`→`audio/mpeg`, `webm`→`audio/webm`, `ogg`→`audio/ogg`, `wav`→`audio/wav`, `aac`→`audio/aac`, default `audio/mp4`).
+  - Renders `<audio key={url} src={url} controls preload="metadata" playsInline />` inside the existing `bg-secondary` pill.
+  - Shows a small skeleton while `loading || !url`.
+- Replace the two `<audio><source/></audio>` blocks in `src/components/feed/PostCard.tsx` (lines ~192–199 single audio, ~274–279 carousel) with `<VoiceNotePlayer storedPath={originalUrl} />`.
+- Replace the inline `<audio key={i} src={url} controls ... />` in `src/pages/Messages.tsx` (line ~125) with `<VoiceNotePlayer storedPath={originalUrl} className="max-w-[240px]" />`.
+- No changes to upload/recording code; `blobToVoiceNoteFile` + the `voice-note-` filename already produce consistent containers.
+
+## 3. Carousel indicator on personal-profile preview
+
+The `Layers` icon + count badge already exists in `src/pages/ProfileView.tsx` (lines 672–677) but the user reports it's not visible. Tighten it to match the user's spec ("super small in top right"):
+
+- Keep the existing `count > 1` condition.
+- Shrink to a pure icon (no number), size `h-3.5 w-3.5`, white, with a soft black drop-shadow instead of a pill background, positioned `absolute top-1 right-1`.
+- Hide it inside the lightbox (it already lives only on the grid button, so no change needed there).
+
+No changes to backend, RLS, edge functions, or migrations. No new dependencies.
 
 ## Verification
-- Open a DM → tap image → close lightbox → tap back → lands on Messages list (not home).
-- Open a Group chat → same.
-- Send the same message via rapid double-tap → only one row inserted.
-- Post a voice note → no moderation toast, post stays up.
-- Send a media-only message → no "(attachment)" caption visible.
-- File picker only allows 1 image at a time.
+
+- Delete a feed post → toast shows an "Undo" button → tap it → post reappears.
+- Record + post a voice note on iOS → audio pill loads, scrubber shows duration, playback works.
+- Same in DMs/group chats.
+- Open a profile with a multi-image post → small layered icon visible in top-right of the thumbnail; single-item posts show no icon.
