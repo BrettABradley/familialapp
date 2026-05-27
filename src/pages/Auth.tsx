@@ -186,7 +186,7 @@ const Auth = () => {
         navigate("/circles");
       }
     }
-  }, [user, loading, navigate, planParam, toast]);
+  }, [user, loading, navigate, planParam, toast, confirmed]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
