@@ -22,7 +22,6 @@ import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import useEmblaCarousel from "embla-carousel-react";
 import { haptic, typingHaptic } from "@/lib/haptics";
 import { useSignedMediaUrls } from "@/lib/postMediaUrl";
-import { useSignedMediaUrls } from "@/lib/postMediaUrl";
 
 interface CircleMemberRef {
   user_id: string;
