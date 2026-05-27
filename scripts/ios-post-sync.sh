@@ -43,6 +43,16 @@ $PB -c "Delete :UIBackgroundModes" "$PLIST" 2>/dev/null
 $PB -c "Add :UIBackgroundModes array" "$PLIST"
 $PB -c "Add :UIBackgroundModes:0 string remote-notification" "$PLIST"
 
+# LSApplicationQueriesSchemes: required so canOpenURL() succeeds for
+# external map apps (Apple Maps, Google Maps). Without these entries iOS
+# silently returns false and our deep links fall back to Safari.
+$PB -c "Delete :LSApplicationQueriesSchemes" "$PLIST" 2>/dev/null
+$PB -c "Add :LSApplicationQueriesSchemes array" "$PLIST"
+$PB -c "Add :LSApplicationQueriesSchemes:0 string maps" "$PLIST"
+$PB -c "Add :LSApplicationQueriesSchemes:1 string comgooglemaps" "$PLIST"
+$PB -c "Add :LSApplicationQueriesSchemes:2 string comgooglemaps-x-callback" "$PLIST"
+$PB -c "Add :LSApplicationQueriesSchemes:3 string googlemaps" "$PLIST"
+
 # Push entitlement: make this script self-healing so a fresh native checkout is
 # not dependent on remembering the Xcode capability click. Xcode can still show
 # the capability in Signing & Capabilities, but the signed app now has a real
