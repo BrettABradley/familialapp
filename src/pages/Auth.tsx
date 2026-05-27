@@ -10,7 +10,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import logo from "@/assets/logo.png";
 import { isIOSNative, purchaseSubscription, APPLE_PRODUCTS } from "@/lib/iapPurchase";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
+import { Link } from "react-router-dom";
+
+const TOS_VERSION = "2026-05-17";
+const PENDING_VERIFY_EMAIL_KEY = "pendingVerificationEmail";
+const PENDING_TERMS_KEY = "pendingTermsAcceptance";
+const RESEND_VERIFY_KEY = "lastVerificationResendAt";
+const RESEND_VERIFY_COOLDOWN = 60;
 
 const RESET_COOLDOWN_SECONDS = 60;
 const RESET_COOLDOWN_KEY = "lastPasswordResetAt";
@@ -30,8 +37,15 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [tosAccepted, setTosAccepted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; age?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; age?: string; tos?: string }>({});
+  const [verificationSentTo, setVerificationSentTo] = useState<string | null>(() =>
+    typeof window !== "undefined" ? sessionStorage.getItem(PENDING_VERIFY_EMAIL_KEY) : null
+  );
+  const [confirmed, setConfirmed] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [isResending, setIsResending] = useState(false);
   const checkoutTriggered = useRef(false);
 
 
@@ -88,8 +102,40 @@ const Auth = () => {
     return () => clearInterval(t);
   }, [resetCooldown]);
 
+  // Resend cooldown countdown
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [resendCooldown]);
+
+  // Initialize resend cooldown from sessionStorage
+  useEffect(() => {
+    const last = Number(sessionStorage.getItem(RESEND_VERIFY_KEY) || 0);
+    if (last) {
+      const remaining = Math.ceil((last + RESEND_VERIFY_COOLDOWN * 1000 - Date.now()) / 1000);
+      if (remaining > 0) setResendCooldown(remaining);
+    }
+  }, []);
+
   // After login, if there's a plan param, trigger checkout
   useEffect(() => {
+    if (loading || !user) return;
+
+    // Email-verification success: show green check for 1.5s, then continue.
+    const pendingEmail = sessionStorage.getItem(PENDING_VERIFY_EMAIL_KEY);
+    if (pendingEmail && pendingEmail === user.email && !confirmed) {
+      setConfirmed(true);
+      const t = setTimeout(() => {
+        sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
+        setVerificationSentTo(null);
+        setConfirmed(false); // re-runs effect; falls through to normal redirect
+      }, 1500);
+      return () => clearTimeout(t);
+    }
+    if (confirmed) return; // wait for timeout
+
+
     if (!loading && user && planParam && PLAN_PRICES[planParam] && !checkoutTriggered.current) {
       checkoutTriggered.current = true;
 
@@ -140,7 +186,7 @@ const Auth = () => {
         navigate("/circles");
       }
     }
-  }, [user, loading, navigate, planParam, toast]);
+  }, [user, loading, navigate, planParam, toast, confirmed]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -238,9 +284,12 @@ const Auth = () => {
         }
 
       } else {
-        // Age confirmation (COPPA 13+)
-        if (!ageConfirmed) {
-          setErrors({ age: "Please confirm you are at least 13 years old." });
+        // Age + TOS confirmation (COPPA 13+ + compliance)
+        const signupErrors: { age?: string; tos?: string } = {};
+        if (!ageConfirmed) signupErrors.age = "Please confirm you are at least 13 years old.";
+        if (!tosAccepted) signupErrors.tos = "Please accept the Terms of Service and Privacy Policy.";
+        if (Object.keys(signupErrors).length) {
+          setErrors(signupErrors);
           setIsLoading(false);
           return;
         }
@@ -261,19 +310,56 @@ const Auth = () => {
             });
           }
         } else {
-          toast({
-            title: "Check your email",
-            description: `We sent a verification link to ${email}. Tap it to finish setting up your account.`,
-          });
-          // Flip to login so they have somewhere to land when they come back.
-          setIsLogin(true);
+          // Stash TOS acceptance so it's persisted as soon as the user
+          // authenticates (post email-confirm). TermsAcceptanceGate picks this up.
+          sessionStorage.setItem(
+            PENDING_TERMS_KEY,
+            JSON.stringify({
+              email,
+              accepted_terms_at: new Date().toISOString(),
+              accepted_terms_version: TOS_VERSION,
+            })
+          );
+          // Show the dedicated "check your email" verification panel.
+          sessionStorage.setItem(PENDING_VERIFY_EMAIL_KEY, email);
+          setVerificationSentTo(email);
           setPassword("");
+          // Start a resend cooldown so they can't immediately re-trigger Supabase rate limits
+          sessionStorage.setItem(RESEND_VERIFY_KEY, String(Date.now()));
+          setResendCooldown(RESEND_VERIFY_COOLDOWN);
         }
       }
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleResendVerification = async () => {
+    if (!verificationSentTo || resendCooldown > 0 || isResending) return;
+    setIsResending(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: verificationSentTo,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    setIsResending(false);
+    sessionStorage.setItem(RESEND_VERIFY_KEY, String(Date.now()));
+    setResendCooldown(RESEND_VERIFY_COOLDOWN);
+    if (error) {
+      toast({ title: "Could not resend", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Email resent", description: `New verification link sent to ${verificationSentTo}.` });
+    }
+  };
+
+  const handleUseDifferentEmail = () => {
+    sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
+    sessionStorage.removeItem(PENDING_TERMS_KEY);
+    setVerificationSentTo(null);
+    setIsLogin(false);
+    setEmail("");
+  };
+
 
   if (loading) {
     return (
@@ -302,23 +388,83 @@ const Auth = () => {
             <img src={logo} alt="Familial" className="h-24 w-auto" />
           </div>
           <CardTitle className="font-serif text-2xl">
-            {isForgotPassword ? "Reset Password" : isLogin ? "Welcome" : "Join Familial"}
+            {confirmed
+              ? "Email confirmed!"
+              : verificationSentTo
+              ? "Check your email"
+              : isForgotPassword
+              ? "Reset Password"
+              : isLogin
+              ? "Welcome"
+              : "Join Familial"}
           </CardTitle>
           <CardDescription>
-            {isForgotPassword
+            {confirmed
+              ? "Welcome to Familial"
+              : verificationSentTo
+              ? "We sent a verification link to finish setting up your account"
+              : isForgotPassword
               ? "Enter your email and we'll send you a reset link"
               : isLogin
               ? "Sign in or sign up to connect with your family"
               : "Create an account to start your family circle"}
           </CardDescription>
-          {planParam && PLAN_PRICES[planParam] && (
+          {planParam && PLAN_PRICES[planParam] && !confirmed && !verificationSentTo && (
             <p className="text-sm text-primary mt-2">
               {isLogin ? "Sign in" : "Sign up"} to continue with the {planParam.charAt(0).toUpperCase() + planParam.slice(1)} plan purchase
             </p>
           )}
         </CardHeader>
         <CardContent>
-          {isForgotPassword ? (
+          {confirmed ? (
+            <div className="flex flex-col items-center justify-center py-8 space-y-4">
+              <div className="rounded-full bg-green-500/10 p-4 animate-in zoom-in-50 duration-500">
+                <CheckCircle2 className="h-16 w-16 text-green-600" strokeWidth={2.5} />
+              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                Taking you in...
+              </p>
+            </div>
+          ) : verificationSentTo ? (
+            <div className="space-y-5 py-2">
+              <div className="flex flex-col items-center text-center space-y-3">
+                <div className="rounded-full bg-primary/10 p-4">
+                  <Mail className="h-10 w-10 text-primary" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  We sent a verification link to
+                </p>
+                <p className="font-medium break-all">{verificationSentTo}</p>
+                <p className="text-sm text-muted-foreground">
+                  Open the email on this device and tap the link. Once confirmed,
+                  you'll be brought right in.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleResendVerification}
+                disabled={resendCooldown > 0 || isResending}
+              >
+                {isResending
+                  ? "Resending..."
+                  : resendCooldown > 0
+                  ? `Resend available in ${resendCooldown}s`
+                  : "Resend verification email"}
+              </Button>
+              <button
+                type="button"
+                onClick={handleUseDifferentEmail}
+                className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Use a different email
+              </button>
+              <p className="text-xs text-muted-foreground text-center">
+                Didn't get it? Check your spam folder.
+              </p>
+            </div>
+          ) : isForgotPassword ? (
             <>
               <form onSubmit={handleForgotPassword} className="space-y-4">
                 <div className="space-y-2">
@@ -392,6 +538,32 @@ const Auth = () => {
                   </div>
                   {errors.age && (
                     <p className="text-sm text-destructive">{errors.age}</p>
+                  )}
+                  <div className="flex items-start gap-2">
+                    <input
+                      id="tos-accept"
+                      type="checkbox"
+                      checked={tosAccepted}
+                      onChange={(e) => {
+                        setTosAccepted(e.target.checked);
+                        setErrors((prev) => ({ ...prev, tos: undefined }));
+                      }}
+                      className="mt-1 h-4 w-4 accent-primary"
+                    />
+                    <Label htmlFor="tos-accept" className="text-sm font-normal leading-snug cursor-pointer">
+                      I agree to the{" "}
+                      <Link to="/terms" target="_blank" className="text-primary underline">
+                        Terms of Service
+                      </Link>{" "}
+                      and{" "}
+                      <Link to="/privacy" target="_blank" className="text-primary underline">
+                        Privacy Policy
+                      </Link>
+                      .
+                    </Label>
+                  </div>
+                  {errors.tos && (
+                    <p className="text-sm text-destructive">{errors.tos}</p>
                   )}
                   </>
                 )}
@@ -506,6 +678,7 @@ const Auth = () => {
                     setIsLogin(!isLogin);
                     setErrors({});
                     setAgeConfirmed(false);
+                    setTosAccepted(false);
                     setDuplicateAccount(false);
                   }}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"

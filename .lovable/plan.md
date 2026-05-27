@@ -1,38 +1,48 @@
-## In-app "New update available" prompt
+## Goal
 
-Detect when the user's installed iOS app version is older than the latest App Store version, then show a non-blocking prompt linking to the App Store listing.
+1. Make Terms of Service acceptance happen **on the signup form** (compliance: agreement before account creation), keeping the post‑login TOS dialog only as a fallback for legacy accounts.
+2. Replace the silent "Check your email" toast with a **dedicated verification‑pending screen**, and when the user returns from the email link, show a **green checkmark success state** before dropping them into the app.
 
-### How it works
+## Changes
 
-1. **Source of truth — Apple's iTunes Lookup API** (no key, no setup):
-   `https://itunes.apple.com/lookup?bundleId=com.familialmedia.app&country=us`
-   Returns the live App Store `version` (e.g. `73.0.1`).
+### 1. Signup form — inline TOS acceptance (`src/pages/Auth.tsx`)
 
-2. **Compare against the installed version** using `@capacitor/app`'s `App.getInfo()` → returns `version` and `build` from Xcode (the fields in your screenshot).
+- Add a second checkbox below the age checkbox (signup only):
+  > "I agree to the [Terms of Service](/terms) and [Privacy Policy](/privacy)."
+- New state `tosAccepted`. Submit blocked (with inline error) until checked.
+- After `signUp()` succeeds, immediately record acceptance so the post‑login TOS dialog does not re‑prompt:
+  - Stash `{ accepted_terms_at, accepted_terms_version: "2026-05-17", email }` in `sessionStorage` under `pendingTermsAcceptance`.
+  - On first authenticated session (in `TermsAcceptanceGate`), if that stash matches `auth.user.email`, upsert to `user_private` and clear the stash. (Can't upsert at signup time — user isn't authenticated until email confirm.)
 
-3. **Semver compare**. If App Store version > installed version, show prompt.
+### 2. Dedicated "verification email sent" screen (`src/pages/Auth.tsx`)
 
-4. **Prompt UX** — bottom sheet / dialog:
-   - Title: "Update Available"
-   - Body: "A new version of Familial (vX.X.X) is available on the App Store."
-   - Buttons: **Update** (opens `https://apps.apple.com/app/id<APP_ID>`) and **Later**
-   - "Later" dismisses for 24 hours via localStorage timestamp
-   - Native-only (skip on web via `Capacitor.isNativePlatform()`)
+- New local state `verificationSentTo: string | null`. On successful signup, set it to the email instead of toasting + flipping to login.
+- When set, the `<Card>` body renders a verification panel instead of the form:
+  - Large mail icon, heading "Check your email", body "We sent a verification link to **{email}**. Open it on this device to finish setting up your account."
+  - "Resend email" button (calls `supabase.auth.resend({ type: 'signup', email })`) with the existing 60s cooldown pattern.
+  - "Use a different email" link → clears state, returns to signup form.
+- Persist `verificationSentTo` in `sessionStorage` so refreshing the Auth tab keeps the panel.
 
-5. **When it runs** — once on app launch after auth, with a 2s delay so it doesn't compete with splash.
+### 3. Green‑checkmark confirmation on return (`src/pages/Auth.tsx`)
 
-### Files
+- Add an `onAuthStateChange` listener on the Auth page (only while unauthenticated UI is mounted). When event is `SIGNED_IN` and `verificationSentTo` (or stored value) matches `session.user.email`:
+  - Swap the Card content for a success state: large animated green `CheckCircle2`, "Email confirmed!", subtext "Welcome to Familial".
+  - After ~1.5s, clear `verificationSentTo`, navigate to `/circles` (or `/upgrade` if `planParam` present — keep existing checkout redirect logic untouched).
+- If the user instead clicks the email link on a different device, the existing redirect path still works — the post‑login flow shows `TermsAcceptanceGate` (no‑op because we stashed acceptance) → `OnboardingFlow` ("Let's get started").
 
-- **New**: `src/hooks/useAppUpdateCheck.ts` — fetch + compare + dismissal state
-- **New**: `src/components/UpdateAvailableDialog.tsx` — the prompt (shadcn Dialog, monochrome theme)
-- **Edit**: `src/App.tsx` — mount `<UpdateAvailableDialog />` once inside the authed shell
+### 4. TermsAcceptanceGate — honor pre‑accepted stash (`src/components/shared/TermsAcceptanceGate.tsx`)
 
-### Required from you
+- On mount, before deciding `needsAcceptance`, check `sessionStorage.pendingTermsAcceptance`. If present and email matches `user.email`, write it to `user_private` immediately and skip the dialog.
+- Legacy users without a current accepted version still see the existing dialog (unchanged).
 
-- **App Store numeric app ID** (the `id######` from your App Store URL, e.g. `id6747...`). Needed for the "Update" button deep link. Bundle ID `com.familialmedia.app` we already have.
+## Technical Notes
 
-### Out of scope
+- No DB migration needed — `user_private.accepted_terms_at` / `accepted_terms_version` already exist.
+- Uses existing `supabase.auth.resend()`; rate‑limit reuses `RESET_COOLDOWN_SECONDS` pattern under a new key (`lastVerificationResendAt`).
+- The success state and the verification panel both live inside the existing Auth Card to keep mobile layout, safe‑area padding, and keyboard handling intact.
+- No changes to `OnboardingFlow` — it still runs after auth + TOS, providing the "Let's get started" steps the user described.
 
-- No force-update / blocking gate (can add later as a `minSupportedBuild` Supabase row if desired)
-- No Android — iOS only for now (matches current Capacitor setup)
-- Updating Version/Build in Xcode itself is manual per release; this only detects after you ship.
+## Out of scope
+
+- Auth email template wording (uses current template; only the in‑app return flow changes).
+- Server‑side enforcement of TOS at signup — Supabase signup endpoint has no metadata hook for this; the stash + gate combination guarantees acceptance is persisted before any app interaction.
