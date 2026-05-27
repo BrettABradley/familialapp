@@ -1908,6 +1908,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      decline_circle_invite: {
+        Args: { _invite_id: string }
+        Returns: undefined
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -1955,6 +1959,7 @@ export type Database = {
           circle_name: string
         }[]
       }
+      leave_group_chat: { Args: { _group_chat_id: string }; Returns: undefined }
       lookup_circle_by_invite_code: {
         Args: { _invite_code: string }
         Returns: {
