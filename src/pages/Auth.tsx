@@ -419,27 +419,22 @@ const Auth = () => {
   // user-visible result toast when the link still hasn't been clicked.
   const handleVerifyPullRefresh = async () => {
     if (!verificationSentTo) return;
-    setIsManualChecking(true);
-    try {
-      const pwd = pendingPasswordRef.current;
-      if (pwd) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: verificationSentTo,
-          password: pwd,
-        });
-        if (!error) return; // success — useEffect handles the green check
-      } else {
-        // No stashed password (app relaunched after signup): refresh any
-        // existing session in case Supabase already flipped the flag.
-        await supabase.auth.refreshSession();
-      }
-      toast({
-        title: "Not verified yet",
-        description: "Tap the link in your email, then pull down again.",
+    const pwd = pendingPasswordRef.current;
+    if (pwd) {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: verificationSentTo,
+        password: pwd,
       });
-    } finally {
-      setIsManualChecking(false);
+      if (!error) return; // success — useEffect handles the green check
+    } else {
+      // No stashed password (app relaunched after signup): refresh any
+      // existing session in case Supabase already flipped the flag.
+      await supabase.auth.refreshSession();
     }
+    toast({
+      title: "Not verified yet",
+      description: "Tap the link in your email, then pull down again.",
+    });
   };
 
 
