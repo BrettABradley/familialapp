@@ -1242,7 +1242,9 @@ const Messages = () => {
             <DialogTitle>Photo</DialogTitle>
             <DialogDescription>Tap outside to close</DialogDescription>
           </DialogHeader>
-          <ZoomableImage src={lightboxUrl} alt="attachment" className="w-full h-full max-h-[95vh] object-contain" />
+          <ZoomableImage onSwipeDown={() => setLightboxUrl(null)} className="w-full h-full max-h-[95vh] flex items-center justify-center">
+            <img src={lightboxUrl} alt="attachment" className="max-w-full max-h-[95vh] object-contain select-none" draggable={false} />
+          </ZoomableImage>
           <button
             type="button"
             onClick={() => handleMediaDownload(lightboxUrl)}
