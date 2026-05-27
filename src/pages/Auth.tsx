@@ -449,6 +449,15 @@ const Auth = () => {
     });
   };
 
+  // On the "Email confirmed!" screen, let the user pull down to force the
+  // hand-off into the app in case the auto-navigate timer got interrupted
+  // (backgrounded tab, slow device, etc.). Also re-checks the session so
+  // a confirmation that happened on another device gets picked up.
+  const handleConfirmedPullRefresh = async () => {
+    await supabase.auth.refreshSession();
+    navigateIntoApp();
+  };
+
 
 
 
