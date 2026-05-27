@@ -670,11 +670,15 @@ const ProfileView = () => {
                       <SquareImageThumbnail src={cover.image_url} alt={cover.caption || "Profile photo"} />
                     )}
                     {count > 1 && (
-                      <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm text-white text-[11px] font-medium px-1.5 py-0.5 rounded-full pointer-events-none">
-                        <Layers className="h-3 w-3" />
-                        {count}
+                      <div
+                        className="absolute top-1 right-1 pointer-events-none text-white"
+                        style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.65))" }}
+                        aria-label={`${count} items`}
+                      >
+                        <Layers className="h-3.5 w-3.5" strokeWidth={2.5} />
                       </div>
                     )}
+
                   </button>
                 );
               })}
