@@ -1,60 +1,54 @@
-## Why it still auto-signed you into Chrome
+## What's actually happening
 
-Three things are working against the current setup:
+Today the verify link does land on `/auth/callback`, but Chrome still ends up signed in. Root cause:
 
-1. **The verify link probably never reached `/auth/callback`.** In `useAuth.signUp()` we use `${window.location.origin}/auth/callback`. If the signup happened from the iOS sim/TestFlight build, `window.location.origin` is `capacitor://localhost`, which Supabase silently rejects and falls back to the project's **Site URL** (the bare published web URL). The verification link then redirects to `https://familialapp.lovable.app/#access_token=...&refresh_token=...` — the **root** route, not `/auth/callback`.
-2. **Index/AuthProvider auto-consumes the hash tokens.** When supabase-js initializes on any page with `access_token` in the URL hash, it auto-creates a session and fires `SIGNED_IN`. Result: you land on `/`, get instantly signed in, AuthCallback never runs, no green check.
-3. **Even when `/auth/callback` does run on web, we exchange the code for a session before signing out.** That brief session is enough to trip any listener watching `user`. Belt-and-suspenders, but worth removing.
+- Supabase's verify endpoint redirects to `/auth/callback?code=…` (PKCE flow — token in the **query string**, not the hash).
+- Our `index.html` early interceptor only looks for hash tokens (`access_token=`, `type=signup`). It never fires.
+- `supabase-js` is created with `detectSessionInUrl: true`, so the moment `main.tsx` boots it sees `?code=` and silently calls `exchangeCodeForSession` → fires `SIGNED_IN` → `AuthProvider` sets `user`.
+- The AppLayout / route guards see an authenticated user and navigate away from `/auth/callback` before its success screen can render. Hence "auto-signed into Chrome, no green check."
 
-## Fix — three small changes that solve all of it
+The `AuthCallback.tsx` web-path `signOut()` runs too late — it races a navigation that already happened.
 
-### 1. Pin the redirect URL to the production web origin
+## The fix
 
-`src/hooks/useAuth.tsx` (both `signUp` and `resendVerification`):
-- Replace `${window.location.origin}/auth/callback` with a constant `https://familialapp.lovable.app/auth/callback`.
-- This guarantees the verify email always points at our handler, regardless of whether signup happened in the web app, the iOS simulator, or TestFlight.
-- iOS Universal Links + AASA already route that URL to the native app when installed; otherwise the browser opens it.
+Intercept the PKCE code **before** `supabase-js` ever sees it, the same way we already do for hash tokens.
 
-### 2. Add a global hash-token interceptor at the App root
+### 1. `index.html` — extend the early inline script
 
-`src/App.tsx` — add a tiny component mounted above `<BrowserRouter>` content (alongside `NativeUrlOpenBridge`):
-- On mount, if `window.location.hash` contains `access_token=` or `type=signup`/`type=recovery`, and we're NOT already on `/auth/callback` or `/reset-password`, do a `window.location.replace("/auth/callback" + window.location.hash)`.
-- This catches any legacy email link that lands on `/` and reroutes before supabase-js auto-signs them in.
-- The replace happens synchronously before AuthProvider mounts effects, so no flash of signed-in state.
+In the existing IIFE, before the module script loads:
 
-### 3. Branch `AuthCallback.tsx` by platform
+- If `location.pathname === "/auth/callback"` AND `location.search` contains `code=` (and we're not native — `index.html` only runs in real web browsers, so this is implicit):
+  - Stash the full original query string (`window.location.search`) and hash in `sessionStorage` under `familial:pendingVerifyParams`.
+  - `history.replaceState({}, "", "/auth/callback")` to wipe `?code=…` from the URL so `detectSessionInUrl` finds nothing.
+- Keep the existing hash-token branch for `/`, `/index.html`, etc.
 
-Right now it always exchanges the code and then signs out. Split the behavior:
+This guarantees supabase-js boots into a clean URL on `/auth/callback` and never creates a session.
 
-- **Web (`!Capacitor.isNativePlatform()`)**:
-  - **Do not call `exchangeCodeForSession` at all.** The Supabase `/auth/v1/verify` endpoint already set `email_confirmed_at` server-side before redirecting to us. We don't need a session to "prove" the verification.
-  - Just strip the URL, set `localStorage.setItem("familial:emailJustVerified", "1")` (used by the app for the welcome flash), and render the green check + "Open Familial app" / "Continue in browser" UI we already have.
-  - Removes the sign-out gymnastics entirely — no session is ever created in the browser.
+### 2. `src/pages/AuthCallback.tsx` — read the stashed params on web
 
-- **Native (`Capacitor.isNativePlatform()`)**:
-  - Exchange the code → user is now signed in inside the app.
-  - Set `sessionStorage.setItem("familial:emailJustVerified", "1")`.
-  - `navigate("/circles", { replace: true })` (or wherever the TermsAcceptanceGate / first-circle onboarding starts). The gate already runs there and will continue the funnel.
+In the web branch only:
 
-### 4. Show the "Email verified" flash once after sign-in
+- Read `sessionStorage.getItem("familial:pendingVerifyParams")` to recover the original `?code=…` / hash for error detection (so we can still show "Link expired" if Supabase returned `error_description`).
+- Do **not** call `exchangeCodeForSession` (unchanged).
+- Still set `familial:emailJustVerified = "1"`, still belt-and-suspenders `signOut()` + clear `sb-*-auth-token` keys (harmless no-op now), and render the green-check screen.
+- Delete the stash key after reading.
 
-`src/components/layout/AppLayout.tsx` (or wherever post-auth landing renders) — add a one-shot effect:
-- On mount, if `localStorage.getItem("familial:emailJustVerified") === "1"` AND there's a signed-in user, fire a 2-second toast with a green check + "Email verified — welcome to Familial" then `localStorage.removeItem("familial:emailJustVerified")`.
-- Works for both flows:
-  - **Web path**: user verifies → returns to app on phone → opens app → signs in → flash fires.
-  - **Native path**: user taps link → Universal Link opens app → AuthCallback handles exchange → routes to `/circles` → flash fires once.
+Native branch is unchanged — Capacitor receives the deep link through `appUrlOpen` and `AuthCallback` exchanges the code normally so onboarding starts immediately.
 
-### What I am NOT changing
+### 3. Verify (no other changes)
 
-- The `auth-email-hook` and template files — `confirmationUrl: payload.data.url` is correct; the URL Supabase generates already encodes our `redirect_to`. Once #1 above is in, the URL it produces will be right.
-- The `Auth.tsx` signup form, verification panel, or the iOS bundle/AASA — those are already correct.
-- The orphan-user rate-limit work from the earlier plan — still parked.
+- `useAuth.signUp` already pins `emailRedirectTo` to `https://familialapp.lovable.app/auth/callback` — keep as is.
+- `AppLayout` already flashes the green-check toast when `familial:emailJustVerified === "1"` after sign-in — keep as is.
+- No DB / edge function / email template changes needed.
 
-## Test matrix (after the change)
+## Expected flow after the fix
 
-| Where you signed up | Where you clicked the link | Expected |
-|---|---|---|
-| Web (Chrome) | Chrome | Green check page, NOT signed in, "Open app" + "Continue in browser" |
-| Web (Chrome) | Phone (iOS app installed) | App opens, exchanges, flashes "Email verified", lands in onboarding |
-| iOS app | Chrome | Same as row 1 (green check on web, app-side sign-in still required) |
-| iOS app | Phone | Same as row 2 |
+1. User taps **Verify Email** in Gmail on their phone/desktop.
+2. Supabase verifies server-side, redirects to `https://familialapp.lovable.app/auth/callback?code=…`.
+3. `index.html` strips `?code=…` instantly, before React/supabase-js mount. No session is ever created in this browser.
+4. Green check + "Email verified — open the Familial app" renders. Browser stays signed out.
+5. User opens the Familial app, signs in once → `AppLayout` mounts, sees the `emailJustVerified` flag, flashes a green-check toast, and the onboarding gate continues to circle creation.
+
+## Out of scope
+
+Auth email templates, rate-limit handling, Supabase auth config, and the `auth-email-hook` itself. This is purely a client-side URL-handoff fix.
