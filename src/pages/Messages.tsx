@@ -190,12 +190,15 @@ const Messages = () => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const isSendingRef = useRef(false);
 
   // Media attachment state
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // Lightbox state: items + active index. Items are signed URLs scoped to the
+  // tapped message so swipe-between only walks that message's media.
+  const [lightbox, setLightbox] = useState<{ items: string[]; index: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Group chat state
