@@ -17,6 +17,7 @@ import { validateFileSize, getFileMediaType } from "@/lib/mediaUtils";
 import { blobToVoiceNoteFile } from "@/lib/voiceNoteFile";
 import { convertHeicFiles } from "@/lib/heicConverter";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
+import { getPostMediaUrls } from "@/lib/postMediaUrl";
 
 interface CreatePostFormProps {
   onPostCreated: () => void;
