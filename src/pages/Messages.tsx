@@ -84,41 +84,62 @@ interface GroupMessage {
 type ChatView = "list" | "dm" | "group";
 
 // Resolves stored paths / legacy public URLs to signed URLs before render.
+// Returns visual media (images/videos) for the lightbox so callers can swipe
+// between them; audio renders inline as a standalone player.
 const MessageMedia = ({
   mediaUrls,
   onOpenLightbox,
-  onDownload,
 }: {
   mediaUrls?: string[];
-  onOpenLightbox: (url: string) => void;
-  onDownload: (url: string) => void;
+  onOpenLightbox: (items: string[], index: number) => void;
 }) => {
   const { urls } = useSignedMediaUrls(mediaUrls || []);
   if (!mediaUrls || mediaUrls.length === 0) return null;
+
+  // Lightbox-able items (images + videos), with their original order preserved.
+  const visualItems = urls.filter((u) => {
+    if (!u) return false;
+    const t = getMediaType(u);
+    return t === "image" || t === "video";
+  });
+
   return (
     <div className="mt-2 space-y-2">
       {urls.map((url, i) => {
         if (!url) return null;
         const type = getMediaType(url);
-        if (type === 'video') return <video key={i} src={url} controls playsInline className="rounded-md max-w-full max-h-48" />;
-        if (type === 'audio') return <audio key={i} src={url} controls className="w-full max-w-[240px]" />;
-        return (
-          <div key={i} className="relative inline-block group">
-            <img
-              src={url}
-              alt="attachment"
-              className="rounded-md max-w-full max-h-48 cursor-zoom-in"
-              onClick={() => onOpenLightbox(url)}
-            />
+        if (type === "video") {
+          const visualIndex = visualItems.indexOf(url);
+          return (
             <button
+              key={i}
               type="button"
-              onClick={(e) => { e.stopPropagation(); onDownload(url); }}
-              className="absolute top-1 right-1 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm"
-              aria-label="Download photo"
+              onClick={() => onOpenLightbox(visualItems, Math.max(0, visualIndex))}
+              className="block rounded-md overflow-hidden max-w-full"
             >
-              <Download className="h-4 w-4" />
+              <video src={url} playsInline muted className="rounded-md max-w-full max-h-72" />
             </button>
-          </div>
+          );
+        }
+        if (type === "audio") {
+          return <audio key={i} src={url} controls className="w-full max-w-[240px]" />;
+        }
+        const visualIndex = visualItems.indexOf(url);
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onOpenLightbox(visualItems, Math.max(0, visualIndex))}
+            className="block rounded-md overflow-hidden max-w-full cursor-zoom-in"
+            aria-label="Open photo"
+          >
+            <SmartImage
+              src={url}
+              preset="card"
+              alt=""
+              className="rounded-md max-w-full max-h-72 object-cover"
+            />
+          </button>
         );
       })}
     </div>
