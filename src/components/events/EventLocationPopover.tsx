@@ -3,7 +3,7 @@ import { MapPin, Bell, Loader2, Check } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { openExternalUrl } from "@/lib/externalUrl";
+import { openMapsApp } from "@/lib/externalUrl";
 
 interface Props {
   location: string;
@@ -12,15 +12,6 @@ interface Props {
 }
 
 type MapApp = "apple" | "google";
-
-// Apple Maps: https://maps.apple.com is a universal link on iOS — the OS
-// hands it straight to the Apple Maps app when we call App.openUrl.
-// Google Maps: https://www.google.com/maps is a universal link for the
-// Google Maps iOS app when installed; otherwise iOS opens it in Safari.
-const mapUrl = (app: MapApp, location: string) =>
-  app === "apple"
-    ? `https://maps.apple.com/?q=${encodeURIComponent(location)}`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
 
 export function EventLocationPopover({ location, eventId, isHost }: Props) {
   const { toast } = useToast();
