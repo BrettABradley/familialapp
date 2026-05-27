@@ -1,19 +1,38 @@
-## Lightbox landscape mode fix
+## In-app "New update available" prompt
 
-Harden the top control bar (X + Download) in all lightboxes so they stay tappable in landscape on notched iPhones.
+Detect when the user's installed iOS app version is older than the latest App Store version, then show a non-blocking prompt linking to the App Store listing.
 
-### Changes per lightbox top bar
+### How it works
 
-1. `z-30` → `z-50` (sit above embla viewport + zoom-pan-pinch wrapper)
-2. Add `pointer-events-auto` on the button container so taps register even when ancestor sets `touch-action: none`
-3. Right padding: `pr-4` → `pr-[max(env(safe-area-inset-right,0px),1rem)]` (clear the notch/camera bumper in landscape)
-4. Left padding: add `pl-[max(env(safe-area-inset-left,0px),1rem)]` for symmetry
+1. **Source of truth — Apple's iTunes Lookup API** (no key, no setup):
+   `https://itunes.apple.com/lookup?bundleId=com.familialmedia.app&country=us`
+   Returns the live App Store `version` (e.g. `73.0.1`).
+
+2. **Compare against the installed version** using `@capacitor/app`'s `App.getInfo()` → returns `version` and `build` from Xcode (the fields in your screenshot).
+
+3. **Semver compare**. If App Store version > installed version, show prompt.
+
+4. **Prompt UX** — bottom sheet / dialog:
+   - Title: "Update Available"
+   - Body: "A new version of Familial (vX.X.X) is available on the App Store."
+   - Buttons: **Update** (opens `https://apps.apple.com/app/id<APP_ID>`) and **Later**
+   - "Later" dismisses for 24 hours via localStorage timestamp
+   - Native-only (skip on web via `Capacitor.isNativePlatform()`)
+
+5. **When it runs** — once on app launch after auth, with a 2s delay so it doesn't compete with splash.
 
 ### Files
 
-- `src/components/feed/PostCard.tsx` — feed lightbox top bar (~line 398)
-- `src/pages/Albums.tsx` — album lightbox top bar (~line 122)
-- `src/pages/ProfileView.tsx` — avatar zoom (~line 80) and post lightbox (~line 689)
-- `src/pages/Messages.tsx` — message image attachment lightbox (~line 1248)
+- **New**: `src/hooks/useAppUpdateCheck.ts` — fetch + compare + dismissal state
+- **New**: `src/components/UpdateAvailableDialog.tsx` — the prompt (shadcn Dialog, monochrome theme)
+- **Edit**: `src/App.tsx` — mount `<UpdateAvailableDialog />` once inside the authed shell
 
-No portrait behavior changes, no logic changes, presentation-only.
+### Required from you
+
+- **App Store numeric app ID** (the `id######` from your App Store URL, e.g. `id6747...`). Needed for the "Update" button deep link. Bundle ID `com.familialmedia.app` we already have.
+
+### Out of scope
+
+- No force-update / blocking gate (can add later as a `minSupportedBuild` Supabase row if desired)
+- No Android — iOS only for now (matches current Capacitor setup)
+- Updating Version/Build in Xcode itself is manual per release; this only detects after you ship.
