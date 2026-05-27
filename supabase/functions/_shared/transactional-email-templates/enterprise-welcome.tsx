@@ -49,5 +49,6 @@ const main = { backgroundColor: '#ffffff', fontFamily: 'Georgia, serif' }
 const container = { padding: '32px 28px', maxWidth: '560px' }
 const h1 = { fontFamily: 'Georgia, serif', fontSize: '26px', fontWeight: 'bold' as const, color: '#000000', margin: '0 0 20px' }
 const text = { fontFamily: 'Arial, sans-serif', fontSize: '15px', color: '#333333', lineHeight: '1.6', margin: '0 0 18px' }
+const link = { color: '#000000', textDecoration: 'underline' }
 const signoff = { fontFamily: 'Georgia, serif', fontSize: '15px', color: '#000000', lineHeight: '1.6', margin: '28px 0 0' }
 const footerSmall = { fontFamily: 'Arial, sans-serif', fontSize: '12px', color: '#999999' }
