@@ -26,6 +26,7 @@ import { pickImage } from "@/lib/imagePicker";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
+import { useSignedMediaUrls, getPostMediaUrl } from "@/lib/postMediaUrl";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -596,8 +597,8 @@ const Messages = () => {
       });
       
       if (error) continue;
-      const { data } = supabase.storage.from("post-media").getPublicUrl(fileName);
-      uploadedUrls.push(data.publicUrl);
+      // Store the bare storage path; renderers resolve to signed URLs.
+      uploadedUrls.push(fileName);
     }
     setUploadProgress(100);
     return uploadedUrls;
@@ -703,11 +704,14 @@ const Messages = () => {
     }
   };
 
-  const renderMediaAttachments = (mediaUrls?: string[]) => {
+  // Resolves stored paths / legacy public URLs to signed URLs before render.
+  const MessageMedia = ({ mediaUrls }: { mediaUrls?: string[] }) => {
+    const { urls } = useSignedMediaUrls(mediaUrls || []);
     if (!mediaUrls || mediaUrls.length === 0) return null;
     return (
       <div className="mt-2 space-y-2">
-        {mediaUrls.map((url, i) => {
+        {urls.map((url, i) => {
+          if (!url) return null;
           const type = getMediaType(url);
           if (type === 'video') return <video key={i} src={url} controls playsInline className="rounded-md max-w-full max-h-48" />;
           if (type === 'audio') return <audio key={i} src={url} controls className="w-full max-w-[240px]" />;
@@ -733,6 +737,7 @@ const Messages = () => {
       </div>
     );
   };
+  const renderMediaAttachments = (mediaUrls?: string[]) => <MessageMedia mediaUrls={mediaUrls} />;
 
   const renderFilePreviewBar = () => {
     if (previewUrls.length === 0) return null;
