@@ -25,7 +25,8 @@ import { convertHeicFiles, convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
-import { ZoomableImage } from "@/components/shared/ZoomableImage";
+import { MediaLightbox } from "@/components/shared/MediaLightbox";
+import { SmartImage } from "@/components/shared/SmartImage";
 import { useSignedMediaUrls, getPostMediaUrl } from "@/lib/postMediaUrl";
 import {
   AlertDialog,
@@ -83,41 +84,62 @@ interface GroupMessage {
 type ChatView = "list" | "dm" | "group";
 
 // Resolves stored paths / legacy public URLs to signed URLs before render.
+// Returns visual media (images/videos) for the lightbox so callers can swipe
+// between them; audio renders inline as a standalone player.
 const MessageMedia = ({
   mediaUrls,
   onOpenLightbox,
-  onDownload,
 }: {
   mediaUrls?: string[];
-  onOpenLightbox: (url: string) => void;
-  onDownload: (url: string) => void;
+  onOpenLightbox: (items: string[], index: number) => void;
 }) => {
   const { urls } = useSignedMediaUrls(mediaUrls || []);
   if (!mediaUrls || mediaUrls.length === 0) return null;
+
+  // Lightbox-able items (images + videos), with their original order preserved.
+  const visualItems = urls.filter((u) => {
+    if (!u) return false;
+    const t = getMediaType(u);
+    return t === "image" || t === "video";
+  });
+
   return (
     <div className="mt-2 space-y-2">
       {urls.map((url, i) => {
         if (!url) return null;
         const type = getMediaType(url);
-        if (type === 'video') return <video key={i} src={url} controls playsInline className="rounded-md max-w-full max-h-48" />;
-        if (type === 'audio') return <audio key={i} src={url} controls className="w-full max-w-[240px]" />;
-        return (
-          <div key={i} className="relative inline-block group">
-            <img
-              src={url}
-              alt="attachment"
-              className="rounded-md max-w-full max-h-48 cursor-zoom-in"
-              onClick={() => onOpenLightbox(url)}
-            />
+        if (type === "video") {
+          const visualIndex = visualItems.indexOf(url);
+          return (
             <button
+              key={i}
               type="button"
-              onClick={(e) => { e.stopPropagation(); onDownload(url); }}
-              className="absolute top-1 right-1 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm"
-              aria-label="Download photo"
+              onClick={() => onOpenLightbox(visualItems, Math.max(0, visualIndex))}
+              className="block rounded-md overflow-hidden max-w-full"
             >
-              <Download className="h-4 w-4" />
+              <video src={url} playsInline muted className="rounded-md max-w-full max-h-72" />
             </button>
-          </div>
+          );
+        }
+        if (type === "audio") {
+          return <audio key={i} src={url} controls className="w-full max-w-[240px]" />;
+        }
+        const visualIndex = visualItems.indexOf(url);
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onOpenLightbox(visualItems, Math.max(0, visualIndex))}
+            className="block rounded-md overflow-hidden max-w-full cursor-zoom-in"
+            aria-label="Open photo"
+          >
+            <SmartImage
+              src={url}
+              preset="card"
+              alt=""
+              className="rounded-md max-w-full max-h-72 object-cover"
+            />
+          </button>
         );
       })}
     </div>
@@ -168,12 +190,15 @@ const Messages = () => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const isSendingRef = useRef(false);
 
   // Media attachment state
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // Lightbox state: items + active index. Items are signed URLs scoped to the
+  // tapped message so swipe-between only walks that message's media.
+  const [lightbox, setLightbox] = useState<{ items: string[]; index: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Group chat state
@@ -579,8 +604,11 @@ const Messages = () => {
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let files = Array.from(e.target.files || []);
-    if (files.length + selectedFiles.length > 4) {
-      toast({ title: "Too many files", description: "You can attach up to 4 files per message.", variant: "destructive" });
+    // Messages send one attachment at a time so each photo arrives as its own
+    // chat bubble — matches iMessage/WhatsApp behavior and keeps the lightbox
+    // scoped to a single image per message.
+    if (selectedFiles.length > 0 || files.length > 1) {
+      toast({ title: "One at a time", description: "Send the current attachment first, then add another.", variant: "destructive" });
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -599,8 +627,8 @@ const Messages = () => {
   };
 
   const handleVoiceRecording = async (blob: Blob) => {
-    if (selectedFiles.length >= 4) {
-      toast({ title: "Too many files", description: "You can attach up to 4 files per message.", variant: "destructive" });
+    if (selectedFiles.length >= 1) {
+      toast({ title: "One at a time", description: "Send the current attachment first, then record a voice note.", variant: "destructive" });
       return;
     }
     if (!blob || blob.size === 0) {
@@ -655,85 +683,89 @@ const Messages = () => {
 
   const handleSendMessage = async () => {
     if ((!newMessage.trim() && selectedFiles.length === 0) || !user) return;
+    // Synchronous guard prevents double-sends on iOS when both `touchend` and
+    // `click` fire before React flushes `isSending`.
+    if (isSendingRef.current) return;
+    isSendingRef.current = true;
     setIsSending(true);
 
-    // Refresh session to ensure token is fresh before insert
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session?.user) {
-      toast({ title: "Session expired", description: "Please sign in again.", variant: "destructive" });
+    try {
+      // Refresh session to ensure token is fresh before insert
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session?.user) {
+        toast({ title: "Session expired", description: "Please sign in again.", variant: "destructive" });
+        return;
+      }
+      const senderId = session.user.id;
+
+      let mediaUrls: string[] = [];
+      if (selectedFiles.length > 0) mediaUrls = await uploadFiles();
+
+      // Media-only messages now persist an empty `content` instead of the
+      // legacy "(attachment)" placeholder. Renderers still hide the legacy
+      // string for back-compat.
+      if (chatView === "dm" && selectedUser) {
+        const optimisticMsg: Message = {
+          id: crypto.randomUUID(),
+          sender_id: senderId,
+          recipient_id: selectedUser.user_id,
+          content: newMessage.trim(),
+          is_read: false,
+          created_at: new Date().toISOString(),
+          media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
+        };
+        const savedContent = newMessage;
+        setMessages(prev => [...prev, optimisticMsg]);
+        clearDraft();
+        setNewMessage("");
+        clearMediaState();
+
+        const { error } = await supabase.from("private_messages").insert({
+          sender_id: senderId,
+          recipient_id: selectedUser.user_id,
+          content: savedContent.trim(),
+          media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+        });
+        if (error) {
+          console.error("DM send error:", JSON.stringify(error));
+          setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+          setNewMessage(savedContent);
+          toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
+        } else {
+          fetchConversations();
+        }
+      } else if (chatView === "group" && selectedGroup) {
+        const optimisticMsg: GroupMessage = {
+          id: crypto.randomUUID(),
+          group_chat_id: selectedGroup.id,
+          sender_id: senderId,
+          content: newMessage.trim(),
+          created_at: new Date().toISOString(),
+          media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
+        };
+        const savedContent = newMessage;
+        setGroupMessages(prev => [...prev, optimisticMsg]);
+        clearDraft();
+        setNewMessage("");
+        clearMediaState();
+
+        const { error } = await supabase.from("group_chat_messages").insert({
+          group_chat_id: selectedGroup.id,
+          sender_id: senderId,
+          content: savedContent.trim(),
+          media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+        });
+        if (error) {
+          console.error("Group send error:", JSON.stringify(error));
+          setGroupMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+          setNewMessage(savedContent);
+          toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
+        }
+      }
+    } finally {
+      isSendingRef.current = false;
       setIsSending(false);
-      return;
     }
-    const senderId = session.user.id;
-
-    let mediaUrls: string[] = [];
-    if (selectedFiles.length > 0) mediaUrls = await uploadFiles();
-
-    if (chatView === "dm" && selectedUser) {
-      // Optimistic: append message locally immediately
-      const optimisticMsg: Message = {
-        id: crypto.randomUUID(),
-        sender_id: senderId,
-        recipient_id: selectedUser.user_id,
-        content: newMessage.trim() || "(attachment)",
-        is_read: false,
-        created_at: new Date().toISOString(),
-        media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
-      };
-      const savedContent = newMessage;
-      setMessages(prev => [...prev, optimisticMsg]);
-      clearDraft();
-      setNewMessage("");
-      clearMediaState();
-
-      const { error } = await supabase.from("private_messages").insert({
-        sender_id: senderId,
-        recipient_id: selectedUser.user_id,
-        content: savedContent.trim() || "(attachment)",
-        media_urls: mediaUrls.length > 0 ? mediaUrls : null,
-      });
-      if (error) {
-        console.error("DM send error:", JSON.stringify(error));
-        // Revert optimistic update
-        setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
-        setNewMessage(savedContent);
-        toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
-      } else {
-        // Silent background sync
-        fetchConversations();
-      }
-    } else if (chatView === "group" && selectedGroup) {
-      // Optimistic: append message locally immediately
-      const optimisticMsg: GroupMessage = {
-        id: crypto.randomUUID(),
-        group_chat_id: selectedGroup.id,
-        sender_id: senderId,
-        content: newMessage.trim() || "(attachment)",
-        created_at: new Date().toISOString(),
-        media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
-      };
-      const savedContent = newMessage;
-      setGroupMessages(prev => [...prev, optimisticMsg]);
-      clearDraft();
-      setNewMessage("");
-      clearMediaState();
-
-      const { error } = await supabase.from("group_chat_messages").insert({
-        group_chat_id: selectedGroup.id,
-        sender_id: senderId,
-        content: savedContent.trim() || "(attachment)",
-        media_urls: mediaUrls.length > 0 ? mediaUrls : null,
-      });
-      if (error) {
-        console.error("Group send error:", JSON.stringify(error));
-        // Revert optimistic update
-        setGroupMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
-        setNewMessage(savedContent);
-        toast({ title: "Error", description: "Failed to send message. Please try again.", variant: "destructive" });
-      }
-    }
-
-    setIsSending(false);
   };
 
   const handleMediaDownload = async (url: string) => {
@@ -749,9 +781,35 @@ const Messages = () => {
   const renderMediaAttachments = (mediaUrls?: string[]) => (
     <MessageMedia
       mediaUrls={mediaUrls}
-      onOpenLightbox={setLightboxUrl}
-      onDownload={handleMediaDownload}
+      onOpenLightbox={(items, index) => setLightbox({ items, index })}
     />
+  );
+
+  // Shared lightbox JSX — rendered inside each top-level return (list / dm /
+  // group) so it works regardless of which view is active. Keeping it inside
+  // the same render tree (instead of after early returns) prevents the chat
+  // view from unmounting when the lightbox opens/closes.
+  const lightboxNode = lightbox && (
+    <Dialog
+      open={!!lightbox}
+      onOpenChange={(o) => { if (!o) setLightbox(null); }}
+    >
+      <DialogContent
+        className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center z-[100]"
+      >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Photo</DialogTitle>
+          <DialogDescription>Swipe down or tap close to dismiss</DialogDescription>
+        </DialogHeader>
+        <MediaLightbox
+          items={lightbox.items}
+          startIndex={lightbox.index}
+          onIndexChange={(i) => setLightbox((prev) => prev ? { ...prev, index: i } : prev)}
+          onClose={() => setLightbox(null)}
+          onDownload={handleMediaDownload}
+        />
+      </DialogContent>
+    </Dialog>
   );
 
   const renderFilePreviewBar = () => {
@@ -915,7 +973,7 @@ const Messages = () => {
             messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[70%] rounded-lg px-4 py-2 ${msg.sender_id === user?.id ? 'bg-foreground text-background' : 'bg-secondary text-foreground'}`}>
-                  {msg.content && msg.content.toLowerCase() !== '(attachment)' && <p>{msg.content}</p>}
+                  {msg.content?.trim() && msg.content.toLowerCase() !== '(attachment)' && <p>{msg.content}</p>}
                   {renderMediaAttachments(msg.media_urls)}
                   <p className={`text-xs mt-1 ${msg.sender_id === user?.id ? 'text-background/70' : 'text-muted-foreground'}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
@@ -931,6 +989,7 @@ const Messages = () => {
             renderMessageInput()
           )}
         </div>
+        {lightboxNode}
       </div>
     );
     return isMobile ? createPortal(dmView, document.body) : dmView;
@@ -1069,7 +1128,7 @@ const Messages = () => {
                     {!isMe && (
                       <Link to={`/profile/${msg.sender_id}`} className="text-xs font-semibold mb-1 opacity-70 hover:underline block">{senderProfile?.display_name || "Deleted User"}</Link>
                     )}
-                    {msg.content && <p>{msg.content}</p>}
+                    {msg.content?.trim() && msg.content.toLowerCase() !== '(attachment)' && <p>{msg.content}</p>}
                     {renderMediaAttachments(msg.media_urls)}
                     <p className={`text-xs mt-1 ${isMe ? 'text-background/70' : 'text-muted-foreground'}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
@@ -1086,6 +1145,7 @@ const Messages = () => {
             renderMessageInput()
           )}
         </div>
+        {lightboxNode}
       </div>
     );
     return isMobile ? createPortal(groupView, document.body) : groupView;
@@ -1255,37 +1315,7 @@ const Messages = () => {
         </div>
       )}
     </main>
-    {lightboxUrl && (
-      <Dialog open={!!lightboxUrl} onOpenChange={(o) => !o && setLightboxUrl(null)}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black border-none overflow-hidden">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Photo</DialogTitle>
-            <DialogDescription>Tap outside to close</DialogDescription>
-          </DialogHeader>
-          <ZoomableImage onSwipeDown={() => setLightboxUrl(null)} className="w-full h-full max-h-[95vh] flex items-center justify-center">
-            <img src={lightboxUrl} alt="attachment" className="max-w-full max-h-[95vh] object-contain select-none" draggable={false} />
-          </ZoomableImage>
-          <div className="pointer-events-auto absolute top-0 left-0 right-0 z-50 flex items-center justify-end gap-2 pl-[max(env(safe-area-inset-left,0px),1rem)] pr-[max(env(safe-area-inset-right,0px),1rem)] pt-[max(env(safe-area-inset-top,0px),1rem)]">
-            <button
-              type="button"
-              onClick={() => handleMediaDownload(lightboxUrl)}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-              aria-label="Download photo"
-            >
-              <Download className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setLightboxUrl(null)}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
-              aria-label="Close"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    )}
+    {lightboxNode}
     </PullToRefreshWrapper>
   );
 };
