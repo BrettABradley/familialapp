@@ -13,6 +13,7 @@ import { UpdateGate } from "@/components/UpdateGate";
 import Index from "./pages/Index";
 import Unsubscribe from "./pages/Unsubscribe";
 import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
 import Feed from "./pages/Feed";
 import Circles from "./pages/Circles";
 import Store from "./pages/Store";
