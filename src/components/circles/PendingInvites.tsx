@@ -141,10 +141,7 @@ const PendingInvites = ({ compact = false, onCountChange }: PendingInvitesProps)
     if (!user?.email) return;
     setProcessingIds((prev) => new Set(prev).add(invite.id));
 
-    const { error } = await supabase
-      .from("circle_invites")
-      .update({ status: "declined" })
-      .eq("id", invite.id);
+    const { error } = await (supabase as any).rpc("decline_circle_invite", { _invite_id: invite.id });
 
     if (error) {
       console.error("Decline invite error:", error);

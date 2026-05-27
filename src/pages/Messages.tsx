@@ -129,6 +129,7 @@ const Messages = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Group chat state
@@ -504,19 +505,17 @@ const Messages = () => {
 
   const handleLeaveGroup = async () => {
     if (!selectedGroup || !user) return;
-    const { error } = await supabase
-      .from("group_chat_members")
-      .delete()
-      .eq("group_chat_id", selectedGroup.id)
-      .eq("user_id", user.id);
+    // Close the dialog FIRST so the UI never freezes waiting on the network.
+    setIsLeaveGroupOpen(false);
+    const groupId = selectedGroup.id;
+    const { error } = await (supabase as any).rpc("leave_group_chat", { _group_chat_id: groupId });
     if (error) {
       toast({ title: "Error", description: error.message || "Failed to leave group chat.", variant: "destructive" });
       return;
     }
-    setGroupChats(prev => prev.filter(g => g.id !== selectedGroup.id));
+    setGroupChats(prev => prev.filter(g => g.id !== groupId));
     setSelectedGroup(null);
     setChatView("list");
-    setIsLeaveGroupOpen(false);
     toast({ title: "You left the group" });
   };
 
@@ -716,8 +715,8 @@ const Messages = () => {
               <img
                 src={url}
                 alt="attachment"
-                className="rounded-md max-w-full max-h-48 cursor-pointer"
-                onClick={() => handleMediaDownload(url)}
+                className="rounded-md max-w-full max-h-48 cursor-zoom-in"
+                onClick={() => setLightboxUrl(url)}
               />
               <button
                 type="button"
@@ -895,7 +894,7 @@ const Messages = () => {
             messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[70%] rounded-lg px-4 py-2 ${msg.sender_id === user?.id ? 'bg-foreground text-background' : 'bg-secondary text-foreground'}`}>
-                  {msg.content && <p>{msg.content}</p>}
+                  {msg.content && msg.content.toLowerCase() !== '(attachment)' && <p>{msg.content}</p>}
                   {renderMediaAttachments(msg.media_urls)}
                   <p className={`text-xs mt-1 ${msg.sender_id === user?.id ? 'text-background/70' : 'text-muted-foreground'}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>

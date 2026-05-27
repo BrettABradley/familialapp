@@ -170,7 +170,16 @@ async function runPushRegistration(): Promise<PushRegistrationResult> {
       await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
         const link = action.notification?.data?.link;
         if (link && typeof link === 'string') {
-          window.location.href = link;
+          // Use SPA navigation so the bottom nav, back button, and React Router
+          // state stay intact. window.location.href triggers a full reload and
+          // can trap the user inside a route (e.g. /messages) because the
+          // history stack is wiped and AppLayout remounts in a weird state.
+          try {
+            window.history.pushState({}, '', link);
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          } catch {
+            window.location.href = link;
+          }
         }
       });
 
