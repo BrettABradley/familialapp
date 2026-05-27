@@ -25,7 +25,8 @@ import { convertHeicFiles, convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
-import { ZoomableImage } from "@/components/shared/ZoomableImage";
+import { MediaLightbox } from "@/components/shared/MediaLightbox";
+import { SmartImage } from "@/components/shared/SmartImage";
 import { useSignedMediaUrls, getPostMediaUrl } from "@/lib/postMediaUrl";
 import {
   AlertDialog,
