@@ -43,6 +43,10 @@ const Auth = () => {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [isResending, setIsResending] = useState(false);
   const checkoutTriggered = useRef(false);
+  // Stashed signup password so we can silently poll signInWithPassword
+  // until Supabase flips email_confirmed_at — auto-advances the app off
+  // the "Check your email" screen as soon as the user clicks the link.
+  const pendingPasswordRef = useRef<string | null>(null);
 
 
 
