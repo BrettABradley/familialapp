@@ -1,48 +1,32 @@
 ## Goal
 
-1. Make Terms of Service acceptance happen **on the signup form** (compliance: agreement before account creation), keeping the post‑login TOS dialog only as a fallback for legacy accounts.
-2. Replace the silent "Check your email" toast with a **dedicated verification‑pending screen**, and when the user returns from the email link, show a **green checkmark success state** before dropping them into the app.
+Revert the signup‑form TOS checkbox. TOS acceptance stays where it already lives: a gate that appears **after email verification** and **before** the "Let's create your first circle" onboarding prompt — already implemented by `TermsAcceptanceGate` wrapping `OnboardingFlow` in `AppLayout`.
+
+Keep all other recent changes (dedicated "Check your email" panel, resend, green‑checkmark success state).
 
 ## Changes
 
-### 1. Signup form — inline TOS acceptance (`src/pages/Auth.tsx`)
+### 1. `src/pages/Auth.tsx`
+- Remove the TOS checkbox UI from the signup form.
+- Remove `tosAccepted` state, its `tos` error field, and the `tos` validation branch in `handleSubmit`.
+- Remove the `sessionStorage.setItem(PENDING_TERMS_KEY, ...)` stash on signup success (no longer needed — TOS is collected post‑verify).
+- Remove the `Link` import and `PENDING_TERMS_KEY` constant if unused after the cleanup.
+- Drop the `setTosAccepted(false)` call from the login/signup toggle handler.
+- Keep `ageConfirmed` checkbox (COPPA 13+) — that stays at signup.
 
-- Add a second checkbox below the age checkbox (signup only):
-  > "I agree to the [Terms of Service](/terms) and [Privacy Policy](/privacy)."
-- New state `tosAccepted`. Submit blocked (with inline error) until checked.
-- After `signUp()` succeeds, immediately record acceptance so the post‑login TOS dialog does not re‑prompt:
-  - Stash `{ accepted_terms_at, accepted_terms_version: "2026-05-17", email }` in `sessionStorage` under `pendingTermsAcceptance`.
-  - On first authenticated session (in `TermsAcceptanceGate`), if that stash matches `auth.user.email`, upsert to `user_private` and clear the stash. (Can't upsert at signup time — user isn't authenticated until email confirm.)
+### 2. `src/components/shared/TermsAcceptanceGate.tsx`
+- Remove the `pendingTermsAcceptance` sessionStorage shortcut added previously.
+- Restore the original behavior: query `user_private`, show the TOS dialog if the current version isn't accepted. Gate runs after sign‑in and before `OnboardingFlow` (existing AppLayout order).
 
-### 2. Dedicated "verification email sent" screen (`src/pages/Auth.tsx`)
+## Resulting flow (post‑fix)
 
-- New local state `verificationSentTo: string | null`. On successful signup, set it to the email instead of toasting + flipping to login.
-- When set, the `<Card>` body renders a verification panel instead of the form:
-  - Large mail icon, heading "Check your email", body "We sent a verification link to **{email}**. Open it on this device to finish setting up your account."
-  - "Resend email" button (calls `supabase.auth.resend({ type: 'signup', email })`) with the existing 60s cooldown pattern.
-  - "Use a different email" link → clears state, returns to signup form.
-- Persist `verificationSentTo` in `sessionStorage` so refreshing the Auth tab keeps the panel.
-
-### 3. Green‑checkmark confirmation on return (`src/pages/Auth.tsx`)
-
-- Add an `onAuthStateChange` listener on the Auth page (only while unauthenticated UI is mounted). When event is `SIGNED_IN` and `verificationSentTo` (or stored value) matches `session.user.email`:
-  - Swap the Card content for a success state: large animated green `CheckCircle2`, "Email confirmed!", subtext "Welcome to Familial".
-  - After ~1.5s, clear `verificationSentTo`, navigate to `/circles` (or `/upgrade` if `planParam` present — keep existing checkout redirect logic untouched).
-- If the user instead clicks the email link on a different device, the existing redirect path still works — the post‑login flow shows `TermsAcceptanceGate` (no‑op because we stashed acceptance) → `OnboardingFlow` ("Let's get started").
-
-### 4. TermsAcceptanceGate — honor pre‑accepted stash (`src/components/shared/TermsAcceptanceGate.tsx`)
-
-- On mount, before deciding `needsAcceptance`, check `sessionStorage.pendingTermsAcceptance`. If present and email matches `user.email`, write it to `user_private` immediately and skip the dialog.
-- Legacy users without a current accepted version still see the existing dialog (unchanged).
-
-## Technical Notes
-
-- No DB migration needed — `user_private.accepted_terms_at` / `accepted_terms_version` already exist.
-- Uses existing `supabase.auth.resend()`; rate‑limit reuses `RESET_COOLDOWN_SECONDS` pattern under a new key (`lastVerificationResendAt`).
-- The success state and the verification panel both live inside the existing Auth Card to keep mobile layout, safe‑area padding, and keyboard handling intact.
-- No changes to `OnboardingFlow` — it still runs after auth + TOS, providing the "Let's get started" steps the user described.
+1. User fills signup form (age‑13+ checkbox only) → submits.
+2. "Check your email" panel appears with resend / different email.
+3. User taps verification link → returns authenticated → green checkmark → routed in.
+4. `TermsAcceptanceGate` dialog: **Accept TOS / Privacy / Community Standards**.
+5. `OnboardingFlow`: **"Welcome to Familial! Let's get you set up"** → create first circle, etc.
 
 ## Out of scope
 
-- Auth email template wording (uses current template; only the in‑app return flow changes).
-- Server‑side enforcement of TOS at signup — Supabase signup endpoint has no metadata hook for this; the stash + gate combination guarantees acceptance is persisted before any app interaction.
+- No DB or `OnboardingFlow` changes.
+- No edits to the verification panel or green‑check confirmation (those were correct).

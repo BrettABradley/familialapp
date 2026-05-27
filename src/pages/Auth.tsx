@@ -11,11 +11,8 @@ import { z } from "zod";
 import logo from "@/assets/logo.png";
 import { isIOSNative, purchaseSubscription, APPLE_PRODUCTS } from "@/lib/iapPurchase";
 import { Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
-import { Link } from "react-router-dom";
 
-const TOS_VERSION = "2026-05-17";
 const PENDING_VERIFY_EMAIL_KEY = "pendingVerificationEmail";
-const PENDING_TERMS_KEY = "pendingTermsAcceptance";
 const RESEND_VERIFY_KEY = "lastVerificationResendAt";
 const RESEND_VERIFY_COOLDOWN = 60;
 
@@ -37,9 +34,8 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
-  const [tosAccepted, setTosAccepted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; age?: string; tos?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; age?: string }>({});
   const [verificationSentTo, setVerificationSentTo] = useState<string | null>(() =>
     typeof window !== "undefined" ? sessionStorage.getItem(PENDING_VERIFY_EMAIL_KEY) : null
   );
@@ -284,12 +280,10 @@ const Auth = () => {
         }
 
       } else {
-        // Age + TOS confirmation (COPPA 13+ + compliance)
-        const signupErrors: { age?: string; tos?: string } = {};
-        if (!ageConfirmed) signupErrors.age = "Please confirm you are at least 13 years old.";
-        if (!tosAccepted) signupErrors.tos = "Please accept the Terms of Service and Privacy Policy.";
-        if (Object.keys(signupErrors).length) {
-          setErrors(signupErrors);
+        // Age confirmation (COPPA 13+). TOS is collected post email-verification
+        // by TermsAcceptanceGate, before the onboarding flow.
+        if (!ageConfirmed) {
+          setErrors({ age: "Please confirm you are at least 13 years old." });
           setIsLoading(false);
           return;
         }
@@ -310,16 +304,6 @@ const Auth = () => {
             });
           }
         } else {
-          // Stash TOS acceptance so it's persisted as soon as the user
-          // authenticates (post email-confirm). TermsAcceptanceGate picks this up.
-          sessionStorage.setItem(
-            PENDING_TERMS_KEY,
-            JSON.stringify({
-              email,
-              accepted_terms_at: new Date().toISOString(),
-              accepted_terms_version: TOS_VERSION,
-            })
-          );
           // Show the dedicated "check your email" verification panel.
           sessionStorage.setItem(PENDING_VERIFY_EMAIL_KEY, email);
           setVerificationSentTo(email);
@@ -354,7 +338,7 @@ const Auth = () => {
 
   const handleUseDifferentEmail = () => {
     sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
-    sessionStorage.removeItem(PENDING_TERMS_KEY);
+    sessionStorage.removeItem("pendingTermsAcceptance");
     setVerificationSentTo(null);
     setIsLogin(false);
     setEmail("");
@@ -539,32 +523,6 @@ const Auth = () => {
                   {errors.age && (
                     <p className="text-sm text-destructive">{errors.age}</p>
                   )}
-                  <div className="flex items-start gap-2">
-                    <input
-                      id="tos-accept"
-                      type="checkbox"
-                      checked={tosAccepted}
-                      onChange={(e) => {
-                        setTosAccepted(e.target.checked);
-                        setErrors((prev) => ({ ...prev, tos: undefined }));
-                      }}
-                      className="mt-1 h-4 w-4 accent-primary"
-                    />
-                    <Label htmlFor="tos-accept" className="text-sm font-normal leading-snug cursor-pointer">
-                      I agree to the{" "}
-                      <Link to="/terms" target="_blank" className="text-primary underline">
-                        Terms of Service
-                      </Link>{" "}
-                      and{" "}
-                      <Link to="/privacy" target="_blank" className="text-primary underline">
-                        Privacy Policy
-                      </Link>
-                      .
-                    </Label>
-                  </div>
-                  {errors.tos && (
-                    <p className="text-sm text-destructive">{errors.tos}</p>
-                  )}
                   </>
                 )}
                 <div className="space-y-2">
@@ -678,7 +636,7 @@ const Auth = () => {
                     setIsLogin(!isLogin);
                     setErrors({});
                     setAgeConfirmed(false);
-                    setTosAccepted(false);
+                    
                     setDuplicateAccount(false);
                   }}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
