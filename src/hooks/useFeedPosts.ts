@@ -319,12 +319,13 @@ export const useFeedPosts = () => {
         title: "Post deleted",
         description: "Tap undo within 10 seconds.",
         duration: 10000,
-        action: (
-          <ToastAction altText="Undo delete" onClick={undoHandler}>
-            Undo
-          </ToastAction>
-        ),
+        action: ToastAction({
+          altText: "Undo delete",
+          onClick: undoHandler,
+          children: "Undo",
+        } as any) as any,
       });
+
     }
 
   };
