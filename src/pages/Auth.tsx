@@ -332,6 +332,7 @@ const Auth = () => {
                       setEmail(e.target.value);
                       setErrors((prev) => ({ ...prev, email: undefined }));
                     }}
+                    style={{ scrollMarginBottom: "calc(var(--keyboard-height, 0px) + 8rem)" }}
                     className={errors.email ? "border-destructive" : ""}
                   />
                   {errors.email && (
@@ -371,6 +372,7 @@ const Auth = () => {
                       placeholder="Your name"
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
+                      style={{ scrollMarginBottom: "calc(var(--keyboard-height, 0px) + 8rem)" }}
                     />
                   </div>
                   <div className="flex items-start gap-2">
@@ -405,6 +407,7 @@ const Auth = () => {
                       setErrors((prev) => ({ ...prev, email: undefined }));
                       setDuplicateAccount(false);
                     }}
+                    style={{ scrollMarginBottom: "calc(var(--keyboard-height, 0px) + 8rem)" }}
                     className={errors.email ? "border-destructive" : ""}
                   />
                   {errors.email && (

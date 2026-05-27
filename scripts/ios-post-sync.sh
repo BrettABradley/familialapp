@@ -67,10 +67,15 @@ if [ -d "ios/App/App" ]; then
 <dict>
   <key>aps-environment</key>
   <string>development</string>
+  <key>com.apple.developer.associated-domains</key>
+  <array>
+    <string>applinks:www.familialmedia.com</string>
+    <string>applinks:familialmedia.com</string>
+  </array>
 </dict>
 </plist>
 PLIST
-  echo "✅ App.entitlements updated: aps-environment enabled for APNs registration"
+  echo "✅ App.entitlements updated: aps-environment + associated-domains (universal links)"
 fi
 
 if [ -f "$PROJECT_FILE" ] && ! grep -q "CODE_SIGN_ENTITLEMENTS = App/App.entitlements" "$PROJECT_FILE"; then
