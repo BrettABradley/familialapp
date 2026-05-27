@@ -1,39 +1,66 @@
-## Problem
+## Issues & Fixes
 
-1. After tapping "Verify Email" in the browser (web flow), the iOS app stays stuck on the "Check your email" screen forever. This is because the web `/auth/callback` intentionally does NOT create a browser session — it only triggers Supabase's server-side `email_confirmed_at`. The iOS app has no way of knowing the email was confirmed, so it never advances to the green-check "Email verified" state.
+### 1. Audio logs always blocked as "against community guidelines"
+**Cause:** `src/components/feed/CreatePostForm.tsx` signs ALL uploaded media URLs (including audio and video) and sends them to `moderate-content` as `imageUrls`. The Gemini classifier receives an audio file as an `image_url` payload and either errors or returns "not allowed" → the post is auto-deleted with the generic guidelines toast.
 
-2. The web success page shows an "Open Familial app" button that uses a Universal Link, which doesn't reliably open the installed app and is unnecessary — users can just swap back to the app themselves.
+**Fix:** Filter `mediaUrls` down to images only before signing (skip when `getMediaType(path)` is `audio` or `video`). If nothing is left to check and there's no text, skip the moderation call entirely. (Video/audio remain unmoderated for now — same as today's intended behavior; we just stop misclassifying them as unsafe images.)
 
-## Fix
+---
 
-### 1. Auto-confirm on the app's "Check your email" screen (`src/pages/Auth.tsx`)
+### 2. Messages lightbox — gray bar, "attachment" caption, low quality, can't exit
+**Causes:**
+- The lightbox `<Dialog>` in `src/pages/Messages.tsx` is rendered **after** the chat-view early returns (lines 873 / 939). When `chatView === "dm" | "group"`, the early return short-circuits and the Dialog never mounts → tapping an image looks broken / inconsistent with what the user sees on desktop where Dialog default close button + DialogHeader leak a gray strip.
+- DM messages render `<p>{msg.content}</p>` with `(attachment)` placeholder unless content is literally `"(attachment)"`. Group messages skip the check entirely → "(attachment)" always shows.
+- Inline `<img alt="attachment">` plus a hard-coded `max-h-48` and no `SmartImage` srcset → blurry quality.
+- After opening the (broken) lightbox the user gets bounced because the chat view isn't preserving state under the unmounted Dialog.
 
-- Stash the signup password in a `useRef` (instead of only `setPassword("")`) when the verification panel is shown, so we can re-attempt sign-in silently.
-- While the `verificationSentTo` panel is mounted, poll every ~3 seconds with `supabase.auth.signInWithPassword({ email, password })`.
-  - As soon as Supabase returns success (which only happens once `email_confirmed_at` is set server-side), the existing `useEffect` on `user` fires, sets `confirmed = true`, shows the green check for 1.5 s, and routes to `/circles`.
-  - Ignore the expected `Email not confirmed` error silently between polls.
-- Stop polling when the panel unmounts, the user signs in, or the user taps "Use a different email" (also clears the password ref).
-- Keep the existing "Resend verification email" and "Use a different email" buttons unchanged.
+**Fix — port the Feed lightbox to Messages:**
+1. Extract the existing `MediaLightbox` (currently inside `src/components/feed/PostCard.tsx`) into a new shared component `src/components/shared/MediaLightbox.tsx`. Update `PostCard.tsx` to import from the new path (no behavior change).
+2. In `Messages.tsx`:
+   - Replace the bottom-of-file `<Dialog><ZoomableImage>…` block with the shared `MediaLightbox` mounted inside **both** the DM view and the group view (so it works while the chat is on screen).
+   - Track `lightboxIndex` per-message (state `{ messageId, index } | null`) instead of a single URL, so swipe-between-images works the same as Feed.
+   - Replace the inline `<img>` in `MessageMedia` with `SmartImage` (`preset="card"`) for crisp 1×/2× rendering; remove the `alt="attachment"` text (use `alt=""` or a generic photo caption).
+3. Stop showing the "(attachment)" caption:
+   - When sending media-only messages, store `content` as empty string (`""`) instead of `"(attachment)"`. The DB column is nullable text, fine.
+   - DM renderer: `{msg.content?.trim() && <p>{msg.content}</p>}`.
+   - Group renderer: same guard added (currently missing).
+   - Keep a back-compat check that hides legacy `"(attachment)"` strings.
 
-This means: user taps the link in the email → browser shows the success page → user comes back to the app → within ~3 s the app auto-detects the confirmation, flashes the green check, and continues into onboarding. No manual action required on the app.
+---
 
-### 2. Simplify the web success screen (`src/pages/AuthCallback.tsx`)
+### 3. One image at a time in messages
+In `handleFileSelect` (and `handleVoiceRecording`) cap image attachments to **1**. If a file is already queued, replace it (or toast "Send the current photo first"). Keep voice notes single-attachment as well. Update the "up to 4 files" toast copy.
 
-In the `status === "success"` block:
-- Remove the `<Button onClick={openApp}>Open Familial app</Button>`.
-- Remove the now-unused `openApp` function and the `Button` import if it becomes unused.
-- Replace the body copy with: **"You may proceed back to the app."** (single line, same `text-sm text-muted-foreground` styling).
-- Remove the "Continue in browser" link as well, since it's only useful when paired with the app button — keeps the screen clean for both iOS and web users who all just need to switch back.
+Also update the hidden file input: drop `multiple` and tighten `accept` so the picker doesn't suggest multi-select.
 
-The green check, "Email verified" heading, and logo stay as-is.
+---
 
-### Technical notes
+### 4. Can't exit chat / X closes to home
+Root cause is item 2: the lightbox Dialog mounted under `PullToRefreshWrapper` causes Radix to unmount the chat view when it opens/closes (Radix Dialog uses a focus trap + portal that, combined with the chat's own `createPortal`, fights for body focus, and `onOpenChange(false)` from the Dialog re-renders the parent which loses `selectedUser`). Once the lightbox lives **inside** the portaled chat view (item 2 above), back arrow and X behave correctly.
 
-- Polling interval: 3000 ms, cleared on unmount via `useEffect` return.
-- The poll only runs while `verificationSentTo && !confirmed && !user`.
-- Password ref is cleared on `handleUseDifferentEmail` to avoid stale credentials being reused for a new email.
-- No backend, RLS, or edge-function changes are needed — Supabase already exposes `email_confirmed_at` via the standard sign-in attempt.
+Additionally:
+- Wrap the chat-view back-arrow handler in `e.stopPropagation()` and increase the touch hit area to `min-h-[44px] min-w-[44px]` to match the rest of the controls.
+- Make the lightbox's `onClose` only call `setLightboxIndex(null)` — never touch `selectedUser` / `chatView`.
+
+---
+
+### 5. Messages double-sending on iOS
+**Cause:** `handleSendMessage` guards with `setIsSending(true)`, but the state flip is async and happens **after** an `await supabase.auth.getSession()`. A fast double-tap (or iOS firing both `touchend` and `click`) lets two invocations pass the `disabled={isSending}` check before React re-renders.
+
+**Fix:**
+- Add a synchronous `isSendingRef = useRef(false)` guard at the top of `handleSendMessage`; bail immediately if already true; set to true synchronously; reset in a `finally` block.
+- Also audit the send button: it currently runs `import("@/lib/haptics").then(...).haptic.medium()` then `handleSendMessage()` synchronously — fine, but wrap in a single `onClick` that doesn't re-fire on bubbled events (`type="button"`).
+
+---
 
 ## Files touched
-- `src/pages/Auth.tsx` — password ref + poll-for-confirmation effect
-- `src/pages/AuthCallback.tsx` — simplified success screen, remove openApp button
+- `src/components/feed/CreatePostForm.tsx` — filter audio/video out of moderation payload.
+- `src/components/shared/MediaLightbox.tsx` — **new**, extracted from PostCard.
+- `src/components/feed/PostCard.tsx` — import lightbox from new path.
+- `src/pages/Messages.tsx` — lightbox swap, one-image cap, `(attachment)` cleanup, send-guard ref, back-button hit area.
+
+No database, RLS, or edge-function changes.
+
+## Out of scope
+- Re-styling the Feed lightbox itself (unchanged, just relocated).
+- Adding audio/video moderation (today's behavior is text+images only; audio stays unmoderated rather than auto-blocked).
