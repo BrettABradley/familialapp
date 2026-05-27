@@ -55,7 +55,7 @@ const Auth = () => {
   );
   // Bumped on focus/visibility/manual pull to re-trigger the poll effect.
   const [pollNonce, setPollNonce] = useState(0);
-  const [isManualChecking, setIsManualChecking] = useState(false);
+  
 
 
 
