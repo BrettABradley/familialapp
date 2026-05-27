@@ -84,6 +84,25 @@ function AppLayoutContent() {
     }
   }, [user, authLoading, navigate]);
 
+  // One-shot "Email verified" flash. The flag is set either on the web
+  // success page (post hand-off back to the app) or by AuthCallback in the
+  // native flow before it routes to /circles.
+  useEffect(() => {
+    if (!user || !user.email_confirmed_at) return;
+    let flagged = false;
+    try {
+      flagged = localStorage.getItem(VERIFIED_FLAG) === "1";
+    } catch {
+      // non-fatal
+    }
+    if (!flagged) return;
+    try { localStorage.removeItem(VERIFIED_FLAG); } catch { /* non-fatal */ }
+    toast.success("Email verified — welcome to Familial", {
+      icon: <CheckCircle2 className="h-5 w-5 text-emerald-600" />,
+      duration: 3000,
+    });
+  }, [user]);
+
   const handleSignOut = async () => {
     signingOut.current = true;
     localStorage.removeItem("selectedCircle");
