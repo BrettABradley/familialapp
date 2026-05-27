@@ -24,6 +24,31 @@ function UnverifiedEmailGate({ email, onSignOut }: { email: string; onSignOut: (
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // If the user verified in another tab/browser while this device was
+  // already signed in, the cached JWT still says email_confirmed_at=null.
+  // Force a session refresh on mount + whenever the window regains focus
+  // so the gate disappears automatically once Supabase confirms.
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      await supabase.auth.refreshSession();
+    } catch { /* non-fatal */ }
+    setRefreshing(false);
+  };
+
+  useEffect(() => {
+    refresh();
+    const onFocus = () => { refresh(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, []);
 
   const resend = async () => {
     setSending(true); setError(null);
@@ -46,6 +71,9 @@ function UnverifiedEmailGate({ email, onSignOut }: { email: string; onSignOut: (
         We sent a verification link to <span className="font-medium text-foreground">{email}</span>. Tap it to finish setting up your account.
       </p>
       <div className="flex flex-col gap-3 w-full max-w-xs">
+        <Button onClick={refresh} disabled={refreshing}>
+          {refreshing ? "Checking…" : "I already verified — refresh"}
+        </Button>
         <Button onClick={resend} disabled={sending || sent} variant="outline">
           {sent ? "Email sent — check your inbox" : sending ? "Sending…" : "Resend verification email"}
         </Button>
@@ -55,6 +83,7 @@ function UnverifiedEmailGate({ email, onSignOut }: { email: string; onSignOut: (
     </div>
   );
 }
+
 
 
 
