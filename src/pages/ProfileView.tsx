@@ -77,7 +77,7 @@ const ProfileMediaLightbox = ({
 
   return (
     <>
-      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-end gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
+      <div className="pointer-events-auto absolute top-0 left-0 right-0 z-50 flex items-center justify-end gap-2 pl-[max(env(safe-area-inset-left,0px),1rem)] pr-[max(env(safe-area-inset-right,0px),1rem)] pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3">
         {current && <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60" onClick={() => onDownload(current.image_url)} aria-label="Download"><Download className="h-5 w-5" /></Button>}
         <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px] rounded-full bg-black/40 backdrop-blur-sm text-white hover:text-white hover:bg-black/60" onClick={onClose} aria-label="Close"><X className="h-5 w-5" /></Button>
       </div>
@@ -686,7 +686,7 @@ const ProfileView = () => {
       {/* Avatar zoom lightbox */}
       <Dialog open={avatarZoomOpen} onOpenChange={setAvatarZoomOpen}>
         <DialogContent className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
-          <div className="absolute top-0 right-0 z-20 flex items-center gap-2 pr-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
+          <div className="pointer-events-auto absolute top-0 left-0 right-0 z-50 flex items-center justify-end gap-2 pl-[max(env(safe-area-inset-left,0px),1rem)] pr-[max(env(safe-area-inset-right,0px),1rem)] pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3">
             <button
               className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
               onClick={() => setAvatarZoomOpen(false)}

@@ -1,65 +1,19 @@
-# iOS Universal Links + Auth Keyboard Fix
+## Lightbox landscape mode fix
 
-Two remaining items from the verification gate work. Both are additive — no changes to existing auth behavior.
+Harden the top control bar (X + Download) in all lightboxes so they stay tappable in landscape on notched iPhones.
 
-## 1. iOS Universal Links (Team ID: U7U8LZV7K8)
+### Changes per lightbox top bar
 
-Goal: when a user taps the verification link in the email on iPhone, iOS opens the Familial app directly to the "Verified ✓" screen instead of Safari. If the app isn't installed, Safari opens the same `/auth/callback` page (already built) and verification still works.
+1. `z-30` → `z-50` (sit above embla viewport + zoom-pan-pinch wrapper)
+2. Add `pointer-events-auto` on the button container so taps register even when ancestor sets `touch-action: none`
+3. Right padding: `pr-4` → `pr-[max(env(safe-area-inset-right,0px),1rem)]` (clear the notch/camera bumper in landscape)
+4. Left padding: add `pl-[max(env(safe-area-inset-left,0px),1rem)]` for symmetry
 
 ### Files
 
-**`public/.well-known/apple-app-site-association`** (new, no extension, served as JSON)
-```json
-{
-  "applinks": {
-    "apps": [],
-    "details": [
-      {
-        "appID": "U7U8LZV7K8.app.lovable.f745440093af4f4390a60d52ff08c778",
-        "paths": ["/auth/callback", "/auth/callback*"]
-      }
-    ]
-  }
-}
-```
-Served from `https://www.familialmedia.com/.well-known/apple-app-site-association` with `Content-Type: application/json` (Lovable hosting handles this automatically for files in `public/`).
+- `src/components/feed/PostCard.tsx` — feed lightbox top bar (~line 398)
+- `src/pages/Albums.tsx` — album lightbox top bar (~line 122)
+- `src/pages/ProfileView.tsx` — avatar zoom (~line 80) and post lightbox (~line 689)
+- `src/pages/Messages.tsx` — message image attachment lightbox (~line 1248)
 
-**`scripts/ios-post-sync.sh`** — add an Associated Domains entitlement step:
-- Patch `ios/App/App/App.entitlements` to include:
-  ```xml
-  <key>com.apple.developer.associated-domains</key>
-  <array>
-    <string>applinks:www.familialmedia.com</string>
-    <string>applinks:familialmedia.com</string>
-  </array>
-  ```
-- Idempotent (skip if already present).
-
-**`src/App.tsx`** — `NativeUrlOpenBridge` already exists from the previous pass; no change needed. It already pushes `/auth/callback?...` into React Router when iOS hands us a universal link.
-
-### What the user has to do once after this ships
-
-1. In Apple Developer Console → Identifiers → `app.lovable.f745440093af4f4390a60d52ff08c778` → enable **Associated Domains** capability. (One-time, free.)
-2. Republish the web app so the AASA file is live at `www.familialmedia.com/.well-known/apple-app-site-association`.
-3. Run `npm run cap:sync:ios` and rebuild the iOS app in Xcode.
-
-If step 1 isn't done, the link just opens Safari instead — no breakage, verification still works.
-
-## 2. Auth.tsx Keyboard Fix (minimal)
-
-Goal: on mobile, when the user taps an input near the bottom of the form (e.g. password during signup), the keyboard doesn't cover it.
-
-### Changes (Auth.tsx only)
-
-- Wrap the form card body in `<ScrollArea className="max-h-[calc(100vh-200px)] pb-32">`.
-- Add `style={{ scrollMarginBottom: '120px' }}` to each `Input` (email, password, confirm password, 2FA code).
-- No layout restructure, no sheet, no resize listener, no changes to the visual design.
-
-This matches the pattern already proven on Events and Messages per the Keyboard UX memory.
-
-## Guardrails
-
-- No changes to `supabase/config.toml`, `useAuth.tsx`, `AppLayout.tsx`, or `AuthCallback.tsx` (already done).
-- No changes to existing 2FA flow.
-- Universal Links are opt-in at the OS level — if the AASA file isn't reachable or the entitlement isn't set, iOS silently falls back to Safari. Zero risk of breaking sign-in.
-- The keyboard fix is purely presentational.
+No portrait behavior changes, no logic changes, presentation-only.

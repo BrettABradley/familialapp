@@ -395,7 +395,7 @@ const MediaLightbox = ({
   return (
     <>
       {/* Top control bar */}
-      <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-end gap-2 px-4 pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3 sm:pr-4">
+      <div className="pointer-events-auto absolute top-0 left-0 right-0 z-50 flex items-center justify-end gap-2 pl-[max(env(safe-area-inset-left,0px),1rem)] pr-[max(env(safe-area-inset-right,0px),1rem)] pt-[max(env(safe-area-inset-top,0px),3.25rem)] sm:pt-3">
         {isImage && (
           <Button
             variant="ghost"
