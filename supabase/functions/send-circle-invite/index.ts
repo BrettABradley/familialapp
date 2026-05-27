@@ -118,6 +118,24 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    // AUTHORIZATION: the caller must be a member or owner of the target circle.
+    // Prevents authenticated users from sending invites for arbitrary circles.
+    const { data: isMember, error: memberCheckError } = await supabaseAdmin
+      .rpc("is_circle_member", { _user_id: user.id, _circle_id: circleId });
+    if (memberCheckError) {
+      console.error("Membership check failed:", memberCheckError);
+      return new Response(JSON.stringify({ error: "Failed to verify circle membership" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+    if (!isMember) {
+      return new Response(JSON.stringify({ error: "You are not a member of this circle" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
     // Look up user by email using admin API
     const { data: authUser } = await supabaseAdmin.auth.admin.listUsers();
     const targetUser = authUser?.users?.find((u) => u.email === email);
