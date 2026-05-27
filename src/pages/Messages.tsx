@@ -604,8 +604,11 @@ const Messages = () => {
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     let files = Array.from(e.target.files || []);
-    if (files.length + selectedFiles.length > 4) {
-      toast({ title: "Too many files", description: "You can attach up to 4 files per message.", variant: "destructive" });
+    // Messages send one attachment at a time so each photo arrives as its own
+    // chat bubble — matches iMessage/WhatsApp behavior and keeps the lightbox
+    // scoped to a single image per message.
+    if (selectedFiles.length > 0 || files.length > 1) {
+      toast({ title: "One at a time", description: "Send the current attachment first, then add another.", variant: "destructive" });
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
@@ -624,8 +627,8 @@ const Messages = () => {
   };
 
   const handleVoiceRecording = async (blob: Blob) => {
-    if (selectedFiles.length >= 4) {
-      toast({ title: "Too many files", description: "You can attach up to 4 files per message.", variant: "destructive" });
+    if (selectedFiles.length >= 1) {
+      toast({ title: "One at a time", description: "Send the current attachment first, then record a voice note.", variant: "destructive" });
       return;
     }
     if (!blob || blob.size === 0) {
