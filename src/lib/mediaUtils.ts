@@ -5,7 +5,10 @@ export function getMediaType(url: string): 'image' | 'video' | 'audio' {
   // <video>. This is a pure-display heuristic.
   if (/voice-note[-_]/i.test(url)) return 'audio';
 
-  const ext = url.split('.').pop()?.toLowerCase().split('?')[0];
+  // Strip query string (signed URLs include `?token=<JWT>` and JWTs contain
+  // dots, which would otherwise be picked up as a "file extension").
+  const clean = url.split('?')[0].split('#')[0];
+  const ext = clean.split('.').pop()?.toLowerCase();
   if (!ext) return 'image';
   if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(ext)) return 'audio';
   if (['mp4', 'mov', 'webm', 'avi', 'mkv'].includes(ext)) return 'video';
