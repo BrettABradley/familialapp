@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,6 +80,18 @@ const Auth = () => {
   const [searchParams] = useSearchParams();
   const planParam = searchParams.get("plan");
 
+  const navigateIntoApp = useCallback(() => {
+    // Check for a saved return URL (e.g. from checkout redirect through auth)
+    const savedRedirect = localStorage.getItem("postAuthRedirect");
+    if (savedRedirect && !savedRedirect.startsWith("/settings") && !savedRedirect.startsWith("/profile")) {
+      localStorage.removeItem("postAuthRedirect");
+      navigate(savedRedirect, { replace: true });
+    } else {
+      localStorage.removeItem("postAuthRedirect");
+      navigate("/circles", { replace: true });
+    }
+  }, [navigate]);
+
   // Lockout countdown timer
   useEffect(() => {
     if (!lockoutUntil) return;
@@ -132,18 +144,12 @@ const Auth = () => {
   useEffect(() => {
     if (loading || !user) return;
 
-    // Email-verification success: show green check for 1.5s, then continue.
+    // Email-verification success: show green check. A separate effect owns
+    // the timeout/navigation so this effect can't clear it when confirmed flips.
     const pendingEmail = sessionStorage.getItem(PENDING_VERIFY_EMAIL_KEY);
     if (pendingEmail && pendingEmail === user.email && !confirmed) {
       setConfirmed(true);
-      const t = setTimeout(() => {
-        sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
-        sessionStorage.removeItem(PENDING_VERIFY_PWD_KEY);
-        pendingPasswordRef.current = null;
-        setVerificationSentTo(null);
-        setConfirmed(false); // re-runs effect; falls through to normal redirect
-      }, 1500);
-      return () => clearTimeout(t);
+      return;
     }
     if (confirmed) return; // wait for timeout
 
@@ -188,17 +194,23 @@ const Auth = () => {
     }
 
     if (!loading && user && !planParam) {
-      // Check for a saved return URL (e.g. from checkout redirect through auth)
-      const savedRedirect = localStorage.getItem("postAuthRedirect");
-      if (savedRedirect && !savedRedirect.startsWith("/settings") && !savedRedirect.startsWith("/profile")) {
-        localStorage.removeItem("postAuthRedirect");
-        navigate(savedRedirect);
-      } else {
-        localStorage.removeItem("postAuthRedirect");
-        navigate("/circles");
-      }
+      navigateIntoApp();
     }
-  }, [user, loading, navigate, planParam, toast, confirmed]);
+  }, [user, loading, navigate, planParam, toast, confirmed, navigateIntoApp]);
+
+  useEffect(() => {
+    if (!confirmed || !user) return;
+
+    const t = setTimeout(() => {
+      sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
+      sessionStorage.removeItem(PENDING_VERIFY_PWD_KEY);
+      pendingPasswordRef.current = null;
+      setVerificationSentTo(null);
+      navigateIntoApp();
+    }, 1500);
+
+    return () => clearTimeout(t);
+  }, [confirmed, user, navigateIntoApp]);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
