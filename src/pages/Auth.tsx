@@ -338,7 +338,7 @@ const Auth = () => {
 
   const handleUseDifferentEmail = () => {
     sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
-    sessionStorage.removeItem(PENDING_TERMS_KEY);
+    sessionStorage.removeItem("pendingTermsAcceptance");
     setVerificationSentTo(null);
     setIsLogin(false);
     setEmail("");
