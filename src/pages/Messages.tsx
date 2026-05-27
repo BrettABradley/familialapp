@@ -1245,14 +1245,24 @@ const Messages = () => {
           <ZoomableImage onSwipeDown={() => setLightboxUrl(null)} className="w-full h-full max-h-[95vh] flex items-center justify-center">
             <img src={lightboxUrl} alt="attachment" className="max-w-full max-h-[95vh] object-contain select-none" draggable={false} />
           </ZoomableImage>
-          <button
-            type="button"
-            onClick={() => handleMediaDownload(lightboxUrl)}
-            className="absolute bottom-4 right-4 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-white/90 text-black backdrop-blur-sm shadow-lg"
-            aria-label="Download photo"
-          >
-            <Download className="h-5 w-5" />
-          </button>
+          <div className="pointer-events-auto absolute top-0 left-0 right-0 z-50 flex items-center justify-end gap-2 pl-[max(env(safe-area-inset-left,0px),1rem)] pr-[max(env(safe-area-inset-right,0px),1rem)] pt-[max(env(safe-area-inset-top,0px),1rem)]">
+            <button
+              type="button"
+              onClick={() => handleMediaDownload(lightboxUrl)}
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+              aria-label="Download photo"
+            >
+              <Download className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setLightboxUrl(null)}
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     )}
