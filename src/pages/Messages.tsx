@@ -25,6 +25,7 @@ import { convertHeicFiles, convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
+import { ZoomableImage } from "@/components/shared/ZoomableImage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1234,6 +1235,27 @@ const Messages = () => {
         </div>
       )}
     </main>
+    {lightboxUrl && (
+      <Dialog open={!!lightboxUrl} onOpenChange={(o) => !o && setLightboxUrl(null)}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black border-none overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Photo</DialogTitle>
+            <DialogDescription>Tap outside to close</DialogDescription>
+          </DialogHeader>
+          <ZoomableImage onSwipeDown={() => setLightboxUrl(null)} className="w-full h-full max-h-[95vh] flex items-center justify-center">
+            <img src={lightboxUrl} alt="attachment" className="max-w-full max-h-[95vh] object-contain select-none" draggable={false} />
+          </ZoomableImage>
+          <button
+            type="button"
+            onClick={() => handleMediaDownload(lightboxUrl)}
+            className="absolute bottom-4 right-4 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-white/90 text-black backdrop-blur-sm shadow-lg"
+            aria-label="Download photo"
+          >
+            <Download className="h-5 w-5" />
+          </button>
+        </DialogContent>
+      </Dialog>
+    )}
     </PullToRefreshWrapper>
   );
 };
