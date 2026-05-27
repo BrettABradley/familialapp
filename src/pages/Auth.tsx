@@ -48,7 +48,15 @@ const Auth = () => {
   // Stashed signup password so we can silently poll signInWithPassword
   // until Supabase flips email_confirmed_at — auto-advances the app off
   // the "Check your email" screen as soon as the user clicks the link.
-  const pendingPasswordRef = useRef<string | null>(null);
+  // Persisted to sessionStorage so polling survives an app relaunch
+  // between signup and the user tapping the verification link.
+  const pendingPasswordRef = useRef<string | null>(
+    typeof window !== "undefined" ? sessionStorage.getItem(PENDING_VERIFY_PWD_KEY) : null
+  );
+  // Bumped on focus/visibility/manual pull to re-trigger the poll effect.
+  const [pollNonce, setPollNonce] = useState(0);
+  const [isManualChecking, setIsManualChecking] = useState(false);
+
 
 
 
