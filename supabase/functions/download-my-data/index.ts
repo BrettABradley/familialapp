@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.0";
+import { signPostMediaUrl, signPostMediaUrls } from "../_shared/post-media-url.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,14 +59,29 @@ serve(async (req: Request) => {
         admin.from("profile_images").select("*").eq("user_id", userId),
       ]);
 
+    // Sign post-media URLs with a 24h TTL so the export contains working links.
+    const TTL = 60 * 60 * 24;
+    const signedPosts = await Promise.all((posts.data || []).map(async (p: any) => ({
+      ...p,
+      media_urls: p.media_urls ? await signPostMediaUrls(admin, p.media_urls, TTL) : p.media_urls,
+    })));
+    const signedMessages = await Promise.all((privateMessages.data || []).map(async (m: any) => ({
+      ...m,
+      media_urls: m.media_urls ? await signPostMediaUrls(admin, m.media_urls, TTL) : m.media_urls,
+    })));
+    const signedPins = await Promise.all((fridgePins.data || []).map(async (f: any) => ({
+      ...f,
+      image_url: f.image_url ? await signPostMediaUrl(admin, f.image_url, TTL) : f.image_url,
+    })));
+
     const exportData = {
       exported_at: new Date().toISOString(),
       profile: { ...(profile.data ?? {}), ...((userPrivate as any).data ?? {}) },
-      posts: posts.data || [],
+      posts: signedPosts,
       comments: comments.data || [],
-      private_messages: privateMessages.data || [],
+      private_messages: signedMessages,
       events: events.data || [],
-      fridge_pins: fridgePins.data || [],
+      fridge_pins: signedPins,
       family_tree_members: familyTree.data || [],
       profile_images: profileImages.data || [],
     };
