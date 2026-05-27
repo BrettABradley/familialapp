@@ -504,19 +504,17 @@ const Messages = () => {
 
   const handleLeaveGroup = async () => {
     if (!selectedGroup || !user) return;
-    const { error } = await supabase
-      .from("group_chat_members")
-      .delete()
-      .eq("group_chat_id", selectedGroup.id)
-      .eq("user_id", user.id);
+    // Close the dialog FIRST so the UI never freezes waiting on the network.
+    setIsLeaveGroupOpen(false);
+    const groupId = selectedGroup.id;
+    const { error } = await (supabase as any).rpc("leave_group_chat", { _group_chat_id: groupId });
     if (error) {
       toast({ title: "Error", description: error.message || "Failed to leave group chat.", variant: "destructive" });
       return;
     }
-    setGroupChats(prev => prev.filter(g => g.id !== selectedGroup.id));
+    setGroupChats(prev => prev.filter(g => g.id !== groupId));
     setSelectedGroup(null);
     setChatView("list");
-    setIsLeaveGroupOpen(false);
     toast({ title: "You left the group" });
   };
 
