@@ -334,6 +334,33 @@ const Auth = () => {
     }
   };
 
+  const handleResendVerification = async () => {
+    if (!verificationSentTo || resendCooldown > 0 || isResending) return;
+    setIsResending(true);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: verificationSentTo,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    setIsResending(false);
+    sessionStorage.setItem(RESEND_VERIFY_KEY, String(Date.now()));
+    setResendCooldown(RESEND_VERIFY_COOLDOWN);
+    if (error) {
+      toast({ title: "Could not resend", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Email resent", description: `New verification link sent to ${verificationSentTo}.` });
+    }
+  };
+
+  const handleUseDifferentEmail = () => {
+    sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
+    sessionStorage.removeItem(PENDING_TERMS_KEY);
+    setVerificationSentTo(null);
+    setIsLogin(false);
+    setEmail("");
+  };
+
+
   if (loading) {
     return (
       <div className="min-h-[100dvh] bg-background flex items-center justify-center px-4">
