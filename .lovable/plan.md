@@ -1,52 +1,146 @@
-## Goal
+## Security findings — fix plan
 
-Make sure when User A signs out and User B signs in on the same iPhone, push notifications start flowing to User B (and stop for User A) — reliably, even if the sign-out unregister call failed.
+Goal: resolve the 4 findings without breaking avatar uploads (profile, circle, group chat), transfer requests, or appeal flows.
 
-## What's already in place (from the last change)
+---
 
-1. **`signOut()`** calls `unregister-push-token` before clearing the session, so User A's row in `push_tokens` is deleted on a clean sign-out.
-2. **`register-push-token`** has a `reclaim` step: before upserting, it deletes any row where the same APNs `device_token` is attached to a different `user_id`. So when User B signs in and the app re-registers, User A's stale row (if any) is wiped and User B's row takes its place.
+### 1. ERROR — Avatars bucket: any user can upload to any path
 
-This already covers the happy path for multi-account on one device.
+The `avatars` bucket is used for three path patterns:
+- `{user_id}/...` — personal profile avatar (`Settings.tsx`)
+- `circle-{circleId}/...` — circle avatar (`Circles.tsx`)
+- `group-chats/{groupId}/...` — group chat avatar (`Messages.tsx`)
 
-## Gaps to close in this plan
+A simple "first folder must equal auth.uid()" check would break circle and group-chat avatars. Replace the INSERT and UPDATE policies with one that allows uploads only to a path the caller is entitled to:
 
-To make it bulletproof for the multi-account case:
+- own-profile path: `(storage.foldername(name))[1] = auth.uid()::text`, OR
+- circle path: name starts with `circle-<uuid>/` AND `public.is_circle_member(auth.uid(), <uuid>)` is true, OR
+- group-chat path: name starts with `group-chats/<uuid>/` AND `public.is_group_chat_member(auth.uid(), <uuid>)` is true.
 
-### 1. Force re-registration on every sign-in (not just first launch)
+Apply the same WITH CHECK (and USING for UPDATE) to both `Authenticated users can upload avatars` and `Users can update their own avatar`.
 
-Today `pushNotifications.ts` has a session-scoped guard (`registrationWatchdog` / `lastRegisteredDeviceToken`) that prevents re-registering the same token twice in one app session. If User A signs out and User B signs in **without killing the app**, the guard could short-circuit and skip calling `register-push-token` — meaning the DB row would still point at User A's `user_id`.
+### 2. WARN — `circle_transfer_requests` INSERT does not verify ownership
 
-**Fix:** In `useAuth.tsx`, on a successful sign-in (`SIGNED_IN` auth event), call `resetPushRegistrationState()` and then trigger `initPushNotifications()` again. This guarantees the token is re-uploaded under User B's JWT, which fires the `reclaim` step server-side and rewrites the row.
+The current `Circle owners can create transfer requests` policy only checks `auth.uid() = from_user_id`. Replace its WITH CHECK with:
 
-### 2. Re-register on `TOKEN_REFRESHED` for the active user
+```
+auth.uid() = from_user_id
+AND EXISTS (
+  SELECT 1 FROM public.circles
+  WHERE id = circle_id AND owner_id = auth.uid()
+)
+```
 
-If User B is already signed in and the JWT refreshes, we don't need to re-register. But if the previous session belonged to User A and the same JS context now has User B's token, we want at least one upload under User B's identity. The sign-in handler above covers this; no extra work needed for token refresh.
+So only the real current owner of the referenced circle can create a transfer request.
 
-### 3. Defense-in-depth: server-side cleanup on stale tokens
+### 3. WARN — `user_appeals` token exposure (future risk)
 
-`trigger_push_notification` / the Expo sender already exists. When Expo returns `DeviceNotRegistered` (e.g., User A's phone uninstalled, or APNs rejected the old token), we should delete that row from `push_tokens`. Check the send-push edge function and, if it doesn't already handle the `DeviceNotRegistered` / `InvalidCredentials` response, add a small cleanup pass. This prevents long-term ghost rows and is the safety net if step 1 ever fails.
+Today there is no user-facing SELECT policy on `user_appeals`, so users cannot read their own row or token — only platform admins can. The finding is purely a "don't add a user SELECT policy later that leaks tokens" warning. Action:
 
-### 4. Verification path
+- Verify (already done) that no SELECT policy grants users access to their own appeals.
+- Mark the finding ignored with an explanation, and record the constraint in security memory so future changes don't add a SELECT policy that exposes `token`.
 
-After deploying:
-- Sign in as User A on the device → confirm `push_tokens` has one row with `user_id = A`, `device_token = T`.
-- Send User A a notification → arrives.
-- Sign out → row for `(A, T)` gone.
-- Sign in as User B on the same device → `push_tokens` has exactly one row: `user_id = B`, `device_token = T`. (Not two rows, no leftover A row.)
-- Send User B a notification → arrives on the device.
-- Send User A a notification → does NOT arrive on the device.
-- Repeat without killing the app between sign-out/sign-in to exercise the guard reset.
+### 4. WARN — `store_offers` company contact details
 
-## Files to touch
+The scanner's own description concludes "No finding needed here" — the SELECT policy correctly limits visibility to the submitter and admins, and submitters reading back their own row is by design. Action: mark ignored with that rationale.
 
-- `src/hooks/useAuth.tsx` — on `SIGNED_IN` event, call `resetPushRegistrationState()` then `initPushNotifications()`.
-- `src/lib/pushNotifications.ts` — confirm `resetPushRegistrationState()` clears every guard (`lastRegisteredDeviceToken`, `registrationWatchdog`, any "already initialized" flag) so the next `initPushNotifications()` actually re-runs end-to-end.
-- `supabase/functions/send-push` (or whichever function calls the Expo Push API) — on `DeviceNotRegistered` / `InvalidCredentials` response from Expo, delete the offending row from `push_tokens`. Read-only inspection first to see what's already there.
+---
 
-No DB migration. No schema changes. No new edge function beyond what already exists.
+### Technical details
 
-## Out of scope
+**Migration** (single file):
 
-- App uninstall detection (handled by the `DeviceNotRegistered` cleanup above).
-- Switching accounts mid-notification-delivery (Expo will deliver to whatever token was current when the push was queued; acceptable).
+```sql
+-- 1. Avatars bucket: tighten upload + update policies
+DROP POLICY IF EXISTS "Authenticated users can upload avatars" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update their own avatar" ON storage.objects;
+
+CREATE POLICY "Authenticated users can upload avatars"
+ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (
+  bucket_id = 'avatars'
+  AND (
+    -- own profile folder
+    (storage.foldername(name))[1] = auth.uid()::text
+    -- circle avatar: path "circle-<uuid>/..."
+    OR (
+      (storage.foldername(name))[1] LIKE 'circle-%'
+      AND public.is_circle_member(
+        auth.uid(),
+        substring((storage.foldername(name))[1] from 8)::uuid
+      )
+    )
+    -- group chat avatar: path "group-chats/<uuid>/..."
+    OR (
+      (storage.foldername(name))[1] = 'group-chats'
+      AND public.is_group_chat_member(
+        auth.uid(),
+        (storage.foldername(name))[2]::uuid
+      )
+    )
+  )
+);
+
+CREATE POLICY "Users can update their own avatar"
+ON storage.objects FOR UPDATE TO authenticated
+USING (
+  bucket_id = 'avatars'
+  AND (
+    (storage.foldername(name))[1] = auth.uid()::text
+    OR (
+      (storage.foldername(name))[1] LIKE 'circle-%'
+      AND public.is_circle_member(
+        auth.uid(),
+        substring((storage.foldername(name))[1] from 8)::uuid
+      )
+    )
+    OR (
+      (storage.foldername(name))[1] = 'group-chats'
+      AND public.is_group_chat_member(
+        auth.uid(),
+        (storage.foldername(name))[2]::uuid
+      )
+    )
+  )
+)
+WITH CHECK (
+  bucket_id = 'avatars'
+  AND (
+    (storage.foldername(name))[1] = auth.uid()::text
+    OR (
+      (storage.foldername(name))[1] LIKE 'circle-%'
+      AND public.is_circle_member(
+        auth.uid(),
+        substring((storage.foldername(name))[1] from 8)::uuid
+      )
+    )
+    OR (
+      (storage.foldername(name))[1] = 'group-chats'
+      AND public.is_group_chat_member(
+        auth.uid(),
+        (storage.foldername(name))[2]::uuid
+      )
+    )
+  )
+);
+
+-- 2. circle_transfer_requests: enforce real ownership on INSERT
+DROP POLICY IF EXISTS "Circle owners can create transfer requests" ON public.circle_transfer_requests;
+CREATE POLICY "Circle owners can create transfer requests"
+ON public.circle_transfer_requests FOR INSERT TO authenticated
+WITH CHECK (
+  auth.uid() = from_user_id
+  AND EXISTS (
+    SELECT 1 FROM public.circles
+    WHERE id = circle_id AND owner_id = auth.uid()
+  )
+);
+```
+
+**Findings to mark ignored** via `security--manage_security_finding`:
+- `user_appeals_token_exposure` — no user-facing SELECT exists; admin-only access by design.
+- `store_offers_company_contact_exposure` — scanner itself notes "No finding needed here".
+
+**Security memory update**: note that `user_appeals.token` and `user_appeals.email` must never be exposed via a user SELECT policy; admin-only is the contract.
+
+No frontend code changes required — existing upload paths (`{user.id}/…`, `circle-{circleId}/…`, `group-chats/{groupId}/…`) already match the tightened policy.
