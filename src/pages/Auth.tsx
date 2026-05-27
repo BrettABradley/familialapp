@@ -11,8 +11,10 @@ import { z } from "zod";
 import logo from "@/assets/logo.png";
 import { isIOSNative, purchaseSubscription, APPLE_PRODUCTS } from "@/lib/iapPurchase";
 import { Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
+import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 
 const PENDING_VERIFY_EMAIL_KEY = "pendingVerificationEmail";
+const PENDING_VERIFY_PWD_KEY = "pendingVerificationPwd";
 const RESEND_VERIFY_KEY = "lastVerificationResendAt";
 const RESEND_VERIFY_COOLDOWN = 60;
 
