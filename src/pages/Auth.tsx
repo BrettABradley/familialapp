@@ -284,9 +284,12 @@ const Auth = () => {
         }
 
       } else {
-        // Age confirmation (COPPA 13+)
-        if (!ageConfirmed) {
-          setErrors({ age: "Please confirm you are at least 13 years old." });
+        // Age + TOS confirmation (COPPA 13+ + compliance)
+        const signupErrors: { age?: string; tos?: string } = {};
+        if (!ageConfirmed) signupErrors.age = "Please confirm you are at least 13 years old.";
+        if (!tosAccepted) signupErrors.tos = "Please accept the Terms of Service and Privacy Policy.";
+        if (Object.keys(signupErrors).length) {
+          setErrors(signupErrors);
           setIsLoading(false);
           return;
         }
@@ -307,13 +310,23 @@ const Auth = () => {
             });
           }
         } else {
-          toast({
-            title: "Check your email",
-            description: `We sent a verification link to ${email}. Tap it to finish setting up your account.`,
-          });
-          // Flip to login so they have somewhere to land when they come back.
-          setIsLogin(true);
+          // Stash TOS acceptance so it's persisted as soon as the user
+          // authenticates (post email-confirm). TermsAcceptanceGate picks this up.
+          sessionStorage.setItem(
+            PENDING_TERMS_KEY,
+            JSON.stringify({
+              email,
+              accepted_terms_at: new Date().toISOString(),
+              accepted_terms_version: TOS_VERSION,
+            })
+          );
+          // Show the dedicated "check your email" verification panel.
+          sessionStorage.setItem(PENDING_VERIFY_EMAIL_KEY, email);
+          setVerificationSentTo(email);
           setPassword("");
+          // Start a resend cooldown so they can't immediately re-trigger Supabase rate limits
+          sessionStorage.setItem(RESEND_VERIFY_KEY, String(Date.now()));
+          setResendCooldown(RESEND_VERIFY_COOLDOWN);
         }
       }
     } finally {
