@@ -10,12 +10,11 @@ type Status = "verifying" | "success" | "error";
 /**
  * /auth/callback — landing page for the email verification link.
  *
- * Supabase email verification redirects here with either:
- *   - `?code=...` (PKCE / new flow)        → exchangeCodeForSession
- *   - `#access_token=...&refresh_token=..` (implicit / legacy) → setSession
- *
- * On success: show "Verified ✓", then route into the app.
- * On failure: show "This link expired" with a Resend hint back to /auth.
+ * On success we deliberately DO NOT auto-sign-in the browser. The user
+ * almost always signed up inside the native iOS app; we just want to
+ * confirm the email server-side, then tell them to return to the app.
+ * The web session created by exchangeCodeForSession is immediately
+ * cleared so Chrome/Safari doesn't end up logged in.
  */
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -48,7 +47,8 @@ const AuthCallback = () => {
           });
           if (error) throw error;
         } else {
-          // No token at all — likely the user opened /auth/callback directly.
+          // No token — likely opened /auth/callback directly. Treat as success
+          // if there's already a session, otherwise error.
           const { data } = await supabase.auth.getSession();
           if (!data.session) {
             throw new Error("This verification link is incomplete or expired.");
@@ -58,17 +58,25 @@ const AuthCallback = () => {
         // Strip tokens from the URL so they don't sit in history.
         window.history.replaceState({}, "", "/auth/callback");
 
+        // Immediately drop the web session so the browser isn't signed in.
+        // Email confirmation is already persisted server-side at this point.
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // non-fatal
+        }
+        try {
+          Object.keys(localStorage).forEach((key) => {
+            if (key.startsWith("sb-") && key.endsWith("-auth-token")) {
+              localStorage.removeItem(key);
+            }
+          });
+        } catch {
+          // non-fatal
+        }
+
         if (cancelled) return;
         setStatus("success");
-
-        // Brief celebratory pause, then route.
-        setTimeout(() => {
-          const saved = localStorage.getItem("postAuthRedirect");
-          const next = url.searchParams.get("next");
-          const target = next || saved || "/circles";
-          if (saved) localStorage.removeItem("postAuthRedirect");
-          navigate(target.startsWith("/") ? target : "/circles", { replace: true });
-        }, 1400);
       } catch (err: any) {
         if (cancelled) return;
         setErrorMessage(err?.message || "We couldn't verify this link.");
@@ -81,6 +89,13 @@ const AuthCallback = () => {
       cancelled = true;
     };
   }, [navigate]);
+
+  const openApp = () => {
+    // Universal link — iOS hands off to the Familial app if installed
+    // (AASA whitelists /auth/callback for the real bundle ID). Otherwise
+    // the browser just stays on this page.
+    window.location.href = "https://familialapp.lovable.app/auth/callback?verified=1";
+  };
 
   return (
     <div
@@ -100,12 +115,26 @@ const AuthCallback = () => {
       )}
 
       {status === "success" && (
-        <div className="flex flex-col items-center gap-4 animate-in zoom-in-50 fade-in duration-500">
+        <div className="flex flex-col items-center gap-5 max-w-sm animate-in zoom-in-50 fade-in duration-500">
           <div className="rounded-full bg-emerald-50 dark:bg-emerald-950/30 p-4">
             <CheckCircle2 className="h-16 w-16 text-emerald-600 dark:text-emerald-400" strokeWidth={1.75} />
           </div>
-          <h1 className="font-serif text-3xl text-foreground">Verified</h1>
-          <p className="text-sm text-muted-foreground">Welcome to Familial. Signing you in…</p>
+          <h1 className="font-serif text-3xl text-foreground">Email verified</h1>
+          <p className="text-sm text-muted-foreground">
+            You're all set. Open the Familial app on your phone and sign in to finish setting up your account.
+          </p>
+          <div className="flex flex-col gap-2 w-full mt-2">
+            <Button onClick={openApp} className="w-full">
+              Open Familial app
+            </Button>
+            <button
+              type="button"
+              onClick={() => navigate("/auth", { replace: true })}
+              className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors"
+            >
+              Continue in browser
+            </button>
+          </div>
         </div>
       )}
 
