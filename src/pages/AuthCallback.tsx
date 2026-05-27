@@ -39,15 +39,32 @@ const AuthCallback = () => {
 
     const run = async () => {
       try {
-        const url = new URL(window.location.href);
-        const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
+        // On web, the early inline script in index.html may have stripped
+        // the PKCE ?code=... off the URL (so supabase-js wouldn't auto-
+        // exchange it). Recover the originals from sessionStorage for
+        // error reporting only.
+        let originalSearch = window.location.search;
+        let originalHash = window.location.hash;
+        try {
+          const stash = sessionStorage.getItem("familial:pendingVerifyParams");
+          if (stash) {
+            const parsed = JSON.parse(stash);
+            if (parsed?.search) originalSearch = parsed.search;
+            if (parsed?.hash) originalHash = parsed.hash;
+            sessionStorage.removeItem("familial:pendingVerifyParams");
+          }
+        } catch { /* non-fatal */ }
+
+        const searchParams = new URLSearchParams(originalSearch);
+        const hashParams = new URLSearchParams(originalHash.replace(/^#/, ""));
         const hashError =
           hashParams.get("error_description") ||
-          url.searchParams.get("error_description");
+          searchParams.get("error_description");
 
         if (hashError) {
           throw new Error(hashError.replace(/\+/g, " "));
         }
+
 
         if (isNative) {
           // Inside the app — we want a real session so the user lands in
