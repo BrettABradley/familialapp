@@ -1,35 +1,39 @@
-# Fix: videos/audio render as broken images after signed-URL switch
+## Problem
 
-## Root cause
+1. After tapping "Verify Email" in the browser (web flow), the iOS app stays stuck on the "Check your email" screen forever. This is because the web `/auth/callback` intentionally does NOT create a browser session — it only triggers Supabase's server-side `email_confirmed_at`. The iOS app has no way of knowing the email was confirmed, so it never advances to the green-check "Email verified" state.
 
-`getMediaType()` in `src/lib/mediaUtils.ts`:
+2. The web success page shows an "Open Familial app" button that uses a Universal Link, which doesn't reliably open the installed app and is unnecessary — users can just swap back to the app themselves.
 
-```ts
-const ext = url.split('.').pop()?.toLowerCase().split('?')[0];
-```
+## Fix
 
-Signed Supabase URLs end with `?token=<JWT>`, and JWTs always contain two `.` separators (`header.payload.signature`). `split('.').pop()` returns the trailing chunk of the JWT signature, not `mov`/`mp3`/`m4a`, so the function falls through to `'image'`. Every video and audio attachment on the now-private `post-media` bucket is therefore handed to an `<img>` tag → broken-image icon with alt text (the `.mov` in the screenshot).
+### 1. Auto-confirm on the app's "Check your email" screen (`src/pages/Auth.tsx`)
 
-This only became visible after the bucket flip because public URLs had no `?token=` suffix.
+- Stash the signup password in a `useRef` (instead of only `setPassword("")`) when the verification panel is shown, so we can re-attempt sign-in silently.
+- While the `verificationSentTo` panel is mounted, poll every ~3 seconds with `supabase.auth.signInWithPassword({ email, password })`.
+  - As soon as Supabase returns success (which only happens once `email_confirmed_at` is set server-side), the existing `useEffect` on `user` fires, sets `confirmed = true`, shows the green check for 1.5 s, and routes to `/circles`.
+  - Ignore the expected `Email not confirmed` error silently between polls.
+- Stop polling when the panel unmounts, the user signs in, or the user taps "Use a different email" (also clears the password ref).
+- Keep the existing "Resend verification email" and "Use a different email" buttons unchanged.
 
-## Fix (1 file, frontend-only)
+This means: user taps the link in the email → browser shows the success page → user comes back to the app → within ~3 s the app auto-detects the confirmation, flashes the green check, and continues into onboarding. No manual action required on the app.
 
-Edit `src/lib/mediaUtils.ts` → `getMediaType()`: strip the query string **before** taking the extension.
+### 2. Simplify the web success screen (`src/pages/AuthCallback.tsx`)
 
-```ts
-const clean = url.split('?')[0].split('#')[0];
-const ext = clean.split('.').pop()?.toLowerCase();
-```
+In the `status === "success"` block:
+- Remove the `<Button onClick={openApp}>Open Familial app</Button>`.
+- Remove the now-unused `openApp` function and the `Button` import if it becomes unused.
+- Replace the body copy with: **"You may proceed back to the app."** (single line, same `text-sm text-muted-foreground` styling).
+- Remove the "Continue in browser" link as well, since it's only useful when paired with the app button — keeps the screen clean for both iOS and web users who all just need to switch back.
 
-Everything else (mp3/wav/ogg/m4a/aac/flac → audio, mp4/mov/webm/avi/mkv → video, voice-note name heuristic, heic/heif → image) is unchanged.
+The green check, "Email verified" heading, and logo stay as-is.
 
-## Why this also fixes audio
+### Technical notes
 
-The audio branch in `PostCard.MediaItem` already renders `<audio controls>` when `getMediaType === 'audio'`. With the extension parsed correctly, `.m4a`/`.mp3`/`.wav` voice notes and clips will hit that branch and show the native player instead of the broken-image fallback.
+- Polling interval: 3000 ms, cleared on unmount via `useEffect` return.
+- The poll only runs while `verificationSentTo && !confirmed && !user`.
+- Password ref is cleared on `handleUseDifferentEmail` to avoid stale credentials being reused for a new email.
+- No backend, RLS, or edge-function changes are needed — Supabase already exposes `email_confirmed_at` via the standard sign-in attempt.
 
-## Verification
-
-- Reload the post in the screenshot → the first tile renders as `VideoThumbnail` (canvas-captured first frame + play overlay) instead of a broken `<img>`.
-- Open a circle with a voice-note post → native `<audio>` player appears.
-- Single-video post and multi-media carousels both classify correctly.
-- No backend, RLS, or migration changes; no other components touched.
+## Files touched
+- `src/pages/Auth.tsx` — password ref + poll-for-confirmation effect
+- `src/pages/AuthCallback.tsx` — simplified success screen, remove openApp button
