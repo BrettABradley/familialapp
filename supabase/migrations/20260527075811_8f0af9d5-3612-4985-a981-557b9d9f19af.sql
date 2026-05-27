@@ -1,0 +1,1 @@
+UPDATE public.app_version_config SET latest_version = '73.0.1', min_supported_version = '73.0.0', update_message = 'A new version of Familial is available with improvements and fixes.' WHERE platform = 'ios';
