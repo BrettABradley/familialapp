@@ -297,6 +297,33 @@ const Messages = () => {
     return () => setLockCircleSwitcher(false);
   }, [chatView, selectedUser, selectedGroup, setLockCircleSwitcher]);
 
+  // Bulletproof chat-exit: always returns to the conversations list.
+  // Used by every back/close affordance so we never rely on Radix portal
+  // onOpenChange (which previously bounced the user to the home tab).
+  const handleExitChat = () => {
+    setLightbox(null);
+    setSelectedUser(null);
+    setSelectedGroup(null);
+    setChatView("list");
+    setMessages([]);
+    setGroupMessages([]);
+    clearMediaState();
+  };
+  const handleExitChatRef = useRef(handleExitChat);
+  handleExitChatRef.current = handleExitChat;
+
+  // Android hardware back / browser back: pop out of the open chat instead of
+  // leaving the Messages page entirely. Push a sentinel history entry when a
+  // chat opens; on popstate, exit the chat.
+  useEffect(() => {
+    const inChat = (chatView === "dm" && !!selectedUser) || (chatView === "group" && !!selectedGroup);
+    if (!inChat) return;
+    window.history.pushState({ familialChat: true }, "");
+    const onPop = () => { handleExitChatRef.current(); };
+    window.addEventListener("popstate", onPop);
+    return () => { window.removeEventListener("popstate", onPop); };
+  }, [chatView, selectedUser, selectedGroup]);
+
   const fetchCircleMembers = async () => {
     if (!user || !selectedCircle) return;
 
@@ -785,31 +812,26 @@ const Messages = () => {
     />
   );
 
-  // Shared lightbox JSX — rendered inside each top-level return (list / dm /
-  // group) so it works regardless of which view is active. Keeping it inside
-  // the same render tree (instead of after early returns) prevents the chat
-  // view from unmounting when the lightbox opens/closes.
+  // Shared lightbox JSX — rendered inside each chat view's render tree as a
+  // plain fixed overlay (NOT a Radix Dialog). Radix Dialog opens a portal +
+  // focus trap whose unmount/remount cycle was clobbering the chat view's
+  // `selectedUser` / `chatView` state on close, which dropped the user onto
+  // the home tab when they then hit the back arrow.
   const lightboxNode = lightbox && (
-    <Dialog
-      open={!!lightbox}
-      onOpenChange={(o) => { if (!o) setLightbox(null); }}
+    <div
+      className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Photo viewer"
     >
-      <DialogContent
-        className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center z-[100]"
-      >
-        <DialogHeader className="sr-only">
-          <DialogTitle>Photo</DialogTitle>
-          <DialogDescription>Swipe down or tap close to dismiss</DialogDescription>
-        </DialogHeader>
-        <MediaLightbox
-          items={lightbox.items}
-          startIndex={lightbox.index}
-          onIndexChange={(i) => setLightbox((prev) => prev ? { ...prev, index: i } : prev)}
-          onClose={() => setLightbox(null)}
-          onDownload={handleMediaDownload}
-        />
-      </DialogContent>
-    </Dialog>
+      <MediaLightbox
+        items={lightbox.items}
+        startIndex={lightbox.index}
+        onIndexChange={(i) => setLightbox((prev) => prev ? { ...prev, index: i } : prev)}
+        onClose={() => setLightbox(null)}
+        onDownload={handleMediaDownload}
+      />
+    </div>
   );
 
   const renderFilePreviewBar = () => {
@@ -881,7 +903,7 @@ const Messages = () => {
       {renderFilePreviewBar()}
       {renderUploadProgress()}
       <div className="flex items-end gap-1">
-        <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.heic,.heif" multiple onChange={handleFileSelect} className="hidden" />
+        <input ref={fileInputRef} type="file" accept="image/*,.heic,.heif" onChange={handleFileSelect} className="hidden" />
         <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isSending} className="flex-shrink-0 h-9 w-9">
           <Paperclip className="w-4 h-4" />
         </Button>
@@ -934,7 +956,7 @@ const Messages = () => {
       <div className="fixed inset-0 z-[60] bg-background flex flex-col md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]" style={{ height: 'calc(100% - var(--keyboard-height, 0px))' }}>
         <div className="flex-shrink-0 bg-background border-b border-border" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 3.25rem)' }}>
           <div className="flex items-center gap-3 px-4 py-3 min-h-[3.5rem]">
-          <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
+          <Button type="button" variant="ghost" size="sm" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleExitChat(); }} className="min-h-[44px] min-w-[44px]" aria-label="Back to messages"><ArrowLeft className="w-4 h-4" /></Button>
           <Link to={`/profile/${selectedUser.user_id}`}>
             <Avatar><AvatarImage src={selectedUser.avatar_url || undefined} /><AvatarFallback>{selectedUser.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback></Avatar>
           </Link>
@@ -1000,7 +1022,7 @@ const Messages = () => {
       <div className="fixed inset-0 z-[60] bg-background flex flex-col md:relative md:z-auto md:inset-auto md:h-[calc(100vh-4rem)]" style={{ height: 'calc(100% - var(--keyboard-height, 0px))' }}>
         <div className="flex-shrink-0 bg-background border-b border-border" style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 3.25rem)' }}>
           <div className="flex items-center gap-3 px-4 py-3 min-h-[3.5rem]">
-          <Button variant="ghost" size="sm" onClick={() => { setSelectedGroup(null); setChatView("list"); clearMediaState(); }}><ArrowLeft className="w-4 h-4" /></Button>
+          <Button type="button" variant="ghost" size="sm" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleExitChat(); }} className="min-h-[44px] min-w-[44px]" aria-label="Back to messages"><ArrowLeft className="w-4 h-4" /></Button>
           {selectedGroup.avatar_url ? (
             <Avatar><AvatarImage src={selectedGroup.avatar_url} /><AvatarFallback><UsersRound className="w-5 h-5" /></AvatarFallback></Avatar>
           ) : (
