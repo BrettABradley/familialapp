@@ -388,23 +388,83 @@ const Auth = () => {
             <img src={logo} alt="Familial" className="h-24 w-auto" />
           </div>
           <CardTitle className="font-serif text-2xl">
-            {isForgotPassword ? "Reset Password" : isLogin ? "Welcome" : "Join Familial"}
+            {confirmed
+              ? "Email confirmed!"
+              : verificationSentTo
+              ? "Check your email"
+              : isForgotPassword
+              ? "Reset Password"
+              : isLogin
+              ? "Welcome"
+              : "Join Familial"}
           </CardTitle>
           <CardDescription>
-            {isForgotPassword
+            {confirmed
+              ? "Welcome to Familial"
+              : verificationSentTo
+              ? "We sent a verification link to finish setting up your account"
+              : isForgotPassword
               ? "Enter your email and we'll send you a reset link"
               : isLogin
               ? "Sign in or sign up to connect with your family"
               : "Create an account to start your family circle"}
           </CardDescription>
-          {planParam && PLAN_PRICES[planParam] && (
+          {planParam && PLAN_PRICES[planParam] && !confirmed && !verificationSentTo && (
             <p className="text-sm text-primary mt-2">
               {isLogin ? "Sign in" : "Sign up"} to continue with the {planParam.charAt(0).toUpperCase() + planParam.slice(1)} plan purchase
             </p>
           )}
         </CardHeader>
         <CardContent>
-          {isForgotPassword ? (
+          {confirmed ? (
+            <div className="flex flex-col items-center justify-center py-8 space-y-4">
+              <div className="rounded-full bg-green-500/10 p-4 animate-in zoom-in-50 duration-500">
+                <CheckCircle2 className="h-16 w-16 text-green-600" strokeWidth={2.5} />
+              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                Taking you in...
+              </p>
+            </div>
+          ) : verificationSentTo ? (
+            <div className="space-y-5 py-2">
+              <div className="flex flex-col items-center text-center space-y-3">
+                <div className="rounded-full bg-primary/10 p-4">
+                  <Mail className="h-10 w-10 text-primary" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  We sent a verification link to
+                </p>
+                <p className="font-medium break-all">{verificationSentTo}</p>
+                <p className="text-sm text-muted-foreground">
+                  Open the email on this device and tap the link. Once confirmed,
+                  you'll be brought right in.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleResendVerification}
+                disabled={resendCooldown > 0 || isResending}
+              >
+                {isResending
+                  ? "Resending..."
+                  : resendCooldown > 0
+                  ? `Resend available in ${resendCooldown}s`
+                  : "Resend verification email"}
+              </Button>
+              <button
+                type="button"
+                onClick={handleUseDifferentEmail}
+                className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Use a different email
+              </button>
+              <p className="text-xs text-muted-foreground text-center">
+                Didn't get it? Check your spam folder.
+              </p>
+            </div>
+          ) : isForgotPassword ? (
             <>
               <form onSubmit={handleForgotPassword} className="space-y-4">
                 <div className="space-y-2">
