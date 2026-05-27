@@ -178,20 +178,22 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
       if (newPost) {
         const postId = newPost.id;
         const textToCheck = newPostContent.trim() || undefined;
-        const urlsToCheck = mediaUrls.length > 0 ? mediaUrls : undefined;
+        // Sign URLs for the moderation model (it needs reachable http URLs).
+        const signedUrlsToCheck = mediaUrls.length > 0
+          ? (await getPostMediaUrls(mediaUrls)).filter(Boolean)
+          : undefined;
 
         (async () => {
           try {
             const { data: modResult, error: modError } = await supabase.functions.invoke("moderate-content", {
-              body: { text: textToCheck, imageUrls: urlsToCheck },
+              body: { text: textToCheck, imageUrls: signedUrlsToCheck },
             });
 
             if (!modError && modResult && !modResult.allowed) {
               // Delete the post
               await supabase.from("posts").delete().eq("id", postId);
-              // Cleanup media from storage
-              for (const url of mediaUrls) {
-                const path = url.split("/post-media/")[1];
+              // Cleanup media from storage — values are bare paths now.
+              for (const path of mediaUrls) {
                 if (path) await supabase.storage.from("post-media").remove([path]);
               }
               toast({
