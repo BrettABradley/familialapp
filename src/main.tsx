@@ -6,36 +6,6 @@ import ErrorBoundary from "./components/shared/ErrorBoundary";
 
 console.log("[boot] react-mount-start");
 
-// EARLY hash-token interceptor — must run BEFORE supabase-js is imported
-// anywhere (its createClient auto-consumes access_token in the URL hash via
-// detectSessionInUrl). If a verification email link landed on any path other
-// than /auth/callback or /reset-password, hard-redirect to /auth/callback so
-// the browser never auto-signs-in.
-try {
-  const hash = window.location.hash || "";
-  const path = window.location.pathname || "/";
-  const isAuthLanding =
-    path === "/auth/callback" || path === "/reset-password";
-  const looksLikeAuthHash =
-    /access_token=/.test(hash) ||
-    /type=signup/.test(hash) ||
-    /type=recovery/.test(hash) ||
-    /type=invite/.test(hash) ||
-    /type=magiclink/.test(hash);
-  if (!isAuthLanding && looksLikeAuthHash) {
-    window.location.replace("/auth/callback" + window.location.search + hash);
-    // Stop the rest of bootstrap from running; the replace navigation is
-    // already in-flight.
-    throw new Error("__auth_hash_redirect__");
-  }
-} catch (e) {
-  if ((e as Error)?.message !== "__auth_hash_redirect__") {
-    console.warn("[boot] hash-token interceptor failed", e);
-  } else {
-    throw e;
-  }
-}
-
 // Global guards — never let an unhandled rejection escape to the native
 // WKWebView host where it could be interpreted as a crash by Apple's
 // automated review.
