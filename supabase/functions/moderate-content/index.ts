@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,27 @@ serve(async (req) => {
   }
 
   try {
+    // AUTH: require a signed-in user. Prevents anonymous AI-credit drain.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const { data: { user } } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
@@ -105,7 +127,6 @@ Rules:
       }
       const errText = await response.text();
       console.error("AI gateway error:", response.status, errText);
-      // On AI error, allow content through (fail-open) to not block users
       return new Response(
         JSON.stringify({ allowed: true }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -115,9 +136,7 @@ Rules:
     const aiResponse = await response.json();
     const content = aiResponse.choices?.[0]?.message?.content || "";
 
-    // Parse the AI's JSON response
     try {
-      // Extract JSON from potential markdown code blocks
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const verdict = JSON.parse(jsonMatch[0]);
@@ -139,7 +158,6 @@ Rules:
     );
   } catch (e) {
     console.error("moderate-content error:", e);
-    // Fail-open: don't block users if moderation itself fails
     return new Response(
       JSON.stringify({ allowed: true }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
