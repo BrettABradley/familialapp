@@ -147,13 +147,8 @@ const AuthCallback = () => {
     };
   }, [navigate, isNative]);
 
-  const openApp = () => {
-    // Universal link — iOS hands off to the Familial app if installed
-    // (AASA whitelists /auth/callback for the real bundle ID). Otherwise
-    // the browser just stays on this page.
-    window.location.href =
-      "https://familialapp.lovable.app/auth/callback?verified=1";
-  };
+
+
 
   return (
     <div
