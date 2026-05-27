@@ -715,8 +715,8 @@ const Messages = () => {
               <img
                 src={url}
                 alt="attachment"
-                className="rounded-md max-w-full max-h-48 cursor-pointer"
-                onClick={() => handleMediaDownload(url)}
+                className="rounded-md max-w-full max-h-48 cursor-zoom-in"
+                onClick={() => setLightboxUrl(url)}
               />
               <button
                 type="button"
