@@ -359,6 +359,7 @@ const Auth = () => {
 
   const handleUseDifferentEmail = () => {
     sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
+    sessionStorage.removeItem(PENDING_VERIFY_PWD_KEY);
     sessionStorage.removeItem("pendingTermsAcceptance");
     pendingPasswordRef.current = null;
     setVerificationSentTo(null);
