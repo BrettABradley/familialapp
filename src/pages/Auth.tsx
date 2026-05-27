@@ -280,12 +280,10 @@ const Auth = () => {
         }
 
       } else {
-        // Age + TOS confirmation (COPPA 13+ + compliance)
-        const signupErrors: { age?: string; tos?: string } = {};
-        if (!ageConfirmed) signupErrors.age = "Please confirm you are at least 13 years old.";
-        if (!tosAccepted) signupErrors.tos = "Please accept the Terms of Service and Privacy Policy.";
-        if (Object.keys(signupErrors).length) {
-          setErrors(signupErrors);
+        // Age confirmation (COPPA 13+). TOS is collected post email-verification
+        // by TermsAcceptanceGate, before the onboarding flow.
+        if (!ageConfirmed) {
+          setErrors({ age: "Please confirm you are at least 13 years old." });
           setIsLoading(false);
           return;
         }
@@ -306,16 +304,6 @@ const Auth = () => {
             });
           }
         } else {
-          // Stash TOS acceptance so it's persisted as soon as the user
-          // authenticates (post email-confirm). TermsAcceptanceGate picks this up.
-          sessionStorage.setItem(
-            PENDING_TERMS_KEY,
-            JSON.stringify({
-              email,
-              accepted_terms_at: new Date().toISOString(),
-              accepted_terms_version: TOS_VERSION,
-            })
-          );
           // Show the dedicated "check your email" verification panel.
           sessionStorage.setItem(PENDING_VERIFY_EMAIL_KEY, email);
           setVerificationSentTo(email);
