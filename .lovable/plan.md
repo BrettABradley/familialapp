@@ -1,26 +1,40 @@
-## Decision
+## Goal
 
-Ignore the remaining warning **"Any authenticated user can subscribe to private-messages and group-messages Realtime channels"**. The risk it describes is already mitigated and the scanner is being conservative.
+Make the circle invite email adapt to whether the recipient already has a Familial account:
 
-## Why it's a false positive now
+- **No account** → copy: "{Inviter} is inviting you to join {Circle} on Familial." CTA "Sign up" links to `/auth?mode=signup&email={invitedEmail}`.
+- **Has account** → copy: "{Inviter} has invited you to {Circle} on Familial." CTA "Log in" links to `/auth?mode=login&email={invitedEmail}`.
 
-1. **Per-user topic names.** `src/pages/Messages.tsx` subscribes to `private-messages:${user.id}` (line 238) and `group-messages:${user.id}` (line 258). Each authenticated user can only listen on a topic that embeds their own UID — there is no shared topic name for outsiders to subscribe to.
-2. **Realtime authorization policy.** The `realtime.messages` policy added in the last security migration restricts subscriptions on these prefixes to topics whose suffix equals `auth.uid()`.
-3. **Row payloads remain RLS-filtered.** `private_messages` and `group_chat_messages` keep their existing table-level RLS, so even if a topic were reached, CDC rows would be filtered out for non-participants.
-4. **No broadcast / no presence.** The app only uses Postgres `postgres_changes` CDC. The extra leak vector the scanner mentions ("if Realtime broadcast or presence features are used") does not apply.
+## Changes
 
-The scanner can't introspect the dynamic topic format and is still matching the old hardcoded channel names from prior commits.
+### 1. `supabase/functions/send-circle-invite/index.ts`
+- We already do an admin lookup that sets `targetUser` (line 141). Reuse that as the `hasAccount` flag.
+- Build two link variants:
+  - `signupUrl = https://familialmedia.com/auth?mode=signup&email=<encoded>`
+  - `loginUrl  = https://familialmedia.com/auth?mode=login&email=<encoded>`
+- Branch the email `subject`, headline, body sentence, CTA label, and CTA href on `hasAccount`:
+  - Signup variant: heading "You're invited", body "{Inviter} is inviting you to join {Circle} on Familial.", button "Sign up", footer keeps "Once you sign up with this email address ({email}), you'll automatically be connected to the circle."
+  - Login variant: heading "You've been invited to a new circle", body "{Inviter} has invited you to {Circle} on Familial.", button "Log in", footer "Log in with {email} to accept the invite."
+- Update both the HTML and plain-text bodies symmetrically.
+- No DB schema changes. No new env vars.
 
-## Plan
+### 2. `src/pages/Auth.tsx`
+- Read `mode` and `email` from `useSearchParams`.
+- On mount:
+  - If `mode === "signup"` → `setIsLogin(false)`.
+  - If `mode === "login"` → `setIsLogin(true)` (already default, but explicit).
+  - If `email` is present and looks valid → `setEmail(decoded)` to prefill the field. Leave editable (don't lock — user may still want to correct).
+- No change to submit logic; the prefill just seeds existing state.
 
-1. Use `security--manage_security_finding` to **ignore** `realtime_channel_private_group_messages_unscoped` with an explanation pointing at the per-user topic + `realtime.messages` policy.
-2. Update **security memory** (`security--update_memory`) with a short "accepted risk / what should never happen" entry stating:
-   - Realtime channels for private + group messages are intentionally namespaced per user (`private-messages:<uid>`, `group-messages:<uid>`), authorized via `realtime.messages` topic-suffix check.
-   - Don't re-introduce a shared/global channel name for these features.
-   - The app uses only Postgres CDC — do not enable broadcast or presence on these channels without re-evaluating.
-3. No code changes. No migration.
+### 3. Deploy
+- Deploy `send-circle-invite` edge function so the new email copy goes live.
 
-## Verification
+## Out of scope
+- No change to the in-app PendingInvites flow.
+- No new "circleId carried through signup" plumbing — the existing post-signup auto-attach via matching email continues to work.
+- Not changing the unsubscribe footer or token logic.
 
-- Re-run the security scan after ignoring; the finding should drop off.
-- Manually confirm DMs and group chats still receive realtime inserts (no behavior change).
+## Risk / edge cases
+- Admin `listUsers()` is already used here, so detection accuracy is unchanged.
+- If a user has an account but is signed out in Chrome, the "Log in" link still works — they land on the login form with email prefilled.
+- Existing pending invites already in the queue were sent under the old copy; nothing to migrate.
