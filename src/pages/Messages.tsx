@@ -235,7 +235,7 @@ const Messages = () => {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel('private-messages-realtime')
+      .channel(`private-messages:${user.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'private_messages' }, (payload) => {
         const newMsg = payload.new as Message;
         if (newMsg.sender_id !== user.id && newMsg.recipient_id !== user.id) return;
@@ -255,7 +255,7 @@ const Messages = () => {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel('group-messages-realtime')
+      .channel(`group-messages:${user.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_chat_messages' }, (payload) => {
         const newMsg = payload.new as GroupMessage;
         if (selectedGroup && newMsg.group_chat_id === selectedGroup.id) {
