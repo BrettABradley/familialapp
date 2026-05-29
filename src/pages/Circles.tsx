@@ -656,10 +656,10 @@ const Circles = () => {
 
     const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
 
-    const { error: updateError } = await supabase
-      .from("circles")
-      .update({ avatar_url: urlData.publicUrl })
-      .eq("id", avatarUploadCircleId);
+    const { error: updateError } = await supabase.rpc("update_circle_avatar", {
+      _circle_id: avatarUploadCircleId,
+      _avatar_url: urlData.publicUrl,
+    });
 
     if (updateError) {
       toast({ title: "Error", description: "Failed to update circle photo.", variant: "destructive" });
