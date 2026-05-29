@@ -41,13 +41,9 @@ const PendingInvites = ({ compact = false, onCountChange }: PendingInvitesProps)
   const fetchInvites = async () => {
     if (!user?.email) return;
 
-    // Fetch invites and user's current circles in parallel
+    // Fetch invites via SECURITY DEFINER RPC (no token exposure) plus current circles in parallel
     const [invitesResult, membershipsResult, ownedResult] = await Promise.all([
-      supabase
-        .from("circle_invites")
-        .select("id, circle_id, email, status, created_at, expires_at, circles(id, name, description)")
-        .eq("email", user.email)
-        .eq("status", "pending"),
+      supabase.rpc("get_my_pending_invites"),
       supabase
         .from("circle_memberships")
         .select("circle_id")
