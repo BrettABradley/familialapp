@@ -60,7 +60,20 @@ const PendingInvites = ({ compact = false, onCountChange }: PendingInvitesProps)
       membershipsResult.data?.forEach((m) => joinedCircleIds.add(m.circle_id));
       ownedResult.data?.forEach((c) => joinedCircleIds.add(c.id));
 
-      const valid = (invitesResult.data as unknown as PendingInvite[]).filter(
+      // Shape RPC rows into PendingInvite (RPC returns flat columns)
+      const rows = (invitesResult.data as any[]).map<PendingInvite>((r) => ({
+        id: r.id,
+        circle_id: r.circle_id,
+        email: r.email,
+        status: r.status,
+        created_at: r.created_at,
+        expires_at: r.expires_at,
+        circles: r.circle_name
+          ? { id: r.circle_id, name: r.circle_name, description: r.circle_description }
+          : null,
+      }));
+
+      const valid = rows.filter(
         (inv) =>
           new Date(inv.expires_at) > new Date() &&
           inv.circles != null &&
