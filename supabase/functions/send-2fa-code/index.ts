@@ -57,7 +57,10 @@ serve(async (req) => {
     }
 
     // Generate 6-digit code
-    const code = String(Math.floor(100000 + Math.random() * 900000));
+    // Generate 6-digit code using CSPRNG
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    const code = String(100000 + (buf[0] % 900000)).padStart(6, "0");
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
     // Store code
