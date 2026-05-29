@@ -56,7 +56,6 @@ serve(async (req) => {
       });
     }
 
-    // Generate 6-digit code
     // Generate 6-digit code using CSPRNG
     const buf = new Uint32Array(1);
     crypto.getRandomValues(buf);
