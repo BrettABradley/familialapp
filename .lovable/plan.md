@@ -1,31 +1,53 @@
-## Are these urgent?
+## Priority
 
-**#1 (Error — invite token exposed): Yes, worth fixing before launch.** The `circle_invites.token` column is a unique secret meant for SECURITY DEFINER redemption only, but the current SELECT policy lets the invited user read their full row including `token`. The client code never actually uses `token` (it only reads `id`, `circle_id`, `status`, `email`), so we can safely hide it without breaking anything. Real-world blast radius is small (invitee can already accept/decline), but it violates the documented model and is an easy fix.
-
-**#2 (Warning — Realtime channel scoping): Not urgent, but worth tightening.** Row payloads on `private_messages` and `group_chat_messages` are still filtered by table RLS, so non-participants can't read message contents. What leaks today is *metadata* — the fact that *some* message arrived on the shared channel name. Low severity, but cheap to address.
-
-Neither is a "stop the launch" bug. #1 should ship in this submission; #2 can ship now or shortly after.
+1. **#2 Circle member privilege escalation (Error)** — real, exploitable. Any member can `UPDATE circles SET owner_id = auth.uid()` and seize ownership. Fix first.
+2. **#4 `Math.random()` 2FA codes (Warning)** — low-likelihood but trivial 2-line swap to `crypto.getRandomValues()`.
+3. **#1 Invite token RLS (Error)** — column-level GRANT from last migration already blocks `select('token')` at the API; scanner only inspects the policy. Replace with a SECURITY DEFINER view to clear the finding cleanly.
+4. **#3 Realtime channel scoping (Warning)** — already mitigated last round (per-user topic + `realtime.messages` policy). Leave as-is; re-run scan after the other fixes to confirm.
 
 ## Plan
 
-### Fix 1 — Hide invite token from clients (migration)
+### Fix #2 — Block `owner_id` (and other sensitive columns) overwrites by members
 
-- Drop policy `Invited users can view their pending invites` on `public.circle_invites`.
-- Create a security-invoker view `public.circle_invites_safe` that selects only `id, circle_id, invited_by, email, status, created_at, expires_at` (no `token`).
-- Grant `SELECT` on the view to `authenticated`; the view inherits row visibility from the user's own JWT email match via a new restricted SELECT policy on the base table that scopes by email **and** is read through the view only.
-- Simpler equivalent: keep the existing predicate but enforce column-level grants — `REVOKE SELECT ON public.circle_invites FROM authenticated; GRANT SELECT (id, circle_id, invited_by, email, status, created_at, expires_at) ON public.circle_invites TO authenticated;`. This preserves the existing PendingInvites query (it never references `token`) and blocks any attempt to select `token`.
-- Update `src/components/circles/PendingInvites.tsx` only if needed — current `select("id, circle_id, status, ...")` already avoids `token`, so no client change required.
+- Drop policy `Members can update circle avatar` on `public.circles`.
+- Create SECURITY DEFINER RPC `update_circle_avatar(_circle_id uuid, _avatar_url text)`:
+  - Verifies `is_circle_member(auth.uid(), _circle_id)`.
+  - Updates only `avatar_url` and `updated_at`.
+  - `GRANT EXECUTE ... TO authenticated`.
+- Update `src/components/profile/AvatarCropDialog.tsx` (and any other circle-avatar upload site — `CircleHeader.tsx`, `Circles.tsx`) to call `supabase.rpc('update_circle_avatar', { _circle_id, _avatar_url })` instead of `supabase.from('circles').update({ avatar_url })`.
+- Audit `circles` UPDATE call sites to ensure no other client-side update relies on the dropped permissive policy. Remaining UPDATE policy `Owners can update circles` stays for name/description/transfer_block/invite_code (already owner-scoped).
 
-### Fix 2 — Scope Realtime channels to participants
+### Fix #4 — CSPRNG for 2FA codes
 
-- Rename the two shared channels in `src/pages/Messages.tsx` so the topic includes the user id, e.g. `private-messages:${userId}` and `group-messages:${userId}`. The Postgres-changes filter already scopes the row payload; the per-user topic prevents non-participants from even subscribing to the shared name.
-- Add a `realtime.messages` RLS policy (via migration) that allows a subscription only when the topic ends with the subscriber's own `auth.uid()` for these two prefixes. For group chats, additionally allow `group-chat:<group_id>` topics only when `is_group_chat_member(auth.uid(), group_id)` — but we are not using per-group topics today, so the per-user topic is sufficient as a first pass.
-- No data-shape changes; only the channel name string changes in the client.
+- In `supabase/functions/send-2fa-code/index.ts`, replace:
+  ```ts
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  ```
+  with:
+  ```ts
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  const code = String(100000 + (buf[0] % 900000)).padStart(6, "0");
+  ```
+- No other call sites use `Math.random()` for security purposes (spot-check `rg "Math.random" supabase/functions`).
+
+### Fix #1 — Clear scanner on invite token
+
+- Drop policy `Invited users can view their pending invites` on `circle_invites`.
+- Create view `public.circle_invites_safe` (security_invoker = on) selecting `id, circle_id, invited_by, email, status, created_at, expires_at` with predicate `email = auth.jwt()->>'email' AND status = 'pending' AND expires_at > now()`.
+- `GRANT SELECT ON public.circle_invites_safe TO authenticated`.
+- Keep the column-level GRANT on the base table for the existing UPDATE policy (`Invited users can respond to their invites`) to keep working — UPDATE doesn't need SELECT access to `token`.
+- Update `src/components/circles/PendingInvites.tsx` to read from `circle_invites_safe` instead of `circle_invites`. (Already avoids `token`, so just a table-name swap.)
+
+### Fix #3 — Verify only
+
+- Re-run security scan after #1, #2, #4 land. If realtime warning persists, revisit; current mitigation (per-user topic + `realtime.messages` policy) is sufficient in practice.
 
 ### Verification
 
-- Run `supabase--linter` and re-run the security scan; both findings should clear.
-- Manually: as user A, try `supabase.from('circle_invites').select('token')` → expect permission error. `select('id, circle_id, status')` still works.
-- Send a DM and confirm the recipient still receives the realtime insert.
+- `supabase--linter` + security scan: #1, #2, #4 should clear.
+- Manual #2: as a non-owner member, `supabase.from('circles').update({ owner_id: '<my uid>' }).eq('id', circleId)` → expect permission error. Avatar upload via the new RPC still works.
+- Manual #1: `supabase.from('circle_invites').select('*')` → permission error. `from('circle_invites_safe').select('*')` → returns rows without `token`. PendingInvites UI still lists pending invites.
+- Manual #4: trigger 2FA, confirm email arrives with a 6-digit code.
 
-No edge function, auth, or business-logic changes needed.
+No auth flow, billing, or business-logic changes. No data migration needed.

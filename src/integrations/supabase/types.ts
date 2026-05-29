@@ -1931,6 +1931,20 @@ export type Database = {
       forfeit_stale_transfer_blocks: { Args: never; Returns: number }
       get_circle_count: { Args: never; Returns: number }
       get_circle_limit: { Args: never; Returns: number }
+      get_my_pending_invites: {
+        Args: never
+        Returns: {
+          circle_description: string
+          circle_id: string
+          circle_name: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          status: string
+        }[]
+      }
       has_circle_role: {
         Args: {
           _circle_id: string
@@ -1987,6 +2001,10 @@ export type Database = {
       shares_circle_with: {
         Args: { _other_user_id: string; _user_id: string }
         Returns: boolean
+      }
+      update_circle_avatar: {
+        Args: { _avatar_url: string; _circle_id: string }
+        Returns: undefined
       }
     }
     Enums: {
