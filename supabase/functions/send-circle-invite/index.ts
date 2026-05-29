@@ -220,6 +220,7 @@ const handler = async (req: Request): Promise<Response> => {
     const safeCircleName = escapeHtml(circleName);
     const safeInviterName = escapeHtml(inviterName || "A family member");
     const safeEmail = escapeHtml(email);
+    const hasAccount = !!targetUser;
 
     if (!RESEND_API_KEY) {
       console.error("RESEND_API_KEY is not configured");
@@ -229,7 +230,29 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    console.log(`Sending invite to ${email} for circle ${circleName}`);
+    console.log(`Sending invite to ${email} for circle ${circleName} (hasAccount=${hasAccount})`);
+
+    const encodedEmail = encodeURIComponent(email);
+    const ctaUrl = hasAccount
+      ? `https://familialmedia.com/auth?mode=login&email=${encodedEmail}`
+      : `https://familialmedia.com/auth?mode=signup&email=${encodedEmail}`;
+    const ctaLabel = hasAccount ? "Log in" : "Sign up";
+    const subject = hasAccount
+      ? `${inviterName || "A family member"} invited you to ${circleName} on Familial`
+      : `You're invited to join ${circleName} on Familial`;
+    const headline = hasAccount ? "You've been invited to a new circle" : "You're invited";
+    const bodySentence = hasAccount
+      ? `<strong>${safeInviterName}</strong> has invited you to <strong>"${safeCircleName}"</strong> on Familial.`
+      : `<strong>${safeInviterName}</strong> is inviting you to join <strong>"${safeCircleName}"</strong> on Familial.`;
+    const bodySentenceText = hasAccount
+      ? `${inviterName || "A family member"} has invited you to "${circleName}" on Familial.`
+      : `${inviterName || "A family member"} is inviting you to join "${circleName}" on Familial.`;
+    const footerLine = hasAccount
+      ? `Log in with ${safeEmail} to accept the invite.`
+      : `Once you sign up with this email address (${safeEmail}), you'll automatically be connected to the circle.`;
+    const footerLineText = hasAccount
+      ? `Log in with ${email} to accept the invite.`
+      : `Once you sign up with this email address (${email}), you'll automatically be connected to the circle.`;
 
     const emailResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -241,13 +264,13 @@ const handler = async (req: Request): Promise<Response> => {
         from: "Familial <support@support.familialmedia.com>",
         to: [email],
         reply_to: "support@familialmedia.com",
-        subject: `You're invited to join ${safeCircleName} on Familial`,
+        subject,
         headers: {
           "List-Unsubscribe": `<${fnUnsubUrl}>, <${unsubUrl}>, <mailto:support@familialmedia.com?subject=unsubscribe>`,
           "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         },
-        text: `You're invited to join ${circleName} on Familial\n\n${inviterName || "A family member"} has invited you to join their family circle "${circleName}" on Familial.\n\nFamilial is a private space for families to share photos, events, messages, and memories together.\n\nJoin here: https://familialmedia.com/auth\n\nOnce you sign up with this email address (${email}), you'll automatically be connected to the circle.\n\nIf you weren't expecting this invitation, you can safely ignore this email.\n\nUnsubscribe: ${unsubUrl}\n\n© Familial — Connecting families everywhere`,
-        html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5;"><div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;"><div style="background-color: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"><h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 20px 0; font-weight: 600;">You're invited</h1><p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;"><strong>${safeInviterName}</strong> has invited you to join their family circle <strong>"${safeCircleName}"</strong> on Familial.</p><p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Familial is a private space for families to share photos, events, messages, and memories together.</p><div style="text-align: center; margin: 30px 0;"><a href="https://familialmedia.com/auth" style="display: inline-block; background-color: #1a1a1a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Join Familial</a></div><p style="color: #888; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0; border-top: 1px solid #eee; padding-top: 20px;">Once you sign up with this email address (${safeEmail}), you'll automatically be connected to the circle.</p><p style="color: #999; font-size: 12px; line-height: 1.5; margin: 16px 0 0 0;">If you weren't expecting this invitation, you can safely ignore this email.</p></div><p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">© Familial — Connecting families everywhere · <a href="${unsubUrl}" style="color: #999; text-decoration: underline;">Unsubscribe</a></p></div></body></html>`,
+        text: `${headline}\n\n${bodySentenceText}\n\nFamilial is a private space for families to share photos, events, messages, and memories together.\n\n${ctaLabel} here: ${ctaUrl}\n\n${footerLineText}\n\nIf you weren't expecting this invitation, you can safely ignore this email.\n\nUnsubscribe: ${unsubUrl}\n\n© Familial — Connecting families everywhere`,
+        html: `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5;"><div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;"><div style="background-color: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"><h1 style="color: #1a1a1a; font-size: 28px; margin: 0 0 20px 0; font-weight: 600;">${headline}</h1><p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">${bodySentence}</p><p style="color: #4a4a4a; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">Familial is a private space for families to share photos, events, messages, and memories together.</p><div style="text-align: center; margin: 30px 0;"><a href="${ctaUrl}" style="display: inline-block; background-color: #1a1a1a; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">${ctaLabel}</a></div><p style="color: #888; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0; border-top: 1px solid #eee; padding-top: 20px;">${footerLine}</p><p style="color: #999; font-size: 12px; line-height: 1.5; margin: 16px 0 0 0;">If you weren't expecting this invitation, you can safely ignore this email.</p></div><p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">© Familial — Connecting families everywhere · <a href="${unsubUrl}" style="color: #999; text-decoration: underline;">Unsubscribe</a></p></div></body></html>`,
       }),
     });
 

@@ -80,6 +80,23 @@ const Auth = () => {
   const [searchParams] = useSearchParams();
   const planParam = searchParams.get("plan");
 
+  // Honor ?mode=signup|login and ?email=... from invite links so a fresh
+  // recipient lands on the correct form with their email prefilled.
+  useEffect(() => {
+    const mode = searchParams.get("mode");
+    if (mode === "signup") setIsLogin(false);
+    else if (mode === "login") setIsLogin(true);
+    const prefillEmail = searchParams.get("email");
+    if (prefillEmail) {
+      try {
+        const decoded = decodeURIComponent(prefillEmail);
+        if (emailSchema.safeParse(decoded).success) setEmail(decoded);
+      } catch { /* ignore malformed */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
   const navigateIntoApp = useCallback(() => {
     // Check for a saved return URL (e.g. from checkout redirect through auth)
     const savedRedirect = localStorage.getItem("postAuthRedirect");
