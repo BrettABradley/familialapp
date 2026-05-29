@@ -1,45 +1,31 @@
-## 1. Tap-to-undo button doesn't work
+## Are these urgent?
 
-**Root cause:** `useFeedPosts.handleDeletePost` shows a toast with the copy "Tap to undo within 10 seconds" but never attaches an actual `action`. The undo handler is stashed on `window.__lastDeleteUndo`, which nothing in the UI calls. Tapping the toast does nothing.
+**#1 (Error — invite token exposed): Yes, worth fixing before launch.** The `circle_invites.token` column is a unique secret meant for SECURITY DEFINER redemption only, but the current SELECT policy lets the invited user read their full row including `token`. The client code never actually uses `token` (it only reads `id`, `circle_id`, `status`, `email`), so we can safely hide it without breaking anything. Real-world blast radius is small (invitee can already accept/decline), but it violates the documented model and is an easy fix.
 
-**Fix:** Attach a real `ToastAction` to the delete toast so tapping it invokes the restore logic.
+**#2 (Warning — Realtime channel scoping): Not urgent, but worth tightening.** Row payloads on `private_messages` and `group_chat_messages` are still filtered by table RLS, so non-participants can't read message contents. What leaks today is *metadata* — the fact that *some* message arrived on the shared channel name. Low severity, but cheap to address.
 
-- In `src/hooks/useFeedPosts.ts`, replace the window stash with a local `undoHandler` and pass it to the toast via `action: <ToastAction altText="Undo" onClick={undoHandler}>Undo</ToastAction>`.
-- The undo handler clears the timeout, sets `deleted_at = null`, re-inserts `postToDelete` into local state (sorted), and shows a "Post restored" toast.
-- Add the missing `ToastAction` import (already used elsewhere).
+Neither is a "stop the launch" bug. #1 should ship in this submission; #2 can ship now or shortly after.
 
-## 2. Audio post never finishes loading / no playback
+## Plan
 
-**Root cause:** Both `PostCard` (feed) and `Messages` render voice notes with `<audio controls><source src={url} /></audio>`. On iOS Safari/WKWebView:
+### Fix 1 — Hide invite token from clients (migration)
 
-- `<source>` is parsed once at mount. When `useSignedMediaUrl` resolves and the parent re-renders with the real URL, the `<source>` child does not trigger a reload, so the player sits in "loading" forever.
-- `<source>` without an explicit `type` makes iOS refuse to pick a codec for signed Supabase URLs (the `?token=...` JWT hides the `.m4a` extension from the sniffer).
+- Drop policy `Invited users can view their pending invites` on `public.circle_invites`.
+- Create a security-invoker view `public.circle_invites_safe` that selects only `id, circle_id, invited_by, email, status, created_at, expires_at` (no `token`).
+- Grant `SELECT` on the view to `authenticated`; the view inherits row visibility from the user's own JWT email match via a new restricted SELECT policy on the base table that scopes by email **and** is read through the view only.
+- Simpler equivalent: keep the existing predicate but enforce column-level grants — `REVOKE SELECT ON public.circle_invites FROM authenticated; GRANT SELECT (id, circle_id, invited_by, email, status, created_at, expires_at) ON public.circle_invites TO authenticated;`. This preserves the existing PendingInvites query (it never references `token`) and blocks any attempt to select `token`.
+- Update `src/components/circles/PendingInvites.tsx` only if needed — current `select("id, circle_id, status, ...")` already avoids `token`, so no client change required.
 
-**Fix:** Switch to direct `<audio src={url} preload="metadata">` and pass an explicit `type` derived from the storage path extension (not from the signed URL). Add `playsInline` and a `key={url}` so the element fully remounts when the signed URL arrives.
+### Fix 2 — Scope Realtime channels to participants
 
-- Create a tiny shared component `src/components/shared/VoiceNotePlayer.tsx` that:
-  - Takes a stored path (or already-resolved URL).
-  - Uses `useSignedMediaUrl` to resolve.
-  - Derives `mimeType` from the original path extension (`m4a`→`audio/mp4`, `mp3`→`audio/mpeg`, `webm`→`audio/webm`, `ogg`→`audio/ogg`, `wav`→`audio/wav`, `aac`→`audio/aac`, default `audio/mp4`).
-  - Renders `<audio key={url} src={url} controls preload="metadata" playsInline />` inside the existing `bg-secondary` pill.
-  - Shows a small skeleton while `loading || !url`.
-- Replace the two `<audio><source/></audio>` blocks in `src/components/feed/PostCard.tsx` (lines ~192–199 single audio, ~274–279 carousel) with `<VoiceNotePlayer storedPath={originalUrl} />`.
-- Replace the inline `<audio key={i} src={url} controls ... />` in `src/pages/Messages.tsx` (line ~125) with `<VoiceNotePlayer storedPath={originalUrl} className="max-w-[240px]" />`.
-- No changes to upload/recording code; `blobToVoiceNoteFile` + the `voice-note-` filename already produce consistent containers.
+- Rename the two shared channels in `src/pages/Messages.tsx` so the topic includes the user id, e.g. `private-messages:${userId}` and `group-messages:${userId}`. The Postgres-changes filter already scopes the row payload; the per-user topic prevents non-participants from even subscribing to the shared name.
+- Add a `realtime.messages` RLS policy (via migration) that allows a subscription only when the topic ends with the subscriber's own `auth.uid()` for these two prefixes. For group chats, additionally allow `group-chat:<group_id>` topics only when `is_group_chat_member(auth.uid(), group_id)` — but we are not using per-group topics today, so the per-user topic is sufficient as a first pass.
+- No data-shape changes; only the channel name string changes in the client.
 
-## 3. Carousel indicator on personal-profile preview
+### Verification
 
-The `Layers` icon + count badge already exists in `src/pages/ProfileView.tsx` (lines 672–677) but the user reports it's not visible. Tighten it to match the user's spec ("super small in top right"):
+- Run `supabase--linter` and re-run the security scan; both findings should clear.
+- Manually: as user A, try `supabase.from('circle_invites').select('token')` → expect permission error. `select('id, circle_id, status')` still works.
+- Send a DM and confirm the recipient still receives the realtime insert.
 
-- Keep the existing `count > 1` condition.
-- Shrink to a pure icon (no number), size `h-3.5 w-3.5`, white, with a soft black drop-shadow instead of a pill background, positioned `absolute top-1 right-1`.
-- Hide it inside the lightbox (it already lives only on the grid button, so no change needed there).
-
-No changes to backend, RLS, edge functions, or migrations. No new dependencies.
-
-## Verification
-
-- Delete a feed post → toast shows an "Undo" button → tap it → post reappears.
-- Record + post a voice note on iOS → audio pill loads, scrubber shows duration, playback works.
-- Same in DMs/group chats.
-- Open a profile with a multi-image post → small layered icon visible in top-right of the thumbnail; single-item posts show no icon.
+No edge function, auth, or business-logic changes needed.
