@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.0";
 
-const ADMIN_SECRET = Deno.env.get("ADMIN_MODERATE_SECRET");
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -22,27 +20,67 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Support both GET (from email link) and POST
-    let reportId: string;
-    let action: string;
-    let secret: string;
+    // Accept a single one-time token (preferred) or legacy report_id+action+secret pair.
+    let reportId = "";
+    let action = "";
+    let token = "";
 
     if (req.method === "GET") {
       const url = new URL(req.url);
+      token = url.searchParams.get("token") || "";
       reportId = url.searchParams.get("report_id") || "";
       action = url.searchParams.get("action") || "";
-      secret = url.searchParams.get("secret") || "";
     } else {
-      const body = await req.json();
+      const body = await req.json().catch(() => ({}));
+      token = body.token || "";
       reportId = body.report_id || "";
       action = body.action || "";
-      secret = body.secret || "";
     }
 
-    // Validate admin secret
-    if (!secret || secret !== ADMIN_SECRET) {
+    // Use service role for admin operations
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // === Authorize via one-time token (preferred) ===
+    if (token) {
+      const { data: tokenRow, error: tokenErr } = await supabase
+        .from("moderation_action_tokens")
+        .select("report_id, action, expires_at, used_at")
+        .eq("token", token)
+        .maybeSingle();
+
+      if (tokenErr || !tokenRow) {
+        return new Response(
+          htmlPage("❌ Invalid Link", "#dc2626", "<p>This moderation link is invalid or has expired.</p>"),
+          { status: 401, headers: { "Content-Type": "text/html", ...corsHeaders } }
+        );
+      }
+      if (tokenRow.used_at) {
+        return new Response(
+          htmlPage("⚠️ Already Used", "#f59e0b", "<p>This moderation link has already been used.</p>"),
+          { status: 410, headers: { "Content-Type": "text/html", ...corsHeaders } }
+        );
+      }
+      if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
+        return new Response(
+          htmlPage("⚠️ Link Expired", "#f59e0b", "<p>This moderation link has expired. Please use the admin dashboard.</p>"),
+          { status: 410, headers: { "Content-Type": "text/html", ...corsHeaders } }
+        );
+      }
+
+      reportId = tokenRow.report_id;
+      action = tokenRow.action;
+
+      // Mark used immediately to prevent double-actions.
+      await supabase
+        .from("moderation_action_tokens")
+        .update({ used_at: new Date().toISOString() })
+        .eq("token", token);
+    } else {
       return new Response(
-        htmlPage("❌ Unauthorized", "#dc2626", "<p>Invalid admin credentials.</p>"),
+        htmlPage("❌ Unauthorized", "#dc2626", "<p>Missing moderation token.</p>"),
         { status: 401, headers: { "Content-Type": "text/html", ...corsHeaders } }
       );
     }
@@ -54,11 +92,8 @@ serve(async (req: Request) => {
       );
     }
 
-    // Use service role for admin operations
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    // (supabase client already created above for token lookup)
+
 
     // Look up the report
     const { data: report, error: reportError } = await supabase

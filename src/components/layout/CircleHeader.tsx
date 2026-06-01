@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -207,7 +207,19 @@ export function CircleHeader({
   lockCircle = false,
 }: CircleHeaderProps) {
   const { user } = useAuth();
-  const currentCircle = circles.find((c) => c.id === selectedCircle);
+  const location = useLocation();
+  // URL is the source of truth: if the route carries ?circle=ID (push deep-link,
+  // direct nav), display THAT circle in the header, even if context state hasn't
+  // synced yet. Falls back to selectedCircle otherwise.
+  const urlCircleId = (() => {
+    const p = new URLSearchParams(location.search);
+    return p.get("circle") || p.get("circleId");
+  })();
+  const headerCircleId =
+    urlCircleId && circles.some((c) => c.id === urlCircleId)
+      ? urlCircleId
+      : selectedCircle;
+  const currentCircle = circles.find((c) => c.id === headerCircleId);
   const isMobile = useIsMobile();
   const [sheetOpen, setSheetOpen] = useState(false);
   const isPlatformAdmin = useIsPlatformAdmin();

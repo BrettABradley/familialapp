@@ -131,24 +131,12 @@ async function fetchAppleTransaction(transactionId: string): Promise<any | null>
   return null;
 }
 
-/**
- * Fallback verification: decode the signed JWS the client sent from StoreKit 2.
- * StoreKit 2 has already cryptographically validated this against Apple's root
- * certificate on-device before handing it to us, so the payload is trustworthy
- * for the standard fields (bundleId, productId, transactionId).
- *
- * We use this when the App Store Server API call fails (e.g. credentials
- * misconfigured or transient outage) so legitimate purchases still activate.
- */
-function decodeClientJws(jws: string | null | undefined): any | null {
-  if (!jws || typeof jws !== "string") return null;
-  try {
-    return decodeJwsPayload(jws);
-  } catch (err: any) {
-    console.warn(`[validate-apple-receipt] client JWS decode failed: ${err.message}`);
-    return null;
-  }
-}
+// NOTE: We intentionally do NOT decode the client JWS as a fallback.
+// Without verifying Apple's ECDSA signature, an attacker could craft a fake
+// JWS and trigger a free plan upgrade whenever Apple's server API is briefly
+// unreachable. If Apple's API fails, we surface a 503 and let the client retry
+// (StoreKit retains the entitlement client-side, so nothing is lost).
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -194,21 +182,22 @@ serve(async (req) => {
       throw new Error("transactionId and productId are required");
     }
 
-    // === Verify with Apple's App Store Server API, fall back to client JWS ===
-    let txn = await fetchAppleTransaction(String(transactionId));
-    let verificationSource = "apple-server-api";
+    // === Verify with Apple's App Store Server API (no unsigned fallback) ===
+    const txn = await fetchAppleTransaction(String(transactionId));
     if (!txn) {
-      txn = decodeClientJws(jwsRepresentation);
-      verificationSource = "client-jws";
-      if (!txn) {
-        throw new Error(
-          "Could not verify transaction with Apple. Check that APPLE_KEY_ID, APPLE_ISSUER_ID, and APPLE_PRIVATE_KEY are correct (must be an App Store Server API key, not an In-App Purchase key)."
-        );
-      }
-      console.log("[validate-apple-receipt] using client JWS fallback");
+      return new Response(
+        JSON.stringify({
+          error: "Apple is temporarily unable to verify this transaction. Please try again in a moment.",
+          retry: true,
+        }),
+        {
+          status: 503,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
     console.log("[validate-apple-receipt] txn decoded", {
-      source: verificationSource,
+      source: "apple-server-api",
       bundleId: txn.bundleId,
       productId: txn.productId,
       type: txn.type,

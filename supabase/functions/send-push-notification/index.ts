@@ -103,6 +103,16 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // === Auth gate: only the database trigger (using SERVICE_ROLE_KEY) may call this. ===
+  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!SERVICE_KEY || authHeader !== `Bearer ${SERVICE_KEY}`) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
   try {
     const { record } = await req.json();
     if (!record || !record.user_id) {
@@ -116,7 +126,7 @@ serve(async (req: Request) => {
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      SERVICE_KEY
     );
 
     // Respect notification preferences
