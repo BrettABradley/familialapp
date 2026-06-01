@@ -461,6 +461,64 @@ const Admin = () => {
                 </CardContent>
               </Card>
 
+              {/* Paying customers list */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    Paying customers
+                    <Badge variant="outline" className="text-[10px]">
+                      {subscriptions.paid.customers?.length ?? 0}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {subscriptions.paid.customers?.length ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b text-left text-muted-foreground">
+                            <th className="py-2 pr-3">Email</th>
+                            <th className="py-2 pr-3">Name</th>
+                            <th className="py-2 pr-3">Plan</th>
+                            <th className="py-2 pr-3">Platform</th>
+                            <th className="py-2 pr-3 text-center">Seats+</th>
+                            <th className="py-2 pr-3">Started</th>
+                            <th className="py-2 pr-3">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {subscriptions.paid.customers.map((c: any) => (
+                            <tr key={c.user_id} className="border-b last:border-0">
+                              <td className="py-2 pr-3 font-medium text-foreground">{c.email || c.user_id.slice(0, 8)}</td>
+                              <td className="py-2 pr-3 text-muted-foreground">{c.display_name || "—"}</td>
+                              <td className="py-2 pr-3 capitalize">{c.plan}</td>
+                              <td className="py-2 pr-3">
+                                <Badge variant="outline" className="text-[10px] capitalize">{c.source}</Badge>
+                              </td>
+                              <td className="py-2 pr-3 text-center">{c.extra_members || 0}</td>
+                              <td className="py-2 pr-3 text-muted-foreground">
+                                {c.subscription_started_at ? new Date(c.subscription_started_at).toLocaleDateString() : "—"}
+                              </td>
+                              <td className="py-2 pr-3">
+                                {c.cancel_at_period_end ? (
+                                  <span className="text-destructive">
+                                    Canceling{c.current_period_end ? ` ${new Date(c.current_period_end).toLocaleDateString()}` : ""}
+                                  </span>
+                                ) : (
+                                  <span className="text-foreground">Active</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No paying customers yet.</p>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Gifted (excluded from paid metrics) */}
               <Card className="border-dashed">
                 <CardHeader>
