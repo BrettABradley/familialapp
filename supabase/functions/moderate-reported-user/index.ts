@@ -92,12 +92,8 @@ serve(async (req: Request) => {
       );
     }
 
+    // (supabase client already created above for token lookup)
 
-    // Use service role for admin operations
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
 
     // Look up the report
     const { data: report, error: reportError } = await supabase
