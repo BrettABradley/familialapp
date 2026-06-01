@@ -1041,6 +1041,33 @@ export type Database = {
           },
         ]
       }
+      moderation_action_tokens: {
+        Row: {
+          action: string
+          created_at: string
+          expires_at: string
+          report_id: string
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          expires_at?: string
+          report_id: string
+          token: string
+          used_at?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          expires_at?: string
+          report_id?: string
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       moderation_decisions: {
         Row: {
           action: string
@@ -1931,6 +1958,13 @@ export type Database = {
       forfeit_stale_transfer_blocks: { Args: never; Returns: number }
       get_circle_count: { Args: never; Returns: number }
       get_circle_limit: { Args: never; Returns: number }
+      get_circle_owner_limits: {
+        Args: { _circle_id: string }
+        Returns: {
+          max_members_per_circle: number
+          plan: string
+        }[]
+      }
       get_my_pending_invites: {
         Args: never
         Returns: {
