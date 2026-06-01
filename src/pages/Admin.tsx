@@ -188,6 +188,7 @@ const Admin = () => {
           <TabsTrigger value="banned">Banned</TabsTrigger>
           <TabsTrigger value="audit">Audit</TabsTrigger>
           <TabsTrigger value="metrics">Metrics</TabsTrigger>
+          <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
           <TabsTrigger value="admins-users"><Users className="w-4 h-4 mr-1" />Admins & Users</TabsTrigger>
         </TabsList>
 
