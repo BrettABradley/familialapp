@@ -1,113 +1,101 @@
 
-## Scope
+## Goal
 
-Six security findings + the "wrong circle name in header after tapping a push notification" bug. Some findings will be fixed in code; one will be downgraded in the security memory with reasoning. I'll also call out what (if anything) you need to do in Xcode.
-
----
-
-## 1. Errors to fix
-
-### A. Circle members can read circle owners' full billing rows (`user_plans`)
-**Fix:** Replace the broad "Circle members can view circle owner plan" SELECT policy with a `SECURITY DEFINER` RPC that returns only the safe columns members actually need (`max_members_per_circle`, `extra_members`-equivalent via circle row, plan name only).
-
-Steps:
-1. Drop policy `Circle members can view circle owner plan` on `public.user_plans`. Keep `Users can view own plan` (`auth.uid() = user_id`).
-2. Create `public.get_circle_owner_limits(_circle_id uuid)` returning `(plan text, max_members_per_circle int)` — SECURITY DEFINER, search_path=public, asserts caller is a member or owner of `_circle_id`.
-3. Update `src/lib/circleLimits.ts → getCircleMemberLimit` to call the RPC instead of selecting from `user_plans` for non-self owners. When the owner is the current user, keep the direct query (still allowed).
-4. Audit other client reads of `user_plans` where `user_id !== auth.uid()` — none expected, but I'll grep `from("user_plans")` and migrate any that read another user's row.
-
-Sensitive columns (`apple_original_transaction_id`, `comp_note`, `pending_plan`, `cancel_at_period_end`, etc.) become inaccessible to non-owners, which is the intent.
-
-### B. `send-push-notification` has no auth
-**Fix:** Require the service-role bearer at the top of the function. The DB trigger `trigger_push_notification` already calls it with `Authorization: Bearer <anon_key>` from the vault — I'll switch the trigger to use the **service-role** secret and update the function to reject anything that doesn't match `SUPABASE_SERVICE_ROLE_KEY`.
-
-Concretely:
-1. Edit `supabase/functions/send-push-notification/index.ts` to 401 unless `Authorization === \`Bearer ${SUPABASE_SERVICE_ROLE_KEY}\``.
-2. Update vault secret used by `trigger_push_notification` from `SUPABASE_ANON_KEY` to `SUPABASE_SERVICE_ROLE_KEY` (or add `SUPABASE_SERVICE_ROLE_KEY` to vault if not present) and update the function body to read it.
-
-Side benefit: blocks the spam/phishing vector flagged by the scanner.
-
-### C. Apple IAP receipt validation falls back to unverified client JWS
-**Fix:** Remove the `decodeClientJws` fallback in `validate-apple-receipt`. If the App Store Server API call fails, surface a clear error and let the client retry. To avoid breaking users during transient Apple outages, also:
-- Log the failure with `verificationSource = "apple-server-api-failed"`.
-- Return HTTP 503 (so the client UI can say "Apple is temporarily unreachable, try again") instead of silently activating the plan.
-
-This closes the payment-bypass risk completely. Genuine StoreKit purchases stay valid because Apple's Server API verifies them — the only thing removed is the unsigned fallback.
-
-### D. Admin moderation secret in email URLs
-**Fix:** Replace the URL-embedded `ADMIN_MODERATE_SECRET` with a short-lived signed token.
-1. Create table `public.moderation_action_tokens` (`token text PK`, `report_id uuid`, `action text`, `expires_at timestamptz`, `used_at timestamptz`). RLS denies all; only service role uses it.
-2. `notify-content-report` generates a random 32-byte token per action (ban / dismiss), inserts a row with 7-day expiry, and embeds **only the token** in the email URL (no secret).
-3. `moderate-reported-user` looks up the token, verifies not expired and not used, marks `used_at`, then performs the action. Existing `secret=` query param support stays for one release as a fallback, then is removed.
-4. After deploy, rotate `ADMIN_MODERATE_SECRET` (you'll do this in Cloud → Secrets — I'll remind you in the closing message).
+Two adds to the admin console:
+1. **Subscriptions analytics tab** — active vs canceled, split by Stripe / Apple, broken down by tier, duration, and extra-member packs. **Gifted (`admin_comp`) plans excluded from the paid metrics** and shown in a separate informational block.
+2. **Banned + Appeals tooling** — the Appeals tab already grants/denies. Banned tab is currently read-only and missing an unban action and any appeal cross-reference. Wire those up.
 
 ---
 
-## 2. Warnings — handle pragmatically
+## Current state (verified)
 
-### E. Realtime `ELSE true` policy
-**Fix:** Tighten the first `realtime.messages` policy to an explicit allowlist of topic patterns we actually use (`private-messages:*`, `group-messages:*`, `bell-*-{uuid}`, plus any others present in code). Anything else → deny.
-
-Approach: I'll grep `supabase.channel(` across `src/` to enumerate every topic name we subscribe to, then write the policy with exact prefix matches. CDC subscriptions on tables are unaffected (those use a separate policy path).
-
-### F. `cleanup-rescue-offers` unauthenticated cron endpoint
-**Fix:** Require `Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}` at the top. Update whatever pg_cron / scheduled invocation header to use the service role. Same pattern as fix B.
-
----
-
-## 3. Push-notification deep-link circle mismatch
-
-**Symptom:** Tapping a push that links to `/events?circle=X&eventId=Y` lands on the right page, but the header still shows the previously selected circle.
-
-**Root cause:** `useDeepLinkCircleSync` waits for `circles.length > 0` and switches via `setSelectedCircle`. But:
-1. On a cold app open from a push, the navigation happens via `window.history.pushState` + a synthesized `popstate` (`src/lib/pushNotifications.ts`). React Router picks up the path, but the header's `currentCircle = circles.find(...)` is computed against `selectedCircle` from `CircleContext`, which is seeded from `localStorage` and not updated until *after* circles load AND the URL `?circle=` is read.
-2. Some notification types (DM, comment, mention pre-fix) don't include `?circle=` in `link`, so the hook never fires for them, leaving the wrong header on whatever page they land on.
-
-**Fix:**
-1. **CircleHeader truth-source:** When the current route's `?circle=` query param is present and matches a circle the user belongs to, the header should display *that* circle's name regardless of `selectedCircle` state. I'll thread the URL param through `CircleHeader` so the displayed name/avatar reflects the URL immediately, even before `setSelectedCircle` resolves.
-2. **Backfill missing `?circle=` on notification links.** Audit triggers that create notifications without it (`notify_on_dm` is intentional — DMs are global). For mention / comment / fridge / album / event triggers, confirm `link` already includes `?circle=`. Where it doesn't (e.g. older `comment` notifications), add the param to the generating trigger.
-3. **Sync on push tap explicitly.** In `pushNotifications.ts pushNotificationActionPerformed`, after `pushState`, also broadcast a `window.dispatchEvent(new CustomEvent('familial:deep-link', { detail: link }))`. `useDeepLinkCircleSync` already keys off `searchParams` so the popstate handles it — but I'll add a tiny effect that also re-reads `window.location.search` on that custom event for belt-and-suspenders.
-
-Net result: header circle always = the circle of the content being shown.
+- `user_plans.source` values in DB: `stripe` (65), `apple` (4), `admin_comp` (16). This is the gift/paid discriminator.
+- `user_plans` columns relevant: `plan`, `source`, `cancel_at_period_end`, `current_period_end`, `extra_members`, `apple_original_transaction_id`, `comped_by_admin_at`, `comp_note`.
+- `circles.extra_members` also exists (per-circle add-on packs).
+- **Missing**: `subscription_started_at` — we have no truthful column for "how long subscribed". `created_at` shifts when a row is upserted by tier changes.
+- Admin.tsx already has tabs for Reports / Appeals / Banned / Audit / Metrics / Admins & Users.
+- Appeals tab: grant button calls `admin-manage-users` with `restore_user` — works.
+- Banned tab: read-only list of `banned_emails` rows — no unban, no appeal cross-reference.
 
 ---
 
-## 4. What you need to do (Xcode / Cloud / external)
+## What we'll build
 
-Nothing requires an Xcode rebuild. All changes are server-side or pure web code that ships through Lovable Cloud + the existing TestFlight bundle.
+### 1. Schema (migration)
 
-After I implement and you accept the changes, you'll need to do this in **Cloud → Secrets**:
-- **Rotate `ADMIN_MODERATE_SECRET`** (one click — "Update secret" with a fresh random value). Old URL-embedded tokens become invalid; new tokens go through the DB table.
-- Confirm `SUPABASE_SERVICE_ROLE_KEY` is present in the vault (it should be — the trigger needs it).
+Add to `public.user_plans`:
+- `subscription_started_at timestamptz`
 
-No App Store submission, no Apple Developer account change, no APNs key change.
+Backfill: for rows where `source IN ('stripe','apple')` AND `plan != 'free'`, set `subscription_started_at = created_at` so existing accounts get a reasonable approximation immediately.
+
+### 2. Set `subscription_started_at` on first paid activation
+
+Edit these edge functions to set the column **only when it's NULL** (never overwrite, so tier upgrades don't reset the clock):
+- `validate-apple-receipt` — on successful Apple verification
+- `sync-stripe-purchases` — when first activating a paid Stripe plan
+- `stripe-webhook` — `customer.subscription.created` handler
+
+When a user cancels and resubscribes later, `subscription_started_at` keeps the original date unless the row was reset to `plan='free'` and back — acceptable for an internal metric.
+
+### 3. Extend `admin-dashboard` edge function
+
+Add a new `tab=subscriptions` branch (keep `tab=metrics` unchanged so the existing Metrics tab keeps working). Returns:
+
+```ts
+{
+  paid: {
+    active:    { byPlatform: { stripe: N, apple: N }, byTier: { family, extended, founder }, total },
+    canceled:  { byPlatform: { stripe: N, apple: N }, byTier: {...}, total },  // cancel_at_period_end=true
+    durationBuckets: { lt30d, d30_90, d90_365, gt365 },  // from subscription_started_at, active paid only
+    extraMembers: {
+      perUserPacks:   { stripe: N, apple: N, total },   // SUM(user_plans.extra_members) where source in stripe/apple
+      perCirclePacks: { totalCircles: N, totalExtraSeats: N }, // SUM(circles.extra_members) — owner-attributed
+    }
+  },
+  gifted: { // INFORMATIONAL, kept out of paid metrics
+    active:    { byTier: {...}, total },
+    recent:    [{ user_id, email, plan, comp_note, comped_by_admin_at }]  // last 10
+  }
+}
+```
+
+All paid queries: `WHERE source IN ('stripe','apple') AND plan != 'free'`.
+Gifted queries: `WHERE source = 'admin_comp'`.
+
+### 4. Add Subscriptions tab in `src/pages/Admin.tsx`
+
+New `<TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>` between Metrics and Admins & Users. Renders:
+- **Top row of cards**: Total Active Paid · Active Stripe · Active Apple · Canceling (cancel_at_period_end)
+- **By tier table**: Family / Extended / Founder × Stripe / Apple, active vs canceling
+- **Duration distribution**: 4 bars (<30d, 1–3mo, 3–12mo, >1yr)
+- **Extra members panel**: per-user packs (by platform) + per-circle packs (totals)
+- **Gifted section** (visually separated, muted): count by tier + recent comp list, with a label "Excluded from paid metrics"
+
+### 5. Banned tab — add unban + appeal cross-reference
+
+- Backend: add `unban_email` case to `admin-manage-users` (delete from `banned_emails` by id, write audit row).
+- Backend: `admin-dashboard` `tab=banned` joins `user_appeals` by email and returns `pending_appeal_id` when present.
+- Frontend Banned tab: show "Pending appeal" badge with a button "View appeal" that switches to Appeals tab; add **Unban** destructive button with confirm dialog.
+
+### 6. Memory
+
+Update `mem://business/subscription-enforcement` with: "`user_plans.source` discriminator: stripe / apple / admin_comp. Admin metrics exclude admin_comp from paid totals. `subscription_started_at` populated on first paid activation, never overwritten on tier change."
 
 ---
 
-## 5. Security memory updates
+## Files touched
 
-After fixes land I'll update `mem://security/...` with:
-- New rule: "Push, cron, and webhook edge functions must validate `Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}` at top of handler."
-- New rule: "Never embed secrets in email URLs. Use single-use DB-backed tokens."
-- New rule: "Apple IAP must require server-side verification — no client-JWS fallback."
-- Note that the `user_plans` exposure was tightened via SECURITY DEFINER RPC; future RLS policies must not expose billing columns to circle members.
+- New migration: `supabase/migrations/<ts>_subscription_started_at.sql`
+- `supabase/functions/admin-dashboard/index.ts` — add `subscriptions` branch, enrich `banned` branch
+- `supabase/functions/admin-manage-users/index.ts` — add `unban_email`
+- `supabase/functions/validate-apple-receipt/index.ts` — set `subscription_started_at`
+- `supabase/functions/sync-stripe-purchases/index.ts` — set `subscription_started_at`
+- `supabase/functions/stripe-webhook/index.ts` — set `subscription_started_at`
+- `src/pages/Admin.tsx` — new Subscriptions tab, Banned tab unban/appeal-link
+- `mem://business/subscription-enforcement` — note the discriminator + column
 
-Nothing will be "downgraded and ignored" — all six are getting fixed.
+## Out of scope
 
----
-
-## Technical details
-
-**Files I'll edit:**
-- `supabase/migrations/<new>.sql` — drop+create user_plans policy, new `get_circle_owner_limits` RPC, new `moderation_action_tokens` table + RLS + grants, tighten `realtime.messages` policy, update `trigger_push_notification` to use service role secret.
-- `src/lib/circleLimits.ts` — switch to RPC.
-- `supabase/functions/send-push-notification/index.ts` — auth gate.
-- `supabase/functions/cleanup-rescue-offers/index.ts` — auth gate.
-- `supabase/functions/validate-apple-receipt/index.ts` — drop client JWS fallback, return 503.
-- `supabase/functions/notify-content-report/index.ts` — generate token, drop secret from URL.
-- `supabase/functions/moderate-reported-user/index.ts` — accept token, keep secret fallback for one release.
-- `src/lib/pushNotifications.ts` — broadcast deep-link event.
-- `src/hooks/useDeepLinkCircleSync.ts` + `src/components/layout/CircleHeader.tsx` — URL-param-driven header truth.
-- Possibly trigger functions that produce notifications missing `?circle=` (only if grep shows any).
-
-**Order of operations:** migration first (you approve), then code edits in one batch, then I'll ask you to rotate `ADMIN_MODERATE_SECRET`.
+- Live Stripe/Apple API lookups per render (would be slow). We rely on the DB columns kept in sync by the existing webhook/sync paths.
+- MRR / revenue dollars — not requested; can add later by joining tier → price map.
+- Historical churn over time / charts — current request is "report active vs canceled" not time-series. Can add with a simple sparkline later if you want.
