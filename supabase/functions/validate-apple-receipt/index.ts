@@ -182,21 +182,22 @@ serve(async (req) => {
       throw new Error("transactionId and productId are required");
     }
 
-    // === Verify with Apple's App Store Server API, fall back to client JWS ===
-    let txn = await fetchAppleTransaction(String(transactionId));
-    let verificationSource = "apple-server-api";
+    // === Verify with Apple's App Store Server API (no unsigned fallback) ===
+    const txn = await fetchAppleTransaction(String(transactionId));
     if (!txn) {
-      txn = decodeClientJws(jwsRepresentation);
-      verificationSource = "client-jws";
-      if (!txn) {
-        throw new Error(
-          "Could not verify transaction with Apple. Check that APPLE_KEY_ID, APPLE_ISSUER_ID, and APPLE_PRIVATE_KEY are correct (must be an App Store Server API key, not an In-App Purchase key)."
-        );
-      }
-      console.log("[validate-apple-receipt] using client JWS fallback");
+      return new Response(
+        JSON.stringify({
+          error: "Apple is temporarily unable to verify this transaction. Please try again in a moment.",
+          retry: true,
+        }),
+        {
+          status: 503,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
     console.log("[validate-apple-receipt] txn decoded", {
-      source: verificationSource,
+      source: "apple-server-api",
       bundleId: txn.bundleId,
       productId: txn.productId,
       type: txn.type,
