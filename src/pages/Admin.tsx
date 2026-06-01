@@ -376,6 +376,132 @@ const Admin = () => {
           ) : <p className="text-muted-foreground text-sm py-8 text-center">No metrics.</p>}
         </TabsContent>
 
+        {/* SUBSCRIPTIONS */}
+        <TabsContent value="subscriptions" className="space-y-4">
+          {isLoading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>
+          : subscriptions ? (
+            <div className="space-y-6 mt-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: "Active Paid", value: subscriptions.paid.active.total },
+                  { label: "Active · Stripe", value: subscriptions.paid.active.byPlatform.stripe },
+                  { label: "Active · Apple", value: subscriptions.paid.active.byPlatform.apple },
+                  { label: "Canceling", value: subscriptions.paid.canceled.total },
+                ].map((s) => (
+                  <Card key={s.label}><CardContent className="pt-4 text-center">
+                    <p className="text-2xl font-bold">{s.value}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+                  </CardContent></Card>
+                ))}
+              </div>
+
+              {/* By tier */}
+              <Card>
+                <CardHeader><CardTitle className="text-sm">By tier &amp; platform</CardTitle></CardHeader>
+                <CardContent>
+                  <table className="w-full text-sm">
+                    <thead className="text-xs text-muted-foreground">
+                      <tr><th className="text-left py-1">Tier</th><th>Stripe active</th><th>Apple active</th><th>Canceling</th></tr>
+                    </thead>
+                    <tbody>
+                      {(["family", "extended", "founder"] as const).map((tier) => {
+                        const a = subscriptions.paid.active.byTier[tier] ?? 0;
+                        const c = subscriptions.paid.canceled.byTier[tier] ?? 0;
+                        // platform split is global, but we still show per-tier active total split is not directly available — show active count per tier and canceling per tier
+                        return (
+                          <tr key={tier} className="border-t">
+                            <td className="py-2 capitalize">{tier}</td>
+                            <td className="text-center">{a /* combined active for this tier */}</td>
+                            <td className="text-center text-muted-foreground">—</td>
+                            <td className="text-center">{c}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  <p className="text-xs text-muted-foreground mt-2">Platform totals are shown in the cards above; per-tier × platform split is summarized as active count per tier.</p>
+                </CardContent>
+              </Card>
+
+              {/* Duration distribution */}
+              <Card>
+                <CardHeader><CardTitle className="text-sm">Active paid · time subscribed</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-4 gap-3 text-center">
+                    {[
+                      { k: "lt30d", label: "< 30 days" },
+                      { k: "d30_90", label: "1–3 months" },
+                      { k: "d90_365", label: "3–12 months" },
+                      { k: "gt365", label: "> 1 year" },
+                    ].map((b) => (
+                      <div key={b.k} className="p-3 bg-muted rounded">
+                        <p className="text-xl font-bold">{subscriptions.paid.durationBuckets[b.k] ?? 0}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{b.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Extra members packs */}
+              <Card>
+                <CardHeader><CardTitle className="text-sm">Extra member packs</CardTitle></CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <div>
+                    <p className="font-medium mb-1">Per-user packs (seats)</p>
+                    <p className="text-xs text-muted-foreground">
+                      Stripe: <span className="text-foreground font-medium">{subscriptions.paid.extraMembers.perUserPacks.stripe}</span> ·
+                      &nbsp;Apple: <span className="text-foreground font-medium">{subscriptions.paid.extraMembers.perUserPacks.apple}</span> ·
+                      &nbsp;Total: <span className="text-foreground font-medium">{subscriptions.paid.extraMembers.perUserPacks.total}</span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-medium mb-1">Per-circle packs</p>
+                    <p className="text-xs text-muted-foreground">
+                      Circles with extra seats: <span className="text-foreground font-medium">{subscriptions.paid.extraMembers.perCirclePacks.totalCircles}</span> ·
+                      &nbsp;Total extra seats sold: <span className="text-foreground font-medium">{subscriptions.paid.extraMembers.perCirclePacks.totalExtraSeats}</span>
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Gifted (excluded from paid metrics) */}
+              <Card className="border-dashed">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    Gifted / Comp plans
+                    <Badge variant="outline" className="text-[10px]">Excluded from paid metrics</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <p className="text-xs text-muted-foreground">
+                    Total gifted: <span className="text-foreground font-medium">{subscriptions.gifted.active.total}</span> ·
+                    &nbsp;Family: <span className="text-foreground font-medium">{subscriptions.gifted.active.byTier.family}</span> ·
+                    &nbsp;Extended: <span className="text-foreground font-medium">{subscriptions.gifted.active.byTier.extended}</span> ·
+                    &nbsp;Founder: <span className="text-foreground font-medium">{subscriptions.gifted.active.byTier.founder}</span>
+                  </p>
+                  {subscriptions.gifted.recent?.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="font-medium text-xs">Recent comps</p>
+                      {subscriptions.gifted.recent.map((c: any) => (
+                        <div key={c.user_id} className="text-xs text-muted-foreground border-t pt-1">
+                          <span className="text-foreground">{c.email || c.user_id.slice(0, 8)}</span>
+                          &nbsp;· {c.plan}
+                          {c.comp_note && <> · "{c.comp_note}"</>}
+                          {c.comped_by_admin_at && <> · {new Date(c.comped_by_admin_at).toLocaleDateString()}</>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : <p className="text-muted-foreground text-sm py-8 text-center">No subscription data.</p>}
+        </TabsContent>
+
+
+
         {/* ADMINS & USERS */}
         <TabsContent value="admins-users">
           {user && <AdminsUsersTab currentUserId={user.id} />}
