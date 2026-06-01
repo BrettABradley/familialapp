@@ -254,6 +254,42 @@ serve(async (req: Request) => {
         comped_by_admin_at: c.comped_by_admin_at,
       }));
 
+      // Build paying customers list (email + display name), excluding comps
+      const paidUserIds = paid.map((r: any) => r.user_id);
+      const paidEmailById = new Map<string, string>();
+      if (paidUserIds.length > 0) {
+        for (let page = 1; page <= 10; page++) {
+          const { data: usersPage } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+          const users = usersPage?.users ?? [];
+          for (const u of users) {
+            if (paidUserIds.includes(u.id)) paidEmailById.set(u.id, u.email ?? "");
+          }
+          if (users.length < 1000) break;
+        }
+      }
+      const { data: paidProfiles } = paidUserIds.length > 0
+        ? await supabaseAdmin.from("profiles").select("user_id, display_name").in("user_id", paidUserIds)
+        : { data: [] as any[] };
+      const nameById = new Map<string, string>((paidProfiles ?? []).map((p: any) => [p.user_id, p.display_name]));
+
+      const customers = paid
+        .map((r: any) => ({
+          user_id: r.user_id,
+          email: paidEmailById.get(r.user_id) ?? null,
+          display_name: nameById.get(r.user_id) ?? null,
+          plan: r.plan,
+          source: r.source,
+          extra_members: r.extra_members ?? 0,
+          cancel_at_period_end: r.cancel_at_period_end,
+          current_period_end: r.current_period_end,
+          subscription_started_at: r.subscription_started_at,
+        }))
+        .sort((a: any, b: any) => {
+          const at = a.subscription_started_at ? new Date(a.subscription_started_at).getTime() : 0;
+          const bt = b.subscription_started_at ? new Date(b.subscription_started_at).getTime() : 0;
+          return bt - at;
+        });
+
       return new Response(JSON.stringify({
         data: {
           paid: {
@@ -261,6 +297,7 @@ serve(async (req: Request) => {
             canceled,
             durationBuckets,
             extraMembers: { perUserPacks, perCirclePacks },
+            customers,
           },
           gifted: {
             active: { byTier: giftedByTier, total: (comps ?? []).length },
