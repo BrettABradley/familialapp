@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.0";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const ADMIN_SECRET = Deno.env.get("ADMIN_MODERATE_SECRET");
+// ADMIN_MODERATE_SECRET removed — moderation links now use one-time DB tokens.
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 
 const corsHeaders = {
@@ -83,9 +83,24 @@ serve(async (req: Request) => {
 
     const safe = (v: string) => escapeHtml(v || "");
 
-    // Build action links
-    const banUrl = `${SUPABASE_URL}/functions/v1/moderate-reported-user?report_id=${reportId}&action=ban_user&secret=${ADMIN_SECRET}`;
-    const dismissUrl = `${SUPABASE_URL}/functions/v1/moderate-reported-user?report_id=${reportId}&action=dismiss&secret=${ADMIN_SECRET}`;
+    // Build action links using one-time-use signed tokens (no shared secret in URL).
+    const supabaseAdmin = createClient(
+      SUPABASE_URL,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+    const newToken = () => {
+      const bytes = new Uint8Array(32);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+    };
+    const banToken = newToken();
+    const dismissToken = newToken();
+    await supabaseAdmin.from("moderation_action_tokens").insert([
+      { token: banToken, report_id: reportId, action: "ban_user" },
+      { token: dismissToken, report_id: reportId, action: "dismiss" },
+    ]);
+    const banUrl = `${SUPABASE_URL}/functions/v1/moderate-reported-user?token=${banToken}`;
+    const dismissUrl = `${SUPABASE_URL}/functions/v1/moderate-reported-user?token=${dismissToken}`;
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5;">
