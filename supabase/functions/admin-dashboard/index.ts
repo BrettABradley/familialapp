@@ -139,10 +139,139 @@ serve(async (req: Request) => {
         .order("banned_at", { ascending: false })
         .limit(100);
 
-      return new Response(JSON.stringify({ data, error: error?.message }), {
+      // Cross-reference any pending appeals by email
+      const emails = (data ?? []).map((b: any) => b.email).filter(Boolean);
+      let appealsByEmail = new Map<string, string>();
+      if (emails.length > 0) {
+        const { data: appeals } = await supabaseAdmin
+          .from("user_appeals")
+          .select("id, email")
+          .eq("status", "pending")
+          .in("email", emails);
+        appealsByEmail = new Map((appeals ?? []).map((a: any) => [a.email, a.id]));
+      }
+      const enriched = (data ?? []).map((b: any) => ({
+        ...b,
+        pending_appeal_id: appealsByEmail.get(b.email) ?? null,
+      }));
+
+      return new Response(JSON.stringify({ data: enriched, error: error?.message }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    if (tab === "subscriptions") {
+      // PAID = source IN ('stripe','apple') AND plan != 'free'
+      // GIFTED = source = 'admin_comp' (excluded from paid metrics)
+      const { data: paidRows } = await supabaseAdmin
+        .from("user_plans")
+        .select("user_id, plan, source, cancel_at_period_end, current_period_end, extra_members, subscription_started_at")
+        .in("source", ["stripe", "apple"])
+        .neq("plan", "free");
+
+      const paid = paidRows ?? [];
+      const tiers = ["family", "extended", "founder"] as const;
+      type Tier = typeof tiers[number];
+
+      const empty = () => ({ stripe: 0, apple: 0, total: 0 });
+      const emptyByTier = () => Object.fromEntries(tiers.map((t) => [t, 0])) as Record<Tier, number>;
+
+      const active = { byPlatform: empty(), byTier: emptyByTier(), total: 0 };
+      const canceled = { byPlatform: empty(), byTier: emptyByTier(), total: 0 };
+      const durationBuckets = { lt30d: 0, d30_90: 0, d90_365: 0, gt365: 0 };
+      const perUserPacks = { stripe: 0, apple: 0, total: 0 };
+
+      const now = Date.now();
+      const DAY = 86400 * 1000;
+
+      for (const r of paid) {
+        const platform = r.source === "apple" ? "apple" : "stripe";
+        const tierKey = (tiers as readonly string[]).includes(r.plan) ? (r.plan as Tier) : null;
+        const bucket = r.cancel_at_period_end ? canceled : active;
+        bucket.byPlatform[platform]++;
+        bucket.total++;
+        if (tierKey) bucket.byTier[tierKey]++;
+
+        // Per-user extra-member packs (count seats, attributed by platform)
+        const seats = r.extra_members ?? 0;
+        if (seats > 0) {
+          perUserPacks[platform] += seats;
+          perUserPacks.total += seats;
+        }
+
+        // Duration buckets for ACTIVE paid only
+        if (!r.cancel_at_period_end && r.subscription_started_at) {
+          const ageDays = (now - new Date(r.subscription_started_at).getTime()) / DAY;
+          if (ageDays < 30) durationBuckets.lt30d++;
+          else if (ageDays < 90) durationBuckets.d30_90++;
+          else if (ageDays < 365) durationBuckets.d90_365++;
+          else durationBuckets.gt365++;
+        }
+      }
+
+      // Per-circle extra members packs (owner-attributed totals only — owner platform unknown without join)
+      const { data: circleExtras } = await supabaseAdmin
+        .from("circles")
+        .select("id, extra_members")
+        .gt("extra_members", 0);
+      const perCirclePacks = {
+        totalCircles: (circleExtras ?? []).length,
+        totalExtraSeats: (circleExtras ?? []).reduce((sum: number, c: any) => sum + (c.extra_members ?? 0), 0),
+      };
+
+      // GIFTED (admin_comp) — informational, not mixed into paid metrics
+      const { data: comps } = await supabaseAdmin
+        .from("user_plans")
+        .select("user_id, plan, comp_note, comped_by_admin_at")
+        .eq("source", "admin_comp")
+        .neq("plan", "free")
+        .order("comped_by_admin_at", { ascending: false, nullsFirst: false })
+        .limit(50);
+
+      const giftedByTier = emptyByTier();
+      for (const c of comps ?? []) {
+        const tierKey = (tiers as readonly string[]).includes(c.plan) ? (c.plan as Tier) : null;
+        if (tierKey) giftedByTier[tierKey]++;
+      }
+
+      // Hydrate recent comps with email
+      const recentComps = (comps ?? []).slice(0, 10);
+      const userIds = recentComps.map((c: any) => c.user_id);
+      let emailById = new Map<string, string>();
+      if (userIds.length > 0) {
+        const { data: usersList } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+        emailById = new Map(
+          (usersList?.users ?? [])
+            .filter((u: any) => userIds.includes(u.id))
+            .map((u: any) => [u.id, u.email ?? ""]),
+        );
+      }
+      const recent = recentComps.map((c: any) => ({
+        user_id: c.user_id,
+        email: emailById.get(c.user_id) ?? null,
+        plan: c.plan,
+        comp_note: c.comp_note,
+        comped_by_admin_at: c.comped_by_admin_at,
+      }));
+
+      return new Response(JSON.stringify({
+        data: {
+          paid: {
+            active,
+            canceled,
+            durationBuckets,
+            extraMembers: { perUserPacks, perCirclePacks },
+          },
+          gifted: {
+            active: { byTier: giftedByTier, total: (comps ?? []).length },
+            recent,
+          },
+        },
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
 
     if (tab === "audit") {
       const { data, error } = await supabaseAdmin

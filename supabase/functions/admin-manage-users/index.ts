@@ -515,6 +515,21 @@ Deno.serve(async (req: Request) => {
         return jsonResponse({ ok: true });
       }
 
+      case "unban_email": {
+        const banned_id = String(body.banned_id ?? "");
+        const email = String(body.email ?? "").toLowerCase().trim();
+        if (!banned_id && !email) return jsonResponse({ error: "banned_id or email required" }, 400);
+
+        const query = supabaseAdmin.from("banned_emails").delete();
+        const { error } = banned_id
+          ? await query.eq("id", banned_id)
+          : await query.eq("email", email);
+        if (error) return jsonResponse({ error: error.message }, 500);
+
+        await logAdminAction(supabaseAdmin, adminEmail, "unban_email", { banned_id, email });
+        return jsonResponse({ ok: true });
+      }
+
       default:
         return jsonResponse({ error: `Unknown action: ${action}` }, 400);
     }

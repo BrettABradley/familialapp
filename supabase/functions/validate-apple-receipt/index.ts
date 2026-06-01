@@ -275,6 +275,13 @@ serve(async (req) => {
 
     if (updateError) throw updateError;
 
+    // Stamp subscription_started_at only on first paid activation (never overwrite).
+    await serviceClient
+      .from("user_plans")
+      .update({ subscription_started_at: new Date().toISOString() })
+      .eq("user_id", user.id)
+      .is("subscription_started_at", null);
+
     // Optional: complete a circle rescue claim after a successful upgrade
     if (rescue_circle_id) {
       const userClient = createClient(

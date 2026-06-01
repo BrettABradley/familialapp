@@ -1730,6 +1730,7 @@ export type Database = {
           pending_plan: string | null
           plan: string
           source: string
+          subscription_started_at: string | null
           updated_at: string
           user_id: string
         }
@@ -1746,6 +1747,7 @@ export type Database = {
           pending_plan?: string | null
           plan?: string
           source?: string
+          subscription_started_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1762,6 +1764,7 @@ export type Database = {
           pending_plan?: string | null
           plan?: string
           source?: string
+          subscription_started_at?: string | null
           updated_at?: string
           user_id?: string
         }

@@ -120,6 +120,7 @@ serve(async (req) => {
                 plan,
                 max_circles: maxCircles,
                 max_members_per_circle: maxMembersPerCircle,
+                source: "stripe",
                 updated_at: new Date().toISOString(),
               })
               .eq("user_id", userId);
@@ -127,6 +128,12 @@ serve(async (req) => {
             if (error) {
               log("Error updating plan", { userId, error: error.message });
             } else {
+              // Stamp subscription_started_at only on first paid activation (never overwrite).
+              await supabaseAdmin
+                .from("user_plans")
+                .update({ subscription_started_at: new Date().toISOString() })
+                .eq("user_id", userId)
+                .is("subscription_started_at", null);
               log("Updated plan", { userId, plan });
               results.push({ type: "subscription", userId, plan, sessionId: session.id });
             }

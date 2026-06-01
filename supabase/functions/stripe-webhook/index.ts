@@ -181,10 +181,18 @@ serve(async (req) => {
             max_members_per_circle: maxMembers,
             cancel_at_period_end: false,
             current_period_end: periodEnd,
+            source: "stripe",
             updated_at: new Date().toISOString(),
           }, { onConflict: "user_id" });
 
         if (error) console.error("[STRIPE-WEBHOOK] Error updating plan:", error);
+
+        // Stamp subscription_started_at only on first paid activation (never overwrite).
+        await supabase
+          .from("user_plans")
+          .update({ subscription_started_at: new Date().toISOString() })
+          .eq("user_id", userId)
+          .is("subscription_started_at", null);
 
       } else if (session.mode === "payment") {
         const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
