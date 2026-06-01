@@ -38,6 +38,7 @@ const Admin = () => {
   const [appealStatus, setAppealStatus] = useState("pending");
   const [data, setData] = useState<any[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
+  const [subscriptions, setSubscriptions] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [actionTarget, setActionTarget] = useState<{ report: any; action: ModAction } | null>(null);
   const [actionNote, setActionNote] = useState("");
