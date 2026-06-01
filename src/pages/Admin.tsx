@@ -309,13 +309,31 @@ const Admin = () => {
           {isLoading ? <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin" /></div>
           : data.length === 0 ? <p className="text-muted-foreground text-sm py-8 text-center">No banned users.</p>
           : data.map((b: any) => (
-            <Card key={b.id}><CardContent className="pt-4 text-sm space-y-1">
-              <p className="font-medium">{b.email}</p>
+            <Card key={b.id}><CardContent className="pt-4 text-sm space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="font-medium">{b.email}</p>
+                {b.pending_appeal_id && (
+                  <Badge variant="secondary" className="gap-1">
+                    <AlertTriangle className="w-3 h-3" />Pending appeal
+                  </Badge>
+                )}
+              </div>
               {b.reason && <p className="text-xs text-muted-foreground">{b.reason}</p>}
               <p className="text-xs text-muted-foreground">Banned: {new Date(b.banned_at).toLocaleString()}</p>
+              <div className="flex gap-2 pt-1">
+                {b.pending_appeal_id && (
+                  <Button size="sm" variant="outline" onClick={() => { setAppealStatus("pending"); setActiveTab("appeals"); }}>
+                    View appeal
+                  </Button>
+                )}
+                <Button size="sm" variant="destructive" onClick={() => unbanEmail(b)}>
+                  Unban
+                </Button>
+              </div>
             </CardContent></Card>
           ))}
         </TabsContent>
+
 
         {/* AUDIT */}
         <TabsContent value="audit" className="space-y-3">
