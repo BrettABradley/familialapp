@@ -257,7 +257,9 @@ const SubscriptionCard = () => {
   const dialogAction = confirmDialog?.action;
   const targetPlanName = dialogAction === "cancel" ? "Free" : "Family";
 
-  const isApple = planData.source === "apple";
+  // Only treat as Apple-managed when actually inside the iOS native app.
+  // On web, route everyone through Stripe Customer Portal.
+  const isApple = planData.source === "apple" && isIOSNative();
 
   return (
     <>
