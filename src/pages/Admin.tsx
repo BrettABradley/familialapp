@@ -139,6 +139,19 @@ const Admin = () => {
     }
     fetchData("appeals", appealStatus);
   };
+  const unbanEmail = async (b: any) => {
+    if (!confirm(`Unban ${b.email}? They will be able to create an account again.`)) return;
+    const { data: result, error } = await supabase.functions.invoke("admin-manage-users", {
+      body: { action: "unban_email", banned_id: b.id, email: b.email },
+    });
+    if (error || (result as any)?.error) {
+      toast({ title: "Unban failed", description: error?.message || (result as any)?.error, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Unbanned", description: b.email });
+    fetchData("banned");
+  };
+
 
   if (authLoading || isAdmin === null) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin" /></div>;
