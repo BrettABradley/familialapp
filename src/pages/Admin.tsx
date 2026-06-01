@@ -398,31 +398,26 @@ const Admin = () => {
 
               {/* By tier */}
               <Card>
-                <CardHeader><CardTitle className="text-sm">By tier &amp; platform</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-sm">Active paid by tier</CardTitle></CardHeader>
                 <CardContent>
                   <table className="w-full text-sm">
                     <thead className="text-xs text-muted-foreground">
-                      <tr><th className="text-left py-1">Tier</th><th>Stripe active</th><th>Apple active</th><th>Canceling</th></tr>
+                      <tr><th className="text-left py-1">Tier</th><th className="text-center">Active</th><th className="text-center">Canceling</th></tr>
                     </thead>
                     <tbody>
-                      {(["family", "extended", "founder"] as const).map((tier) => {
-                        const a = subscriptions.paid.active.byTier[tier] ?? 0;
-                        const c = subscriptions.paid.canceled.byTier[tier] ?? 0;
-                        // platform split is global, but we still show per-tier active total split is not directly available — show active count per tier and canceling per tier
-                        return (
-                          <tr key={tier} className="border-t">
-                            <td className="py-2 capitalize">{tier}</td>
-                            <td className="text-center">{a /* combined active for this tier */}</td>
-                            <td className="text-center text-muted-foreground">—</td>
-                            <td className="text-center">{c}</td>
-                          </tr>
-                        );
-                      })}
+                      {(["family", "extended", "founder"] as const).map((tier) => (
+                        <tr key={tier} className="border-t">
+                          <td className="py-2 capitalize">{tier}</td>
+                          <td className="text-center">{subscriptions.paid.active.byTier[tier] ?? 0}</td>
+                          <td className="text-center">{subscriptions.paid.canceled.byTier[tier] ?? 0}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
-                  <p className="text-xs text-muted-foreground mt-2">Platform totals are shown in the cards above; per-tier × platform split is summarized as active count per tier.</p>
+                  <p className="text-xs text-muted-foreground mt-2">Platform split is shown in the cards above.</p>
                 </CardContent>
               </Card>
+
 
               {/* Duration distribution */}
               <Card>
