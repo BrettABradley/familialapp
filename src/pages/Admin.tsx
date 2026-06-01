@@ -68,6 +68,7 @@ const Admin = () => {
       );
       const json = await res.json();
       if (tab === "metrics") setMetrics(json.data || null);
+      else if (tab === "subscriptions") setSubscriptions(json.data || null);
       else setData(json.data || []);
     } catch {
       toast({ title: "Failed to load data", variant: "destructive" });
