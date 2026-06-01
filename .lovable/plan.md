@@ -1,101 +1,60 @@
+## What's actually happening
 
-## Goal
+**1. Google's favicon (the icon next to the search result)**
 
-Two adds to the admin console:
-1. **Subscriptions analytics tab** — active vs canceled, split by Stripe / Apple, broken down by tier, duration, and extra-member packs. **Gifted (`admin_comp`) plans excluded from the paid metrics** and shown in a separate informational block.
-2. **Banned + Appeals tooling** — the Appeals tab already grants/denies. Banned tab is currently read-only and missing an unban action and any appeal cross-reference. Wire those up.
+Google fetches the favicon **separately** from the page favicon — it uses a special crawler (`googlebot-image`) that looks for `/favicon.ico` at the **root of the canonical domain**, and it caches it for weeks. Two things to fix:
 
----
+- `public/` only contains `favicon.png`. Browsers requesting `/favicon.ico` (which Google does) fall back to whatever Lovable serves by default — the Lovable logo. We need an actual `favicon.ico` at the root.
+- Even after fixing, Google's cache won't refresh until it re-crawls (days to weeks). We can speed it up by requesting re-indexing in Search Console.
 
-## Current state (verified)
+**2. App Store search not surfacing "Familial"**
 
-- `user_plans.source` values in DB: `stripe` (65), `apple` (4), `admin_comp` (16). This is the gift/paid discriminator.
-- `user_plans` columns relevant: `plan`, `source`, `cancel_at_period_end`, `current_period_end`, `extra_members`, `apple_original_transaction_id`, `comped_by_admin_at`, `comp_note`.
-- `circles.extra_members` also exists (per-circle add-on packs).
-- **Missing**: `subscription_started_at` — we have no truthful column for "how long subscribed". `created_at` shifts when a row is upserted by tier changes.
-- Admin.tsx already has tabs for Reports / Appeals / Banned / Audit / Metrics / Admins & Users.
-- Appeals tab: grant button calls `admin-manage-users` with `restore_user` — works.
-- Banned tab: read-only list of `banned_emails` rows — no unban, no appeal cross-reference.
+This is **not** a code/website fix — it's an App Store Connect metadata issue. Apple's search ranks results based on:
+- App **name** / **subtitle** (highest weight)
+- **Keywords** field (100 chars, comma-separated, no spaces)
+- Developer name (why your dev name works)
+- Downloads + ratings velocity (you're brand new, so this is near zero)
 
----
-
-## What we'll build
-
-### 1. Schema (migration)
-
-Add to `public.user_plans`:
-- `subscription_started_at timestamptz`
-
-Backfill: for rows where `source IN ('stripe','apple')` AND `plan != 'free'`, set `subscription_started_at = created_at` so existing accounts get a reasonable approximation immediately.
-
-### 2. Set `subscription_started_at` on first paid activation
-
-Edit these edge functions to set the column **only when it's NULL** (never overwrite, so tier upgrades don't reset the clock):
-- `validate-apple-receipt` — on successful Apple verification
-- `sync-stripe-purchases` — when first activating a paid Stripe plan
-- `stripe-webhook` — `customer.subscription.created` handler
-
-When a user cancels and resubscribes later, `subscription_started_at` keeps the original date unless the row was reset to `plan='free'` and back — acceptable for an internal metric.
-
-### 3. Extend `admin-dashboard` edge function
-
-Add a new `tab=subscriptions` branch (keep `tab=metrics` unchanged so the existing Metrics tab keeps working). Returns:
-
-```ts
-{
-  paid: {
-    active:    { byPlatform: { stripe: N, apple: N }, byTier: { family, extended, founder }, total },
-    canceled:  { byPlatform: { stripe: N, apple: N }, byTier: {...}, total },  // cancel_at_period_end=true
-    durationBuckets: { lt30d, d30_90, d90_365, gt365 },  // from subscription_started_at, active paid only
-    extraMembers: {
-      perUserPacks:   { stripe: N, apple: N, total },   // SUM(user_plans.extra_members) where source in stripe/apple
-      perCirclePacks: { totalCircles: N, totalExtraSeats: N }, // SUM(circles.extra_members) — owner-attributed
-    }
-  },
-  gifted: { // INFORMATIONAL, kept out of paid metrics
-    active:    { byTier: {...}, total },
-    recent:    [{ user_id, email, plan, comp_note, comped_by_admin_at }]  // last 10
-  }
-}
-```
-
-All paid queries: `WHERE source IN ('stripe','apple') AND plan != 'free'`.
-Gifted queries: `WHERE source = 'admin_comp'`.
-
-### 4. Add Subscriptions tab in `src/pages/Admin.tsx`
-
-New `<TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>` between Metrics and Admins & Users. Renders:
-- **Top row of cards**: Total Active Paid · Active Stripe · Active Apple · Canceling (cancel_at_period_end)
-- **By tier table**: Family / Extended / Founder × Stripe / Apple, active vs canceling
-- **Duration distribution**: 4 bars (<30d, 1–3mo, 3–12mo, >1yr)
-- **Extra members panel**: per-user packs (by platform) + per-circle packs (totals)
-- **Gifted section** (visually separated, muted): count by tier + recent comp list, with a label "Excluded from paid metrics"
-
-### 5. Banned tab — add unban + appeal cross-reference
-
-- Backend: add `unban_email` case to `admin-manage-users` (delete from `banned_emails` by id, write audit row).
-- Backend: `admin-dashboard` `tab=banned` joins `user_appeals` by email and returns `pending_appeal_id` when present.
-- Frontend Banned tab: show "Pending appeal" badge with a button "View appeal" that switches to Appeals tab; add **Unban** destructive button with confirm dialog.
-
-### 6. Memory
-
-Update `mem://business/subscription-enforcement` with: "`user_plans.source` discriminator: stripe / apple / admin_comp. Admin metrics exclude admin_comp from paid totals. `subscription_started_at` populated on first paid activation, never overwritten on tier change."
+If "Familial" the word isn't in your app's **name** or **subtitle** exactly, or if a more established app owns that keyword, you won't rank. New apps also take 24–72h after "Ready for Distribution" to appear in search at all, and competitive single-word terms can take weeks to climb.
 
 ---
 
-## Files touched
+## The plan
 
-- New migration: `supabase/migrations/<ts>_subscription_started_at.sql`
-- `supabase/functions/admin-dashboard/index.ts` — add `subscriptions` branch, enrich `banned` branch
-- `supabase/functions/admin-manage-users/index.ts` — add `unban_email`
-- `supabase/functions/validate-apple-receipt/index.ts` — set `subscription_started_at`
-- `supabase/functions/sync-stripe-purchases/index.ts` — set `subscription_started_at`
-- `supabase/functions/stripe-webhook/index.ts` — set `subscription_started_at`
-- `src/pages/Admin.tsx` — new Subscriptions tab, Banned tab unban/appeal-link
-- `mem://business/subscription-enforcement` — note the discriminator + column
+### Fix #1 — Favicon (code changes)
 
-## Out of scope
+1. Generate a proper `favicon.ico` (multi-resolution: 16×16, 32×32, 48×48) from the existing `Familial_PFP.png` brand mark and save to `public/favicon.ico`.
+2. Add `<link rel="icon" href="/favicon.ico" sizes="any" />` as the **first** icon link in `index.html` so Google's crawler picks it up before the PNG variants.
+3. Bump the `?v=` cache-bust on the PNG icons.
+4. Verify by curling `https://www.familialmedia.com/favicon.ico` after deploy and confirming a non-Lovable image.
 
-- Live Stripe/Apple API lookups per render (would be slow). We rely on the DB columns kept in sync by the existing webhook/sync paths.
-- MRR / revenue dollars — not requested; can add later by joining tier → price map.
-- Historical churn over time / charts — current request is "report active vs canceled" not time-series. Can add with a simple sparkline later if you want.
+### Fix #2 — Help Google re-crawl faster (no code, instructions)
+
+After the deploy, you (or I, via the Google Search Console connector) submit the homepage URL for re-indexing. Favicon refresh in search results still takes 1–4 weeks even after re-crawl — Google rate-limits favicon updates aggressively. There's no faster fix; this is on Google's side.
+
+### Fix #3 — App Store discoverability (no code, App Store Connect changes)
+
+I'll give you a checklist to apply in App Store Connect → App Information / iOS App version:
+
+- **Subtitle** (30 chars): include "Private Family Social" or similar — this is searched.
+- **Keywords** (100 chars, comma-separated, no spaces): e.g. `family,private,social,circle,kids,memories,album,events,share,group,chat,parents`. Do **not** repeat the app name — Apple already indexes it.
+- **Promotional Text** is NOT indexed — don't waste keywords there.
+- Confirm **Primary Category** = Social Networking, **Secondary** = Lifestyle (already set per your memory).
+- Confirm the app is **released to all territories** (a region-restricted release won't appear in your store if you're outside it).
+- Wait 24–72h after the metadata update; Apple's search index rebuilds asynchronously.
+
+I can't change App Store Connect for you — those fields live in Apple's portal and need your login.
+
+---
+
+## Files I'll touch in build mode
+
+- `public/favicon.ico` (new, generated from brand PNG)
+- `index.html` (add `.ico` link, bump `?v=`)
+
+## What I won't do
+
+- Build any UI for this — it's purely head meta + a binary asset + external-portal guidance.
+- Touch the OG image / large preview card — you confirmed those are correct.
+
+Ready to switch to build mode and apply Fix #1 + give you the App Store Connect checklist to paste in?
