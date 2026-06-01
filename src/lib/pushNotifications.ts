@@ -177,6 +177,9 @@ async function runPushRegistration(): Promise<PushRegistrationResult> {
           try {
             window.history.pushState({}, '', link);
             window.dispatchEvent(new PopStateEvent('popstate'));
+            // Tell the circle-sync hook a deep link landed so the header
+            // switches to the linked circle even before React Router rerenders.
+            window.dispatchEvent(new CustomEvent('familial:deep-link', { detail: link }));
           } catch {
             window.location.href = link;
           }

@@ -30,23 +30,39 @@ export async function getCircleMemberCount(circleId: string): Promise<number> {
 }
 
 export async function getCircleMemberLimit(circleOwnerId: string, circleId?: string): Promise<{ limit: number; plan: string; extraMembers: number; maxMembers: number }> {
-  // Fetch owner plan
-  const planPromise = supabase
-    .from("user_plans")
-    .select("max_members_per_circle, plan")
-    .eq("user_id", circleOwnerId)
-    .maybeSingle();
+  // For the circle owner's plan, prefer the SECURITY DEFINER RPC which returns
+  // only the safe columns (plan + max_members_per_circle) — direct table SELECT
+  // of another user's billing row is no longer permitted by RLS.
+  const planPromise = circleId
+    ? supabase.rpc("get_circle_owner_limits", { _circle_id: circleId })
+    : supabase
+        .from("user_plans")
+        .select("max_members_per_circle, plan")
+        .eq("user_id", circleOwnerId)
+        .maybeSingle();
 
-  // Fetch per-circle extra members if circleId provided
   const circlePromise = circleId
     ? supabase.from("circles").select("extra_members").eq("id", circleId).maybeSingle()
     : Promise.resolve({ data: null });
 
-  const [{ data: planData }, { data: circleData }] = await Promise.all([planPromise, circlePromise]);
+  const [planRes, { data: circleData }] = await Promise.all([planPromise, circlePromise]);
 
-  const maxMembers = planData?.max_members_per_circle ?? 8;
+  let maxMembers = 8;
+  let plan = "free";
+  if (circleId) {
+    const row = Array.isArray((planRes as any).data) ? (planRes as any).data[0] : null;
+    if (row) {
+      maxMembers = row.max_members_per_circle ?? 8;
+      plan = row.plan ?? "free";
+    }
+  } else {
+    const row = (planRes as any).data;
+    if (row) {
+      maxMembers = row.max_members_per_circle ?? 8;
+      plan = row.plan ?? "free";
+    }
+  }
   const circleExtra = (circleData as any)?.extra_members ?? 0;
-  const plan = planData?.plan ?? "free";
 
   return {
     limit: maxMembers + circleExtra,
