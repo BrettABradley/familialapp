@@ -110,11 +110,12 @@ const SubscriptionCard = () => {
   };
 
   const handleManageBilling = async () => {
-    // iOS native: route to Apple's subscription management page (App Store guideline 3.1.1)
-    if (isIOSNative() || planData?.source === "apple") {
+    // iOS native app: always route to Apple's subscription management (App Store guideline 3.1.1)
+    if (isIOSNative()) {
       openAppleSubscriptionManagement();
       return;
     }
+    // Web: always use Stripe Customer Portal, regardless of original purchase source
     setPortalLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("customer-portal");
@@ -256,7 +257,9 @@ const SubscriptionCard = () => {
   const dialogAction = confirmDialog?.action;
   const targetPlanName = dialogAction === "cancel" ? "Free" : "Family";
 
-  const isApple = planData.source === "apple";
+  // Only treat as Apple-managed when actually inside the iOS native app.
+  // On web, route everyone through Stripe Customer Portal.
+  const isApple = planData.source === "apple" && isIOSNative();
 
   return (
     <>
