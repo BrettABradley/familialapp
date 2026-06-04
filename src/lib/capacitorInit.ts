@@ -141,6 +141,26 @@ export async function initCapacitorPlugins() {
   }
 
 
+  // Android-only: ensure a notification channel exists so FCM notifications
+  // surface correctly on Android 8+.
+  if (Capacitor.getPlatform() === 'android') {
+    try {
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      await PushNotifications.createChannel({
+        id: 'family_activity',
+        name: 'Family activity',
+        description: 'Posts, comments, messages, and events from your family circles',
+        importance: 4, // IMPORTANCE_HIGH
+        visibility: 1,
+        sound: 'default',
+        vibration: true,
+        lights: true,
+      });
+    } catch (e) {
+      console.warn('[boot] createChannel failed', e);
+    }
+  }
+
   // Push notifications — entirely optional. If the entitlement is missing
   // or the device can't register, swallow the error so launch completes.
   try {
