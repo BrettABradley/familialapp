@@ -115,6 +115,14 @@ const SubscriptionCard = () => {
       openAppleSubscriptionManagement();
       return;
     }
+    // Android native app: route to Google Play subscriptions (Play policy 3.4)
+    if (isAndroidNative()) {
+      const productId =
+        planData?.plan === "extended" ? "extended_monthly" :
+        planData?.plan === "family" ? "family_monthly" : undefined;
+      openPlaySubscriptionManagement(productId);
+      return;
+    }
     // Web: always use Stripe Customer Portal, regardless of original purchase source
     setPortalLoading(true);
     try {
