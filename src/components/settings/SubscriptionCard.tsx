@@ -9,7 +9,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { CreditCard, ExternalLink, Loader2, RotateCcw } from "lucide-react";
 import { openExternalUrl } from "@/lib/externalUrl";
-import { isIOSNative, openAppleSubscriptionManagement, restorePurchases } from "@/lib/iapPurchase";
+import { isIOSNative, openAppleSubscriptionManagement, restorePurchases as restoreAppleP } from "@/lib/iapPurchase";
+import { isAndroidNative } from "@/lib/platform";
+import { openPlaySubscriptionManagement, restorePurchases as restoreGoogleP } from "@/lib/googlePlayPurchase";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -265,9 +267,11 @@ const SubscriptionCard = () => {
   const dialogAction = confirmDialog?.action;
   const targetPlanName = dialogAction === "cancel" ? "Free" : "Family";
 
-  // Only treat as Apple-managed when actually inside the iOS native app.
+  // Only treat as native-store-managed when actually inside the corresponding native app.
   // On web, route everyone through Stripe Customer Portal.
   const isApple = planData.source === "apple" && isIOSNative();
+  const isGoogle = planData.source === "google" && isAndroidNative();
+  const isStoreManaged = isApple || isGoogle;
 
   return (
     <>
@@ -307,37 +311,39 @@ const SubscriptionCard = () => {
             {isPaid && (
               <Button variant="outline" onClick={handleManageBilling} disabled={portalLoading} className="w-full">
                 {portalLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ExternalLink className="w-4 h-4 mr-2" />}
-                {isApple ? "Manage in App Store" : "Manage Billing"}
+                {isApple ? "Manage in App Store" : isGoogle ? "Manage in Google Play" : "Manage Billing"}
               </Button>
             )}
 
-            {isApple && isPaid && (
+            {isStoreManaged && isPaid && (
               <p className="text-xs text-muted-foreground text-center px-2">
-                Your subscription is managed by Apple. To change or cancel your plan, use the App Store subscription settings.
+                {isApple
+                  ? "Your subscription is managed by Apple. To change or cancel your plan, use the App Store subscription settings."
+                  : "Your subscription is managed by Google Play. To change or cancel your plan, use Google Play's subscription settings."}
               </p>
             )}
 
-            {!isApple && isExtended && !planData.cancel_at_period_end && !planData.pending_plan && (
+            {!isStoreManaged && isExtended && !planData.cancel_at_period_end && !planData.pending_plan && (
               <Button variant="outline" onClick={() => openConfirmDialog("downgrade")} disabled={downgradeLoading} className="w-full">
                 Downgrade to Family
               </Button>
             )}
 
-            {!isApple && planData.pending_plan && !planData.cancel_at_period_end && (
+            {!isStoreManaged && planData.pending_plan && !planData.cancel_at_period_end && (
               <Button variant="default" onClick={() => setCancelDowngradeDialog(true)} disabled={cancelDowngradeLoading} className="w-full">
                 {cancelDowngradeLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RotateCcw className="w-4 h-4 mr-2" />}
                 Cancel Downgrade
               </Button>
             )}
 
-            {!isApple && isPaid && planData.cancel_at_period_end && (
+            {!isStoreManaged && isPaid && planData.cancel_at_period_end && (
               <Button variant="default" onClick={handleReactivate} disabled={reactivateLoading} className="w-full">
                 {reactivateLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RotateCcw className="w-4 h-4 mr-2" />}
                 Reactivate Subscription
               </Button>
             )}
 
-            {!isApple && isPaid && !planData.cancel_at_period_end && (
+            {!isStoreManaged && isPaid && !planData.cancel_at_period_end && (
               <Button variant="outline" onClick={() => openConfirmDialog("cancel")} disabled={cancelLoading} className="w-full text-destructive hover:text-destructive">
                 Cancel Membership
               </Button>
@@ -349,16 +355,18 @@ const SubscriptionCard = () => {
               </Button>
             )}
 
-            {isIOSNative() && (
+            {(isIOSNative() || isAndroidNative()) && (
               <Button
                 variant="ghost"
                 onClick={async () => {
-                  const ok = await restorePurchases();
+                  const ok = isAndroidNative() ? await restoreGoogleP() : await restoreAppleP();
                   toast({
                     title: ok ? "Purchases restored" : "Nothing to restore",
                     description: ok
                       ? "Your subscription has been restored."
-                      : "We couldn't find any previous purchases on this Apple ID.",
+                      : isAndroidNative()
+                        ? "We couldn't find any previous purchases on this Google account."
+                        : "We couldn't find any previous purchases on this Apple ID.",
                   });
                 }}
                 className="w-full"
