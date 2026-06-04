@@ -32,6 +32,7 @@
     "@capacitor/share": "^8.0.1",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.1",
+    "@capgo/capacitor-purchases": "^5.0.8",
     "@capgo/native-purchases": "^8.3.0",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/playfair-display": "^5.2.8",
