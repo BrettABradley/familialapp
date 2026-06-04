@@ -12,9 +12,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "cap:sync:ios": "npx cap sync ios && sh scripts/ios-post-sync.sh",
-    "capacitor:sync:after": "sh scripts/ios-post-sync.sh",
-    "capacitor:copy:after": "sh scripts/ios-post-sync.sh",
-    "capacitor:update:after": "sh scripts/ios-post-sync.sh"
+    "cap:sync:android": "npx cap sync android && sh scripts/android-post-sync.sh",
+    "capacitor:sync:after": "sh scripts/ios-post-sync.sh; sh scripts/android-post-sync.sh",
+    "capacitor:copy:after": "sh scripts/ios-post-sync.sh; sh scripts/android-post-sync.sh",
+    "capacitor:update:after": "sh scripts/ios-post-sync.sh; sh scripts/android-post-sync.sh"
   },
   "dependencies": {
     "@capacitor-community/media": "^9.1.0",
@@ -32,6 +33,7 @@
     "@capacitor/share": "^8.0.1",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.1",
+    "@capgo/capacitor-purchases": "^5.0.8",
     "@capgo/native-purchases": "^8.3.0",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/playfair-display": "^5.2.8",

@@ -98,6 +98,104 @@ async function sendApns(
   return { ok: false, status: res.status, reason };
 }
 
+// ---------- FCM HTTP v1 (Android) ----------
+let cachedFcm: { token: string; exp: number } | null = null;
+
+function pemToPkcs8Rsa(pem: string): ArrayBuffer {
+  const normalized = pem.replace(/\\n/g, "\n");
+  const body = normalized
+    .replace(/-----BEGIN [^-]+-----/g, "")
+    .replace(/-----END [^-]+-----/g, "")
+    .replace(/\s+/g, "");
+  const bin = atob(body);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf.buffer;
+}
+
+async function getFcmAccessToken(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  if (cachedFcm && cachedFcm.exp - 60 > now) return cachedFcm.token;
+
+  const rawJson = Deno.env.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON");
+  if (!rawJson) throw new Error("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is not set (used for FCM)");
+  const sa = JSON.parse(rawJson);
+
+  const header = { alg: "RS256", typ: "JWT", kid: sa.private_key_id };
+  const payload = {
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600,
+  };
+  const signingInput = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    pemToPkcs8Rsa(sa.private_key),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    cryptoKey,
+    new TextEncoder().encode(signingInput),
+  );
+  const jwt = `${signingInput}.${b64url(sig)}`;
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+  if (!res.ok) throw new Error(`FCM OAuth error: ${res.status} ${await res.text()}`);
+  const json = await res.json();
+  cachedFcm = { token: json.access_token, exp: now + json.expires_in };
+  return cachedFcm.token;
+}
+
+async function sendFcm(
+  deviceToken: string,
+  payload: { title: string; body: string; type: string; link: string | null },
+): Promise<{ ok: boolean; status: number; reason?: string }> {
+  const projectId = Deno.env.get("FCM_PROJECT_ID");
+  if (!projectId) return { ok: false, status: 0, reason: "FCM_PROJECT_ID missing" };
+  const accessToken = await getFcmAccessToken();
+  const url = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
+
+  const message = {
+    token: deviceToken,
+    notification: { title: payload.title, body: payload.body },
+    android: {
+      priority: "HIGH" as const,
+      notification: { channel_id: "family_activity", sound: "default" },
+    },
+    data: {
+      type: payload.type,
+      ...(payload.link ? { link: payload.link } : {}),
+    },
+  };
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+  if (res.ok) return { ok: true, status: res.status };
+  let reason: string | undefined;
+  try {
+    const j = await res.json();
+    reason = j?.error?.status ?? j?.error?.message;
+  } catch {
+    /* ignore */
+  }
+  return { ok: false, status: res.status, reason };
+}
+
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -158,7 +256,7 @@ serve(async (req: Request) => {
 
     const { data: tokens, error: tokenError } = await supabase
       .from("push_tokens")
-      .select("device_token")
+      .select("device_token, platform")
       .eq("user_id", user_id);
 
     if (tokenError) {
@@ -184,23 +282,45 @@ serve(async (req: Request) => {
       type: type || "general",
       link: link || null,
     };
+    const fcmPayload = {
+      title: title || "Familial",
+      body: message || "",
+      type: type || "general",
+      link: link || null,
+    };
 
     const invalidTokens: string[] = [];
     let sent = 0;
 
-    for (const t of tokens as { device_token: string }[]) {
+    for (const t of tokens as { device_token: string; platform: string | null }[]) {
+      const platform = (t.platform ?? "ios").toLowerCase();
       try {
-        const result = await sendApns(t.device_token, apnsPayload);
-        if (result.ok) {
-          sent++;
+        let result: { ok: boolean; status: number; reason?: string };
+        if (platform === "android") {
+          result = await sendFcm(t.device_token, fcmPayload);
+          if (!result.ok) {
+            console.warn(`FCM ${result.status} for token ${t.device_token.slice(0, 8)}…: ${result.reason}`);
+            if (
+              result.status === 404 ||
+              result.reason === "NOT_FOUND" ||
+              result.reason === "UNREGISTERED" ||
+              result.reason === "INVALID_ARGUMENT"
+            ) {
+              invalidTokens.push(t.device_token);
+            }
+          }
         } else {
-          console.warn(`APNs ${result.status} for token ${t.device_token.slice(0, 8)}…: ${result.reason}`);
-          if (result.status === 410 || result.reason === "Unregistered") {
-            invalidTokens.push(t.device_token);
+          result = await sendApns(t.device_token, apnsPayload);
+          if (!result.ok) {
+            console.warn(`APNs ${result.status} for token ${t.device_token.slice(0, 8)}…: ${result.reason}`);
+            if (result.status === 410 || result.reason === "Unregistered") {
+              invalidTokens.push(t.device_token);
+            }
           }
         }
+        if (result.ok) sent++;
       } catch (e) {
-        console.error("APNs send threw:", e);
+        console.error("push send threw:", e);
       }
     }
 

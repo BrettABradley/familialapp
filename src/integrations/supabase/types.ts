@@ -907,6 +907,45 @@ export type Database = {
           },
         ]
       }
+      google_play_events: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          notification_type: number | null
+          package_name: string | null
+          payload: Json
+          processed_at: string | null
+          purchase_token: string | null
+          subscription_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          notification_type?: number | null
+          package_name?: string | null
+          payload: Json
+          processed_at?: string | null
+          purchase_token?: string | null
+          subscription_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          notification_type?: number | null
+          package_name?: string | null
+          payload?: Json
+          processed_at?: string | null
+          purchase_token?: string | null
+          subscription_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       group_chat_members: {
         Row: {
           group_chat_id: string
@@ -1476,18 +1515,21 @@ export type Database = {
           created_at: string
           device_token: string
           id: string
+          platform: string
           user_id: string
         }
         Insert: {
           created_at?: string
           device_token: string
           id?: string
+          platform?: string
           user_id: string
         }
         Update: {
           created_at?: string
           device_token?: string
           id?: string
+          platform?: string
           user_id?: string
         }
         Relationships: []
@@ -1725,6 +1767,8 @@ export type Database = {
           created_at: string
           current_period_end: string | null
           extra_members: number
+          google_purchase_token: string | null
+          google_subscription_id: string | null
           max_circles: number
           max_members_per_circle: number
           pending_plan: string | null
@@ -1742,6 +1786,8 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           extra_members?: number
+          google_purchase_token?: string | null
+          google_subscription_id?: string | null
           max_circles?: number
           max_members_per_circle?: number
           pending_plan?: string | null
@@ -1759,6 +1805,8 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           extra_members?: number
+          google_purchase_token?: string | null
+          google_subscription_id?: string | null
           max_circles?: number
           max_members_per_circle?: number
           pending_plan?: string | null
