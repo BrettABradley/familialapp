@@ -41,9 +41,10 @@ serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    // Accept either `device_token` (new) or `expo_token` (legacy alias) for one release
-    // so cached app sessions don't break during rollout.
+    // Accept either `device_token` (new) or `expo_token` (legacy alias).
     const device_token: string | undefined = body?.device_token ?? body?.expo_token;
+    const rawPlatform: string = (body?.platform ?? "ios").toString().toLowerCase();
+    const platform = rawPlatform === "android" ? "android" : "ios";
 
     if (!device_token || typeof device_token !== "string") {
       return new Response(
@@ -63,7 +64,7 @@ serve(async (req: Request) => {
     // Reclaim this device token: remove any rows where it's still attached
     // to a different user (e.g. previous account on a shared device, or a
     // user who signed out without the unregister call reaching the server).
-    // Guarantees one APNs token → exactly one user_id.
+    // Guarantees one device token → exactly one user_id per platform.
     const { error: reclaimError } = await admin
       .from("push_tokens")
       .delete()
@@ -77,8 +78,8 @@ serve(async (req: Request) => {
     const { error: upsertError } = await admin
       .from("push_tokens")
       .upsert(
-        { user_id: user.id, device_token },
-        { onConflict: "user_id,device_token" }
+        { user_id: user.id, device_token, platform },
+        { onConflict: "user_id,device_token,platform" }
       );
 
     if (upsertError) {
