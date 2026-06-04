@@ -12,7 +12,7 @@ export type PushRegistrationResult = {
   status:
     | 'registered'
     | 'already_attempted'
-    | 'not_ios'
+    | 'not_native'
     | 'no_session'
     | 'permission_denied'
     | 'registration_error'
@@ -57,9 +57,10 @@ export function resetPushRegistrationState() {
  * diagnosable from Safari Web Inspector.
  */
 export async function registerForPushNotifications(options: { force?: boolean } = {}): Promise<PushRegistrationResult> {
-  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') {
-    console.log('[push] skip — not native iOS');
-    return { ok: false, status: 'not_ios', message: 'Push registration only runs in the iOS app.' };
+  const platform = Capacitor.getPlatform();
+  if (!Capacitor.isNativePlatform() || (platform !== 'ios' && platform !== 'android')) {
+    console.log('[push] skip — not a native mobile platform');
+    return { ok: false, status: 'not_native', message: 'Push registration only runs in the iOS/Android app.' };
   }
 
   if (activeRegistration) return activeRegistration;
@@ -134,7 +135,7 @@ async function runPushRegistration(): Promise<PushRegistrationResult> {
 
           const { error } = await supabase.functions.invoke('register-push-token', {
             headers: { Authorization: `Bearer ${sd.session.access_token}` },
-            body: { device_token: token.value },
+            body: { device_token: token.value, platform: Capacitor.getPlatform() },
           });
 
           if (error) {
@@ -144,7 +145,7 @@ async function runPushRegistration(): Promise<PushRegistrationResult> {
           } else {
             console.log('[push] token-uploaded ✅');
             lastRegisteredDeviceToken = token.value ?? null;
-            settle({ ok: true, status: 'registered', message: 'This iPhone is registered for push notifications.' });
+            settle({ ok: true, status: 'registered', message: 'This device is registered for push notifications.' });
           }
         } catch (e) {
           console.error('[push] token-upload threw:', e);
