@@ -1,49 +1,34 @@
-# Clear the three flagged security findings
+# Triage the four flagged warnings — none are real vulnerabilities
 
-Two of the three are **already fixed in code** — the scanner result is stale. The third is a real tightening on the `post-media` storage bucket.
+After reading the actual policies and write paths, every one of these four findings is either already mitigated or describes the system working as intended. No code or migration changes needed; we'll close them out in the scanner and update security memory so future scans don't keep re-flagging the same things.
 
-## 1. Google Play RTDN webhook (Critical — already fixed)
+## 1. Circle invite tokens readable by inviter and circle admins — intentional
 
-`supabase/functions/google-play-rtdn/index.ts` already enforces a `?secret=<GOOGLE_PLAY_RTDN_SECRET>` query-param check at the top of the handler and rejects every request that doesn't match (lines 60–69). The exact mitigation the scanner suggested is in place.
+`circle_invites.token` is the unguessable identifier embedded in the invite link the inviter sends. The SELECT policy allows: the inviter, circle admins managing pending invites, and the invited email's owner. Each of those needs the token:
+- **Inviter:** to copy or resend the invite link from the UI.
+- **Circle admins:** the admin UI shows pending invites and offers a "resend" action.
+- **Invitee:** to accept the invite when signed in with that email.
 
-Action: mark the finding as fixed via the security tool. No code change.
+Stripping the token from admin reads would break the existing admin invite-management UI. The token is also rotated when a new invite is generated and invites expire in 7 days. Treat as intentional, not a vulnerability.
 
-## 2. Transactional email endpoint accepts anon JWTs (Critical — already fixed)
+## 2. post-media upload policy — already correct (scanner self-resolved)
 
-`supabase/functions/send-transactional-email/index.ts` already:
-- Decodes the caller's JWT and rejects anything other than `role === 'service_role'` with a 403 (lines 40–67).
-- Validates `templateData.url` against an allowlist of `*.familialmedia.com` origins and rejects anything else with 400 (lines 34–38, 119–127).
+The scanner text itself ends with: "On re-read, the uid folder check is present — this finding is not applicable." The INSERT policy already requires `(storage.foldername(name))[1] = auth.uid()::text`, so users can only upload into their own UID folder. No change needed.
 
-Action: mark the finding as fixed. No code change.
+## 3. `shadow_reports` has no INSERT policy — intentional
 
-## 3. Post-media bucket read policy — folder-ownership shortcut (Warning — needs a migration)
+Inserts happen exclusively through the `redirect_spam_reporter` SECURITY DEFINER trigger on `content_reports`. When a flagged "spam reporter" submits a content report, the trigger silently writes the row into `shadow_reports` instead. Granting a client-side INSERT policy would defeat the shadow-banning mechanism by letting suspected spammers know they're shadow-banned. The current setup is correct.
 
-Current `post-media members can read` SELECT policy starts with:
+## 4. `user_appeals` tokens visible to platform admins — intended audience
 
-```sql
-((auth.uid())::text = (storage.foldername(name))[1])
-```
+`user_appeals.token` is consumed by tokenized admin action links in moderation emails (the same one-time token pattern documented in security memory). Platform admins are the legitimate audience for those tokens. Submitters intentionally do not have a SELECT policy because appeal status is communicated back to them by email, not by polling the table. Token reuse is bounded by `moderation_action_tokens.used_at` and `expires_at`. No change needed.
 
-…then ORs together the row-based checks (posts, fridge_pins, album_photos, campfire_stories, private_messages, group_chat_messages). That first clause means a user permanently retains read access to anything they ever uploaded, even after leaving the circle.
+## Actions
 
-### Fix (single migration)
+1. Mark all four findings as not applicable in the security scanner with the explanations above.
+2. Update `@security-memory` so future scans understand:
+   - `circle_invites.token` is intentionally readable by inviter, circle admins, and the invitee.
+   - `shadow_reports` writes flow only through the `redirect_spam_reporter` SECURITY DEFINER trigger.
+   - `user_appeals.token` is only for platform admins (used by admin email links).
 
-Drop and recreate `post-media members can read` without the folder-ownership branch — keep every row-based clause exactly as it is today. Access is then strictly tied to current circle membership / current message participation, which is what the scanner expects and matches our intent.
-
-Keep the separate `post-media uploader can update own files` policy (UPDATE) and the existing INSERT/DELETE policies untouched — uploaders still need folder-ownership for write operations.
-
-### Why this is safe for upload flows
-
-`CreatePostForm`, `Albums`, `Fridge`, `Messages`, and `CampfireDialog` all upload first and only sign URLs **after** the corresponding DB row (post, album_photo, fridge_pin, message, campfire_story) is inserted. The row-based branches of the policy already grant SELECT at that point. There's no in-app code path that signs a `post-media` URL before the row exists, so removing the folder shortcut won't break the active app. Server-side signing in `download-my-data`, `admin-dashboard`, and the email helpers uses the service role and bypasses RLS regardless.
-
-### What's NOT changing
-
-- No edge function code edits
-- No frontend changes
-- Bucket itself, INSERT/UPDATE/DELETE policies, and all row-based SELECT branches stay identical
-
-## Verification
-
-- Open Feed, Albums, Fridge, Messages → existing images still load (row-based branches grant access).
-- Re-run the security scan → all three findings should clear.
-- Spot-check: a user who leaves a circle can no longer sign URLs for media they uploaded while a member (manual SQL check is easy).
+No file edits, no migrations, no frontend changes.
