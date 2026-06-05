@@ -127,9 +127,12 @@ const AlbumPhotoLightbox = ({
           className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
           onClick={async () => {
             if (!current) return;
-            const { downloadFile } = await import("@/lib/nativeDownload");
+            const [{ downloadFile }, fullUrl] = await Promise.all([
+              import("@/lib/nativeDownload"),
+              getPostMediaUrl(current.photo_url),
+            ]);
             await downloadFile(
-              current.photo_url,
+              fullUrl,
               current.photo_url.split("/").pop()?.split("?")[0] || "photo.jpg"
             );
           }}
