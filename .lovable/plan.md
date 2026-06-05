@@ -1,59 +1,56 @@
-## Security findings — triage
+# Fix "email rate limit exceeded" during invite signup
 
-### 1. ERROR: Any authenticated user can subscribe to any `bell-*` notification channel
-**Real risk:** Low-medium. The bell channel currently uses Postgres CDC with `filter: user_id=eq.<userId>`, and RLS on `notifications` only returns each user their own rows — so subscribers don't actually receive other people's notification *payloads*. However, the realtime topic itself isn't user-scoped, so a malicious user could subscribe to another user's bell topic name and observe broadcast presence/timing.
+## What's happening
 
-**Fix (safe, no functional change):**
-- Rename the bell channel from `bell-{variant}-{circleId}` to `bell-{userId}-{variant}-{circleId}` in `src/components/layout/CircleHeader.tsx`.
-- Update the realtime policy so the `'bell-%'` branch requires `realtime.topic() LIKE 'bell-' || auth.uid()::text || '-%'`.
+Your customer's daughter received the invite email fine (that goes through Resend via `send-circle-invite` and is not rate limited). The error she hit is from a *separate* email Supabase Auth itself sends — the **signup confirmation email** that goes out when she creates her account on `/auth?mode=signup`.
 
-### 2. ERROR: Realtime topics not matching known prefixes are open to all authenticated users
-**Real risk:** Medium. Two policies have permissive fallbacks:
-- `"Users can only subscribe to their own private-messages topic"` falls through to `ELSE true`.
-- `"authenticated can subscribe to allowed topics"` has an open `'realtime:%' ⇒ true` branch.
+Supabase Auth applies a per-project email rate limit (default **30 emails/hour**, with stricter per-address throttling — typically 1 email per ~60 seconds and ~4/hour to the same address). If she (or the mom, while testing) hit the signup form, the "resend verification" button, or a forgot-password flow even a few times in a row with the same email, Supabase blocks further sends with `over_email_send_rate_limit` and surfaces it as "email rate limit exceeded."
 
-Combined, any authenticated user could subscribe to arbitrary CDC topics. We don't use any `realtime:*` topics in the client (verified — only `private-messages:`, `group-messages:`, and `bell-*` are used).
+Right now nothing in the circle is broken — the mom is still on Free and only has 2 members. The bottleneck is purely the auth email throttle on the daughter's address.
 
-**Fix (safe, no functional change):**
-- Change the first policy's `ELSE true` to `ELSE false`.
-- Remove the `'realtime:%' ⇒ true` branch from the second policy; keep only the explicit user-scoped allowlist (`private-messages:{uid}`, `group-messages:{uid}`, and the new `bell-{uid}-%`).
+## The fix (three parts)
 
-### 3. WARNING: `circles.invite_code` is readable by all circle members
-**Real risk:** None — this is intentional product behavior. The invite code is masked by default in the UI, members can reveal/share it, and owners can refresh it at any time (existing "Invites" memory). Restricting it to owners-only would break the documented sharing flow.
+### 1. Raise Supabase Auth email rate limits (project setting — no code)
 
-**Action:** Ignore the finding with an explanation and update `@security-memory` to record this as intentional so the scanner stops flagging it.
+This is the only real unblock. In the Lovable Cloud backend's Auth → Rate Limits panel:
 
----
+- **Emails per hour**: raise from default `30` → `150` (or higher; we are paying Resend per email so the Supabase number is just a safety cap).
+- Confirm the project is using the custom `auth-email-hook` (it already is) so these go through Resend rather than Supabase's shared SMTP pool.
 
-## Implementation steps
+No migration is needed; I'll just tell you exactly where to click, or you can let me open the backend panel.
 
-1. **Migration** — replace both realtime policies:
-   ```sql
-   DROP POLICY "Users can only subscribe to their own private-messages topic" ON realtime.messages;
-   DROP POLICY "authenticated can subscribe to allowed topics" ON realtime.messages;
+### 2. Make repeat signup attempts not burn rate-limit budget
 
-   CREATE POLICY "authenticated topic allowlist" ON realtime.messages
-   FOR SELECT TO authenticated
-   USING (
-     realtime.topic() = 'private-messages:' || auth.uid()::text
-     OR realtime.topic() = 'group-messages:' || auth.uid()::text
-     OR realtime.topic() LIKE 'bell-' || auth.uid()::text || '-%'
-   );
-   ```
-   (One consolidated policy is cleaner than two overlapping ones.)
+In `src/pages/Auth.tsx` the signup path calls `supabase.auth.signUp()` every time the user re-submits the form, even if a verification email was already sent moments ago. Each submission counts against the per-address throttle. Changes:
 
-2. **Client edit** — `src/components/layout/CircleHeader.tsx` line 75:
-   ```ts
-   .channel(`bell-${userId}-${variant}-${selectedCircle}`)
-   ```
+- If the user just submitted signup for `email X` (we already track `PENDING_VERIFY_EMAIL_KEY` in sessionStorage), and they submit again for the same email within the cooldown window, **skip the network call** and just re-show the "check your email" panel.
+- Same treatment for the "Resend verification" button — it already has `RESEND_VERIFY_COOLDOWN` but the cooldown isn't enforced server-side, so increase it to 60s and disable the button visibly with a countdown.
+- For forgot-password, persist `RESET_COOLDOWN_KEY` across reloads (currently sessionStorage; bump to 90s and show the countdown in the button).
 
-3. **Ignore the `invite_code` finding** via `security--manage_security_finding` with rationale: "Members are intended to be able to reveal and share the 8-char invite code; owners can refresh it at any time. Restricting to owners would break the documented invite-sharing flow."
+### 3. Friendlier error messaging when the limit does hit
 
-4. **Update `@security-memory`** — add a "what is intentionally readable" note for `circles.invite_code` and a note that realtime topics are now strictly scoped to `auth.uid()`.
+In `src/pages/Auth.tsx` `handleSubmit` signup branch and `handleResendVerification`, detect `over_email_send_rate_limit` / `429` and show:
 
-5. **Verify** — re-run the security scan; confirm the two ERRORs clear and that Messages + Notifications still work in the preview (private messages topic, group messages topic, and the per-user bell channel).
+> "Too many verification emails sent to this address. Please check your inbox and spam folder for the link we already sent — or try again in a few minutes."
 
-## What stays the same / cannot break
-- `private-messages:{uid}` and `group-messages:{uid}` topic names are unchanged → `Messages.tsx` keeps working.
-- Bell still uses postgres_changes CDC with the same RLS-filtered notifications query, just on a user-scoped topic name → no UX change.
-- No edge functions, no DB schema, no Stripe/IAP, no iOS/Android logic touched.
+…instead of the raw Supabase message. (This pattern already exists for forgot-password; mirror it for signup + resend.)
+
+## What I will NOT change
+
+- The invite email flow (`send-circle-invite` via Resend) — it is working and is not the cause.
+- Circle member limits, billing, or the Free-plan 8-seat allowance — the mom is well under her limit.
+- Database schema, RLS, or any edge function other than client-side `Auth.tsx` improvements.
+
+## How to verify after rollout
+
+1. Have the customer's daughter open the invite email again and tap the signup CTA.
+2. She enters her email + password → she should land on the "Check your email" screen and receive the Supabase confirmation email from `support@support.familialmedia.com`.
+3. Click the link → she is auto-joined to the mom's circle.
+
+## Technical notes (for reference)
+
+- Supabase setting paths: Auth → Rate Limits → "Rate limit for sending emails" and "Rate limit for token verifications".
+- Per-address throttle is enforced by `gotrue` and cannot be disabled, only widened by increasing the per-hour ceiling and by ensuring our custom email hook returns 2xx quickly (already does).
+- Files touched in code: `src/pages/Auth.tsx` only.
+
+Want me to proceed with the `Auth.tsx` hardening and walk you through the rate-limit setting change?
