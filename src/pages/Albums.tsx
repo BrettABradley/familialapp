@@ -105,14 +105,20 @@ const AlbumPhotoLightbox = ({
   }, [emblaApi, onIndexChange]);
 
   useEffect(() => {
-    [selected - 1, selected + 1].forEach(async (i) => {
+    // Warm current + ±2 neighbors at the lightbox's full preset so swipes
+    // and re-paints pull from cache instead of waiting on the network.
+    [selected, selected - 1, selected + 1, selected - 2, selected + 2].forEach(async (i) => {
       const p = photos[i];
       if (!p?.photo_url) return;
       const url = await getPostMediaUrl(p.photo_url, { width: 1600, quality: 80, resize: "contain" }).catch(() => "");
-      if (url) {
-        const img = new window.Image();
-        img.src = url;
+      if (!url) return;
+      const img = new window.Image();
+      if (i === selected) {
+        // @ts-expect-error - fetchPriority is a valid property, types lag
+        img.fetchPriority = "high";
       }
+      img.decoding = "async";
+      img.src = url;
     });
   }, [selected, photos]);
 
