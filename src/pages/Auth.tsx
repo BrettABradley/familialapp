@@ -461,6 +461,10 @@ const Auth = () => {
     sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
     sessionStorage.removeItem(PENDING_VERIFY_PWD_KEY);
     sessionStorage.removeItem("pendingTermsAcceptance");
+    // Clear the cooldown timestamp too — it belonged to the previous email
+    // and would otherwise wrongly throttle / short-circuit the next signup.
+    sessionStorage.removeItem(RESEND_VERIFY_KEY);
+    setResendCooldown(0);
     pendingPasswordRef.current = null;
     setVerificationSentTo(null);
     setIsLogin(false);
