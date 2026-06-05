@@ -72,7 +72,7 @@ function NotificationBell({ userId, selectedCircle, variant }: { userId: string;
     fetchNotifications();
 
     const channel = supabase
-      .channel(`bell-${variant}-${selectedCircle}`)
+      .channel(`bell-${userId}-${variant}-${selectedCircle}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, () => {
         fetchNotifications();
       })
