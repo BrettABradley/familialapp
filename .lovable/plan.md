@@ -1,78 +1,51 @@
-## Root cause
+# "Email rate exceeded" on invitee signup
 
-Two separate pain points the user is feeling:
+## What's actually happening
 
-1. **Layout jump in Feed.** Single-image posts wrap `SmartImage` in a container with `h-auto max-h-[600px]` — no reserved height. The post card collapses to text/buttons, then the image decodes and shoves everything down. Multi-image carousels are already `aspect-square` so they're fine, but the inner image still pops in without a skeleton.
-2. **Images feel slow.** Even though signed URLs already include the `card` transform (~800px WebP), three things still hurt:
-   - Carousel tiles render at the screen width on phones (~390px) but request the 800px variant — ~4× more bytes than needed.
-   - No `srcset`, so retina screens always pull 1×.
-   - No progressive low-res placeholder on Feed/Messages/Fridge tiles (only the Album lightbox uses `lowPreset="thumb"`).
-   - Off-screen posts aren't pre-signed/pre-decoded, so each one waits on a network round-trip the first time it scrolls into view.
+I checked the email logs for the last few days — every recent `signup` row is `sent` with no errors, including for the addresses your friend has been inviting (`willroark16@gmail.com`, `raeleigh.roark@gmail.com`, etc.). So our outbound queue is healthy and emails *are* being delivered.
 
-## Changes
+The "email rate exceeded" message is coming directly from Supabase Auth's **per-email signup throttle**, not from our email pipeline. Supabase blocks the same email address from triggering more than one signup email within ~60 seconds (and there is a softer per-hour cap as well). The exact string is `For security purposes, you can only request this after N seconds` / `over_email_send_rate_limit`.
 
-### 1. `SignedSmartImage` — srcset, skeleton, fade-in
+This trips in real, common situations for invitees:
+1. They tap "Sign Up", switch to Mail to verify, come back and tap "Sign Up" again because nothing visibly happened → second call hits the 60s throttle.
+2. They double-tap the button on a slow connection.
+3. They start signup, abandon, then return a few seconds later from the invite link.
+4. They were already invited as a placeholder account, so Supabase considers the address "recently emailed."
 
-`src/components/shared/SignedSmartImage.tsx`
+## Why the screenshot they sent is just an iPhone status bar
 
-- Sign a second URL at `width × 2` for retina and emit `srcSet="<1x> 1x, <2x> 2x"`.
-- Add a `reserveAspect?: number` prop. When set, wrap the `<img>` in a `style={{ aspectRatio: reserveAspect }}` div that shows the animated `Skeleton` until `onLoad` fires, then fades the image in.
-- Keep the existing `lowPreset` progressive-blur behavior; it composes with the skeleton.
+The image in the email shows the iPhone status bar (9:51, phone call timer 5:42, 99% battery) — it's not an in-app error screen, it's just what was on her phone when she took the screenshot of the Familial signup page. The actual blocker is the toast message our code already shows on rate limit:
 
-### 2. `SquareSignedThumbnail` — drop preset to `thumb` for carousel tiles
+> "Too many verification emails sent to this address. Check your inbox and spam folder for the link we already sent, or try again in a few minutes."
 
-`src/components/shared/SquareSignedThumbnail.tsx`
+Today that toast only auto-restores the **"Check your email"** panel if `sessionStorage.pendingVerificationEmail === email`. For a brand new invitee on a fresh device that key is empty, so they just see a red error toast and the same signup form — there's no obvious next step, which feels like a glitch.
 
-- Default `preset` stays `thumb` (already 400px).
-- Pass `lowPreset="thumb"` through (no-op when same preset — guarded inside the component) and wire a skeleton overlay via the new `reserveAspect={1}`.
+## The fix
 
-### 3. `PostCard` — reserve aspect ratio for every media tile
+Make the Auth page treat a rate-limit response as proof that **an email was already sent to this address**, and drop the user onto the "Check your email" panel every time — even when local sessionStorage is empty. Then they can wait, tap the resend button when the cooldown ends, or just open the email that's already in their inbox.
 
-`src/components/feed/PostCard.tsx`
+### Changes (frontend only — `src/pages/Auth.tsx`)
 
-- `MediaItem` single-image branch: wrap in a container with a default `aspectRatio: 4/5` placeholder + skeleton. After the image's `onLoad`, swap to its natural `naturalWidth/naturalHeight` ratio (tracked in local state) so tall photos still show full. Use `SignedSmartImage path={…} preset="card" lowPreset="thumb"` instead of `SmartImage`.
-- `PostMediaCarousel`: switch `FeedImagePreview` to `preset="thumb"` (carousel tiles never exceed ~500px wide); keep `aspect-square` reservation; add `lowPreset` so first paint is the cached thumb.
-- Drop the redundant `useSignedMediaUrls(imagePathsForCard, PRESET_TRANSFORM.card)` pre-sign for rendering (the new `SignedSmartImage` does it). Keep `fullUrls` only for the lightbox and download handler.
+1. **Signup rate-limit branch (`handleSubmit`, ~lines 384–404)** — remove the `if (pendingEmail === email)` guard. On *any* `isEmailRateLimitError(error)` during signUp:
+   - Set `verificationSentTo = email`
+   - Save the password into the ref + sessionStorage so the silent verification poll can pick up once they click the link
+   - Start the 60s `resendCooldown` and write `RESEND_VERIFY_KEY`
+   - Write `PENDING_VERIFY_EMAIL_KEY = email`
+   - Toast wording: "We already sent a verification link to {email}. Please check your inbox and spam folder — you can request another in 60 seconds." (less alarming than "Too many…")
 
-### 4. Feed skeleton reserves image space
+2. **Pre-submit cooldown short-circuit (~lines 353–374)** — keep the existing "if pendingEmail === email and still in cooldown, just re-show the panel" logic. Tighten it to also fire when `pendingEmail` is empty *but* `lastSendAt` is within the cooldown for the same `email` (rare but covers double-tap with a cleared session).
 
-`src/pages/Feed.tsx`
+3. **Forgot-password rate-limit branch (~lines 286–302)** — keep behavior, but improve copy ("A reset link was already sent. Check spam, or try again in 90 seconds.") and don't close `isForgotPassword` so they still see the email input/state.
 
-- Update the initial-load skeleton card to include a `<div className="aspect-square w-full" />` Skeleton block under the text Skeletons so the loading state matches the real card shape and there's no jump between skeleton → first post.
+4. **Resend button (~lines 432–456)** — when `isEmailRateLimitError`, surface the remaining cooldown in seconds instead of a generic message.
 
-### 5. Viewport prefetch for upcoming posts
+### Not in scope (won't change)
 
-`src/components/feed/PostCard.tsx` + `src/lib/postMediaUrl.ts`
+- No backend/RLS/edge-function changes. `auth-email-hook` and the email queue are working correctly; logs confirm delivery.
+- Not changing Supabase's per-email throttle itself (it's a built-in security control we shouldn't disable).
+- No iOS rebuild required — pure web/JS.
 
-- Add `prefetchSignedMediaUrl(path, transform)` — fires `getPostMediaUrl` and a hidden `Image()` decode in the background, populating the in-memory cache.
-- In `PostCard`, attach an `IntersectionObserver` (root margin `800px`) that prefetches the post's first image's `card` variant when the card gets within ~one screen of the viewport. Result: by the time the user scrolls to it, the WebP is already in the browser cache.
+## Verification
 
-### 6. (Same SignedSmartImage upgrade benefits) Messages, Fridge, Profile
-
-No additional code in those files needed — they already render through `SignedSmartImage`/`SquareSignedThumbnail`, so the srcset + skeleton + fade-in land there too.
-
-## Out of scope
-
-- Storing image dimensions in the DB (would give perfect aspect ratios from the first paint, but requires a migration + upload-time changes). The natural-ratio swap on `onLoad` is the no-migration substitute.
-- Service-worker / on-disk persistent cache.
-- Video poster optimization.
-
-## Files touched
-
-```text
-src/components/shared/SignedSmartImage.tsx
-src/components/shared/SquareSignedThumbnail.tsx
-src/components/feed/PostCard.tsx
-src/pages/Feed.tsx
-src/lib/postMediaUrl.ts
-```
-
-Pure web/JS. **No DB / RLS / edge function / iOS build changes — ships with the next Update, no App Store submission needed.**
-
-## Expected impact
-
-- Feed cards reserve space immediately → no more "text appears, image pops, layout jumps."
-- Carousel tiles drop from ~80 KB to ~25–35 KB per slide on phones (thumb vs card preset).
-- Retina phones now pull the right resolution via `srcset` instead of either over- or under-fetching.
-- Off-screen posts are pre-warmed, so scrolling feels nearly instant after the first card.
-- Progressive thumb→full fade-in gives a perceived <100 ms first paint on every tile, app-wide.
+- Trigger a signup twice in <60s with a fresh email in an incognito window → should land on the "Check your email" panel both times with a soft toast, not a red error on the signup form.
+- Existing single-attempt signup, resend cooldown, password reset, and silent verification poll continue to work unchanged.
