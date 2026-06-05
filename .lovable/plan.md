@@ -1,71 +1,51 @@
-## Root cause
+## Goal
 
-Album photos are stored in the **private** `post-media` bucket, so each render goes through `getPostMediaUrl`, which calls `createSignedUrl(path, 3600)` — a `/storage/v1/object/sign/...` URL.
+Make album photos appear faster in the lightbox. Today, opening a photo or swiping to one waits for the full 1600px WebP to download before anything paints. Neighbors are preloaded but only one slot ahead, and the current photo isn't warmed at all before mount.
 
-`src/lib/imageUrl.ts` explicitly **bails out of image transforms for signed URLs** (the render/image endpoint won't validate the sign token on a different path). So:
+## Changes (all in `src/pages/Albums.tsx`, plus a tiny helper)
 
-- Every album grid tile downloads the **full-resolution original** (often 3–8 MB iPhone JPEGs) instead of the 400-px `thumb` preset.
-- The lightbox loads the same full original again, with no `full` (1600 px / quality 80) resize.
+### 1. Warm the current photo before the lightbox mounts
 
-On iOS WebViews this is enough to:
-1. Make the album grid feel "super slow" (dozens of multi-MB images decoded at once).
-2. Make tapping a photo freeze the UI long enough that the user perceives it as a crash, after which iOS often pops the view back to the previous scroll position — they land on the album list. The "almost crashes the album section and takes me to the album home" symptom matches this exactly.
+In the outer `Albums` component, the existing neighbor-preload effect (lines 245–257) only fires after `enlargedPhoto` is set — too late to help the photo the user just tapped. Update it so it also requests the `full` variant of the tapped photo with `fetchpriority="high"`, and extend the window from ±1 to ±2 neighbors at normal priority.
 
-Supabase Storage **does** support transforms on signed URLs — you just have to pass `{ transform: { width, height, quality, resize } }` to `createSignedUrl`. The current code never uses that.
+### 2. Move/extend the preload inside `AlbumPhotoLightbox`
 
-## Fix
+Replace the current `[selected-1, selected+1]` preloader (lines 107–117) with:
 
-### 1. Extend the signed-URL helper to support transforms (`src/lib/postMediaUrl.ts`)
+- Preload `full` for `selected`, `selected±1`, `selected±2` (range configurable).
+- Mark the `selected` image with `img.fetchPriority = "high"`; neighbors stay default.
+- Bail out cleanly if `photos[i]` is missing (end of album).
 
-- Add an optional `transform` arg to `getPostMediaUrl` / `getPostMediaUrls` / `useSignedMediaUrl` / `useSignedMediaUrls`.
-- Key the in-memory cache by `path + transform variant` so the thumb and full versions are cached separately and don't evict each other.
-- Pass `transform` straight through to `supabase.storage.from(BUCKET).createSignedUrl(path, TTL, { transform })`.
+Because signed URLs are cached by `(path, transform)` in `postMediaUrl.ts`, these preloads share the exact URL the `<SignedSmartImage>` later requests, so the browser serves it from cache instantly.
 
-### 2. Add a preset-aware variant that mirrors `SmartImage` semantics
+### 3. Progressive placeholder: paint the small variant first
 
-In `src/lib/imageUrl.ts` (or alongside it) expose a small `PRESET_TRANSFORM` map matching the existing presets:
+Right now `SignedSmartImage` renders a grey `bg-muted` block while the 1600px WebP downloads — that's the perceived "slow". Add an optional `lowPreset` prop to `SignedSmartImage`:
 
-```text
-thumb  → { width: 400,  quality: 70, resize: 'contain' }
-card   → { width: 800,  quality: 75, resize: 'contain' }
-full   → { width: 1600, quality: 80, resize: 'contain' }
-avatar → { width: 256, height: 256, quality: 80, resize: 'cover' }
-```
+- If `lowPreset` is set, render a second `<img>` underneath at that preset (e.g. `thumb`, ~30 KB) which almost always paints in <100ms because the grid already loaded it.
+- The hi-res image stacks on top with `opacity-0 → opacity-100` once `onLoad` fires.
 
-### 3. Create `SignedSmartImage` (thin wrapper around `SmartImage`)
+In the lightbox `<SignedSmartImage>` (line 167), pass `lowPreset="thumb"`. The grid tile is already cached, so swiping to a new photo shows a blurred thumb instantly and sharpens to full when the WebP arrives.
 
-- Props: `path` (bare storage path or legacy URL), `preset`, `priority`, `alt`, `className`.
-- Internally calls `useSignedMediaUrl(path, PRESET_TRANSFORM[preset])` and renders `<SmartImage src={signedUrl} preset={preset} priority={priority} ... />`. Because the URL it hands `SmartImage` is already correctly sized, `SmartImage`'s no-op transform path is fine.
-- Shows the existing `bg-muted` placeholder while `loading` is true.
+### 4. Widen the virtualization window from ±1 to ±2
 
-### 4. Switch Albums to render storage paths, not pre-signed URLs
+Line 159: change `Math.abs(i - selected) <= 1` to `<= 2`. With the lower-res placeholder, the extra `ZoomableImage` instances are cheap (no full image decoded until needed). This makes left/right swipes feel instant on the first neighbor and still safe on iOS memory because we're capping at 5 mounted slides.
 
-In `src/pages/Albums.tsx`:
+### 5. Tiny cleanup
 
-- Stop pre-signing in `fetchAlbums` / `fetchPhotos` — store the bare `photo_url` / `cover_photo_url` paths in state.
-- Replace `AlbumImagePreview` with a version backed by `SignedSmartImage` (`preset="thumb"` for grid tiles, `preset="card"` for the cover, `preset="full"` for the lightbox image inside `AlbumPhotoLightbox`).
-- Update the lightbox neighbor-preload effect to ask for the `full` transformed signed URL instead of `presetImage(...)` (which is a no-op for signed URLs).
-- Keep `getPostMediaUrl` (untransformed) only where we need the true original — the **Download / Download All** handlers and the cover-upload flow.
-
-### 5. Confirm the fix end-to-end
-
-After the change:
-- Album grid: each tile pulls a ~30–80 KB WebP via the render endpoint instead of a multi-MB JPEG — should be visibly snappy on a cold load.
-- Tap a photo: lightbox opens a ≤1600 px WebP; no more multi-second freeze; the "drops back to album home" symptom goes away because the WebView no longer chokes.
-- Download All / single Download still pull the full original (unchanged).
+The outer preloader (Albums lines 245–257) becomes redundant once the lightbox preloads its own current+neighbors on every `selected` change. Keep only the "warm on tap" part (current photo high-priority + ±1 neighbors normal priority) so the very first paint after tapping a tile is fast; delete the rest.
 
 ## Files touched
 
 ```text
-src/lib/postMediaUrl.ts        ← add transform support + variant cache key
-src/lib/imageUrl.ts            ← export PRESET_TRANSFORM map for reuse
-src/components/shared/SignedSmartImage.tsx   ← new wrapper
-src/pages/Albums.tsx           ← use paths + SignedSmartImage; update lightbox preload
+src/components/shared/SignedSmartImage.tsx    ← add optional lowPreset prop + fade-in
+src/pages/Albums.tsx                          ← improved preload effects, ±2 window, lowPreset="thumb" in lightbox
 ```
 
-No DB / RLS / edge function changes. No behavioral changes to upload, delete, cover, or download flows.
+No changes to `postMediaUrl.ts`, `imageUrl.ts`, `ZoomableImage`, RLS, edge functions, downloads, or upload flow.
 
-## Out of scope (intentionally)
+## Out of scope
 
-- Feed / Messages / Fridge: they go through `getPostMediaUrl` too and would benefit from the same treatment, but the report is album-specific and you asked to fix this "asap". Happy to roll the same `SignedSmartImage` swap into those surfaces in a follow-up once we've confirmed the album fix in production.
-- The unrelated security findings (Google Play RTDN auth, transactional email anon role check, post-media folder-ownership read shortcut) — separate work.
+- Feed / Messages / Fridge lightboxes (same pattern would help but the user asked specifically about albums today).
+- Service-worker caching of signed URLs.
+- No new iOS build required — pure web/JS change.
