@@ -446,10 +446,8 @@ const Auth = () => {
     if (error) {
       if (isEmailRateLimitError(error)) {
         toast({
-          title: "Please wait a moment",
-          description:
-            "Too many verification emails sent recently. Check your inbox and spam folder for the most recent link, or try again in a few minutes.",
-          variant: "destructive",
+          title: "Check your email",
+          description: `A verification link was already sent recently. Please open your inbox or spam folder, or try again in ${RESEND_VERIFY_COOLDOWN} seconds.`,
         });
       } else {
         toast({ title: "Could not resend", description: error.message, variant: "destructive" });
