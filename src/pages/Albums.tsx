@@ -233,15 +233,17 @@ const Albums = () => {
   const [photos, setPhotos] = useState<AlbumPhoto[]>([]);
   const [coverCropSrc, setCoverCropSrc] = useState<string | null>(null);
 
-  // Preload neighbor photos in lightbox for snappy swipes
+  // Preload neighbor photos in lightbox for snappy swipes (signed + resized).
   useEffect(() => {
     if (!enlargedPhoto) return;
     const idx = photos.findIndex(p => p.id === enlargedPhoto.id);
-    [idx - 1, idx + 1].forEach((i) => {
+    [idx - 1, idx + 1].forEach(async (i) => {
       const p = photos[i];
-      if (p?.photo_url) {
+      if (!p?.photo_url) return;
+      const url = await getPostMediaUrl(p.photo_url, { width: 1600, quality: 80, resize: "contain" }).catch(() => "");
+      if (url) {
         const img = new window.Image();
-        img.src = presetImage(p.photo_url, "full");
+        img.src = url;
       }
     });
   }, [enlargedPhoto, photos]);
