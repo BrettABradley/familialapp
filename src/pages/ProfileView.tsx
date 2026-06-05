@@ -43,6 +43,35 @@ interface ProfileImage {
 }
 
 const MAX_GROUP_ITEMS = 5;
+const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour
+
+// Extracts the storage path from a stored profile-images URL.
+// Handles both legacy public URLs and already-signed URLs.
+const extractProfileImagePath = (url: string): string | null => {
+  if (!url) return null;
+  // Path-only (newer uploads may store just the path)
+  if (!url.startsWith("http")) return url;
+  const m = url.match(/\/profile-images\/(.+?)(?:\?|$)/);
+  return m ? m[1] : null;
+};
+
+// Sign a single profile image; returns the signed URL or the original on failure.
+const signProfileImage = async (image_url: string): Promise<string> => {
+  const path = extractProfileImagePath(image_url);
+  if (!path) return image_url;
+  const { data, error } = await supabase.storage
+    .from("profile-images")
+    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+  if (error || !data?.signedUrl) return image_url;
+  return data.signedUrl;
+};
+
+const signProfileImages = async <T extends { image_url: string }>(rows: T[]): Promise<T[]> => {
+  if (rows.length === 0) return rows;
+  return Promise.all(
+    rows.map(async (r) => ({ ...r, image_url: await signProfileImage(r.image_url) }))
+  );
+};
 
 const ProfileMediaLightbox = ({
   group,
