@@ -387,24 +387,25 @@ const Auth = () => {
             setDuplicateAccount(true);
           } else if (isEmailRateLimitError(error)) {
             // Per-address / per-project Supabase auth email throttle.
-            // If we previously sent a verification to this email, drop the
-            // user back onto the "Check your email" panel so they can use
-            // the link that was already delivered.
-            if (pendingEmail === email) {
-              setVerificationSentTo(email);
-              if (password) {
-                pendingPasswordRef.current = password;
-                try { sessionStorage.setItem(PENDING_VERIFY_PWD_KEY, password); } catch { /* non-fatal */ }
-              }
-              setPassword("");
-              setResendCooldown(RESEND_VERIFY_COOLDOWN);
-              sessionStorage.setItem(RESEND_VERIFY_KEY, String(Date.now()));
+            // A rate-limit response means an email WAS recently sent to this
+            // address — drop the user onto the "Check your email" panel so
+            // they have a clear next step instead of a dead-end red toast.
+            sessionStorage.setItem(PENDING_VERIFY_EMAIL_KEY, email);
+            setVerificationSentTo(email);
+            if (password) {
+              pendingPasswordRef.current = password;
+              try { sessionStorage.setItem(PENDING_VERIFY_PWD_KEY, password); } catch { /* non-fatal */ }
             }
+            setPassword("");
+            const existing = Number(sessionStorage.getItem(RESEND_VERIFY_KEY) || 0);
+            const remaining = existing
+              ? Math.ceil((existing + RESEND_VERIFY_COOLDOWN * 1000 - Date.now()) / 1000)
+              : RESEND_VERIFY_COOLDOWN;
+            if (!existing) sessionStorage.setItem(RESEND_VERIFY_KEY, String(Date.now()));
+            setResendCooldown(Math.max(remaining, 1));
             toast({
-              title: "Please wait a moment",
-              description:
-                "Too many verification emails sent to this address. Check your inbox and spam folder for the link we already sent, or try again in a few minutes.",
-              variant: "destructive",
+              title: "Check your email",
+              description: `We already sent a verification link to ${email}. Please check your inbox and spam folder — you can request another in ${Math.max(remaining, 1)} seconds.`,
             });
           } else {
             toast({
