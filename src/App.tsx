@@ -38,6 +38,7 @@ import About from "./pages/About";
 import Careers from "./pages/Careers";
 import Blog from "./pages/Blog";
 import Support from "./pages/Support";
+import DeleteAccount from "./pages/DeleteAccount";
 
 const queryClient = new QueryClient();
 
