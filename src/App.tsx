@@ -105,6 +105,7 @@ const App = () => {
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/cookies" element={<CookiePolicy />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
+            <Route path="/delete-account" element={<DeleteAccount />} />
             <Route path="/store" element={<Store />} />
             <Route path="/about" element={<About />} />
             <Route path="/careers" element={<Careers />} />
