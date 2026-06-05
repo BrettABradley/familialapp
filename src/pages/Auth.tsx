@@ -346,6 +346,33 @@ const Auth = () => {
           return;
         }
 
+        // If a verification email was just sent to THIS same address and the
+        // per-address cooldown is still ticking, don't burn the Supabase
+        // rate-limit budget with another signUp() call — just re-show the
+        // "check your email" panel and let them use the existing link.
+        const pendingEmail = sessionStorage.getItem(PENDING_VERIFY_EMAIL_KEY);
+        const lastSendAt = Number(sessionStorage.getItem(RESEND_VERIFY_KEY) || 0);
+        const stillCoolingDown =
+          lastSendAt &&
+          Date.now() - lastSendAt < RESEND_VERIFY_COOLDOWN * 1000;
+        if (pendingEmail === email && stillCoolingDown) {
+          setVerificationSentTo(email);
+          if (password) {
+            pendingPasswordRef.current = password;
+            try { sessionStorage.setItem(PENDING_VERIFY_PWD_KEY, password); } catch { /* non-fatal */ }
+          }
+          setPassword("");
+          const remaining = Math.ceil(
+            (lastSendAt + RESEND_VERIFY_COOLDOWN * 1000 - Date.now()) / 1000
+          );
+          setResendCooldown(Math.max(remaining, 1));
+          toast({
+            title: "Check your email",
+            description: `We already sent a verification link to ${email}. Check your inbox (and spam folder).`,
+          });
+          return;
+        }
+
         const { error } = await signUp(email, password, displayName);
         if (error) {
           const dup =
@@ -354,6 +381,27 @@ const Auth = () => {
             error.message.toLowerCase().includes("identities");
           if (dup) {
             setDuplicateAccount(true);
+          } else if (isEmailRateLimitError(error)) {
+            // Per-address / per-project Supabase auth email throttle.
+            // If we previously sent a verification to this email, drop the
+            // user back onto the "Check your email" panel so they can use
+            // the link that was already delivered.
+            if (pendingEmail === email) {
+              setVerificationSentTo(email);
+              if (password) {
+                pendingPasswordRef.current = password;
+                try { sessionStorage.setItem(PENDING_VERIFY_PWD_KEY, password); } catch { /* non-fatal */ }
+              }
+              setPassword("");
+              setResendCooldown(RESEND_VERIFY_COOLDOWN);
+              sessionStorage.setItem(RESEND_VERIFY_KEY, String(Date.now()));
+            }
+            toast({
+              title: "Please wait a moment",
+              description:
+                "Too many verification emails sent to this address. Check your inbox and spam folder for the link we already sent, or try again in a few minutes.",
+              variant: "destructive",
+            });
           } else {
             toast({
               title: "Sign up failed",
