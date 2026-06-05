@@ -108,11 +108,13 @@ const AlbumPhotoLightbox = ({
   }, [emblaApi, onIndexChange]);
 
   useEffect(() => {
-    [selected - 1, selected + 1].forEach((i) => {
+    [selected - 1, selected + 1].forEach(async (i) => {
       const p = photos[i];
-      if (p?.photo_url) {
+      if (!p?.photo_url) return;
+      const url = await getPostMediaUrl(p.photo_url, { width: 1600, quality: 80, resize: "contain" }).catch(() => "");
+      if (url) {
         const img = new window.Image();
-        img.src = presetImage(p.photo_url, "full");
+        img.src = url;
       }
     });
   }, [selected, photos]);
