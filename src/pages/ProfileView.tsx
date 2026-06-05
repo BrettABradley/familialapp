@@ -416,12 +416,14 @@ const ProfileView = () => {
     }
 
     if (insertedRows.length > 0) {
+      // Sign URLs so the private bucket can be fetched by the client + moderator
+      const signedRows = await signProfileImages(insertedRows);
       // Prepend the whole new group at the top
-      setImages((prev) => [...insertedRows, ...prev]);
-      toast({ title: insertedRows.length > 1 ? `Posted ${insertedRows.length} items!` : "Media uploaded!" });
+      setImages((prev) => [...signedRows, ...prev]);
+      toast({ title: signedRows.length > 1 ? `Posted ${signedRows.length} items!` : "Media uploaded!" });
 
-      // Silent background moderation per image
-      const imageRows = insertedRows.filter((r) => getMediaType(r.image_url) === "image");
+      // Silent background moderation per image (uses signed URLs)
+      const imageRows = signedRows.filter((r) => getMediaType(r.image_url) === "image");
       if (imageRows.length > 0) {
         (async () => {
           try {
@@ -430,7 +432,7 @@ const ProfileView = () => {
             });
 
             if (!modError && modResult && !modResult.allowed) {
-              const ids = insertedRows.map((r) => r.id);
+              const ids = signedRows.map((r) => r.id);
               await supabase.from("profile_images").delete().in("id", ids);
               await supabase.storage.from("profile-images").remove(insertedStoragePaths);
               setImages((prev) => prev.filter((i) => !ids.includes(i.id)));
