@@ -390,13 +390,7 @@ export function FridgeBoard({
                   </div>
                 ) : (
                   <div className="w-full aspect-square bg-white flex items-center justify-center overflow-hidden">
-                    <SmartImage
-                      src={enlargedPin.image_url}
-                      preset="full"
-                      priority
-                      alt={enlargedPin.title}
-                      className="max-w-full max-h-full w-auto h-auto object-contain"
-                    />
+                    <EnlargedFridgeImage url={enlargedPin.image_url} alt={enlargedPin.title} />
                   </div>
                 )
               ) : (
