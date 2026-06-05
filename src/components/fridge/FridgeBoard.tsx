@@ -25,6 +25,26 @@ export interface FridgeBoardPin {
 }
 
 /**
+ * Re-signs the polaroid thumb URL with the `full` transform so the enlarged
+ * dialog gets a 1600px WebP instead of the 400px tile thumbnail.
+ */
+const EnlargedFridgeImage = ({ url, alt }: { url: string; alt: string }) => {
+  const { url: fullUrl } = useSignedMediaUrl(url, PRESET_TRANSFORM.full);
+  if (!fullUrl) {
+    return <div className="w-full h-full bg-muted" aria-hidden />;
+  }
+  return (
+    <SmartImage
+      src={fullUrl}
+      preset="full"
+      priority
+      alt={alt}
+      className="max-w-full max-h-full w-auto h-auto object-contain"
+    />
+  );
+};
+
+/**
  * Fixed positions for up to 8 polaroid photos.
  */
 const PIN_LAYOUT: Array<{ top: string; left: string; rotate: number }> = [
