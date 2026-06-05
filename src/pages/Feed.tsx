@@ -92,14 +92,16 @@ const Feed = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <Skeleton className="h-16 w-full mb-4" />
-              <Skeleton className="h-48 w-full rounded-lg" />
+              <Skeleton className="h-4 w-full mb-2" />
+              <Skeleton className="h-4 w-3/4 mb-4" />
+              <Skeleton className="w-full aspect-square rounded-lg" />
             </CardContent>
           </Card>
         ))}
       </main>
     );
   }
+
 
   return (
     <PullToRefreshWrapper onRefresh={async () => { await fetchPosts(true); }}>
