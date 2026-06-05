@@ -567,9 +567,9 @@ export const PostCard = ({
         {/* Unified Media Lightbox — fullscreen on mobile, centered modal on desktop */}
         <Dialog open={lightboxIndex !== null} onOpenChange={(open) => !open && setLightboxIndex(null)}>
           <DialogContent className="max-w-none sm:max-w-[95vw] sm:w-fit px-0 py-0 p-0 border-0 bg-black/95 sm:bg-background/95 sm:p-2 sm:border sm:rounded-lg [&>button:last-child]:hidden inset-0 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] rounded-none sm:rounded-lg flex flex-col items-center justify-center">
-            {lightboxIndex !== null && visualMedia.length > 0 && (
+            {lightboxIndex !== null && visualMediaFull.length > 0 && (
               <MediaLightbox
-                items={visualMedia}
+                items={visualMediaFull}
                 startIndex={lightboxIndex}
                 onIndexChange={setLightboxIndex}
                 onClose={() => setLightboxIndex(null)}
