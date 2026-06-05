@@ -560,7 +560,7 @@ const ProfileView = () => {
     if (updateError) {
       toast({ title: "Error", description: "Failed to update image.", variant: "destructive" });
     } else {
-      const signedUrl = await signProfileImage(publicUrlData.publicUrl);
+      const signedUrl = await signProfileImage(publicUrlData.publicUrl, PROFILE_CARD_TRANSFORM);
       setImages((prev) => prev.map((i) => i.id === target.id ? { ...i, image_url: signedUrl } : i));
       setEditingGroup((prev) => prev ? prev.map((i) => i.id === target.id ? { ...i, image_url: signedUrl } : i) : null);
       toast({ title: "Image updated!" });
