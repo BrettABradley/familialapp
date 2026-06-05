@@ -23,6 +23,8 @@ import { blobToVoiceNoteFile } from "@/lib/voiceNoteFile";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import { getPostMediaUrl } from "@/lib/postMediaUrl";
+import { PRESET_TRANSFORM } from "@/lib/imageUrl";
+import { getMediaType } from "@/lib/mediaUtils";
 
 interface Circle {
   id: string;
