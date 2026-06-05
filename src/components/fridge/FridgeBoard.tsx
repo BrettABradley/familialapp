@@ -8,6 +8,8 @@ import { PixelCampfire } from "./PixelCampfire";
 import { CampfireDialog } from "./CampfireDialog";
 import { SmartImage } from "@/components/shared/SmartImage";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
+import { useSignedMediaUrl } from "@/lib/postMediaUrl";
+import { PRESET_TRANSFORM } from "@/lib/imageUrl";
 
 export interface FridgeBoardPin {
   id: string;
@@ -21,6 +23,26 @@ export interface FridgeBoardPin {
   campfire_prompt?: string | null;
   circles?: { id: string; name: string };
 }
+
+/**
+ * Re-signs the polaroid thumb URL with the `full` transform so the enlarged
+ * dialog gets a 1600px WebP instead of the 400px tile thumbnail.
+ */
+const EnlargedFridgeImage = ({ url, alt }: { url: string; alt: string }) => {
+  const { url: fullUrl } = useSignedMediaUrl(url, PRESET_TRANSFORM.full);
+  if (!fullUrl) {
+    return <div className="w-full h-full bg-muted" aria-hidden />;
+  }
+  return (
+    <SmartImage
+      src={fullUrl}
+      preset="full"
+      priority
+      alt={alt}
+      className="max-w-full max-h-full w-auto h-auto object-contain"
+    />
+  );
+};
 
 /**
  * Fixed positions for up to 8 polaroid photos.
@@ -388,13 +410,7 @@ export function FridgeBoard({
                   </div>
                 ) : (
                   <div className="w-full aspect-square bg-white flex items-center justify-center overflow-hidden">
-                    <SmartImage
-                      src={enlargedPin.image_url}
-                      preset="full"
-                      priority
-                      alt={enlargedPin.title}
-                      className="max-w-full max-h-full w-auto h-auto object-contain"
-                    />
+                    <EnlargedFridgeImage url={enlargedPin.image_url} alt={enlargedPin.title} />
                   </div>
                 )
               ) : (

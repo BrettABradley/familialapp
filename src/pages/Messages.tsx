@@ -29,6 +29,7 @@ import { MediaLightbox } from "@/components/shared/MediaLightbox";
 import { SmartImage } from "@/components/shared/SmartImage";
 import { VoiceNotePlayer } from "@/components/shared/VoiceNotePlayer";
 import { useSignedMediaUrls, getPostMediaUrl } from "@/lib/postMediaUrl";
+import { PRESET_TRANSFORM } from "@/lib/imageUrl";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -94,23 +95,30 @@ const MessageMedia = ({
   mediaUrls?: string[];
   onOpenLightbox: (items: string[], index: number) => void;
 }) => {
-  const { urls } = useSignedMediaUrls(mediaUrls || []);
+  const paths = mediaUrls || [];
+  // Images: sign with the `card` transform so chat tiles fetch a CDN-cached
+  // ~50–80 KB WebP instead of the full original. Non-images get a normal
+  // signed URL (the render endpoint only handles images).
+  const imagePathsForCard = paths.map((p) => (getMediaType(p || "") === "image" ? p : null));
+  const { urls: cardImageUrls } = useSignedMediaUrls(imagePathsForCard, PRESET_TRANSFORM.card);
+  const { urls: fullUrls } = useSignedMediaUrls(paths);
   if (!mediaUrls || mediaUrls.length === 0) return null;
 
-  // Lightbox-able items (images + videos), with their original order preserved.
-  const visualItems = urls.filter((u) => {
+  // Visual items for the lightbox (full-res), order-preserved.
+  const visualItems = fullUrls.filter((u, i) => {
     if (!u) return false;
-    const t = getMediaType(u);
+    const t = getMediaType(paths[i] || "");
     return t === "image" || t === "video";
   });
 
   return (
     <div className="mt-2 space-y-2">
-      {urls.map((url, i) => {
-        if (!url) return null;
-        const type = getMediaType(url);
+      {paths.map((p, i) => {
+        const type = getMediaType(p || "");
+        const fullUrl = fullUrls[i];
+        if (!fullUrl) return null;
         if (type === "video") {
-          const visualIndex = visualItems.indexOf(url);
+          const visualIndex = visualItems.indexOf(fullUrl);
           return (
             <button
               key={i}
@@ -118,15 +126,16 @@ const MessageMedia = ({
               onClick={() => onOpenLightbox(visualItems, Math.max(0, visualIndex))}
               className="block rounded-md overflow-hidden max-w-full"
             >
-              <video src={url} playsInline muted className="rounded-md max-w-full max-h-72" />
+              <video src={fullUrl} playsInline muted className="rounded-md max-w-full max-h-72" />
             </button>
           );
         }
         if (type === "audio") {
-          return <VoiceNotePlayer key={i} src={url} />;
+          return <VoiceNotePlayer key={i} src={fullUrl} />;
         }
 
-        const visualIndex = visualItems.indexOf(url);
+        const tileUrl = cardImageUrls[i] || fullUrl;
+        const visualIndex = visualItems.indexOf(fullUrl);
         return (
           <button
             key={i}
@@ -136,7 +145,7 @@ const MessageMedia = ({
             aria-label="Open photo"
           >
             <SmartImage
-              src={url}
+              src={tileUrl}
               preset="card"
               alt=""
               className="rounded-md max-w-full max-h-72 object-cover"

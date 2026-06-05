@@ -23,6 +23,8 @@ import { blobToVoiceNoteFile } from "@/lib/voiceNoteFile";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import { getPostMediaUrl } from "@/lib/postMediaUrl";
+import { PRESET_TRANSFORM } from "@/lib/imageUrl";
+import { getMediaType } from "@/lib/mediaUtils";
 
 interface Circle {
   id: string;
@@ -89,11 +91,16 @@ const Fridge = () => {
 
     if (!error && data) {
       // Resolve stored paths / legacy public URLs to signed URLs for display.
+      // Image pins get a `thumb` transform so the fridge polaroids download
+      // small WebPs instead of multi-MB originals. Video/audio pins are
+      // signed untransformed (transforms only work on images).
       const resolved = await Promise.all(
-        (data as unknown as FridgePin[]).map(async (pin) => ({
-          ...pin,
-          image_url: pin.image_url ? await getPostMediaUrl(pin.image_url) : null,
-        })),
+        (data as unknown as FridgePin[]).map(async (pin) => {
+          if (!pin.image_url) return { ...pin, image_url: null };
+          const isImage = getMediaType(pin.image_url) === "image";
+          const transform = isImage ? PRESET_TRANSFORM.thumb : undefined;
+          return { ...pin, image_url: await getPostMediaUrl(pin.image_url, transform) };
+        }),
       );
       setPins(resolved);
     }
