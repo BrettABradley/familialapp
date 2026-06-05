@@ -494,8 +494,8 @@ const Albums = () => {
         // user gets the whole album in Photos in one shot.
         toast({ title: "Saving to Photos...", description: `Saving ${photos.length} photos to your camera roll.` });
         const { downloadFilesToCameraRoll } = await import("@/lib/nativeDownload");
-        const urls = photos.map(p => p.photo_url);
-        const { saved, failed } = await downloadFilesToCameraRoll(urls);
+        const urls = await getPostMediaUrls(photos.map(p => p.photo_url));
+        const { saved, failed } = await downloadFilesToCameraRoll(urls.filter(Boolean));
         toast({
           title: failed === 0 ? "Saved to Photos!" : "Partially saved",
           description: failed === 0
@@ -507,9 +507,12 @@ const Albums = () => {
         const zip = new JSZip();
         const folder = zip.folder(selectedAlbum.name) || zip;
 
+        const signedUrls = await getPostMediaUrls(photos.map(p => p.photo_url));
         for (let i = 0; i < photos.length; i++) {
           try {
-            const response = await fetch(photos[i].photo_url);
+            const u = signedUrls[i];
+            if (!u) continue;
+            const response = await fetch(u);
             const blob = await response.blob();
             const ext = photos[i].photo_url.split(".").pop()?.split("?")[0] || "jpg";
             folder.file(`photo_${i + 1}.${ext}`, blob);
