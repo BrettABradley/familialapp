@@ -22,6 +22,8 @@ import { SmartImage } from "@/components/shared/SmartImage";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
 import { presetImage } from "@/lib/imageUrl";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
+import { SquareSignedThumbnail } from "@/components/shared/SquareSignedThumbnail";
+import { SignedSmartImage } from "@/components/shared/SignedSmartImage";
 import useEmblaCarousel from "embla-carousel-react";
 import { useSwipeDownClose } from "@/hooks/useSwipeDownClose";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
