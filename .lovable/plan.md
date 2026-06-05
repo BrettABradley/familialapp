@@ -1,51 +1,72 @@
-## Goal
+## Root cause (same as Albums was)
 
-Make album photos appear faster in the lightbox. Today, opening a photo or swiping to one waits for the full 1600px WebP to download before anything paints. Neighbors are preloaded but only one slot ahead, and the current photo isn't warmed at all before mount.
+`SmartImage` rewrites Supabase URLs through the on-the-fly transformer, but **bails out for signed URLs** (the render endpoint won't validate sign tokens). Every surface that loads media from the private `post-media` bucket — Feed, Messages, Fridge, ProfileView — currently passes pre-signed URLs into `SmartImage` and gets the **full original** for every tile and lightbox image. That's why thumbs feel slow everywhere.
 
-## Changes (all in `src/pages/Albums.tsx`, plus a tiny helper)
+Albums already has the fix: it stores raw storage paths, and renders via `SignedSmartImage` / `SquareSignedThumbnail`, which produce signed URLs that include `{ transform: { width, quality, resize } }` — a CDN-cached ~30–80 KB WebP per thumbnail instead of a multi-MB JPEG.
 
-### 1. Warm the current photo before the lightbox mounts
+Roll the same swap into the other four surfaces.
 
-In the outer `Albums` component, the existing neighbor-preload effect (lines 245–257) only fires after `enlargedPhoto` is set — too late to help the photo the user just tapped. Update it so it also requests the `full` variant of the tapped photo with `fetchpriority="high"`, and extend the window from ±1 to ±2 neighbors at normal priority.
+## Changes
 
-### 2. Move/extend the preload inside `AlbumPhotoLightbox`
+### 1. Feed — `src/components/feed/PostCard.tsx`
 
-Replace the current `[selected-1, selected+1]` preloader (lines 107–117) with:
+- Stop pre-signing `post.media_urls` for rendering. Drop the `useSignedMediaUrls` call on line 389 (only kept for rendering — keep it only for the download handler if needed, or replace with on-demand `getPostMediaUrl(path)` in the download click).
+- Pass raw storage paths down to `MediaItem`, `PostMediaCarousel`, and `FeedImagePreview`.
+- Replace:
+  - `SmartImage src=… preset="card"` → `SignedSmartImage path=… preset="card" lowPreset="thumb"`
+  - `SquareImageThumbnail src=…` (the carousel grid tile) → `SquareSignedThumbnail path=…`
+- `VideoThumbnail` and audio (`VoiceNotePlayer`) still need a real signed URL — keep `getPostMediaUrl(path)` for those specific cases.
+- Download button: call `getPostMediaUrl(path)` (untransformed original) at click time.
 
-- Preload `full` for `selected`, `selected±1`, `selected±2` (range configurable).
-- Mark the `selected` image with `img.fetchPriority = "high"`; neighbors stay default.
-- Bail out cleanly if `photos[i]` is missing (end of album).
+### 2. Messages — `src/pages/Messages.tsx`
 
-Because signed URLs are cached by `(path, transform)` in `postMediaUrl.ts`, these preloads share the exact URL the `<SignedSmartImage>` later requests, so the browser serves it from cache instantly.
+In `MessageMedia` (lines 90–149):
+- Stop calling `useSignedMediaUrls(mediaUrls)` to pre-sign. Instead, work directly with `mediaUrls` (paths).
+- For each item, branch on the bare path's extension via `getMediaType(path)`:
+  - image → `<SignedSmartImage path={p} preset="card" lowPreset="thumb" … />`
+  - video → keep current behavior but resolve the URL on demand with `useSignedMediaUrl(p)` (small per-video hook) — or wrap into a `MessageVideoTile` component.
+  - audio → resolve via `useSignedMediaUrl(p)` and feed to `VoiceNotePlayer`.
+- Lightbox open: still expects an array of resolved URLs. Resolve only the visual items lazily when the user taps (`Promise.all(visualPaths.map(p => getPostMediaUrl(p)))`) before opening — or keep a `useSignedMediaUrls(visualPaths)` solely for the lightbox; that's the one place full originals are appropriate.
 
-### 3. Progressive placeholder: paint the small variant first
+### 3. Fridge — `src/pages/Fridge.tsx` + `src/components/fridge/FridgeBoard.tsx`
 
-Right now `SignedSmartImage` renders a grey `bg-muted` block while the 1600px WebP downloads — that's the perceived "slow". Add an optional `lowPreset` prop to `SignedSmartImage`:
+- `Fridge.tsx` line 95: stop pre-signing `pin.image_url` during fetch — store the raw path on the pin row.
+- `FridgeBoard.tsx`:
+  - Tile (line 211 `SquareImageThumbnail src={pin.image_url}`) → `SquareSignedThumbnail path={pin.image_url}`.
+  - Audio/video at lines 199–209 and 378–388: resolve a signed URL on demand via `useSignedMediaUrl(pin.image_url)` for those branches (small wrapper components keep render clean).
+  - Enlarged image (line 391 `SmartImage preset="full"`) → `SignedSmartImage path=… preset="full" lowPreset="card" priority`.
 
-- If `lowPreset` is set, render a second `<img>` underneath at that preset (e.g. `thumb`, ~30 KB) which almost always paints in <100ms because the grid already loaded it.
-- The hi-res image stacks on top with `opacity-0 → opacity-100` once `onLoad` fires.
+### 4. ProfileView — `src/pages/ProfileView.tsx`
 
-In the lightbox `<SignedSmartImage>` (line 167), pass `lowPreset="thumb"`. The grid tile is already cached, so swiping to a new photo shows a blurred thumb instantly and sharpens to full when the WebP arrives.
+ProfileView signs via its own `signProfileImage` helper into `image_url` strings. Two options; pick the smaller diff:
+- **Preferred**: stop signing in `signProfileImage`/`signProfileImages` and store raw paths in `image_url`. Then:
+  - All grid tiles `SquareImageThumbnail src={cover.image_url}` (lines 705, 924) → `SquareSignedThumbnail path={cover.image_url}`.
+  - Lightbox image (line 126) → `SignedSmartImage path=… preset="full" lowPreset="thumb" priority={…}`.
+  - Video tiles continue to need a signed URL; resolve per-item with `useSignedMediaUrl`.
+  - Download / edit-crop flows still call `getPostMediaUrl(path)` for originals.
 
-### 4. Widen the virtualization window from ±1 to ±2
+### 5. Helper tweak — `SignedSmartImage`
 
-Line 159: change `Math.abs(i - selected) <= 1` to `<= 2`. With the lower-res placeholder, the extra `ZoomableImage` instances are cheap (no full image decoded until needed). This makes left/right swipes feel instant on the first neighbor and still safe on iOS memory because we're capping at 5 mounted slides.
+Already supports `lowPreset` (added in the album fix); no change required, just used in more places. Confirm no regressions when `lowPreset` is set but the underlying `useSignedMediaUrls` cache is cold (the hidden hi-res decoder fades in when ready — already implemented).
 
-### 5. Tiny cleanup
+## Out of scope
 
-The outer preloader (Albums lines 245–257) becomes redundant once the lightbox preloads its own current+neighbors on every `selected` change. Keep only the "warm on tap" part (current photo high-priority + ±1 neighbors normal priority) so the very first paint after tapping a tile is fast; delete the rest.
+- Service-worker / persistent CDN caching beyond the existing in-memory cache.
+- Avatar bucket (separate flow — already small).
+- Video poster frames (separate work; videos already use `<VideoThumbnail>`).
 
 ## Files touched
 
 ```text
-src/components/shared/SignedSmartImage.tsx    ← add optional lowPreset prop + fade-in
-src/pages/Albums.tsx                          ← improved preload effects, ±2 window, lowPreset="thumb" in lightbox
+src/components/feed/PostCard.tsx
+src/pages/Messages.tsx
+src/pages/Fridge.tsx
+src/components/fridge/FridgeBoard.tsx
+src/pages/ProfileView.tsx
 ```
 
-No changes to `postMediaUrl.ts`, `imageUrl.ts`, `ZoomableImage`, RLS, edge functions, downloads, or upload flow.
+No DB / RLS / edge function / iOS-build changes. Pure web/JS — ships with the next Update.
 
-## Out of scope
+## Expected impact
 
-- Feed / Messages / Fridge lightboxes (same pattern would help but the user asked specifically about albums today).
-- Service-worker caching of signed URLs.
-- No new iOS build required — pure web/JS change.
+Tiles in Feed, Messages, Fridge, and Profile go from multi-MB JPEG originals to ~30–80 KB WebP variants served from the CDN. Lightbox images get the same progressive thumb→full fade-in as Albums. First paint of a feed/message/profile view will feel dramatically snappier on cellular and iOS.
