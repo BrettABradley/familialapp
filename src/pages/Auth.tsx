@@ -441,7 +441,16 @@ const Auth = () => {
     sessionStorage.setItem(RESEND_VERIFY_KEY, String(Date.now()));
     setResendCooldown(RESEND_VERIFY_COOLDOWN);
     if (error) {
-      toast({ title: "Could not resend", description: error.message, variant: "destructive" });
+      if (isEmailRateLimitError(error)) {
+        toast({
+          title: "Please wait a moment",
+          description:
+            "Too many verification emails sent recently. Check your inbox and spam folder for the most recent link, or try again in a few minutes.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Could not resend", description: error.message, variant: "destructive" });
+      }
     } else {
       toast({ title: "Email resent", description: `New verification link sent to ${verificationSentTo}.` });
     }
