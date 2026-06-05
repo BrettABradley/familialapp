@@ -735,7 +735,7 @@ const Albums = () => {
           {selectedAlbum.cover_photo_url && (
             <div className="relative mb-6 aspect-square rounded-lg overflow-hidden bg-secondary">
               <AlbumImagePreview
-                url={selectedAlbum.cover_photo_url}
+                path={selectedAlbum.cover_photo_url}
                 preset="card"
                 priority
                 alt={`${selectedAlbum.name} cover`}
