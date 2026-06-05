@@ -547,8 +547,9 @@ const ProfileView = () => {
     if (updateError) {
       toast({ title: "Error", description: "Failed to update image.", variant: "destructive" });
     } else {
-      setImages((prev) => prev.map((i) => i.id === target.id ? { ...i, image_url: publicUrlData.publicUrl } : i));
-      setEditingGroup((prev) => prev ? prev.map((i) => i.id === target.id ? { ...i, image_url: publicUrlData.publicUrl } : i) : null);
+      const signedUrl = await signProfileImage(publicUrlData.publicUrl);
+      setImages((prev) => prev.map((i) => i.id === target.id ? { ...i, image_url: signedUrl } : i));
+      setEditingGroup((prev) => prev ? prev.map((i) => i.id === target.id ? { ...i, image_url: signedUrl } : i) : null);
       toast({ title: "Image updated!" });
     }
     setIsSavingEdit(false);
