@@ -18,8 +18,21 @@ const PENDING_VERIFY_PWD_KEY = "pendingVerificationPwd";
 const RESEND_VERIFY_KEY = "lastVerificationResendAt";
 const RESEND_VERIFY_COOLDOWN = 60;
 
-const RESET_COOLDOWN_SECONDS = 60;
+const RESET_COOLDOWN_SECONDS = 90;
 const RESET_COOLDOWN_KEY = "lastPasswordResetAt";
+
+const isEmailRateLimitError = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+  const msg = ((error as any).message || "").toLowerCase();
+  const status = (error as any).status;
+  return (
+    status === 429 ||
+    msg.includes("rate limit") ||
+    msg.includes("over_email_send_rate_limit") ||
+    msg.includes("email rate limit") ||
+    msg.includes("for security purposes")
+  );
+};
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
