@@ -161,7 +161,7 @@ const AlbumPhotoLightbox = ({
             // for the current slide and its immediate neighbors. Mounting all
             // N photos at once (each with a TransformWrapper) crashes the iOS
             // WebView on large albums and pops the user back to the app root.
-            const withinWindow = Math.abs(i - selected) <= 1;
+            const withinWindow = Math.abs(i - selected) <= 2;
             return (
               <div key={p.id} className="flex-[0_0_100%] min-w-0 h-full flex items-center justify-center px-2">
                 {withinWindow ? (
@@ -172,6 +172,7 @@ const AlbumPhotoLightbox = ({
                     <SignedSmartImage
                       path={p.photo_url}
                       preset="full"
+                      lowPreset="thumb"
                       priority={isCurrent}
                       alt={p.caption || `Photo ${i + 1}`}
                       className="max-h-full max-w-full object-contain select-none bg-transparent"
