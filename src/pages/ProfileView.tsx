@@ -189,7 +189,10 @@ const ProfileView = () => {
       ]);
 
       if (profileRes.data) setProfileData(profileRes.data);
-      if (imagesRes.data) setImages(imagesRes.data as ProfileImage[]);
+      if (imagesRes.data) {
+        const signed = await signProfileImages(imagesRes.data as ProfileImage[]);
+        setImages(signed);
+      }
       setIsLoading(false);
     };
 
