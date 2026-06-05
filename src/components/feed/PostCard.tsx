@@ -15,6 +15,8 @@ import { getMediaType } from "@/lib/mediaUtils";
 import type { Post } from "@/hooks/useFeedPosts";
 import { ReportDialog } from "@/components/shared/ReportDialog";
 import { SmartImage } from "@/components/shared/SmartImage";
+import { SignedSmartImage } from "@/components/shared/SignedSmartImage";
+import { SquareSignedThumbnail } from "@/components/shared/SquareSignedThumbnail";
 import { VoiceNotePlayer } from "@/components/shared/VoiceNotePlayer";
 import { avatarUrl, presetImage, PRESET_TRANSFORM } from "@/lib/imageUrl";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
@@ -22,7 +24,7 @@ import { MediaLightbox } from "@/components/shared/MediaLightbox";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import useEmblaCarousel from "embla-carousel-react";
 import { haptic, typingHaptic } from "@/lib/haptics";
-import { useSignedMediaUrls } from "@/lib/postMediaUrl";
+import { useSignedMediaUrls, prefetchSignedMediaUrl } from "@/lib/postMediaUrl";
 
 interface CircleMemberRef {
   user_id: string;
