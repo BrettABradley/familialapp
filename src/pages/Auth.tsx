@@ -353,10 +353,10 @@ const Auth = () => {
         const stillCoolingDown =
           lastSendAt &&
           Date.now() - lastSendAt < RESEND_VERIFY_COOLDOWN * 1000;
-        // Match if pendingEmail equals this email, OR if pendingEmail is empty
-        // (cleared session / double-tap) but we still have a recent send
-        // timestamp — either way an email is already in flight.
-        if ((pendingEmail === email || !pendingEmail) && stillCoolingDown) {
+        // Only short-circuit when the cooldown timestamp belongs to THIS
+        // email — otherwise switching addresses via "Use different email"
+        // would falsely jump to the panel without ever calling signUp.
+        if (pendingEmail === email && stillCoolingDown) {
           sessionStorage.setItem(PENDING_VERIFY_EMAIL_KEY, email);
           setVerificationSentTo(email);
           if (password) {
@@ -461,6 +461,10 @@ const Auth = () => {
     sessionStorage.removeItem(PENDING_VERIFY_EMAIL_KEY);
     sessionStorage.removeItem(PENDING_VERIFY_PWD_KEY);
     sessionStorage.removeItem("pendingTermsAcceptance");
+    // Clear the cooldown timestamp too — it belonged to the previous email
+    // and would otherwise wrongly throttle / short-circuit the next signup.
+    sessionStorage.removeItem(RESEND_VERIFY_KEY);
+    setResendCooldown(0);
     pendingPasswordRef.current = null;
     setVerificationSentTo(null);
     setIsLogin(false);
