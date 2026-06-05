@@ -247,18 +247,21 @@ const Albums = () => {
   const [photos, setPhotos] = useState<AlbumPhoto[]>([]);
   const [coverCropSrc, setCoverCropSrc] = useState<string | null>(null);
 
-  // Preload neighbor photos in lightbox for snappy swipes (signed + resized).
+  // Warm the tapped photo (high priority) plus ±1 neighbors so the very
+  // first paint of the lightbox is served from cache. The lightbox itself
+  // then takes over preloading once it mounts and `selected` updates.
   useEffect(() => {
     if (!enlargedPhoto) return;
     const idx = photos.findIndex(p => p.id === enlargedPhoto.id);
-    [idx - 1, idx + 1].forEach(async (i) => {
+    [idx, idx - 1, idx + 1].forEach(async (i) => {
       const p = photos[i];
       if (!p?.photo_url) return;
       const url = await getPostMediaUrl(p.photo_url, { width: 1600, quality: 80, resize: "contain" }).catch(() => "");
-      if (url) {
-        const img = new window.Image();
-        img.src = url;
-      }
+      if (!url) return;
+      const img = new window.Image();
+      if (i === idx) (img as any).fetchPriority = "high";
+      img.decoding = "async";
+      img.src = url;
     });
   }, [enlargedPhoto, photos]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
