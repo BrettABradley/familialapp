@@ -105,14 +105,19 @@ const AlbumPhotoLightbox = ({
   }, [emblaApi, onIndexChange]);
 
   useEffect(() => {
-    [selected - 1, selected + 1].forEach(async (i) => {
+    // Warm current + ±2 neighbors at the lightbox's full preset so swipes
+    // and re-paints pull from cache instead of waiting on the network.
+    [selected, selected - 1, selected + 1, selected - 2, selected + 2].forEach(async (i) => {
       const p = photos[i];
       if (!p?.photo_url) return;
       const url = await getPostMediaUrl(p.photo_url, { width: 1600, quality: 80, resize: "contain" }).catch(() => "");
-      if (url) {
-        const img = new window.Image();
-        img.src = url;
+      if (!url) return;
+      const img = new window.Image();
+      if (i === selected) {
+        (img as any).fetchPriority = "high";
       }
+      img.decoding = "async";
+      img.src = url;
     });
   }, [selected, photos]);
 
@@ -156,7 +161,7 @@ const AlbumPhotoLightbox = ({
             // for the current slide and its immediate neighbors. Mounting all
             // N photos at once (each with a TransformWrapper) crashes the iOS
             // WebView on large albums and pops the user back to the app root.
-            const withinWindow = Math.abs(i - selected) <= 1;
+            const withinWindow = Math.abs(i - selected) <= 2;
             return (
               <div key={p.id} className="flex-[0_0_100%] min-w-0 h-full flex items-center justify-center px-2">
                 {withinWindow ? (
@@ -167,6 +172,7 @@ const AlbumPhotoLightbox = ({
                     <SignedSmartImage
                       path={p.photo_url}
                       preset="full"
+                      lowPreset="thumb"
                       priority={isCurrent}
                       alt={p.caption || `Photo ${i + 1}`}
                       className="max-h-full max-w-full object-contain select-none bg-transparent"
@@ -241,18 +247,21 @@ const Albums = () => {
   const [photos, setPhotos] = useState<AlbumPhoto[]>([]);
   const [coverCropSrc, setCoverCropSrc] = useState<string | null>(null);
 
-  // Preload neighbor photos in lightbox for snappy swipes (signed + resized).
+  // Warm the tapped photo (high priority) plus ±1 neighbors so the very
+  // first paint of the lightbox is served from cache. The lightbox itself
+  // then takes over preloading once it mounts and `selected` updates.
   useEffect(() => {
     if (!enlargedPhoto) return;
     const idx = photos.findIndex(p => p.id === enlargedPhoto.id);
-    [idx - 1, idx + 1].forEach(async (i) => {
+    [idx, idx - 1, idx + 1].forEach(async (i) => {
       const p = photos[i];
       if (!p?.photo_url) return;
       const url = await getPostMediaUrl(p.photo_url, { width: 1600, quality: 80, resize: "contain" }).catch(() => "");
-      if (url) {
-        const img = new window.Image();
-        img.src = url;
-      }
+      if (!url) return;
+      const img = new window.Image();
+      if (i === idx) (img as any).fetchPriority = "high";
+      img.decoding = "async";
+      img.src = url;
     });
   }, [enlargedPhoto, photos]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
