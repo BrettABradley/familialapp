@@ -18,10 +18,9 @@ import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { convertHeicToJpeg, convertHeicFiles } from "@/lib/heicConverter";
 import JSZip from "jszip";
-import { SmartImage } from "@/components/shared/SmartImage";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
-import { presetImage } from "@/lib/imageUrl";
-import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
+import { SquareSignedThumbnail } from "@/components/shared/SquareSignedThumbnail";
+import { SignedSmartImage } from "@/components/shared/SignedSmartImage";
 import useEmblaCarousel from "embla-carousel-react";
 import { useSwipeDownClose } from "@/hooks/useSwipeDownClose";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
@@ -55,17 +54,17 @@ interface AlbumPhoto {
 }
 
 const AlbumImagePreview = ({
-  url,
+  path,
   alt,
   preset = "thumb",
   priority = false,
 }: {
-  url: string;
+  path: string;
   alt: string;
   preset?: "thumb" | "card";
   priority?: boolean;
 }) => (
-  <SquareImageThumbnail src={url} preset={preset} priority={priority} alt={alt} />
+  <SquareSignedThumbnail path={path} preset={preset} priority={priority} alt={alt} />
 );
 
 // Embla-powered finger-following lightbox for album photos. Mirrors the
@@ -106,11 +105,13 @@ const AlbumPhotoLightbox = ({
   }, [emblaApi, onIndexChange]);
 
   useEffect(() => {
-    [selected - 1, selected + 1].forEach((i) => {
+    [selected - 1, selected + 1].forEach(async (i) => {
       const p = photos[i];
-      if (p?.photo_url) {
+      if (!p?.photo_url) return;
+      const url = await getPostMediaUrl(p.photo_url, { width: 1600, quality: 80, resize: "contain" }).catch(() => "");
+      if (url) {
         const img = new window.Image();
-        img.src = presetImage(p.photo_url, "full");
+        img.src = url;
       }
     });
   }, [selected, photos]);
@@ -125,9 +126,12 @@ const AlbumPhotoLightbox = ({
           className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm text-white hover:bg-black/60 transition-colors"
           onClick={async () => {
             if (!current) return;
-            const { downloadFile } = await import("@/lib/nativeDownload");
+            const [{ downloadFile }, fullUrl] = await Promise.all([
+              import("@/lib/nativeDownload"),
+              getPostMediaUrl(current.photo_url),
+            ]);
             await downloadFile(
-              current.photo_url,
+              fullUrl,
               current.photo_url.split("/").pop()?.split("?")[0] || "photo.jpg"
             );
           }}
@@ -154,8 +158,8 @@ const AlbumPhotoLightbox = ({
                   className="w-full h-full flex items-center justify-center"
                   onScaleChange={(s) => { if (isCurrent) zoomedRef.current = s > 1.05; }}
                 >
-                  <SmartImage
-                    src={p.photo_url}
+                  <SignedSmartImage
+                    path={p.photo_url}
                     preset="full"
                     priority={Math.abs(i - selected) <= 1}
                     alt={p.caption || `Photo ${i + 1}`}
@@ -228,15 +232,17 @@ const Albums = () => {
   const [photos, setPhotos] = useState<AlbumPhoto[]>([]);
   const [coverCropSrc, setCoverCropSrc] = useState<string | null>(null);
 
-  // Preload neighbor photos in lightbox for snappy swipes
+  // Preload neighbor photos in lightbox for snappy swipes (signed + resized).
   useEffect(() => {
     if (!enlargedPhoto) return;
     const idx = photos.findIndex(p => p.id === enlargedPhoto.id);
-    [idx - 1, idx + 1].forEach((i) => {
+    [idx - 1, idx + 1].forEach(async (i) => {
       const p = photos[i];
-      if (p?.photo_url) {
+      if (!p?.photo_url) return;
+      const url = await getPostMediaUrl(p.photo_url, { width: 1600, quality: 80, resize: "contain" }).catch(() => "");
+      if (url) {
         const img = new window.Image();
-        img.src = presetImage(p.photo_url, "full");
+        img.src = url;
       }
     });
   }, [enlargedPhoto, photos]);
@@ -311,11 +317,12 @@ const Albums = () => {
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      const resolved = await Promise.all(data.map(async (a: any) => ({
+      // Keep bare storage paths; renderers sign + transform on demand.
+      const resolved = data.map((a: any) => ({
         ...a,
-        cover_photo_url: a.cover_photo_url ? await getPostMediaUrl(a.cover_photo_url) : null,
+        cover_photo_url: a.cover_photo_url ?? null,
         creator_name: a.profiles?.display_name || "Unknown",
-      })));
+      }));
       setAlbums(resolved);
     }
     setIsLoadingAlbums(false);
@@ -331,11 +338,8 @@ const Albums = () => {
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      const resolved = await Promise.all(data.map(async (p: any) => ({
-        ...p,
-        photo_url: await getPostMediaUrl(p.photo_url),
-      })));
-      setPhotos(resolved);
+      // Keep bare storage paths; SignedSmartImage signs + resizes per preset.
+      setPhotos(data as AlbumPhoto[]);
     }
   };
 
@@ -397,8 +401,7 @@ const Albums = () => {
     if (updateError) {
       toast({ title: "Error", description: "Failed to update cover photo.", variant: "destructive" });
     } else {
-      const signed = await getPostMediaUrl(fileName);
-      setSelectedAlbum({ ...selectedAlbum, cover_photo_url: signed });
+      setSelectedAlbum({ ...selectedAlbum, cover_photo_url: fileName });
       fetchAlbums();
       toast({ title: "Cover updated!" });
     }
@@ -488,8 +491,8 @@ const Albums = () => {
         // user gets the whole album in Photos in one shot.
         toast({ title: "Saving to Photos...", description: `Saving ${photos.length} photos to your camera roll.` });
         const { downloadFilesToCameraRoll } = await import("@/lib/nativeDownload");
-        const urls = photos.map(p => p.photo_url);
-        const { saved, failed } = await downloadFilesToCameraRoll(urls);
+        const urls = await getPostMediaUrls(photos.map(p => p.photo_url));
+        const { saved, failed } = await downloadFilesToCameraRoll(urls.filter(Boolean));
         toast({
           title: failed === 0 ? "Saved to Photos!" : "Partially saved",
           description: failed === 0
@@ -501,9 +504,12 @@ const Albums = () => {
         const zip = new JSZip();
         const folder = zip.folder(selectedAlbum.name) || zip;
 
+        const signedUrls = await getPostMediaUrls(photos.map(p => p.photo_url));
         for (let i = 0; i < photos.length; i++) {
           try {
-            const response = await fetch(photos[i].photo_url);
+            const u = signedUrls[i];
+            if (!u) continue;
+            const response = await fetch(u);
             const blob = await response.blob();
             const ext = photos[i].photo_url.split(".").pop()?.split("?")[0] || "jpg";
             folder.file(`photo_${i + 1}.${ext}`, blob);
@@ -730,7 +736,7 @@ const Albums = () => {
           {selectedAlbum.cover_photo_url && (
             <div className="relative mb-6 aspect-square rounded-lg overflow-hidden bg-secondary">
               <AlbumImagePreview
-                url={selectedAlbum.cover_photo_url}
+                path={selectedAlbum.cover_photo_url}
                 preset="card"
                 priority
                 alt={`${selectedAlbum.name} cover`}
@@ -750,7 +756,7 @@ const Albums = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {photos.map((photo) => (
                 <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer bg-secondary" style={{ contentVisibility: "auto", containIntrinsicSize: "300px 300px" }} onClick={() => setEnlargedPhoto(photo)}>
-                  <AlbumImagePreview url={photo.photo_url} preset="thumb" alt={photo.caption || "Photo"} />
+                  <AlbumImagePreview path={photo.photo_url} preset="thumb" alt={photo.caption || "Photo"} />
                   {user && photo.uploaded_by === user.id && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo); }}
@@ -847,7 +853,7 @@ const Albums = () => {
                   )}
                   <div className="aspect-square bg-secondary relative overflow-hidden">
                     {album.cover_photo_url ? (
-                      <AlbumImagePreview url={album.cover_photo_url} preset="card" alt={album.name} />
+                      <AlbumImagePreview path={album.cover_photo_url} preset="card" alt={album.name} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Image className="w-12 h-12 text-muted-foreground" />

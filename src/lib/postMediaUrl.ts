@@ -5,8 +5,20 @@ const BUCKET = "post-media";
 const TTL_SECONDS = 60 * 60; // 1 hour
 const REFRESH_BEFORE_MS = 5 * 60 * 1000; // refresh 5 min before expiry
 
+export interface SignTransform {
+  width?: number;
+  height?: number;
+  quality?: number;
+  resize?: "cover" | "contain" | "fill";
+}
+
 type CacheEntry = { url: string; expiresAt: number; promise?: Promise<string> };
 const cache = new Map<string, CacheEntry>();
+
+function variantKey(path: string, t?: SignTransform): string {
+  if (!t) return path;
+  return `${path}|w=${t.width ?? ""}|h=${t.height ?? ""}|q=${t.quality ?? ""}|r=${t.resize ?? ""}`;
+}
 
 /**
  * Extracts the storage path from either a bare path ("uid/file.jpg") or a
@@ -30,10 +42,11 @@ export function toPostMediaPath(value: string | null | undefined): string | null
   return null;
 }
 
-async function signOne(path: string): Promise<string> {
+async function signOne(path: string, transform?: SignTransform): Promise<string> {
+  const opts = transform ? { transform } : undefined;
   const { data, error } = await supabase.storage
     .from(BUCKET)
-    .createSignedUrl(path, TTL_SECONDS);
+    .createSignedUrl(path, TTL_SECONDS, opts as any);
   if (error || !data?.signedUrl) {
     throw error ?? new Error("Failed to sign URL");
   }
@@ -43,9 +56,12 @@ async function signOne(path: string): Promise<string> {
 /**
  * Resolve a stored value (path or legacy public URL or blob/external) to a
  * displayable URL. Blob/data/external values pass through unchanged.
+ * Optionally apply a Supabase Storage image transform (resize/quality) so
+ * the returned signed URL points at a CDN-cached WebP variant.
  */
 export async function getPostMediaUrl(
   value: string | null | undefined,
+  transform?: SignTransform,
 ): Promise<string> {
   if (!value) return "";
   if (value.startsWith("blob:") || value.startsWith("data:")) return value;
@@ -53,16 +69,17 @@ export async function getPostMediaUrl(
   const path = toPostMediaPath(value);
   if (!path) return value; // external URL — let it through
 
+  const key = variantKey(path, transform);
   const now = Date.now();
-  const cached = cache.get(path);
+  const cached = cache.get(key);
   if (cached && cached.expiresAt - REFRESH_BEFORE_MS > now) return cached.url;
   if (cached?.promise) return cached.promise;
 
-  const promise = signOne(path).then((url) => {
-    cache.set(path, { url, expiresAt: Date.now() + TTL_SECONDS * 1000 });
+  const promise = signOne(path, transform).then((url) => {
+    cache.set(key, { url, expiresAt: Date.now() + TTL_SECONDS * 1000 });
     return url;
   });
-  cache.set(path, {
+  cache.set(key, {
     url: cached?.url ?? "",
     expiresAt: cached?.expiresAt ?? 0,
     promise,
@@ -70,28 +87,33 @@ export async function getPostMediaUrl(
   try {
     return await promise;
   } catch (e) {
-    cache.delete(path);
+    cache.delete(key);
     throw e;
   }
 }
 
 export async function getPostMediaUrls(
   values: (string | null | undefined)[],
+  transform?: SignTransform,
 ): Promise<string[]> {
-  return Promise.all(values.map((v) => getPostMediaUrl(v).catch(() => "")));
+  return Promise.all(values.map((v) => getPostMediaUrl(v, transform).catch(() => "")));
 }
 
 /** React hook returning a resolved signed URL. */
-export function useSignedMediaUrl(value: string | null | undefined): {
+export function useSignedMediaUrl(
+  value: string | null | undefined,
+  transform?: SignTransform,
+): {
   url: string;
   loading: boolean;
 } {
+  const tKey = transform ? `${transform.width ?? ""}x${transform.height ?? ""}q${transform.quality ?? ""}r${transform.resize ?? ""}` : "";
   const [url, setUrl] = useState<string>(() => {
     if (!value) return "";
     if (value.startsWith("blob:") || value.startsWith("data:")) return value;
     const path = toPostMediaPath(value);
     if (!path) return value;
-    const cached = cache.get(path);
+    const cached = cache.get(variantKey(path, transform));
     return cached?.url ?? "";
   });
   const [loading, setLoading] = useState(!url && !!value);
@@ -109,7 +131,7 @@ export function useSignedMediaUrl(value: string | null | undefined): {
       return;
     }
     setLoading(true);
-    getPostMediaUrl(value)
+    getPostMediaUrl(value, transform)
       .then((resolved) => {
         if (!cancelled) {
           setUrl(resolved);
@@ -125,17 +147,22 @@ export function useSignedMediaUrl(value: string | null | undefined): {
     return () => {
       cancelled = true;
     };
-  }, [value]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, tKey]);
 
   return { url, loading };
 }
 
 /** Hook for an array of values (e.g. post media_urls). Preserves order. */
-export function useSignedMediaUrls(values: (string | null | undefined)[]): {
+export function useSignedMediaUrls(
+  values: (string | null | undefined)[],
+  transform?: SignTransform,
+): {
   urls: string[];
   loading: boolean;
 } {
   const key = values.join("|");
+  const tKey = transform ? `${transform.width ?? ""}x${transform.height ?? ""}q${transform.quality ?? ""}r${transform.resize ?? ""}` : "";
   const [urls, setUrls] = useState<string[]>(() => values.map(() => ""));
   const [loading, setLoading] = useState(values.length > 0);
 
@@ -147,7 +174,7 @@ export function useSignedMediaUrls(values: (string | null | undefined)[]): {
       return;
     }
     setLoading(true);
-    getPostMediaUrls(values)
+    getPostMediaUrls(values, transform)
       .then((resolved) => {
         if (!cancelled) {
           setUrls(resolved);
@@ -161,7 +188,7 @@ export function useSignedMediaUrls(values: (string | null | undefined)[]): {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, tKey]);
 
   return { urls, loading };
 }

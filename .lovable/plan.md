@@ -1,56 +1,71 @@
-# Fix "email rate limit exceeded" during invite signup
+## Root cause
 
-## What's happening
+Album photos are stored in the **private** `post-media` bucket, so each render goes through `getPostMediaUrl`, which calls `createSignedUrl(path, 3600)` — a `/storage/v1/object/sign/...` URL.
 
-Your customer's daughter received the invite email fine (that goes through Resend via `send-circle-invite` and is not rate limited). The error she hit is from a *separate* email Supabase Auth itself sends — the **signup confirmation email** that goes out when she creates her account on `/auth?mode=signup`.
+`src/lib/imageUrl.ts` explicitly **bails out of image transforms for signed URLs** (the render/image endpoint won't validate the sign token on a different path). So:
 
-Supabase Auth applies a per-project email rate limit (default **30 emails/hour**, with stricter per-address throttling — typically 1 email per ~60 seconds and ~4/hour to the same address). If she (or the mom, while testing) hit the signup form, the "resend verification" button, or a forgot-password flow even a few times in a row with the same email, Supabase blocks further sends with `over_email_send_rate_limit` and surfaces it as "email rate limit exceeded."
+- Every album grid tile downloads the **full-resolution original** (often 3–8 MB iPhone JPEGs) instead of the 400-px `thumb` preset.
+- The lightbox loads the same full original again, with no `full` (1600 px / quality 80) resize.
 
-Right now nothing in the circle is broken — the mom is still on Free and only has 2 members. The bottleneck is purely the auth email throttle on the daughter's address.
+On iOS WebViews this is enough to:
+1. Make the album grid feel "super slow" (dozens of multi-MB images decoded at once).
+2. Make tapping a photo freeze the UI long enough that the user perceives it as a crash, after which iOS often pops the view back to the previous scroll position — they land on the album list. The "almost crashes the album section and takes me to the album home" symptom matches this exactly.
 
-## The fix (three parts)
+Supabase Storage **does** support transforms on signed URLs — you just have to pass `{ transform: { width, height, quality, resize } }` to `createSignedUrl`. The current code never uses that.
 
-### 1. Raise Supabase Auth email rate limits (project setting — no code)
+## Fix
 
-This is the only real unblock. In the Lovable Cloud backend's Auth → Rate Limits panel:
+### 1. Extend the signed-URL helper to support transforms (`src/lib/postMediaUrl.ts`)
 
-- **Emails per hour**: raise from default `30` → `150` (or higher; we are paying Resend per email so the Supabase number is just a safety cap).
-- Confirm the project is using the custom `auth-email-hook` (it already is) so these go through Resend rather than Supabase's shared SMTP pool.
+- Add an optional `transform` arg to `getPostMediaUrl` / `getPostMediaUrls` / `useSignedMediaUrl` / `useSignedMediaUrls`.
+- Key the in-memory cache by `path + transform variant` so the thumb and full versions are cached separately and don't evict each other.
+- Pass `transform` straight through to `supabase.storage.from(BUCKET).createSignedUrl(path, TTL, { transform })`.
 
-No migration is needed; I'll just tell you exactly where to click, or you can let me open the backend panel.
+### 2. Add a preset-aware variant that mirrors `SmartImage` semantics
 
-### 2. Make repeat signup attempts not burn rate-limit budget
+In `src/lib/imageUrl.ts` (or alongside it) expose a small `PRESET_TRANSFORM` map matching the existing presets:
 
-In `src/pages/Auth.tsx` the signup path calls `supabase.auth.signUp()` every time the user re-submits the form, even if a verification email was already sent moments ago. Each submission counts against the per-address throttle. Changes:
+```text
+thumb  → { width: 400,  quality: 70, resize: 'contain' }
+card   → { width: 800,  quality: 75, resize: 'contain' }
+full   → { width: 1600, quality: 80, resize: 'contain' }
+avatar → { width: 256, height: 256, quality: 80, resize: 'cover' }
+```
 
-- If the user just submitted signup for `email X` (we already track `PENDING_VERIFY_EMAIL_KEY` in sessionStorage), and they submit again for the same email within the cooldown window, **skip the network call** and just re-show the "check your email" panel.
-- Same treatment for the "Resend verification" button — it already has `RESEND_VERIFY_COOLDOWN` but the cooldown isn't enforced server-side, so increase it to 60s and disable the button visibly with a countdown.
-- For forgot-password, persist `RESET_COOLDOWN_KEY` across reloads (currently sessionStorage; bump to 90s and show the countdown in the button).
+### 3. Create `SignedSmartImage` (thin wrapper around `SmartImage`)
 
-### 3. Friendlier error messaging when the limit does hit
+- Props: `path` (bare storage path or legacy URL), `preset`, `priority`, `alt`, `className`.
+- Internally calls `useSignedMediaUrl(path, PRESET_TRANSFORM[preset])` and renders `<SmartImage src={signedUrl} preset={preset} priority={priority} ... />`. Because the URL it hands `SmartImage` is already correctly sized, `SmartImage`'s no-op transform path is fine.
+- Shows the existing `bg-muted` placeholder while `loading` is true.
 
-In `src/pages/Auth.tsx` `handleSubmit` signup branch and `handleResendVerification`, detect `over_email_send_rate_limit` / `429` and show:
+### 4. Switch Albums to render storage paths, not pre-signed URLs
 
-> "Too many verification emails sent to this address. Please check your inbox and spam folder for the link we already sent — or try again in a few minutes."
+In `src/pages/Albums.tsx`:
 
-…instead of the raw Supabase message. (This pattern already exists for forgot-password; mirror it for signup + resend.)
+- Stop pre-signing in `fetchAlbums` / `fetchPhotos` — store the bare `photo_url` / `cover_photo_url` paths in state.
+- Replace `AlbumImagePreview` with a version backed by `SignedSmartImage` (`preset="thumb"` for grid tiles, `preset="card"` for the cover, `preset="full"` for the lightbox image inside `AlbumPhotoLightbox`).
+- Update the lightbox neighbor-preload effect to ask for the `full` transformed signed URL instead of `presetImage(...)` (which is a no-op for signed URLs).
+- Keep `getPostMediaUrl` (untransformed) only where we need the true original — the **Download / Download All** handlers and the cover-upload flow.
 
-## What I will NOT change
+### 5. Confirm the fix end-to-end
 
-- The invite email flow (`send-circle-invite` via Resend) — it is working and is not the cause.
-- Circle member limits, billing, or the Free-plan 8-seat allowance — the mom is well under her limit.
-- Database schema, RLS, or any edge function other than client-side `Auth.tsx` improvements.
+After the change:
+- Album grid: each tile pulls a ~30–80 KB WebP via the render endpoint instead of a multi-MB JPEG — should be visibly snappy on a cold load.
+- Tap a photo: lightbox opens a ≤1600 px WebP; no more multi-second freeze; the "drops back to album home" symptom goes away because the WebView no longer chokes.
+- Download All / single Download still pull the full original (unchanged).
 
-## How to verify after rollout
+## Files touched
 
-1. Have the customer's daughter open the invite email again and tap the signup CTA.
-2. She enters her email + password → she should land on the "Check your email" screen and receive the Supabase confirmation email from `support@support.familialmedia.com`.
-3. Click the link → she is auto-joined to the mom's circle.
+```text
+src/lib/postMediaUrl.ts        ← add transform support + variant cache key
+src/lib/imageUrl.ts            ← export PRESET_TRANSFORM map for reuse
+src/components/shared/SignedSmartImage.tsx   ← new wrapper
+src/pages/Albums.tsx           ← use paths + SignedSmartImage; update lightbox preload
+```
 
-## Technical notes (for reference)
+No DB / RLS / edge function changes. No behavioral changes to upload, delete, cover, or download flows.
 
-- Supabase setting paths: Auth → Rate Limits → "Rate limit for sending emails" and "Rate limit for token verifications".
-- Per-address throttle is enforced by `gotrue` and cannot be disabled, only widened by increasing the per-hour ceiling and by ensuring our custom email hook returns 2xx quickly (already does).
-- Files touched in code: `src/pages/Auth.tsx` only.
+## Out of scope (intentionally)
 
-Want me to proceed with the `Auth.tsx` hardening and walk you through the rate-limit setting change?
+- Feed / Messages / Fridge: they go through `getPostMediaUrl` too and would benefit from the same treatment, but the report is album-specific and you asked to fix this "asap". Happy to roll the same `SignedSmartImage` swap into those surfaces in a follow-up once we've confirmed the album fix in production.
+- The unrelated security findings (Google Play RTDN auth, transactional email anon role check, post-media folder-ownership read shortcut) — separate work.

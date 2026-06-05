@@ -22,6 +22,15 @@ const PRESETS: Record<ImagePreset, { width: number; height?: number; quality: nu
   avatar: { width: 256, height: 256, quality: 80, resize: "cover" },
 };
 
+/** Public preset transform map — used by signed-URL helpers to pass the
+ *  same resize/quality params to `createSignedUrl({ transform })`. */
+export const PRESET_TRANSFORM: Record<ImagePreset, { width: number; height?: number; quality: number; resize: "contain" | "cover" | "fill" }> = {
+  thumb: { width: 400, quality: 70, resize: "contain" },
+  card: { width: 800, quality: 75, resize: "contain" },
+  full: { width: 1600, quality: 80, resize: "contain" },
+  avatar: { width: 256, height: 256, quality: 80, resize: "cover" },
+};
+
 function isSupabaseStorageUrl(url: string): boolean {
   return /\/storage\/v1\/object\/(public|sign)\//.test(url);
 }
