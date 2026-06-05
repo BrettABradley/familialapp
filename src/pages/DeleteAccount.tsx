@@ -8,7 +8,7 @@ export default function DeleteAccount() {
       <SEO
         title="Delete Your Familial Account"
         description="How to request deletion of your Familial account and associated data."
-        canonicalUrl="https://familialmedia.com/delete-account"
+        path="/delete-account"
       />
       <div className="max-w-2xl mx-auto px-6 py-12">
         <h1 className="font-serif text-4xl mb-2">Delete Your Familial Account</h1>
