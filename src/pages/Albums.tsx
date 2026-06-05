@@ -852,7 +852,7 @@ const Albums = () => {
                   )}
                   <div className="aspect-square bg-secondary relative overflow-hidden">
                     {album.cover_photo_url ? (
-                      <AlbumImagePreview url={album.cover_photo_url} preset="card" alt={album.name} />
+                      <AlbumImagePreview path={album.cover_photo_url} preset="card" alt={album.name} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Image className="w-12 h-12 text-muted-foreground" />
