@@ -29,6 +29,7 @@ import { MediaLightbox } from "@/components/shared/MediaLightbox";
 import { SmartImage } from "@/components/shared/SmartImage";
 import { VoiceNotePlayer } from "@/components/shared/VoiceNotePlayer";
 import { useSignedMediaUrls, getPostMediaUrl } from "@/lib/postMediaUrl";
+import { PRESET_TRANSFORM } from "@/lib/imageUrl";
 import {
   AlertDialog,
   AlertDialogAction,
