@@ -8,6 +8,8 @@ import { PixelCampfire } from "./PixelCampfire";
 import { CampfireDialog } from "./CampfireDialog";
 import { SmartImage } from "@/components/shared/SmartImage";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
+import { useSignedMediaUrl } from "@/lib/postMediaUrl";
+import { PRESET_TRANSFORM } from "@/lib/imageUrl";
 
 export interface FridgeBoardPin {
   id: string;
