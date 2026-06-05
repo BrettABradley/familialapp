@@ -42,20 +42,18 @@ async function sendTemplateEmail(
   recipientEmail: string,
   templateData: Record<string, unknown>,
   idempotencyKey: string,
-  authHeader: string,
+  _authHeader: string,
 ) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  if (!supabaseUrl || !anonKey) {
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) {
     return { requested: true, queued: false, error: "Email service is not configured" };
   }
 
   try {
-    // send-transactional-email has verify_jwt=true; forward the caller's
-    // admin JWT so the gateway accepts it.
-    const client = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    // send-transactional-email requires a service_role JWT (locked down to
+    // prevent abuse). Invoke with the service-role key, not the caller's JWT.
+    const client = createClient(supabaseUrl, serviceKey);
     const { data, error } = await client.functions.invoke("send-transactional-email", {
       body: { templateName, recipientEmail, templateData, idempotencyKey },
     });

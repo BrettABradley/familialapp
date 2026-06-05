@@ -25,14 +25,45 @@ function generateToken(): string {
     .join('')
 }
 
-// Auth note: this function uses verify_jwt = true in config.toml, so Supabase's
-// gateway validates the caller's JWT (anon or service_role) before the request
-// reaches this code. No in-function auth check is needed.
+// Auth: requires a service_role JWT. The Supabase gateway validates the
+// JWT signature (verify_jwt = true); we additionally enforce the role
+// claim here so anon callers can't trigger arbitrary outbound emails.
+// Only trusted server-side code (edge functions / DB triggers using
+// SUPABASE_SERVICE_ROLE_KEY) may invoke this function.
+
+const ALLOWED_URL_PREFIXES = [
+  'https://www.familialmedia.com',
+  'https://familialmedia.com',
+  'https://support.familialmedia.com',
+]
+
+function decodeJwtRole(authHeader: string | null): string | null {
+  if (!authHeader?.startsWith('Bearer ')) return null
+  const parts = authHeader.slice(7).split('.')
+  if (parts.length < 2) return null
+  try {
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+    )
+    return typeof payload?.role === 'string' ? payload.role : null
+  } catch {
+    return null
+  }
+}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
+  }
+
+  // Enforce service_role caller — block anon JWTs.
+  const callerRole = decodeJwtRole(req.headers.get('Authorization'))
+  if (callerRole !== 'service_role') {
+    return new Response(
+      JSON.stringify({ error: 'Forbidden: service role required' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -82,6 +113,17 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )
+  }
+
+  // Validate templateData.url (if present) to block phishing redirects.
+  if (templateData.url && typeof templateData.url === 'string') {
+    const u = templateData.url
+    if (!ALLOWED_URL_PREFIXES.some((p) => u.startsWith(p))) {
+      return new Response(
+        JSON.stringify({ error: 'templateData.url must point to a familialmedia.com domain' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
   }
 
   // 1. Look up template from registry (early — needed to resolve recipient)

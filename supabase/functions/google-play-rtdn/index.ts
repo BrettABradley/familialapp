@@ -54,6 +54,20 @@ const cors = {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
 
+  // Shared-secret check: Pub/Sub push URL must include ?secret=<GOOGLE_PLAY_RTDN_SECRET>.
+  // Configure on the Pub/Sub subscription's push endpoint in Google Cloud Console.
+  // Without this, anyone on the internet could POST forged RTDN payloads.
+  const expectedSecret = Deno.env.get("GOOGLE_PLAY_RTDN_SECRET");
+  if (!expectedSecret) {
+    console.error("[google-play-rtdn] GOOGLE_PLAY_RTDN_SECRET not configured — rejecting");
+    return new Response("unauthorized", { status: 401, headers: cors });
+  }
+  const provided = new URL(req.url).searchParams.get("secret");
+  if (provided !== expectedSecret) {
+    console.warn("[google-play-rtdn] rejected request with bad/missing secret");
+    return new Response("unauthorized", { status: 401, headers: cors });
+  }
+
   const service = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
