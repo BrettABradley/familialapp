@@ -1,28 +1,49 @@
-# Fix "Use different email" regression in Auth.tsx
+# Clear the three flagged security findings
 
-## What broke
+Two of the three are **already fixed in code** — the scanner result is stale. The third is a real tightening on the `post-media` storage bucket.
 
-In the last change I broadened the pre-submit cooldown shortcut from
-`pendingEmail === email` to `(pendingEmail === email || !pendingEmail)` (Auth.tsx ~line 360).
+## 1. Google Play RTDN webhook (Critical — already fixed)
 
-That assumes "no pendingEmail + recent send timestamp" always means a send went out for *this* email. It doesn't, because `handleUseDifferentEmail` only clears `PENDING_VERIFY_EMAIL_KEY` — it leaves `RESEND_VERIFY_KEY` (the timestamp) in place.
+`supabase/functions/google-play-rtdn/index.ts` already enforces a `?secret=<GOOGLE_PLAY_RTDN_SECRET>` query-param check at the top of the handler and rejects every request that doesn't match (lines 60–69). The exact mitigation the scanner suggested is in place.
 
-Effect: a user who signs up with email A, taps "Use different email", then submits email B within 60s gets dropped onto a fake "Check your email" panel for email B without `signUp()` ever being called. No email is sent to B and the silent poll will never resolve.
+Action: mark the finding as fixed via the security tool. No code change.
 
-## Onboarding is fine
+## 2. Transactional email endpoint accepts anon JWTs (Critical — already fixed)
 
-`TermsAcceptanceGate` and `OnboardingFlow` only mount once `user.email_confirmed_at` is set; nothing in the signup happy path or the post-confirmation routing changed. Duplicate-account detection, silent verification polling, password reset, and the resend button all still work.
+`supabase/functions/send-transactional-email/index.ts` already:
+- Decodes the caller's JWT and rejects anything other than `role === 'service_role'` with a 403 (lines 40–67).
+- Validates `templateData.url` against an allowlist of `*.familialmedia.com` origins and rejects anything else with 400 (lines 34–38, 119–127).
 
-## Fix (frontend only — `src/pages/Auth.tsx`)
+Action: mark the finding as fixed. No code change.
 
-1. **`handleUseDifferentEmail` (~line 462)** — also clear `RESEND_VERIFY_KEY` and reset `resendCooldown` to 0, so switching emails starts with a clean slate.
+## 3. Post-media bucket read policy — folder-ownership shortcut (Warning — needs a migration)
 
-2. **Pre-submit cooldown shortcut (~line 360)** — tighten the condition back to require an actual match: `pendingEmail === email && stillCoolingDown`. The fallback for the "cleared session double-tap" case I was trying to cover is already handled by the post-`signUp()` rate-limit branch, which now drops the user onto the panel on any rate-limit response.
+Current `post-media members can read` SELECT policy starts with:
 
-That's it — two small edits, no backend/iOS work, no impact on onboarding.
+```sql
+((auth.uid())::text = (storage.foldername(name))[1])
+```
+
+…then ORs together the row-based checks (posts, fridge_pins, album_photos, campfire_stories, private_messages, group_chat_messages). That first clause means a user permanently retains read access to anything they ever uploaded, even after leaving the circle.
+
+### Fix (single migration)
+
+Drop and recreate `post-media members can read` without the folder-ownership branch — keep every row-based clause exactly as it is today. Access is then strictly tied to current circle membership / current message participation, which is what the scanner expects and matches our intent.
+
+Keep the separate `post-media uploader can update own files` policy (UPDATE) and the existing INSERT/DELETE policies untouched — uploaders still need folder-ownership for write operations.
+
+### Why this is safe for upload flows
+
+`CreatePostForm`, `Albums`, `Fridge`, `Messages`, and `CampfireDialog` all upload first and only sign URLs **after** the corresponding DB row (post, album_photo, fridge_pin, message, campfire_story) is inserted. The row-based branches of the policy already grant SELECT at that point. There's no in-app code path that signs a `post-media` URL before the row exists, so removing the folder shortcut won't break the active app. Server-side signing in `download-my-data`, `admin-dashboard`, and the email helpers uses the service role and bypasses RLS regardless.
+
+### What's NOT changing
+
+- No edge function code edits
+- No frontend changes
+- Bucket itself, INSERT/UPDATE/DELETE policies, and all row-based SELECT branches stay identical
 
 ## Verification
 
-- Sign up email A → "Check your email" → tap "Use different email" → enter email B → should call `signUp()` and actually send a verification to B (not jump straight to the panel).
-- Sign up email A twice in <60s → still lands on "Check your email" via the post-signup rate-limit branch (unchanged behavior).
-- TermsAcceptanceGate + OnboardingFlow appear after clicking the verification link, same as before.
+- Open Feed, Albums, Fridge, Messages → existing images still load (row-based branches grant access).
+- Re-run the security scan → all three findings should clear.
+- Spot-check: a user who leaves a circle can no longer sign URLs for media they uploaded while a member (manual SQL check is easy).
