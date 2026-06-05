@@ -9,18 +9,18 @@ interface SignedSmartImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>
   path: string | null | undefined;
   preset?: ImagePreset;
   priority?: boolean;
-  /** Optional smaller preset to paint underneath the hi-res image while it
-   *  loads. The thumb variant is usually already in cache from the grid,
-   *  so it paints in <100ms and fades into the full image on load. */
+  /** Optional smaller preset shown immediately as a placeholder behind the
+   *  hi-res image. The thumb variant is usually already cached from the
+   *  grid, so it paints in <100ms and is then replaced by the full image. */
   lowPreset?: ImagePreset;
 }
 
 /**
  * <img> for assets in the private `post-media` bucket.
  *
- * Internally produces a signed URL that includes the preset's
- * width/quality/resize transform, so the browser downloads a CDN-cached
- * WebP variant (~30–80 KB) instead of the multi-MB original.
+ * Produces a signed URL that includes the preset's width/quality/resize
+ * transform, so the browser downloads a CDN-cached WebP variant
+ * (~30–80 KB) instead of the multi-MB original.
  */
 export const SignedSmartImage = ({
   path,
@@ -29,6 +29,7 @@ export const SignedSmartImage = ({
   lowPreset,
   className,
   alt = "",
+  style,
   ...rest
 }: SignedSmartImageProps) => {
   const transform = PRESET_TRANSFORM[preset];
@@ -37,62 +38,49 @@ export const SignedSmartImage = ({
   const { url: lowUrl } = useSignedMediaUrl(lowPreset ? path : null, lowTransform);
   const [hiLoaded, setHiLoaded] = useState(false);
 
-  if (!url && !lowUrl) {
+  // While the hi-res hasn't loaded yet, show the low-res variant in its
+  // place. We keep a single <img> in the DOM so the lightbox's
+  // max-h-full/max-w-full/object-contain sizing keeps working.
+  const displaySrc = hiLoaded && url ? url : (lowUrl || url);
+
+  if (!displaySrc) {
     return (
       <div
         className={cn("bg-muted", className)}
+        style={style}
         aria-busy={loading || undefined}
         aria-hidden={alt ? undefined : true}
       />
     );
   }
 
-  // Progressive: stack low-res underneath, fade in hi-res on load.
-  if (lowUrl) {
-    return (
-      <div className={cn("relative bg-muted", className)}>
+  return (
+    <>
+      <img
+        src={displaySrc}
+        alt={alt}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        // @ts-expect-error - fetchpriority is a valid attribute, types lag
+        fetchpriority={priority ? "high" : "auto"}
+        className={cn("bg-muted", className)}
+        style={style}
+        {...rest}
+      />
+      {url && !hiLoaded && (
+        // Hidden decoder for the hi-res image. Once it decodes we swap
+        // `displaySrc` above to the hi-res URL.
         <img
-          src={lowUrl}
+          src={url}
           alt=""
           aria-hidden="true"
           decoding="async"
-          className={cn(
-            "absolute inset-0 h-full w-full",
-            // Mirror object-fit from incoming className when present
-            className?.includes("object-cover") ? "object-cover" : "object-contain",
-          )}
+          // @ts-expect-error - fetchpriority is a valid attribute, types lag
+          fetchpriority={priority ? "high" : "auto"}
+          onLoad={() => setHiLoaded(true)}
+          style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
         />
-        {url && (
-          <img
-            src={url}
-            alt={alt}
-            loading={priority ? "eager" : "lazy"}
-            decoding="async"
-            // @ts-expect-error - fetchpriority is a valid attribute, types lag
-            fetchpriority={priority ? "high" : "auto"}
-            onLoad={() => setHiLoaded(true)}
-            className={cn(
-              "relative h-full w-full transition-opacity duration-200",
-              className?.includes("object-cover") ? "object-cover" : "object-contain",
-              hiLoaded ? "opacity-100" : "opacity-0",
-            )}
-            {...rest}
-          />
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={url}
-      alt={alt}
-      loading={priority ? "eager" : "lazy"}
-      decoding="async"
-      // @ts-expect-error - fetchpriority is a valid attribute, types lag
-      fetchpriority={priority ? "high" : "auto"}
-      className={cn("bg-muted", className)}
-      {...rest}
-    />
+      )}
+    </>
   );
 };
