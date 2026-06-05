@@ -755,7 +755,7 @@ const Albums = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {photos.map((photo) => (
                 <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden cursor-pointer bg-secondary" style={{ contentVisibility: "auto", containIntrinsicSize: "300px 300px" }} onClick={() => setEnlargedPhoto(photo)}>
-                  <AlbumImagePreview url={photo.photo_url} preset="thumb" alt={photo.caption || "Photo"} />
+                  <AlbumImagePreview path={photo.photo_url} preset="thumb" alt={photo.caption || "Photo"} />
                   {user && photo.uploaded_by === user.id && (
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo); }}
