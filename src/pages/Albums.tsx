@@ -114,8 +114,7 @@ const AlbumPhotoLightbox = ({
       if (!url) return;
       const img = new window.Image();
       if (i === selected) {
-        // @ts-expect-error - fetchPriority is a valid property, types lag
-        img.fetchPriority = "high";
+        (img as any).fetchPriority = "high";
       }
       img.decoding = "async";
       img.src = url;
