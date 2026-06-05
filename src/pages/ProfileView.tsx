@@ -43,6 +43,35 @@ interface ProfileImage {
 }
 
 const MAX_GROUP_ITEMS = 5;
+const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour
+
+// Extracts the storage path from a stored profile-images URL.
+// Handles both legacy public URLs and already-signed URLs.
+const extractProfileImagePath = (url: string): string | null => {
+  if (!url) return null;
+  // Path-only (newer uploads may store just the path)
+  if (!url.startsWith("http")) return url;
+  const m = url.match(/\/profile-images\/(.+?)(?:\?|$)/);
+  return m ? m[1] : null;
+};
+
+// Sign a single profile image; returns the signed URL or the original on failure.
+const signProfileImage = async (image_url: string): Promise<string> => {
+  const path = extractProfileImagePath(image_url);
+  if (!path) return image_url;
+  const { data, error } = await supabase.storage
+    .from("profile-images")
+    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+  if (error || !data?.signedUrl) return image_url;
+  return data.signedUrl;
+};
+
+const signProfileImages = async <T extends { image_url: string }>(rows: T[]): Promise<T[]> => {
+  if (rows.length === 0) return rows;
+  return Promise.all(
+    rows.map(async (r) => ({ ...r, image_url: await signProfileImage(r.image_url) }))
+  );
+};
 
 const ProfileMediaLightbox = ({
   group,
@@ -160,7 +189,10 @@ const ProfileView = () => {
       ]);
 
       if (profileRes.data) setProfileData(profileRes.data);
-      if (imagesRes.data) setImages(imagesRes.data as ProfileImage[]);
+      if (imagesRes.data) {
+        const signed = await signProfileImages(imagesRes.data as ProfileImage[]);
+        setImages(signed);
+      }
       setIsLoading(false);
     };
 
@@ -384,12 +416,14 @@ const ProfileView = () => {
     }
 
     if (insertedRows.length > 0) {
+      // Sign URLs so the private bucket can be fetched by the client + moderator
+      const signedRows = await signProfileImages(insertedRows);
       // Prepend the whole new group at the top
-      setImages((prev) => [...insertedRows, ...prev]);
-      toast({ title: insertedRows.length > 1 ? `Posted ${insertedRows.length} items!` : "Media uploaded!" });
+      setImages((prev) => [...signedRows, ...prev]);
+      toast({ title: signedRows.length > 1 ? `Posted ${signedRows.length} items!` : "Media uploaded!" });
 
-      // Silent background moderation per image
-      const imageRows = insertedRows.filter((r) => getMediaType(r.image_url) === "image");
+      // Silent background moderation per image (uses signed URLs)
+      const imageRows = signedRows.filter((r) => getMediaType(r.image_url) === "image");
       if (imageRows.length > 0) {
         (async () => {
           try {
@@ -398,7 +432,7 @@ const ProfileView = () => {
             });
 
             if (!modError && modResult && !modResult.allowed) {
-              const ids = insertedRows.map((r) => r.id);
+              const ids = signedRows.map((r) => r.id);
               await supabase.from("profile_images").delete().in("id", ids);
               await supabase.storage.from("profile-images").remove(insertedStoragePaths);
               setImages((prev) => prev.filter((i) => !ids.includes(i.id)));
@@ -513,8 +547,9 @@ const ProfileView = () => {
     if (updateError) {
       toast({ title: "Error", description: "Failed to update image.", variant: "destructive" });
     } else {
-      setImages((prev) => prev.map((i) => i.id === target.id ? { ...i, image_url: publicUrlData.publicUrl } : i));
-      setEditingGroup((prev) => prev ? prev.map((i) => i.id === target.id ? { ...i, image_url: publicUrlData.publicUrl } : i) : null);
+      const signedUrl = await signProfileImage(publicUrlData.publicUrl);
+      setImages((prev) => prev.map((i) => i.id === target.id ? { ...i, image_url: signedUrl } : i));
+      setEditingGroup((prev) => prev ? prev.map((i) => i.id === target.id ? { ...i, image_url: signedUrl } : i) : null);
       toast({ title: "Image updated!" });
     }
     setIsSavingEdit(false);
