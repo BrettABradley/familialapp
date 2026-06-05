@@ -159,8 +159,8 @@ const AlbumPhotoLightbox = ({
                   className="w-full h-full flex items-center justify-center"
                   onScaleChange={(s) => { if (isCurrent) zoomedRef.current = s > 1.05; }}
                 >
-                  <SmartImage
-                    src={p.photo_url}
+                  <SignedSmartImage
+                    path={p.photo_url}
                     preset="full"
                     priority={Math.abs(i - selected) <= 1}
                     alt={p.caption || `Photo ${i + 1}`}
