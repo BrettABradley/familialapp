@@ -1,72 +1,78 @@
-## Root cause (same as Albums was)
+## Root cause
 
-`SmartImage` rewrites Supabase URLs through the on-the-fly transformer, but **bails out for signed URLs** (the render endpoint won't validate sign tokens). Every surface that loads media from the private `post-media` bucket — Feed, Messages, Fridge, ProfileView — currently passes pre-signed URLs into `SmartImage` and gets the **full original** for every tile and lightbox image. That's why thumbs feel slow everywhere.
+Two separate pain points the user is feeling:
 
-Albums already has the fix: it stores raw storage paths, and renders via `SignedSmartImage` / `SquareSignedThumbnail`, which produce signed URLs that include `{ transform: { width, quality, resize } }` — a CDN-cached ~30–80 KB WebP per thumbnail instead of a multi-MB JPEG.
-
-Roll the same swap into the other four surfaces.
+1. **Layout jump in Feed.** Single-image posts wrap `SmartImage` in a container with `h-auto max-h-[600px]` — no reserved height. The post card collapses to text/buttons, then the image decodes and shoves everything down. Multi-image carousels are already `aspect-square` so they're fine, but the inner image still pops in without a skeleton.
+2. **Images feel slow.** Even though signed URLs already include the `card` transform (~800px WebP), three things still hurt:
+   - Carousel tiles render at the screen width on phones (~390px) but request the 800px variant — ~4× more bytes than needed.
+   - No `srcset`, so retina screens always pull 1×.
+   - No progressive low-res placeholder on Feed/Messages/Fridge tiles (only the Album lightbox uses `lowPreset="thumb"`).
+   - Off-screen posts aren't pre-signed/pre-decoded, so each one waits on a network round-trip the first time it scrolls into view.
 
 ## Changes
 
-### 1. Feed — `src/components/feed/PostCard.tsx`
+### 1. `SignedSmartImage` — srcset, skeleton, fade-in
 
-- Stop pre-signing `post.media_urls` for rendering. Drop the `useSignedMediaUrls` call on line 389 (only kept for rendering — keep it only for the download handler if needed, or replace with on-demand `getPostMediaUrl(path)` in the download click).
-- Pass raw storage paths down to `MediaItem`, `PostMediaCarousel`, and `FeedImagePreview`.
-- Replace:
-  - `SmartImage src=… preset="card"` → `SignedSmartImage path=… preset="card" lowPreset="thumb"`
-  - `SquareImageThumbnail src=…` (the carousel grid tile) → `SquareSignedThumbnail path=…`
-- `VideoThumbnail` and audio (`VoiceNotePlayer`) still need a real signed URL — keep `getPostMediaUrl(path)` for those specific cases.
-- Download button: call `getPostMediaUrl(path)` (untransformed original) at click time.
+`src/components/shared/SignedSmartImage.tsx`
 
-### 2. Messages — `src/pages/Messages.tsx`
+- Sign a second URL at `width × 2` for retina and emit `srcSet="<1x> 1x, <2x> 2x"`.
+- Add a `reserveAspect?: number` prop. When set, wrap the `<img>` in a `style={{ aspectRatio: reserveAspect }}` div that shows the animated `Skeleton` until `onLoad` fires, then fades the image in.
+- Keep the existing `lowPreset` progressive-blur behavior; it composes with the skeleton.
 
-In `MessageMedia` (lines 90–149):
-- Stop calling `useSignedMediaUrls(mediaUrls)` to pre-sign. Instead, work directly with `mediaUrls` (paths).
-- For each item, branch on the bare path's extension via `getMediaType(path)`:
-  - image → `<SignedSmartImage path={p} preset="card" lowPreset="thumb" … />`
-  - video → keep current behavior but resolve the URL on demand with `useSignedMediaUrl(p)` (small per-video hook) — or wrap into a `MessageVideoTile` component.
-  - audio → resolve via `useSignedMediaUrl(p)` and feed to `VoiceNotePlayer`.
-- Lightbox open: still expects an array of resolved URLs. Resolve only the visual items lazily when the user taps (`Promise.all(visualPaths.map(p => getPostMediaUrl(p)))`) before opening — or keep a `useSignedMediaUrls(visualPaths)` solely for the lightbox; that's the one place full originals are appropriate.
+### 2. `SquareSignedThumbnail` — drop preset to `thumb` for carousel tiles
 
-### 3. Fridge — `src/pages/Fridge.tsx` + `src/components/fridge/FridgeBoard.tsx`
+`src/components/shared/SquareSignedThumbnail.tsx`
 
-- `Fridge.tsx` line 95: stop pre-signing `pin.image_url` during fetch — store the raw path on the pin row.
-- `FridgeBoard.tsx`:
-  - Tile (line 211 `SquareImageThumbnail src={pin.image_url}`) → `SquareSignedThumbnail path={pin.image_url}`.
-  - Audio/video at lines 199–209 and 378–388: resolve a signed URL on demand via `useSignedMediaUrl(pin.image_url)` for those branches (small wrapper components keep render clean).
-  - Enlarged image (line 391 `SmartImage preset="full"`) → `SignedSmartImage path=… preset="full" lowPreset="card" priority`.
+- Default `preset` stays `thumb` (already 400px).
+- Pass `lowPreset="thumb"` through (no-op when same preset — guarded inside the component) and wire a skeleton overlay via the new `reserveAspect={1}`.
 
-### 4. ProfileView — `src/pages/ProfileView.tsx`
+### 3. `PostCard` — reserve aspect ratio for every media tile
 
-ProfileView signs via its own `signProfileImage` helper into `image_url` strings. Two options; pick the smaller diff:
-- **Preferred**: stop signing in `signProfileImage`/`signProfileImages` and store raw paths in `image_url`. Then:
-  - All grid tiles `SquareImageThumbnail src={cover.image_url}` (lines 705, 924) → `SquareSignedThumbnail path={cover.image_url}`.
-  - Lightbox image (line 126) → `SignedSmartImage path=… preset="full" lowPreset="thumb" priority={…}`.
-  - Video tiles continue to need a signed URL; resolve per-item with `useSignedMediaUrl`.
-  - Download / edit-crop flows still call `getPostMediaUrl(path)` for originals.
+`src/components/feed/PostCard.tsx`
 
-### 5. Helper tweak — `SignedSmartImage`
+- `MediaItem` single-image branch: wrap in a container with a default `aspectRatio: 4/5` placeholder + skeleton. After the image's `onLoad`, swap to its natural `naturalWidth/naturalHeight` ratio (tracked in local state) so tall photos still show full. Use `SignedSmartImage path={…} preset="card" lowPreset="thumb"` instead of `SmartImage`.
+- `PostMediaCarousel`: switch `FeedImagePreview` to `preset="thumb"` (carousel tiles never exceed ~500px wide); keep `aspect-square` reservation; add `lowPreset` so first paint is the cached thumb.
+- Drop the redundant `useSignedMediaUrls(imagePathsForCard, PRESET_TRANSFORM.card)` pre-sign for rendering (the new `SignedSmartImage` does it). Keep `fullUrls` only for the lightbox and download handler.
 
-Already supports `lowPreset` (added in the album fix); no change required, just used in more places. Confirm no regressions when `lowPreset` is set but the underlying `useSignedMediaUrls` cache is cold (the hidden hi-res decoder fades in when ready — already implemented).
+### 4. Feed skeleton reserves image space
+
+`src/pages/Feed.tsx`
+
+- Update the initial-load skeleton card to include a `<div className="aspect-square w-full" />` Skeleton block under the text Skeletons so the loading state matches the real card shape and there's no jump between skeleton → first post.
+
+### 5. Viewport prefetch for upcoming posts
+
+`src/components/feed/PostCard.tsx` + `src/lib/postMediaUrl.ts`
+
+- Add `prefetchSignedMediaUrl(path, transform)` — fires `getPostMediaUrl` and a hidden `Image()` decode in the background, populating the in-memory cache.
+- In `PostCard`, attach an `IntersectionObserver` (root margin `800px`) that prefetches the post's first image's `card` variant when the card gets within ~one screen of the viewport. Result: by the time the user scrolls to it, the WebP is already in the browser cache.
+
+### 6. (Same SignedSmartImage upgrade benefits) Messages, Fridge, Profile
+
+No additional code in those files needed — they already render through `SignedSmartImage`/`SquareSignedThumbnail`, so the srcset + skeleton + fade-in land there too.
 
 ## Out of scope
 
-- Service-worker / persistent CDN caching beyond the existing in-memory cache.
-- Avatar bucket (separate flow — already small).
-- Video poster frames (separate work; videos already use `<VideoThumbnail>`).
+- Storing image dimensions in the DB (would give perfect aspect ratios from the first paint, but requires a migration + upload-time changes). The natural-ratio swap on `onLoad` is the no-migration substitute.
+- Service-worker / on-disk persistent cache.
+- Video poster optimization.
 
 ## Files touched
 
 ```text
+src/components/shared/SignedSmartImage.tsx
+src/components/shared/SquareSignedThumbnail.tsx
 src/components/feed/PostCard.tsx
-src/pages/Messages.tsx
-src/pages/Fridge.tsx
-src/components/fridge/FridgeBoard.tsx
-src/pages/ProfileView.tsx
+src/pages/Feed.tsx
+src/lib/postMediaUrl.ts
 ```
 
-No DB / RLS / edge function / iOS-build changes. Pure web/JS — ships with the next Update.
+Pure web/JS. **No DB / RLS / edge function / iOS build changes — ships with the next Update, no App Store submission needed.**
 
 ## Expected impact
 
-Tiles in Feed, Messages, Fridge, and Profile go from multi-MB JPEG originals to ~30–80 KB WebP variants served from the CDN. Lightbox images get the same progressive thumb→full fade-in as Albums. First paint of a feed/message/profile view will feel dramatically snappier on cellular and iOS.
+- Feed cards reserve space immediately → no more "text appears, image pops, layout jumps."
+- Carousel tiles drop from ~80 KB to ~25–35 KB per slide on phones (thumb vs card preset).
+- Retina phones now pull the right resolution via `srcset` instead of either over- or under-fetching.
+- Off-screen posts are pre-warmed, so scrolling feels nearly instant after the first card.
+- Progressive thumb→full fade-in gives a perceived <100 ms first paint on every tile, app-wide.

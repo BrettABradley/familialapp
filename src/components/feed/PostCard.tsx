@@ -15,6 +15,8 @@ import { getMediaType } from "@/lib/mediaUtils";
 import type { Post } from "@/hooks/useFeedPosts";
 import { ReportDialog } from "@/components/shared/ReportDialog";
 import { SmartImage } from "@/components/shared/SmartImage";
+import { SignedSmartImage } from "@/components/shared/SignedSmartImage";
+import { SquareSignedThumbnail } from "@/components/shared/SquareSignedThumbnail";
 import { VoiceNotePlayer } from "@/components/shared/VoiceNotePlayer";
 import { avatarUrl, presetImage, PRESET_TRANSFORM } from "@/lib/imageUrl";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
@@ -22,7 +24,7 @@ import { MediaLightbox } from "@/components/shared/MediaLightbox";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import useEmblaCarousel from "embla-carousel-react";
 import { haptic, typingHaptic } from "@/lib/haptics";
-import { useSignedMediaUrls } from "@/lib/postMediaUrl";
+import { useSignedMediaUrls, prefetchSignedMediaUrl } from "@/lib/postMediaUrl";
 
 interface CircleMemberRef {
   user_id: string;
@@ -213,15 +215,62 @@ const MediaItem = ({ url, index, onDownload, onImageClick, onVideoClick }: { url
   );
 };
 
+/**
+ * Single-image feed photo. Reserves a default 4/5 aspect ratio with a
+ * skeleton so the post card never jumps when the image decodes. Once the
+ * image loads we transition the container to the image's natural ratio so
+ * tall/wide photos still display fully.
+ */
+const SingleFeedPhoto = ({
+  path,
+  fullUrl,
+  onClick,
+  onDownload,
+  priority = true,
+}: {
+  path: string;
+  fullUrl: string;
+  onClick: () => void;
+  onDownload: (url: string) => void;
+  priority?: boolean;
+}) => {
+  const [aspect, setAspect] = useState<number>(4 / 5);
+  return (
+    <div
+      className="relative group rounded-lg overflow-hidden cursor-pointer bg-secondary w-full transition-[aspect-ratio] duration-300"
+      style={{ aspectRatio: aspect }}
+      onClick={onClick}
+    >
+      <SignedSmartImage
+        path={path}
+        preset="card"
+        lowPreset="thumb"
+        priority={priority}
+        reserveAspect={aspect}
+        onAspect={(r) => setAspect(r)}
+        alt="Post image"
+        className="object-contain"
+      />
+      <button
+        onClick={(e) => { e.stopPropagation(); onDownload(fullUrl); }}
+        className="absolute bottom-2 right-2 z-20 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
+        aria-label="Download image"
+      >
+        <Download className="w-4 h-4" />
+      </button>
+    </div>
+  );
+};
+
 const FeedImagePreview = ({
-  url,
+  path,
   alt,
   priority,
 }: {
-  url: string;
+  path: string;
   alt: string;
   priority?: boolean;
-}) => <SquareImageThumbnail src={url} preset="card" priority={priority} alt={alt} />;
+}) => <SquareSignedThumbnail path={path} preset="thumb" priority={priority} alt={alt} />;
 
 // Instagram-style swipeable carousel for multi-media posts
 const PostMediaCarousel = ({
@@ -283,7 +332,7 @@ const PostMediaCarousel = ({
                       onClick={() => onImageClick(index)}
                       aria-label={`Open image ${index + 1}`}
                     >
-                      <FeedImagePreview url={url} priority={isPriority} alt={`Post media ${index + 1}`} />
+                      <FeedImagePreview path={url} priority={isPriority} alt={`Post media ${index + 1}`} />
                     </button>
                   )}
                 </div>
@@ -385,31 +434,57 @@ export const PostCard = ({
     setIsEditing(false);
   };
 
-  // Resolve stored paths/URLs to signed URLs (post-media bucket is private).
-  // Images are signed with the `card` transform so tiles pull a CDN-cached
-  // ~50–80 KB WebP instead of the multi-MB original. Videos/audio are
-  // signed untransformed (the render endpoint only handles images).
+  // Build visual + audio media tables. Image tiles are rendered from raw
+  // storage paths via SignedSmartImage / SquareSignedThumbnail, which sign
+  // a transformed (DPR-aware WebP) URL per tile. Videos/audio still need a
+  // playable signed URL so we resolve `fullUrls` once for those branches +
+  // for the lightbox + for download. Keeping arrays index-aligned with
+  // `paths` makes the lightbox indexing trivial.
   const paths = post.media_urls || [];
-  const imagePathsForCard = paths.map((p) => (getMediaType(p || "") === "image" ? p : null));
-  const { urls: cardImageUrls } = useSignedMediaUrls(imagePathsForCard, PRESET_TRANSFORM.card);
   const { urls: fullUrls } = useSignedMediaUrls(paths);
-  const tileUrls = paths.map((p, i) =>
-    getMediaType(p || "") === "image" ? cardImageUrls[i] : fullUrls[i],
-  );
 
-  // Separate media by type for layout (filter on original path so signed
-  // query-string params don't trip up `getMediaType`).
   const isVisual = (i: number) => {
     const t = getMediaType(paths[i] || "");
     return t === "image" || t === "video";
   };
-  const visualMedia = tileUrls.filter((u, i) => !!u && isVisual(i));
-  const visualMediaFull = fullUrls.filter((u, i) => !!u && isVisual(i));
+  type VisualEntry = { path: string; fullUrl: string; type: "image" | "video" };
+  const visualEntries: VisualEntry[] = paths
+    .map((p, i): VisualEntry | null => {
+      if (!p || !isVisual(i)) return null;
+      const t = getMediaType(p) as "image" | "video";
+      return { path: p, fullUrl: fullUrls[i] || "", type: t };
+    })
+    .filter((e): e is VisualEntry => e !== null);
+  const visualMediaFull = visualEntries.map((e) => e.fullUrl);
   const audioMedia = fullUrls.filter((u, i) => !!u && getMediaType(paths[i] || "") === "audio");
-  const imageUrls = tileUrls.filter((u, i) => !!u && getMediaType(paths[i] || "") === "image");
 
   // Extract first URL from post content for link preview
   const firstUrl = post.content?.match(/(https?:\/\/[^\s]+)/)?.[0] || null;
+
+  // Viewport prefetch: warm the signed-URL + browser image cache for the
+  // first image of this card when it's within ~one screen of the viewport.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const firstImagePath = visualEntries.find((e) => e.type === "image")?.path;
+  useEffect(() => {
+    if (!firstImagePath || !cardRef.current || typeof IntersectionObserver === "undefined") return;
+    const el = cardRef.current;
+    let done = false;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && !done) {
+            done = true;
+            prefetchSignedMediaUrl(firstImagePath, PRESET_TRANSFORM.card);
+            prefetchSignedMediaUrl(firstImagePath, PRESET_TRANSFORM.thumb);
+            io.disconnect();
+          }
+        }
+      },
+      { rootMargin: "800px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [firstImagePath]);
 
   // Preload neighbors at full-res when lightbox is open for instant swipes.
   useEffect(() => {
@@ -423,8 +498,9 @@ export const PostCard = ({
     });
   }, [lightboxIndex, visualMediaFull]);
 
+
   return (
-    <Card>
+    <Card ref={cardRef}>
       <CardHeader className="pb-4">
         <div className="flex items-center gap-3">
           <Link to={`/profile/${post.author_id}`}>
@@ -510,48 +586,41 @@ export const PostCard = ({
           </div>
         )}
 
-        {/* Visual media: carousel for 2+, single for 1 */}
-        {visualMedia.length === 1 && (
+        {/* Visual media: single for 1, grid for 2+ */}
+        {visualEntries.length === 1 && (
           <div className="mb-4">
-            {getMediaType(visualMedia[0]) === 'video' ? (
+            {visualEntries[0].type === 'video' ? (
               <MediaItem
-                url={visualMedia[0]}
+                url={visualEntries[0].fullUrl}
                 index={0}
                 onDownload={onDownloadImage}
                 onImageClick={() => setLightboxIndex(0)}
                 onVideoClick={() => setLightboxIndex(0)}
               />
             ) : (
-              <div
-                className="relative group rounded-lg overflow-hidden cursor-pointer bg-secondary w-full aspect-square"
+              <SingleFeedPhoto
+                path={visualEntries[0].path}
+                fullUrl={visualEntries[0].fullUrl}
                 onClick={() => setLightboxIndex(0)}
-              >
-                <FeedImagePreview url={visualMedia[0]} alt="Post image" priority />
-                <button
-                  onClick={(e) => { e.stopPropagation(); onDownloadImage(visualMediaFull[0] || visualMedia[0]); }}
-                  className="absolute bottom-2 right-2 z-20 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
-                  aria-label="Download image"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-              </div>
+                onDownload={onDownloadImage}
+              />
             )}
           </div>
         )}
-        {visualMedia.length > 1 && (
+        {visualEntries.length > 1 && (
           <div className="mb-4 grid grid-cols-2 gap-2">
-            {visualMedia.map((url, i) => (
+            {visualEntries.map((entry, i) => (
               <div key={i} className="relative group">
-                {getMediaType(url) === 'video' ? (
-                  <VideoThumbnail url={url} onClick={() => setLightboxIndex(i)} />
+                {entry.type === 'video' ? (
+                  <VideoThumbnail url={entry.fullUrl} onClick={() => setLightboxIndex(i)} />
                 ) : (
                   <div
                     className="relative rounded-lg overflow-hidden cursor-pointer bg-secondary w-full aspect-square"
                     onClick={() => setLightboxIndex(i)}
                   >
-                    <FeedImagePreview url={url} alt={`Post media ${i + 1}`} priority={i < 2} />
+                    <FeedImagePreview path={entry.path} alt={`Post media ${i + 1}`} priority={i < 2} />
                     <button
-                      onClick={(e) => { e.stopPropagation(); onDownloadImage(visualMediaFull[i] || url); }}
+                      onClick={(e) => { e.stopPropagation(); onDownloadImage(entry.fullUrl); }}
                       className="absolute bottom-2 right-2 z-20 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
                       aria-label="Download image"
                     >
@@ -563,6 +632,7 @@ export const PostCard = ({
             ))}
           </div>
         )}
+
 
         {/* Unified Media Lightbox — fullscreen on mobile, centered modal on desktop */}
         <Dialog open={lightboxIndex !== null} onOpenChange={(open) => !open && setLightboxIndex(null)}>

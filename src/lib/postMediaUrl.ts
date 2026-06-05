@@ -99,6 +99,29 @@ export async function getPostMediaUrls(
   return Promise.all(values.map((v) => getPostMediaUrl(v, transform).catch(() => "")));
 }
 
+/**
+ * Warm the in-memory signed-URL cache AND the browser image cache for an
+ * upcoming asset. Safe to call repeatedly — duplicates are deduped by the
+ * signed-URL cache and the browser's HTTP cache.
+ */
+export function prefetchSignedMediaUrl(
+  value: string | null | undefined,
+  transform?: SignTransform,
+): void {
+  if (!value) return;
+  if (typeof window === "undefined") return;
+  getPostMediaUrl(value, transform)
+    .then((url) => {
+      if (!url) return;
+      const img = new Image();
+      // @ts-expect-error - fetchpriority is a valid attribute, types lag
+      img.fetchpriority = "low";
+      img.decoding = "async";
+      img.src = url;
+    })
+    .catch(() => {});
+}
+
 /** React hook returning a resolved signed URL. */
 export function useSignedMediaUrl(
   value: string | null | undefined,
