@@ -1,51 +1,28 @@
-# "Email rate exceeded" on invitee signup
+# Fix "Use different email" regression in Auth.tsx
 
-## What's actually happening
+## What broke
 
-I checked the email logs for the last few days — every recent `signup` row is `sent` with no errors, including for the addresses your friend has been inviting (`willroark16@gmail.com`, `raeleigh.roark@gmail.com`, etc.). So our outbound queue is healthy and emails *are* being delivered.
+In the last change I broadened the pre-submit cooldown shortcut from
+`pendingEmail === email` to `(pendingEmail === email || !pendingEmail)` (Auth.tsx ~line 360).
 
-The "email rate exceeded" message is coming directly from Supabase Auth's **per-email signup throttle**, not from our email pipeline. Supabase blocks the same email address from triggering more than one signup email within ~60 seconds (and there is a softer per-hour cap as well). The exact string is `For security purposes, you can only request this after N seconds` / `over_email_send_rate_limit`.
+That assumes "no pendingEmail + recent send timestamp" always means a send went out for *this* email. It doesn't, because `handleUseDifferentEmail` only clears `PENDING_VERIFY_EMAIL_KEY` — it leaves `RESEND_VERIFY_KEY` (the timestamp) in place.
 
-This trips in real, common situations for invitees:
-1. They tap "Sign Up", switch to Mail to verify, come back and tap "Sign Up" again because nothing visibly happened → second call hits the 60s throttle.
-2. They double-tap the button on a slow connection.
-3. They start signup, abandon, then return a few seconds later from the invite link.
-4. They were already invited as a placeholder account, so Supabase considers the address "recently emailed."
+Effect: a user who signs up with email A, taps "Use different email", then submits email B within 60s gets dropped onto a fake "Check your email" panel for email B without `signUp()` ever being called. No email is sent to B and the silent poll will never resolve.
 
-## Why the screenshot they sent is just an iPhone status bar
+## Onboarding is fine
 
-The image in the email shows the iPhone status bar (9:51, phone call timer 5:42, 99% battery) — it's not an in-app error screen, it's just what was on her phone when she took the screenshot of the Familial signup page. The actual blocker is the toast message our code already shows on rate limit:
+`TermsAcceptanceGate` and `OnboardingFlow` only mount once `user.email_confirmed_at` is set; nothing in the signup happy path or the post-confirmation routing changed. Duplicate-account detection, silent verification polling, password reset, and the resend button all still work.
 
-> "Too many verification emails sent to this address. Check your inbox and spam folder for the link we already sent, or try again in a few minutes."
+## Fix (frontend only — `src/pages/Auth.tsx`)
 
-Today that toast only auto-restores the **"Check your email"** panel if `sessionStorage.pendingVerificationEmail === email`. For a brand new invitee on a fresh device that key is empty, so they just see a red error toast and the same signup form — there's no obvious next step, which feels like a glitch.
+1. **`handleUseDifferentEmail` (~line 462)** — also clear `RESEND_VERIFY_KEY` and reset `resendCooldown` to 0, so switching emails starts with a clean slate.
 
-## The fix
+2. **Pre-submit cooldown shortcut (~line 360)** — tighten the condition back to require an actual match: `pendingEmail === email && stillCoolingDown`. The fallback for the "cleared session double-tap" case I was trying to cover is already handled by the post-`signUp()` rate-limit branch, which now drops the user onto the panel on any rate-limit response.
 
-Make the Auth page treat a rate-limit response as proof that **an email was already sent to this address**, and drop the user onto the "Check your email" panel every time — even when local sessionStorage is empty. Then they can wait, tap the resend button when the cooldown ends, or just open the email that's already in their inbox.
-
-### Changes (frontend only — `src/pages/Auth.tsx`)
-
-1. **Signup rate-limit branch (`handleSubmit`, ~lines 384–404)** — remove the `if (pendingEmail === email)` guard. On *any* `isEmailRateLimitError(error)` during signUp:
-   - Set `verificationSentTo = email`
-   - Save the password into the ref + sessionStorage so the silent verification poll can pick up once they click the link
-   - Start the 60s `resendCooldown` and write `RESEND_VERIFY_KEY`
-   - Write `PENDING_VERIFY_EMAIL_KEY = email`
-   - Toast wording: "We already sent a verification link to {email}. Please check your inbox and spam folder — you can request another in 60 seconds." (less alarming than "Too many…")
-
-2. **Pre-submit cooldown short-circuit (~lines 353–374)** — keep the existing "if pendingEmail === email and still in cooldown, just re-show the panel" logic. Tighten it to also fire when `pendingEmail` is empty *but* `lastSendAt` is within the cooldown for the same `email` (rare but covers double-tap with a cleared session).
-
-3. **Forgot-password rate-limit branch (~lines 286–302)** — keep behavior, but improve copy ("A reset link was already sent. Check spam, or try again in 90 seconds.") and don't close `isForgotPassword` so they still see the email input/state.
-
-4. **Resend button (~lines 432–456)** — when `isEmailRateLimitError`, surface the remaining cooldown in seconds instead of a generic message.
-
-### Not in scope (won't change)
-
-- No backend/RLS/edge-function changes. `auth-email-hook` and the email queue are working correctly; logs confirm delivery.
-- Not changing Supabase's per-email throttle itself (it's a built-in security control we shouldn't disable).
-- No iOS rebuild required — pure web/JS.
+That's it — two small edits, no backend/iOS work, no impact on onboarding.
 
 ## Verification
 
-- Trigger a signup twice in <60s with a fresh email in an incognito window → should land on the "Check your email" panel both times with a soft toast, not a red error on the signup form.
-- Existing single-attempt signup, resend cooldown, password reset, and silent verification poll continue to work unchanged.
+- Sign up email A → "Check your email" → tap "Use different email" → enter email B → should call `signUp()` and actually send a verification to B (not jump straight to the panel).
+- Sign up email A twice in <60s → still lands on "Check your email" via the post-signup rate-limit branch (unchanged behavior).
+- TermsAcceptanceGate + OnboardingFlow appear after clicking the verification link, same as before.
