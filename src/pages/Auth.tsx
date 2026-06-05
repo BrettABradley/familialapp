@@ -18,8 +18,21 @@ const PENDING_VERIFY_PWD_KEY = "pendingVerificationPwd";
 const RESEND_VERIFY_KEY = "lastVerificationResendAt";
 const RESEND_VERIFY_COOLDOWN = 60;
 
-const RESET_COOLDOWN_SECONDS = 60;
+const RESET_COOLDOWN_SECONDS = 90;
 const RESET_COOLDOWN_KEY = "lastPasswordResetAt";
+
+const isEmailRateLimitError = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+  const msg = ((error as any).message || "").toLowerCase();
+  const status = (error as any).status;
+  return (
+    status === 429 ||
+    msg.includes("rate limit") ||
+    msg.includes("over_email_send_rate_limit") ||
+    msg.includes("email rate limit") ||
+    msg.includes("for security purposes")
+  );
+};
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -333,6 +346,33 @@ const Auth = () => {
           return;
         }
 
+        // If a verification email was just sent to THIS same address and the
+        // per-address cooldown is still ticking, don't burn the Supabase
+        // rate-limit budget with another signUp() call — just re-show the
+        // "check your email" panel and let them use the existing link.
+        const pendingEmail = sessionStorage.getItem(PENDING_VERIFY_EMAIL_KEY);
+        const lastSendAt = Number(sessionStorage.getItem(RESEND_VERIFY_KEY) || 0);
+        const stillCoolingDown =
+          lastSendAt &&
+          Date.now() - lastSendAt < RESEND_VERIFY_COOLDOWN * 1000;
+        if (pendingEmail === email && stillCoolingDown) {
+          setVerificationSentTo(email);
+          if (password) {
+            pendingPasswordRef.current = password;
+            try { sessionStorage.setItem(PENDING_VERIFY_PWD_KEY, password); } catch { /* non-fatal */ }
+          }
+          setPassword("");
+          const remaining = Math.ceil(
+            (lastSendAt + RESEND_VERIFY_COOLDOWN * 1000 - Date.now()) / 1000
+          );
+          setResendCooldown(Math.max(remaining, 1));
+          toast({
+            title: "Check your email",
+            description: `We already sent a verification link to ${email}. Check your inbox (and spam folder).`,
+          });
+          return;
+        }
+
         const { error } = await signUp(email, password, displayName);
         if (error) {
           const dup =
@@ -341,6 +381,27 @@ const Auth = () => {
             error.message.toLowerCase().includes("identities");
           if (dup) {
             setDuplicateAccount(true);
+          } else if (isEmailRateLimitError(error)) {
+            // Per-address / per-project Supabase auth email throttle.
+            // If we previously sent a verification to this email, drop the
+            // user back onto the "Check your email" panel so they can use
+            // the link that was already delivered.
+            if (pendingEmail === email) {
+              setVerificationSentTo(email);
+              if (password) {
+                pendingPasswordRef.current = password;
+                try { sessionStorage.setItem(PENDING_VERIFY_PWD_KEY, password); } catch { /* non-fatal */ }
+              }
+              setPassword("");
+              setResendCooldown(RESEND_VERIFY_COOLDOWN);
+              sessionStorage.setItem(RESEND_VERIFY_KEY, String(Date.now()));
+            }
+            toast({
+              title: "Please wait a moment",
+              description:
+                "Too many verification emails sent to this address. Check your inbox and spam folder for the link we already sent, or try again in a few minutes.",
+              variant: "destructive",
+            });
           } else {
             toast({
               title: "Sign up failed",
@@ -380,7 +441,16 @@ const Auth = () => {
     sessionStorage.setItem(RESEND_VERIFY_KEY, String(Date.now()));
     setResendCooldown(RESEND_VERIFY_COOLDOWN);
     if (error) {
-      toast({ title: "Could not resend", description: error.message, variant: "destructive" });
+      if (isEmailRateLimitError(error)) {
+        toast({
+          title: "Please wait a moment",
+          description:
+            "Too many verification emails sent recently. Check your inbox and spam folder for the most recent link, or try again in a few minutes.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Could not resend", description: error.message, variant: "destructive" });
+      }
     } else {
       toast({ title: "Email resent", description: `New verification link sent to ${verificationSentTo}.` });
     }
