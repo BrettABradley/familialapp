@@ -57,17 +57,17 @@ interface AlbumPhoto {
 }
 
 const AlbumImagePreview = ({
-  url,
+  path,
   alt,
   preset = "thumb",
   priority = false,
 }: {
-  url: string;
+  path: string;
   alt: string;
   preset?: "thumb" | "card";
   priority?: boolean;
 }) => (
-  <SquareImageThumbnail src={url} preset={preset} priority={priority} alt={alt} />
+  <SquareSignedThumbnail path={path} preset={preset} priority={priority} alt={alt} />
 );
 
 // Embla-powered finger-following lightbox for album photos. Mirrors the
