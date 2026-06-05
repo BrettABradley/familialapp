@@ -404,8 +404,7 @@ const Albums = () => {
     if (updateError) {
       toast({ title: "Error", description: "Failed to update cover photo.", variant: "destructive" });
     } else {
-      const signed = await getPostMediaUrl(fileName);
-      setSelectedAlbum({ ...selectedAlbum, cover_photo_url: signed });
+      setSelectedAlbum({ ...selectedAlbum, cover_photo_url: fileName });
       fetchAlbums();
       toast({ title: "Cover updated!" });
     }
