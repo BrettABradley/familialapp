@@ -291,12 +291,10 @@ const Auth = () => {
         (error as any).status === 429;
       if (isRateLimit) {
         toast({
-          title: "Please wait a moment",
+          title: "Check your email",
           description:
-            "Too many reset requests. Check your inbox (and spam folder) for an earlier link, or try again in a minute.",
-          variant: "destructive",
+            "A password reset link was already sent recently. Check your inbox and spam folder, or try again in about a minute.",
         });
-        setIsForgotPassword(false);
       } else {
         toast({ title: "Error", description: error.message, variant: "destructive" });
       }
