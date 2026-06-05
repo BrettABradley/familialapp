@@ -528,7 +528,7 @@ export const PostCard = ({
               >
                 <FeedImagePreview url={visualMedia[0]} alt="Post image" priority />
                 <button
-                  onClick={(e) => { e.stopPropagation(); onDownloadImage(visualMedia[0]); }}
+                  onClick={(e) => { e.stopPropagation(); onDownloadImage(visualMediaFull[0] || visualMedia[0]); }}
                   className="absolute bottom-2 right-2 z-20 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
                   aria-label="Download image"
                 >
