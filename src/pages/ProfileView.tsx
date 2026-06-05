@@ -56,20 +56,33 @@ const extractProfileImagePath = (url: string): string | null => {
 };
 
 // Sign a single profile image; returns the signed URL or the original on failure.
-const signProfileImage = async (image_url: string): Promise<string> => {
+// Pass `transform` to fetch a CDN-cached WebP variant (only valid for images).
+const signProfileImage = async (
+  image_url: string,
+  transform?: { width?: number; height?: number; quality?: number; resize?: "cover" | "contain" | "fill" },
+): Promise<string> => {
   const path = extractProfileImagePath(image_url);
   if (!path) return image_url;
+  const opts = transform ? { transform } : undefined;
   const { data, error } = await supabase.storage
     .from("profile-images")
-    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS, opts as any);
   if (error || !data?.signedUrl) return image_url;
   return data.signedUrl;
 };
 
+// Card preset transform — small enough for grid tiles + the lightbox on phone
+// screens, served as a CDN-cached WebP instead of the multi-MB original.
+const PROFILE_CARD_TRANSFORM = { width: 800, quality: 75, resize: "contain" as const };
+
 const signProfileImages = async <T extends { image_url: string }>(rows: T[]): Promise<T[]> => {
   if (rows.length === 0) return rows;
   return Promise.all(
-    rows.map(async (r) => ({ ...r, image_url: await signProfileImage(r.image_url) }))
+    rows.map(async (r) => {
+      const isImage = getMediaType(r.image_url) === "image";
+      const transform = isImage ? PROFILE_CARD_TRANSFORM : undefined;
+      return { ...r, image_url: await signProfileImage(r.image_url, transform) };
+    }),
   );
 };
 
