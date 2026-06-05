@@ -320,11 +320,12 @@ const Albums = () => {
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      const resolved = await Promise.all(data.map(async (a: any) => ({
+      // Keep bare storage paths; renderers sign + transform on demand.
+      const resolved = data.map((a: any) => ({
         ...a,
-        cover_photo_url: a.cover_photo_url ? await getPostMediaUrl(a.cover_photo_url) : null,
+        cover_photo_url: a.cover_photo_url ?? null,
         creator_name: a.profiles?.display_name || "Unknown",
-      })));
+      }));
       setAlbums(resolved);
     }
     setIsLoadingAlbums(false);
@@ -340,11 +341,8 @@ const Albums = () => {
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      const resolved = await Promise.all(data.map(async (p: any) => ({
-        ...p,
-        photo_url: await getPostMediaUrl(p.photo_url),
-      })));
-      setPhotos(resolved);
+      // Keep bare storage paths; SignedSmartImage signs + resizes per preset.
+      setPhotos(data as AlbumPhoto[]);
     }
   };
 
