@@ -215,15 +215,62 @@ const MediaItem = ({ url, index, onDownload, onImageClick, onVideoClick }: { url
   );
 };
 
+/**
+ * Single-image feed photo. Reserves a default 4/5 aspect ratio with a
+ * skeleton so the post card never jumps when the image decodes. Once the
+ * image loads we transition the container to the image's natural ratio so
+ * tall/wide photos still display fully.
+ */
+const SingleFeedPhoto = ({
+  path,
+  fullUrl,
+  onClick,
+  onDownload,
+  priority = true,
+}: {
+  path: string;
+  fullUrl: string;
+  onClick: () => void;
+  onDownload: (url: string) => void;
+  priority?: boolean;
+}) => {
+  const [aspect, setAspect] = useState<number>(4 / 5);
+  return (
+    <div
+      className="relative group rounded-lg overflow-hidden cursor-pointer bg-secondary w-full transition-[aspect-ratio] duration-300"
+      style={{ aspectRatio: aspect }}
+      onClick={onClick}
+    >
+      <SignedSmartImage
+        path={path}
+        preset="card"
+        lowPreset="thumb"
+        priority={priority}
+        reserveAspect={aspect}
+        onAspect={(r) => setAspect(r)}
+        alt="Post image"
+        className="object-contain"
+      />
+      <button
+        onClick={(e) => { e.stopPropagation(); onDownload(fullUrl); }}
+        className="absolute bottom-2 right-2 z-20 bg-background/80 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"
+        aria-label="Download image"
+      >
+        <Download className="w-4 h-4" />
+      </button>
+    </div>
+  );
+};
+
 const FeedImagePreview = ({
-  url,
+  path,
   alt,
   priority,
 }: {
-  url: string;
+  path: string;
   alt: string;
   priority?: boolean;
-}) => <SquareImageThumbnail src={url} preset="card" priority={priority} alt={alt} />;
+}) => <SquareSignedThumbnail path={path} preset="thumb" priority={priority} alt={alt} />;
 
 // Instagram-style swipeable carousel for multi-media posts
 const PostMediaCarousel = ({
