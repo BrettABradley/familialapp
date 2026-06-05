@@ -386,26 +386,42 @@ export const PostCard = ({
   };
 
   // Resolve stored paths/URLs to signed URLs (post-media bucket is private).
-  const { urls: resolvedMedia } = useSignedMediaUrls(post.media_urls || []);
-  // Separate media by type for layout
-  const visualMedia = resolvedMedia.filter(u => u && (getMediaType(u) === 'image' || getMediaType(u) === 'video'));
-  const audioMedia = resolvedMedia.filter(u => u && getMediaType(u) === 'audio');
-  const imageUrls = resolvedMedia.filter(u => u && getMediaType(u) === 'image');
+  // Images are signed with the `card` transform so tiles pull a CDN-cached
+  // ~50–80 KB WebP instead of the multi-MB original. Videos/audio are
+  // signed untransformed (the render endpoint only handles images).
+  const paths = post.media_urls || [];
+  const imagePathsForCard = paths.map((p) => (getMediaType(p || "") === "image" ? p : null));
+  const { urls: cardImageUrls } = useSignedMediaUrls(imagePathsForCard, PRESET_TRANSFORM.card);
+  const { urls: fullUrls } = useSignedMediaUrls(paths);
+  const tileUrls = paths.map((p, i) =>
+    getMediaType(p || "") === "image" ? cardImageUrls[i] : fullUrls[i],
+  );
+
+  // Separate media by type for layout (filter on original path so signed
+  // query-string params don't trip up `getMediaType`).
+  const isVisual = (i: number) => {
+    const t = getMediaType(paths[i] || "");
+    return t === "image" || t === "video";
+  };
+  const visualMedia = tileUrls.filter((u, i) => !!u && isVisual(i));
+  const visualMediaFull = fullUrls.filter((u, i) => !!u && isVisual(i));
+  const audioMedia = fullUrls.filter((u, i) => !!u && getMediaType(paths[i] || "") === "audio");
+  const imageUrls = tileUrls.filter((u, i) => !!u && getMediaType(paths[i] || "") === "image");
 
   // Extract first URL from post content for link preview
   const firstUrl = post.content?.match(/(https?:\/\/[^\s]+)/)?.[0] || null;
 
-  // Preload neighbors when lightbox is open for instant swipes
+  // Preload neighbors at full-res when lightbox is open for instant swipes.
   useEffect(() => {
     if (lightboxIndex === null) return;
     [lightboxIndex - 1, lightboxIndex + 1].forEach((i) => {
-      const u = visualMedia[i];
+      const u = visualMediaFull[i];
       if (u && getMediaType(u) === "image") {
         const img = new Image();
         img.src = presetImage(u, "full");
       }
     });
-  }, [lightboxIndex, visualMedia]);
+  }, [lightboxIndex, visualMediaFull]);
 
   return (
     <Card>
