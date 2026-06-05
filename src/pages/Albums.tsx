@@ -152,20 +152,29 @@ const AlbumPhotoLightbox = ({
         <div className="flex h-full touch-pan-y will-change-transform">
           {photos.map((p, i) => {
             const isCurrent = i === selected;
+            // Virtualize: only mount the heavy ZoomableImage + signed-URL image
+            // for the current slide and its immediate neighbors. Mounting all
+            // N photos at once (each with a TransformWrapper) crashes the iOS
+            // WebView on large albums and pops the user back to the app root.
+            const withinWindow = Math.abs(i - selected) <= 1;
             return (
               <div key={p.id} className="flex-[0_0_100%] min-w-0 h-full flex items-center justify-center px-2">
-                <ZoomableImage
-                  className="w-full h-full flex items-center justify-center"
-                  onScaleChange={(s) => { if (isCurrent) zoomedRef.current = s > 1.05; }}
-                >
-                  <SignedSmartImage
-                    path={p.photo_url}
-                    preset="full"
-                    priority={Math.abs(i - selected) <= 1}
-                    alt={p.caption || `Photo ${i + 1}`}
-                    className="max-h-full max-w-full object-contain select-none bg-transparent"
-                  />
-                </ZoomableImage>
+                {withinWindow ? (
+                  <ZoomableImage
+                    className="w-full h-full flex items-center justify-center"
+                    onScaleChange={(s) => { if (isCurrent) zoomedRef.current = s > 1.05; }}
+                  >
+                    <SignedSmartImage
+                      path={p.photo_url}
+                      preset="full"
+                      priority={isCurrent}
+                      alt={p.caption || `Photo ${i + 1}`}
+                      className="max-h-full max-w-full object-contain select-none bg-transparent"
+                    />
+                  </ZoomableImage>
+                ) : (
+                  <div className="w-full h-full" aria-hidden />
+                )}
               </div>
             );
           })}
