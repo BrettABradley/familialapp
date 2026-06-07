@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -78,15 +78,32 @@ export function FridgeBoard({
   onDelete,
   className,
   circleName,
+  initialPinId,
+  onInitialPinConsumed,
 }: {
   pins: FridgeBoardPin[];
   canDelete: (pin: FridgeBoardPin) => boolean;
   onDelete: (pin: FridgeBoardPin) => void;
   className?: string;
   circleName?: string;
+  initialPinId?: string | null;
+  onInitialPinConsumed?: () => void;
 }) {
   const [enlargedPin, setEnlargedPin] = useState<FridgeBoardPin | null>(null);
   const [campfirePin, setCampfirePin] = useState<FridgeBoardPin | null>(null);
+
+  // Notification deep-link: open the pin's dialog when the URL targets it.
+  useEffect(() => {
+    if (!initialPinId) return;
+    const target = pins.find(p => p.id === initialPinId);
+    if (!target) return;
+    if (target.pin_type === "campfire") {
+      setCampfirePin(target);
+    } else {
+      setEnlargedPin(target);
+    }
+    onInitialPinConsumed?.();
+  }, [initialPinId, pins, onInitialPinConsumed]);
 
   return (
     <section
