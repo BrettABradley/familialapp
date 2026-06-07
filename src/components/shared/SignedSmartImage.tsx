@@ -1,6 +1,6 @@
 import { ImgHTMLAttributes, SyntheticEvent, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { useSignedMediaUrl } from "@/lib/postMediaUrl";
+import { invalidateSignedMediaUrl, useSignedMediaUrl } from "@/lib/postMediaUrl";
 import { PRESET_TRANSFORM, ImagePreset } from "@/lib/imageUrl";
 
 interface SignedSmartImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, "src" | "srcSet"> {
@@ -19,6 +19,9 @@ interface SignedSmartImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>
    *  reserves space before the image decodes. The container shows an
    *  animated skeleton until the image loads, then fades the image in. */
   reserveAspect?: number;
+  /** Disable Storage image transforms for surfaces where the native WebView
+   *  must receive the original signed object URL (notably iOS profile media). */
+  transformImage?: boolean;
   /** Called after the image decodes with its naturalWidth/naturalHeight
    *  ratio. Lets parents swap the reserved aspect-ratio to the real one. */
   onAspect?: (ratio: number) => void;
@@ -54,6 +57,7 @@ export const SignedSmartImage = ({
   priority = false,
   lowPreset,
   reserveAspect,
+  transformImage = true,
   onAspect,
   className,
   alt = "",
@@ -63,25 +67,31 @@ export const SignedSmartImage = ({
   ...rest
 }: SignedSmartImageProps) => {
   const [useOriginalFallback, setUseOriginalFallback] = useState(false);
-  const transform = useOriginalFallback ? undefined : scaleTransform(PRESET_TRANSFORM[preset]);
-  const lowTransform = lowPreset && !useOriginalFallback ? scaleTransform(PRESET_TRANSFORM[lowPreset]) : undefined;
-  const { url, loading } = useSignedMediaUrl(path, transform, bucket);
-  const { url: lowUrl } = useSignedMediaUrl(lowPreset ? path : null, lowTransform, bucket);
+  const [retryNonce, setRetryNonce] = useState(0);
+  const shouldTransform = transformImage && !useOriginalFallback;
+  const transform = shouldTransform ? scaleTransform(PRESET_TRANSFORM[preset]) : undefined;
+  const lowTransform = lowPreset && shouldTransform ? scaleTransform(PRESET_TRANSFORM[lowPreset]) : undefined;
+  const { url, loading } = useSignedMediaUrl(path, transform, bucket, retryNonce);
+  const { url: lowUrl } = useSignedMediaUrl(lowPreset && shouldTransform ? path : null, lowTransform, bucket, retryNonce);
   const [hiLoaded, setHiLoaded] = useState(false);
 
   useEffect(() => {
     setHiLoaded(false);
     setUseOriginalFallback(false);
-  }, [path, bucket, preset, lowPreset]);
+    setRetryNonce((n) => n + 1);
+  }, [path, bucket, preset, lowPreset, transformImage]);
 
   useEffect(() => {
     setHiLoaded(false);
   }, [url]);
 
   const handleImageError = (e: SyntheticEvent<HTMLImageElement, Event>) => {
-    if (!useOriginalFallback && url) {
-      setHiLoaded(false);
+    setHiLoaded(false);
+    invalidateSignedMediaUrl(path, transform, bucket);
+    if (!useOriginalFallback && transformImage) {
       setUseOriginalFallback(true);
+    } else {
+      setRetryNonce((n) => n + 1);
     }
     onError?.(e);
   };
