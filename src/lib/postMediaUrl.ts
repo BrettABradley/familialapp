@@ -386,6 +386,61 @@ export function useStorageBlobUrl(
   return { url, loading };
 }
 
+/** React hook returning a native-safe data URL from private storage. */
+export function useStorageDataUrl(
+  value: string | null | undefined,
+  bucket: string = DEFAULT_BUCKET,
+  refreshKey: string | number = 0,
+): {
+  url: string;
+  loading: boolean;
+} {
+  const [url, setUrl] = useState<string>(() => {
+    if (!value) return "";
+    if (value.startsWith("blob:") || value.startsWith("data:")) return value;
+    const path = toBucketPath(value, bucket);
+    if (!path) return value;
+    return dataUrlCache.get(variantKey(bucket, path))?.url ?? "";
+  });
+  const [loading, setLoading] = useState(!url && !!value);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!value) {
+      setUrl("");
+      setLoading(false);
+      return;
+    }
+    if (value.startsWith("blob:") || value.startsWith("data:")) {
+      setUrl(value);
+      setLoading(false);
+      return;
+    }
+    const path = toBucketPath(value, bucket);
+    const cached = path ? dataUrlCache.get(variantKey(bucket, path)) : null;
+    setUrl(cached?.url ?? (path ? "" : value));
+    setLoading(true);
+    getStorageDataUrl(value, bucket)
+      .then((resolved) => {
+        if (!cancelled) {
+          setUrl(resolved);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUrl("");
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [value, bucket, refreshKey]);
+
+  return { url, loading };
+}
+
 /** Hook for an array of values (e.g. post media_urls). Preserves order. */
 export function useSignedMediaUrls(
   values: (string | null | undefined)[],
