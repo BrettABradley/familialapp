@@ -1,4 +1,4 @@
-import { ImgHTMLAttributes, useState, useEffect } from "react";
+import { ImgHTMLAttributes, SyntheticEvent, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useSignedMediaUrl } from "@/lib/postMediaUrl";
 import { PRESET_TRANSFORM, ImagePreset } from "@/lib/imageUrl";
@@ -78,7 +78,7 @@ export const SignedSmartImage = ({
     setHiLoaded(false);
   }, [url]);
 
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+  const handleImageError = (e: SyntheticEvent<HTMLImageElement, Event>) => {
     if (!useOriginalFallback && url) {
       setHiLoaded(false);
       setUseOriginalFallback(true);
