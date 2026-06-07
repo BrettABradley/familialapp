@@ -145,13 +145,35 @@ async function downloadOne(bucket: string, path: string): Promise<string> {
   return URL.createObjectURL(data);
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("Failed to read media"));
-    reader.readAsDataURL(blob);
-  });
+function mimeFromPath(path: string, fallback: string): string {
+  if (fallback && !/^(application\/octet-stream|text\/plain)$/i.test(fallback)) return fallback;
+  const ext = path.split("?")[0].split("#")[0].split(".").pop()?.toLowerCase();
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "png") return "image/png";
+  if (ext === "gif") return "image/gif";
+  if (ext === "webp") return "image/webp";
+  if (ext === "heic") return "image/heic";
+  if (ext === "heif") return "image/heif";
+  if (ext === "mp4" || ext === "m4v" || ext === "mov") return "video/mp4";
+  if (ext === "webm") return "video/webm";
+  return fallback || "application/octet-stream";
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 8192;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+async function blobToDataUrl(blob: Blob, path: string): Promise<string> {
+  const mime = mimeFromPath(path, blob.type);
+  const base64 = arrayBufferToBase64(await blob.arrayBuffer());
+  return `data:${mime};base64,${base64}`;
 }
 
 async function downloadOneAsDataUrl(bucket: string, path: string): Promise<string> {
@@ -160,7 +182,7 @@ async function downloadOneAsDataUrl(bucket: string, path: string): Promise<strin
   if (error || !data) {
     throw error ?? new Error("Failed to download media");
   }
-  return blobToDataUrl(data);
+  return blobToDataUrl(data, path);
 }
 
 /** Resolve private storage media by downloading it to a local blob URL.
