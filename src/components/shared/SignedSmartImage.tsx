@@ -68,6 +68,7 @@ export const SignedSmartImage = ({
 }: SignedSmartImageProps) => {
   const [useOriginalFallback, setUseOriginalFallback] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
   const shouldTransform = transformImage && !useOriginalFallback;
   const transform = shouldTransform ? scaleTransform(PRESET_TRANSFORM[preset]) : undefined;
   const lowTransform = lowPreset && shouldTransform ? scaleTransform(PRESET_TRANSFORM[lowPreset]) : undefined;
@@ -78,6 +79,7 @@ export const SignedSmartImage = ({
   useEffect(() => {
     setHiLoaded(false);
     setUseOriginalFallback(false);
+    setRetryCount(0);
     setRetryNonce((n) => n + 1);
   }, [path, bucket, preset, lowPreset, transformImage]);
 
@@ -90,7 +92,8 @@ export const SignedSmartImage = ({
     invalidateSignedMediaUrl(path, transform, bucket);
     if (!useOriginalFallback && transformImage) {
       setUseOriginalFallback(true);
-    } else {
+    } else if (retryCount < 1) {
+      setRetryCount((n) => n + 1);
       setRetryNonce((n) => n + 1);
     }
     onError?.(e);
