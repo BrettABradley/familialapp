@@ -74,7 +74,7 @@ const SignedVideoThumbnail = ({ path }: { path: string }) => {
   const dataUrlMedia = useStorageDataUrl(nativeProfileMedia ? path : null, PROFILE_BUCKET);
   const url = nativeProfileMedia ? dataUrlMedia.url : signedMedia.url;
   if (!url) return <div className="h-full w-full bg-muted" aria-busy />;
-  return <VideoThumbnail src={url} />;
+  return <VideoThumbnail src={url} cacheKey={`${PROFILE_BUCKET}:${path}`} />;
 };
 
 
