@@ -24,7 +24,7 @@ import { ZoomableImage } from "@/components/shared/ZoomableImage";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import { SquareSignedThumbnail } from "@/components/shared/SquareSignedThumbnail";
 import { SignedSmartImage } from "@/components/shared/SignedSmartImage";
-import { useSignedMediaUrl, getPostMediaUrl, getPostMediaUrls, toBucketPath } from "@/lib/postMediaUrl";
+import { useSignedMediaUrl, useStorageDataUrl, getPostMediaUrl, getPostMediaUrls, toBucketPath } from "@/lib/postMediaUrl";
 import { PRESET_TRANSFORM } from "@/lib/imageUrl";
 import useEmblaCarousel from "embla-carousel-react";
 
@@ -47,6 +47,7 @@ interface ProfileImage {
 
 const MAX_GROUP_ITEMS = 5;
 const PROFILE_BUCKET = "profile-images";
+const isNativeProfileDataUrl = () => Capacitor.isNativePlatform();
 
 /** Normalize a stored profile_images.image_url (legacy public URL or bare path)
  *  into a bare storage path. Returns the input unchanged for blob/data URLs. */
@@ -58,16 +59,22 @@ const toProfilePath = (value: string): string => {
 
 /** Inline <video> that resolves a bare storage path to a signed URL on the fly. */
 const SignedVideo = ({ path, ...rest }: { path: string } & VideoHTMLAttributes<HTMLVideoElement>) => {
-  const { url } = useSignedMediaUrl(path, undefined, PROFILE_BUCKET);
+  const nativeProfileMedia = isNativeProfileDataUrl();
+  const signedMedia = useSignedMediaUrl(nativeProfileMedia ? null : path, undefined, PROFILE_BUCKET);
+  const dataUrlMedia = useStorageDataUrl(nativeProfileMedia ? path : null, PROFILE_BUCKET);
+  const url = nativeProfileMedia ? dataUrlMedia.url : signedMedia.url;
   if (!url) return <div className="h-full w-full bg-muted" aria-busy />;
   return <video src={url} {...rest} />;
 };
 
 /** Inline <VideoThumbnail> that resolves a bare path to a signed URL first. */
 const SignedVideoThumbnail = ({ path }: { path: string }) => {
-  const { url } = useSignedMediaUrl(path, undefined, PROFILE_BUCKET);
+  const nativeProfileMedia = isNativeProfileDataUrl();
+  const signedMedia = useSignedMediaUrl(nativeProfileMedia ? null : path, undefined, PROFILE_BUCKET);
+  const dataUrlMedia = useStorageDataUrl(nativeProfileMedia ? path : null, PROFILE_BUCKET);
+  const url = nativeProfileMedia ? dataUrlMedia.url : signedMedia.url;
   if (!url) return <div className="h-full w-full bg-muted" aria-busy />;
-  return <VideoThumbnail src={url} />;
+  return <VideoThumbnail src={url} cacheKey={`${PROFILE_BUCKET}:${path}`} />;
 };
 
 
@@ -88,6 +95,7 @@ const ProfileMediaLightbox = ({
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "center", duration: 34, dragThreshold: 4, containScroll: "trimSnaps", startIndex, watchDrag: () => !zoomedRef.current });
   const [selected, setSelected] = useState(startIndex);
   const current = group[selected];
+  const nativeProfileMedia = isNativeProfileDataUrl();
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -121,7 +129,7 @@ const ProfileMediaLightbox = ({
                     className="w-full h-full flex items-center justify-center"
                     onScaleChange={(s) => { if (isCurrent) zoomedRef.current = s > 1.05; }}
                   >
-                    <SignedSmartImage path={item.image_url} bucket={PROFILE_BUCKET} preset="full" transformImage={false} priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
+                    <SignedSmartImage path={item.image_url} bucket={PROFILE_BUCKET} preset="full" transformImage={false} resolveAsDataUrl={nativeProfileMedia} priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
                   </ZoomableImage>
                 )}
               </div>
@@ -592,6 +600,7 @@ const ProfileView = () => {
   }
 
   const currentSlide = lightbox ? lightbox.group[lightbox.index] : null;
+  const nativeProfileMedia = isNativeProfileDataUrl();
 
   return (
     <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
@@ -710,7 +719,7 @@ const ProfileView = () => {
                     {isVideo ? (
                       <SignedVideoThumbnail path={cover.image_url} />
                     ) : (
-                      <SquareSignedThumbnail path={cover.image_url} bucket={PROFILE_BUCKET} transformImage={false} alt={cover.caption || "Profile photo"} />
+                      <SquareSignedThumbnail path={cover.image_url} bucket={PROFILE_BUCKET} transformImage={false} resolveAsDataUrl={nativeProfileMedia} alt={cover.caption || "Profile photo"} />
                     )}
                     {count > 1 && (
                       <div
@@ -929,7 +938,7 @@ const ProfileView = () => {
                     {getMediaType(item.image_url) === "video" ? (
                       <SignedVideoThumbnail path={item.image_url} />
                     ) : (
-                      <SquareSignedThumbnail path={item.image_url} bucket={PROFILE_BUCKET} transformImage={false} alt={`Item ${i + 1}`} />
+                      <SquareSignedThumbnail path={item.image_url} bucket={PROFILE_BUCKET} transformImage={false} resolveAsDataUrl={nativeProfileMedia} alt={`Item ${i + 1}`} />
                     )}
                   </div>
                 ))}

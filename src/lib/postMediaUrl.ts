@@ -16,6 +16,7 @@ type CacheEntry = { url: string; expiresAt: number; promise?: Promise<string> };
 const cache = new Map<string, CacheEntry>();
 type BlobCacheEntry = { url: string; promise?: Promise<string> };
 const blobCache = new Map<string, BlobCacheEntry>();
+const dataUrlCache = new Map<string, BlobCacheEntry>();
 
 function safeDecodePath(path: string): string {
   try {
@@ -144,6 +145,24 @@ async function downloadOne(bucket: string, path: string): Promise<string> {
   return URL.createObjectURL(data);
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Failed to read media"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function downloadOneAsDataUrl(bucket: string, path: string): Promise<string> {
+  await supabase.auth.getSession();
+  const { data, error } = await supabase.storage.from(bucket).download(path);
+  if (error || !data) {
+    throw error ?? new Error("Failed to download media");
+  }
+  return blobToDataUrl(data);
+}
+
 /** Resolve private storage media by downloading it to a local blob URL.
  *  Used for iOS surfaces that render signed object URLs as broken images. */
 export async function getStorageBlobUrl(
@@ -186,6 +205,47 @@ export function invalidateStorageBlobUrl(
   const cached = blobCache.get(key);
   if (cached?.url?.startsWith("blob:")) URL.revokeObjectURL(cached.url);
   blobCache.delete(key);
+}
+
+/** Resolve private storage media as a data URL for native WebViews that show
+ *  broken-image placeholders for remote signed/object URLs and blob URLs. */
+export async function getStorageDataUrl(
+  value: string | null | undefined,
+  bucket: string = DEFAULT_BUCKET,
+): Promise<string> {
+  if (!value) return "";
+  if (value.startsWith("data:")) return value;
+  if (value.startsWith("blob:")) return value;
+  if (typeof FileReader === "undefined") return getPostMediaUrl(value, undefined, bucket);
+
+  const path = toBucketPath(value, bucket);
+  if (!path) return value;
+
+  const key = variantKey(bucket, path);
+  const cached = dataUrlCache.get(key);
+  if (cached?.url) return cached.url;
+  if (cached?.promise) return cached.promise;
+
+  const promise = downloadOneAsDataUrl(bucket, path).then((url) => {
+    dataUrlCache.set(key, { url });
+    return url;
+  });
+  dataUrlCache.set(key, { url: "", promise });
+  try {
+    return await promise;
+  } catch (e) {
+    dataUrlCache.delete(key);
+    throw e;
+  }
+}
+
+export function invalidateStorageDataUrl(
+  value: string | null | undefined,
+  bucket: string = DEFAULT_BUCKET,
+): void {
+  const path = toBucketPath(value, bucket);
+  if (!path) return;
+  dataUrlCache.delete(variantKey(bucket, path));
 }
 
 /**
@@ -306,6 +366,61 @@ export function useStorageBlobUrl(
     setUrl(cached?.url ?? (path ? "" : value));
     setLoading(true);
     getStorageBlobUrl(value, bucket)
+      .then((resolved) => {
+        if (!cancelled) {
+          setUrl(resolved);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUrl("");
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [value, bucket, refreshKey]);
+
+  return { url, loading };
+}
+
+/** React hook returning a native-safe data URL from private storage. */
+export function useStorageDataUrl(
+  value: string | null | undefined,
+  bucket: string = DEFAULT_BUCKET,
+  refreshKey: string | number = 0,
+): {
+  url: string;
+  loading: boolean;
+} {
+  const [url, setUrl] = useState<string>(() => {
+    if (!value) return "";
+    if (value.startsWith("blob:") || value.startsWith("data:")) return value;
+    const path = toBucketPath(value, bucket);
+    if (!path) return value;
+    return dataUrlCache.get(variantKey(bucket, path))?.url ?? "";
+  });
+  const [loading, setLoading] = useState(!url && !!value);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!value) {
+      setUrl("");
+      setLoading(false);
+      return;
+    }
+    if (value.startsWith("blob:") || value.startsWith("data:")) {
+      setUrl(value);
+      setLoading(false);
+      return;
+    }
+    const path = toBucketPath(value, bucket);
+    const cached = path ? dataUrlCache.get(variantKey(bucket, path)) : null;
+    setUrl(cached?.url ?? (path ? "" : value));
+    setLoading(true);
+    getStorageDataUrl(value, bucket)
       .then((resolved) => {
         if (!cancelled) {
           setUrl(resolved);

@@ -59,6 +59,7 @@ const acquire = (): Promise<() => void> =>
 interface VideoThumbnailProps {
   src: string;
   className?: string;
+  cacheKey?: string;
 }
 
 /**
@@ -70,8 +71,8 @@ interface VideoThumbnailProps {
  *  - Limits to 2 concurrent video captures globally
  *  - Persists the generated JPEG in sessionStorage so navigation reuses it
  */
-export const VideoThumbnail = ({ src, className = "" }: VideoThumbnailProps) => {
-  const initial = memCache.get(src) ?? readPersisted(src) ?? null;
+export const VideoThumbnail = ({ src, className = "", cacheKey = src }: VideoThumbnailProps) => {
+  const initial = memCache.get(cacheKey) ?? readPersisted(cacheKey) ?? null;
   const [poster, setPoster] = useState<string | null>(initial);
   const [failed, setFailed] = useState(false);
   const [inView, setInView] = useState(!!initial);
@@ -130,8 +131,8 @@ export const VideoThumbnail = ({ src, className = "" }: VideoThumbnailProps) => 
         // Use dataURL so it can be persisted in sessionStorage across nav.
         const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
         if (cancelled) return;
-        memCache.set(src, dataUrl);
-        writePersisted(src, dataUrl);
+        memCache.set(cacheKey, dataUrl);
+        writePersisted(cacheKey, dataUrl);
         setPoster(dataUrl);
         // Free the underlying <video> immediately so iOS stops buffering.
         try {
@@ -189,7 +190,7 @@ export const VideoThumbnail = ({ src, className = "" }: VideoThumbnailProps) => 
       video.removeEventListener("error", onError);
       if (release) release();
     };
-  }, [src, poster, failed, inView]);
+  }, [src, cacheKey, poster, failed, inView]);
 
   return (
     <div ref={containerRef} className={`relative w-full h-full bg-muted ${className}`}>
