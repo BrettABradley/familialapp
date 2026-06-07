@@ -15,6 +15,14 @@ export interface SignTransform {
 type CacheEntry = { url: string; expiresAt: number; promise?: Promise<string> };
 const cache = new Map<string, CacheEntry>();
 
+function safeDecodePath(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
 function variantKey(bucket: string, path: string, t?: SignTransform): string {
   const base = `${bucket}|${path}`;
   if (!t) return base;
@@ -37,10 +45,10 @@ export function toBucketPath(
   const marker = `/${bucket}/`;
   const idx = value.indexOf(marker);
   if (idx >= 0) {
-    return value.slice(idx + marker.length).split("?")[0];
+    return safeDecodePath(value.slice(idx + marker.length).split("?")[0]);
   }
   // Already a bare path
-  if (!value.startsWith("http")) return value.replace(/^\/+/, "");
+  if (!value.startsWith("http")) return safeDecodePath(value.replace(/^\/+/, ""));
 
   // Unknown http URL (e.g. external) — return as-is signal
   return null;
@@ -52,6 +60,10 @@ export function toPostMediaPath(value: string | null | undefined): string | null
 }
 
 async function signOne(bucket: string, path: string, transform?: SignTransform): Promise<string> {
+  // Native iOS can keep the app process alive for a long time; refresh the
+  // session before Storage signing so private-bucket URLs are minted with a
+  // current token instead of silently producing unusable image responses.
+  await supabase.auth.getSession();
   const storage = supabase.storage.from(bucket);
   const { data, error } = transform
     ? await storage.createSignedUrl(path, TTL_SECONDS, { transform })
@@ -110,6 +122,17 @@ export async function getPostMediaUrls(
   return Promise.all(values.map((v) => getPostMediaUrl(v, transform, bucket).catch(() => "")));
 }
 
+/** Drop a cached signed URL after the browser reports it as broken. */
+export function invalidateSignedMediaUrl(
+  value: string | null | undefined,
+  transform?: SignTransform,
+  bucket: string = DEFAULT_BUCKET,
+): void {
+  const path = toBucketPath(value, bucket);
+  if (!path) return;
+  cache.delete(variantKey(bucket, path, transform));
+}
+
 /**
  * Warm the in-memory signed-URL cache AND the browser image cache for an
  * upcoming asset. Safe to call repeatedly — duplicates are deduped by the
@@ -139,6 +162,7 @@ export function useSignedMediaUrl(
   value: string | null | undefined,
   transform?: SignTransform,
   bucket: string = DEFAULT_BUCKET,
+  refreshKey: string | number = 0,
 ): {
   url: string;
   loading: boolean;
@@ -166,6 +190,9 @@ export function useSignedMediaUrl(
       setLoading(false);
       return;
     }
+    const path = toBucketPath(value, bucket);
+    const cached = path ? cache.get(variantKey(bucket, path, transform)) : null;
+    setUrl(cached?.url ?? (path ? "" : value));
     setLoading(true);
     getPostMediaUrl(value, transform, bucket)
       .then((resolved) => {
@@ -184,7 +211,7 @@ export function useSignedMediaUrl(
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, tKey, bucket]);
+  }, [value, tKey, bucket, refreshKey]);
 
   return { url, loading };
 }

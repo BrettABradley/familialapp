@@ -25,6 +25,7 @@ import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import { SquareSignedThumbnail } from "@/components/shared/SquareSignedThumbnail";
 import { SignedSmartImage } from "@/components/shared/SignedSmartImage";
 import { useSignedMediaUrl, getPostMediaUrl, getPostMediaUrls, toBucketPath } from "@/lib/postMediaUrl";
+import { PRESET_TRANSFORM } from "@/lib/imageUrl";
 import useEmblaCarousel from "embla-carousel-react";
 
 interface ProfileData {
@@ -120,7 +121,7 @@ const ProfileMediaLightbox = ({
                     className="w-full h-full flex items-center justify-center"
                     onScaleChange={(s) => { if (isCurrent) zoomedRef.current = s > 1.05; }}
                   >
-                    <SignedSmartImage path={item.image_url} bucket={PROFILE_BUCKET} preset="full" priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
+                    <SignedSmartImage path={item.image_url} bucket={PROFILE_BUCKET} preset="full" transformImage={false} priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
                   </ZoomableImage>
                 )}
               </div>
@@ -174,6 +175,7 @@ const ProfileView = () => {
   const { blockUser, isBlocked } = useBlockedUsers();
   const [reportOpen, setReportOpen] = useState(false);
   const [avatarZoomOpen, setAvatarZoomOpen] = useState(false);
+  const { url: avatarSignedUrl } = useSignedMediaUrl(profileData?.avatar_url, PRESET_TRANSFORM.avatar, "avatars");
 
   useEffect(() => {
     if (!userId) return;
@@ -605,7 +607,7 @@ const ProfileView = () => {
               disabled={!profileData.avatar_url}
             >
               <Avatar className="h-28 w-28 cursor-pointer hover:opacity-90 transition-opacity">
-                <AvatarImage src={profileData.avatar_url || undefined} />
+                <AvatarImage src={avatarSignedUrl || undefined} />
                 <AvatarFallback className="text-3xl font-serif">
                   {profileData.display_name?.charAt(0)?.toUpperCase() || "U"}
                 </AvatarFallback>
@@ -708,7 +710,7 @@ const ProfileView = () => {
                     {isVideo ? (
                       <SignedVideoThumbnail path={cover.image_url} />
                     ) : (
-                      <SquareSignedThumbnail path={cover.image_url} bucket={PROFILE_BUCKET} alt={cover.caption || "Profile photo"} />
+                      <SquareSignedThumbnail path={cover.image_url} bucket={PROFILE_BUCKET} transformImage={false} alt={cover.caption || "Profile photo"} />
                     )}
                     {count > 1 && (
                       <div
@@ -746,7 +748,7 @@ const ProfileView = () => {
               onSwipeDown={() => setAvatarZoomOpen(false)}
             >
               <img
-                src={profileData.avatar_url}
+                src={avatarSignedUrl || undefined}
                 alt={profileData.display_name || "Profile picture"}
                 className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
               />
@@ -927,7 +929,7 @@ const ProfileView = () => {
                     {getMediaType(item.image_url) === "video" ? (
                       <SignedVideoThumbnail path={item.image_url} />
                     ) : (
-                      <SquareSignedThumbnail path={item.image_url} bucket={PROFILE_BUCKET} alt={`Item ${i + 1}`} />
+                      <SquareSignedThumbnail path={item.image_url} bucket={PROFILE_BUCKET} transformImage={false} alt={`Item ${i + 1}`} />
                     )}
                   </div>
                 ))}
