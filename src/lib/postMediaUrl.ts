@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-const BUCKET = "post-media";
+const DEFAULT_BUCKET = "post-media";
 const TTL_SECONDS = 60 * 60; // 1 hour
 const REFRESH_BEFORE_MS = 5 * 60 * 1000; // refresh 5 min before expiry
 
@@ -15,25 +15,29 @@ export interface SignTransform {
 type CacheEntry = { url: string; expiresAt: number; promise?: Promise<string> };
 const cache = new Map<string, CacheEntry>();
 
-function variantKey(path: string, t?: SignTransform): string {
-  if (!t) return path;
-  return `${path}|w=${t.width ?? ""}|h=${t.height ?? ""}|q=${t.quality ?? ""}|r=${t.resize ?? ""}`;
+function variantKey(bucket: string, path: string, t?: SignTransform): string {
+  const base = `${bucket}|${path}`;
+  if (!t) return base;
+  return `${base}|w=${t.width ?? ""}|h=${t.height ?? ""}|q=${t.quality ?? ""}|r=${t.resize ?? ""}`;
 }
 
 /**
  * Extracts the storage path from either a bare path ("uid/file.jpg") or a
- * legacy public URL ("https://.../storage/v1/object/public/post-media/uid/file.jpg").
+ * legacy public URL ("https://.../storage/v1/object/public/<bucket>/uid/file.jpg").
  * Returns null for blob:/data: URLs (in-flight previews).
  */
-export function toPostMediaPath(value: string | null | undefined): string | null {
+export function toBucketPath(
+  value: string | null | undefined,
+  bucket: string = DEFAULT_BUCKET,
+): string | null {
   if (!value) return null;
   if (value.startsWith("blob:") || value.startsWith("data:")) return null;
 
-  // Legacy public URL
-  const publicMarker = `/${BUCKET}/`;
-  const idx = value.indexOf(publicMarker);
+  // Legacy public/signed URL
+  const marker = `/${bucket}/`;
+  const idx = value.indexOf(marker);
   if (idx >= 0) {
-    return value.slice(idx + publicMarker.length).split("?")[0];
+    return value.slice(idx + marker.length).split("?")[0];
   }
   // Already a bare path
   if (!value.startsWith("http")) return value.replace(/^\/+/, "");
@@ -42,10 +46,15 @@ export function toPostMediaPath(value: string | null | undefined): string | null
   return null;
 }
 
-async function signOne(path: string, transform?: SignTransform): Promise<string> {
+/** Back-compat alias for the post-media-only helper. */
+export function toPostMediaPath(value: string | null | undefined): string | null {
+  return toBucketPath(value, DEFAULT_BUCKET);
+}
+
+async function signOne(bucket: string, path: string, transform?: SignTransform): Promise<string> {
   const opts = transform ? { transform } : undefined;
   const { data, error } = await supabase.storage
-    .from(BUCKET)
+    .from(bucket)
     .createSignedUrl(path, TTL_SECONDS, opts as any);
   if (error || !data?.signedUrl) {
     throw error ?? new Error("Failed to sign URL");
@@ -62,20 +71,21 @@ async function signOne(path: string, transform?: SignTransform): Promise<string>
 export async function getPostMediaUrl(
   value: string | null | undefined,
   transform?: SignTransform,
+  bucket: string = DEFAULT_BUCKET,
 ): Promise<string> {
   if (!value) return "";
   if (value.startsWith("blob:") || value.startsWith("data:")) return value;
 
-  const path = toPostMediaPath(value);
+  const path = toBucketPath(value, bucket);
   if (!path) return value; // external URL — let it through
 
-  const key = variantKey(path, transform);
+  const key = variantKey(bucket, path, transform);
   const now = Date.now();
   const cached = cache.get(key);
   if (cached && cached.expiresAt - REFRESH_BEFORE_MS > now) return cached.url;
   if (cached?.promise) return cached.promise;
 
-  const promise = signOne(path, transform).then((url) => {
+  const promise = signOne(bucket, path, transform).then((url) => {
     cache.set(key, { url, expiresAt: Date.now() + TTL_SECONDS * 1000 });
     return url;
   });
@@ -95,8 +105,9 @@ export async function getPostMediaUrl(
 export async function getPostMediaUrls(
   values: (string | null | undefined)[],
   transform?: SignTransform,
+  bucket: string = DEFAULT_BUCKET,
 ): Promise<string[]> {
-  return Promise.all(values.map((v) => getPostMediaUrl(v, transform).catch(() => "")));
+  return Promise.all(values.map((v) => getPostMediaUrl(v, transform, bucket).catch(() => "")));
 }
 
 /**
@@ -107,10 +118,11 @@ export async function getPostMediaUrls(
 export function prefetchSignedMediaUrl(
   value: string | null | undefined,
   transform?: SignTransform,
+  bucket: string = DEFAULT_BUCKET,
 ): void {
   if (!value) return;
   if (typeof window === "undefined") return;
-  getPostMediaUrl(value, transform)
+  getPostMediaUrl(value, transform, bucket)
     .then((url) => {
       if (!url) return;
       const img = new Image();
@@ -126,6 +138,7 @@ export function prefetchSignedMediaUrl(
 export function useSignedMediaUrl(
   value: string | null | undefined,
   transform?: SignTransform,
+  bucket: string = DEFAULT_BUCKET,
 ): {
   url: string;
   loading: boolean;
@@ -134,9 +147,9 @@ export function useSignedMediaUrl(
   const [url, setUrl] = useState<string>(() => {
     if (!value) return "";
     if (value.startsWith("blob:") || value.startsWith("data:")) return value;
-    const path = toPostMediaPath(value);
+    const path = toBucketPath(value, bucket);
     if (!path) return value;
-    const cached = cache.get(variantKey(path, transform));
+    const cached = cache.get(variantKey(bucket, path, transform));
     return cached?.url ?? "";
   });
   const [loading, setLoading] = useState(!url && !!value);
@@ -154,7 +167,7 @@ export function useSignedMediaUrl(
       return;
     }
     setLoading(true);
-    getPostMediaUrl(value, transform)
+    getPostMediaUrl(value, transform, bucket)
       .then((resolved) => {
         if (!cancelled) {
           setUrl(resolved);
@@ -171,7 +184,7 @@ export function useSignedMediaUrl(
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, tKey]);
+  }, [value, tKey, bucket]);
 
   return { url, loading };
 }
@@ -180,6 +193,7 @@ export function useSignedMediaUrl(
 export function useSignedMediaUrls(
   values: (string | null | undefined)[],
   transform?: SignTransform,
+  bucket: string = DEFAULT_BUCKET,
 ): {
   urls: string[];
   loading: boolean;
@@ -197,7 +211,7 @@ export function useSignedMediaUrls(
       return;
     }
     setLoading(true);
-    getPostMediaUrls(values, transform)
+    getPostMediaUrls(values, transform, bucket)
       .then((resolved) => {
         if (!cancelled) {
           setUrls(resolved);
@@ -211,7 +225,7 @@ export function useSignedMediaUrls(
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, tKey]);
+  }, [key, tKey, bucket]);
 
   return { urls, loading };
 }

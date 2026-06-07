@@ -7,6 +7,8 @@ interface SignedSmartImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>
   /** Bare storage path (e.g. "userId/album/file.jpg") or legacy public URL.
    *  Blob/data URLs and external HTTPS URLs pass through unchanged. */
   path: string | null | undefined;
+  /** Storage bucket name. Defaults to "post-media" for back-compat. */
+  bucket?: string;
   preset?: ImagePreset;
   priority?: boolean;
   /** Optional smaller preset shown immediately as a placeholder behind the
@@ -47,6 +49,7 @@ function scaleTransform(t: { width: number; height?: number; quality: number; re
  */
 export const SignedSmartImage = ({
   path,
+  bucket = "post-media",
   preset = "thumb",
   priority = false,
   lowPreset,
@@ -60,8 +63,8 @@ export const SignedSmartImage = ({
 }: SignedSmartImageProps) => {
   const transform = scaleTransform(PRESET_TRANSFORM[preset]);
   const lowTransform = lowPreset ? scaleTransform(PRESET_TRANSFORM[lowPreset]) : undefined;
-  const { url, loading } = useSignedMediaUrl(path, transform);
-  const { url: lowUrl } = useSignedMediaUrl(lowPreset ? path : null, lowTransform);
+  const { url, loading } = useSignedMediaUrl(path, transform, bucket);
+  const { url: lowUrl } = useSignedMediaUrl(lowPreset ? path : null, lowTransform, bucket);
   const [hiLoaded, setHiLoaded] = useState(false);
 
   useEffect(() => {

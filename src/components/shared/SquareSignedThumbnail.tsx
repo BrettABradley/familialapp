@@ -4,6 +4,7 @@ import type { ImagePreset } from "@/lib/imageUrl";
 interface SquareSignedThumbnailProps {
   path: string | null | undefined;
   alt: string;
+  bucket?: string;
   preset?: ImagePreset;
   priority?: boolean;
 }
@@ -16,12 +17,14 @@ interface SquareSignedThumbnailProps {
 export const SquareSignedThumbnail = ({
   path,
   alt,
+  bucket = "post-media",
   preset = "thumb",
   priority = false,
 }: SquareSignedThumbnailProps) => (
   <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-muted">
     <SignedSmartImage
       path={path}
+      bucket={bucket}
       preset={preset}
       alt=""
       aria-hidden="true"
@@ -29,6 +32,7 @@ export const SquareSignedThumbnail = ({
     />
     <SignedSmartImage
       path={path}
+      bucket={bucket}
       preset={preset}
       priority={priority}
       alt={alt}

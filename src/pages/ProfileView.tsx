@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, type VideoHTMLAttributes } from "react";
 import { useKeyboardDismissOnScroll } from "@/hooks/useKeyboardDismissOnScroll";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,7 +22,9 @@ import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { VideoThumbnail } from "@/components/shared/VideoThumbnail";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
-import { SmartImage } from "@/components/shared/SmartImage";
+import { SquareSignedThumbnail } from "@/components/shared/SquareSignedThumbnail";
+import { SignedSmartImage } from "@/components/shared/SignedSmartImage";
+import { useSignedMediaUrl, getPostMediaUrl, getPostMediaUrls, toBucketPath } from "@/lib/postMediaUrl";
 import useEmblaCarousel from "embla-carousel-react";
 
 interface ProfileData {
@@ -43,48 +45,30 @@ interface ProfileImage {
 }
 
 const MAX_GROUP_ITEMS = 5;
-const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour
+const PROFILE_BUCKET = "profile-images";
 
-// Extracts the storage path from a stored profile-images URL.
-// Handles both legacy public URLs and already-signed URLs.
-const extractProfileImagePath = (url: string): string | null => {
-  if (!url) return null;
-  // Path-only (newer uploads may store just the path)
-  if (!url.startsWith("http")) return url;
-  const m = url.match(/\/profile-images\/(.+?)(?:\?|$)/);
-  return m ? m[1] : null;
+/** Normalize a stored profile_images.image_url (legacy public URL or bare path)
+ *  into a bare storage path. Returns the input unchanged for blob/data URLs. */
+const toProfilePath = (value: string): string => {
+  if (!value) return value;
+  if (value.startsWith("blob:") || value.startsWith("data:")) return value;
+  return toBucketPath(value, PROFILE_BUCKET) ?? value;
 };
 
-// Sign a single profile image; returns the signed URL or the original on failure.
-// Pass `transform` to fetch a CDN-cached WebP variant (only valid for images).
-const signProfileImage = async (
-  image_url: string,
-  transform?: { width?: number; height?: number; quality?: number; resize?: "cover" | "contain" | "fill" },
-): Promise<string> => {
-  const path = extractProfileImagePath(image_url);
-  if (!path) return image_url;
-  const opts = transform ? { transform } : undefined;
-  const { data, error } = await supabase.storage
-    .from("profile-images")
-    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS, opts as any);
-  if (error || !data?.signedUrl) return image_url;
-  return data.signedUrl;
+/** Inline <video> that resolves a bare storage path to a signed URL on the fly. */
+const SignedVideo = ({ path, ...rest }: { path: string } & VideoHTMLAttributes<HTMLVideoElement>) => {
+  const { url } = useSignedMediaUrl(path, undefined, PROFILE_BUCKET);
+  if (!url) return <div className="h-full w-full bg-muted" aria-busy />;
+  return <video src={url} {...rest} />;
 };
 
-// Card preset transform — small enough for grid tiles + the lightbox on phone
-// screens, served as a CDN-cached WebP instead of the multi-MB original.
-const PROFILE_CARD_TRANSFORM = { width: 800, quality: 75, resize: "contain" as const };
-
-const signProfileImages = async <T extends { image_url: string }>(rows: T[]): Promise<T[]> => {
-  if (rows.length === 0) return rows;
-  return Promise.all(
-    rows.map(async (r) => {
-      const isImage = getMediaType(r.image_url) === "image";
-      const transform = isImage ? PROFILE_CARD_TRANSFORM : undefined;
-      return { ...r, image_url: await signProfileImage(r.image_url, transform) };
-    }),
-  );
+/** Inline <VideoThumbnail> that resolves a bare path to a signed URL first. */
+const SignedVideoThumbnail = ({ path }: { path: string }) => {
+  const { url } = useSignedMediaUrl(path, undefined, PROFILE_BUCKET);
+  if (!url) return <div className="h-full w-full bg-muted" aria-busy />;
+  return <VideoThumbnail src={url} />;
 };
+
 
 const ProfileMediaLightbox = ({
   group,
@@ -130,13 +114,13 @@ const ProfileMediaLightbox = ({
             return (
               <div key={item.id} className="flex h-full min-w-0 flex-[0_0_100%] items-center justify-center px-2">
                 {getMediaType(item.image_url) === "video" ? (
-                  <video src={item.image_url} controls autoPlay={isCurrent} playsInline className="max-h-full max-w-full select-none object-contain" />
+                  <SignedVideo path={item.image_url} controls autoPlay={isCurrent} playsInline className="max-h-full max-w-full select-none object-contain" />
                 ) : (
                   <ZoomableImage
                     className="w-full h-full flex items-center justify-center"
                     onScaleChange={(s) => { if (isCurrent) zoomedRef.current = s > 1.05; }}
                   >
-                    <SmartImage src={item.image_url} preset="full" priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
+                    <SignedSmartImage path={item.image_url} bucket={PROFILE_BUCKET} preset="full" priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
                   </ZoomableImage>
                 )}
               </div>
@@ -203,8 +187,8 @@ const ProfileView = () => {
 
       if (profileRes.data) setProfileData(profileRes.data);
       if (imagesRes.data) {
-        const signed = await signProfileImages(imagesRes.data as ProfileImage[]);
-        setImages(signed);
+        const rows = (imagesRes.data as ProfileImage[]).map((r) => ({ ...r, image_url: toProfilePath(r.image_url) }));
+        setImages(rows);
       }
       setIsLoading(false);
     };
@@ -429,23 +413,26 @@ const ProfileView = () => {
     }
 
     if (insertedRows.length > 0) {
-      // Sign URLs so the private bucket can be fetched by the client + moderator
-      const signedRows = await signProfileImages(insertedRows);
+      // Store bare storage paths in state; SignedSmartImage signs on render.
+      const pathRows = insertedRows.map((r) => ({ ...r, image_url: toProfilePath(r.image_url) }));
       // Prepend the whole new group at the top
-      setImages((prev) => [...signedRows, ...prev]);
-      toast({ title: signedRows.length > 1 ? `Posted ${signedRows.length} items!` : "Media uploaded!" });
+      setImages((prev) => [...pathRows, ...prev]);
+      toast({ title: pathRows.length > 1 ? `Posted ${pathRows.length} items!` : "Media uploaded!" });
 
-      // Silent background moderation per image (uses signed URLs)
-      const imageRows = signedRows.filter((r) => getMediaType(r.image_url) === "image");
-      if (imageRows.length > 0) {
+      // Silent background moderation per image — sign just-in-time so the
+      // edge function can fetch the private-bucket asset.
+      const imagePaths = pathRows.filter((r) => getMediaType(r.image_url) === "image").map((r) => r.image_url);
+      if (imagePaths.length > 0) {
         (async () => {
           try {
+            const signedUrls = (await getPostMediaUrls(imagePaths, undefined, PROFILE_BUCKET)).filter(Boolean);
+            if (signedUrls.length === 0) return;
             const { data: modResult, error: modError } = await supabase.functions.invoke("moderate-content", {
-              body: { imageUrls: imageRows.map((r) => r.image_url) },
+              body: { imageUrls: signedUrls },
             });
 
             if (!modError && modResult && !modResult.allowed) {
-              const ids = signedRows.map((r) => r.id);
+              const ids = pathRows.map((r) => r.id);
               await supabase.from("profile_images").delete().in("id", ids);
               await supabase.storage.from("profile-images").remove(insertedStoragePaths);
               setImages((prev) => prev.filter((i) => !ids.includes(i.id)));
@@ -468,24 +455,25 @@ const ProfileView = () => {
     resetUploadState();
   };
 
-  const handleDownload = async (url: string, filename?: string) => {
+  const handleDownload = async (pathOrUrl: string, filename?: string) => {
     try {
+      // The grid + lightbox store bare storage paths; resolve to a signed URL
+      // before handing off to the native/web downloader.
+      const url = await getPostMediaUrl(pathOrUrl, undefined, PROFILE_BUCKET);
+      if (!url) throw new Error("Could not resolve download URL");
       const { downloadFile } = await import("@/lib/nativeDownload");
-      await downloadFile(url, filename || url.split("/").pop()?.split("?")[0]);
+      await downloadFile(url, filename || pathOrUrl.split("/").pop()?.split("?")[0]);
     } catch {
       toast({ title: "Download failed", variant: "destructive" });
     }
   };
 
-  const extractStoragePath = (publicUrl: string): string | null => {
-    // public URL is .../object/public/profile-images/<userId>/<file>
-    const m = publicUrl.match(/\/profile-images\/(.+?)(?:\?|$)/);
-    return m ? m[1] : null;
-  };
-
   const handleDeleteGroup = async (group: ProfileImage[]) => {
     const ids = group.map((g) => g.id);
-    const paths = group.map((g) => extractStoragePath(g.image_url)).filter((p): p is string => !!p);
+    // image_url is already a bare storage path after the fetch normalization.
+    const paths = group
+      .map((g) => (g.image_url && !g.image_url.startsWith("blob:") && !g.image_url.startsWith("data:") ? g.image_url : null))
+      .filter((p): p is string => !!p);
 
     const { error } = await supabase.from("profile_images").delete().in("id", ids);
     if (error) {
@@ -528,9 +516,14 @@ const ProfileView = () => {
     setIsSavingEdit(false);
   };
 
-  const handleEditRecrop = () => {
+  const handleEditRecrop = async () => {
     if (!editingGroup || editingGroup.length !== 1) return;
-    setEditCropSrc(editingGroup[0].image_url);
+    const url = await getPostMediaUrl(editingGroup[0].image_url, undefined, PROFILE_BUCKET);
+    if (!url) {
+      toast({ title: "Could not load image", variant: "destructive" });
+      return;
+    }
+    setEditCropSrc(url);
   };
 
   const handleEditCropComplete = async (blob: Blob) => {
@@ -560,9 +553,9 @@ const ProfileView = () => {
     if (updateError) {
       toast({ title: "Error", description: "Failed to update image.", variant: "destructive" });
     } else {
-      const signedUrl = await signProfileImage(publicUrlData.publicUrl, PROFILE_CARD_TRANSFORM);
-      setImages((prev) => prev.map((i) => i.id === target.id ? { ...i, image_url: signedUrl } : i));
-      setEditingGroup((prev) => prev ? prev.map((i) => i.id === target.id ? { ...i, image_url: signedUrl } : i) : null);
+      const newPath = toProfilePath(publicUrlData.publicUrl);
+      setImages((prev) => prev.map((i) => i.id === target.id ? { ...i, image_url: newPath } : i));
+      setEditingGroup((prev) => prev ? prev.map((i) => i.id === target.id ? { ...i, image_url: newPath } : i) : null);
       toast({ title: "Image updated!" });
     }
     setIsSavingEdit(false);
@@ -713,9 +706,9 @@ const ProfileView = () => {
                     aria-label={count > 1 ? `Open post with ${count} items` : "Open post"}
                   >
                     {isVideo ? (
-                      <VideoThumbnail src={cover.image_url} />
+                      <SignedVideoThumbnail path={cover.image_url} />
                     ) : (
-                      <SquareImageThumbnail src={cover.image_url} alt={cover.caption || "Profile photo"} />
+                      <SquareSignedThumbnail path={cover.image_url} bucket={PROFILE_BUCKET} alt={cover.caption || "Profile photo"} />
                     )}
                     {count > 1 && (
                       <div
@@ -932,9 +925,9 @@ const ProfileView = () => {
                 {editingGroup.map((item, i) => (
                   <div key={item.id} className="relative flex-shrink-0 w-20 h-20 rounded-md overflow-hidden bg-muted">
                     {getMediaType(item.image_url) === "video" ? (
-                      <VideoThumbnail src={item.image_url} />
+                      <SignedVideoThumbnail path={item.image_url} />
                     ) : (
-                      <SquareImageThumbnail src={item.image_url} alt={`Item ${i + 1}`} />
+                      <SquareSignedThumbnail path={item.image_url} bucket={PROFILE_BUCKET} alt={`Item ${i + 1}`} />
                     )}
                   </div>
                 ))}
