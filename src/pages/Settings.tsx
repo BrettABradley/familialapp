@@ -86,6 +86,32 @@ const Settings = () => {
     }
   }, [profile]);
 
+  // Onboarding deep links: ?open=avatar opens the photo picker, ?focus=displayName
+  // scrolls to and focuses the Display Name field. Strip the param so a refresh
+  // doesn't re-trigger.
+  useEffect(() => {
+    const open = searchParams.get("open");
+    const focus = searchParams.get("focus");
+    if (!open && !focus) return;
+    const t = setTimeout(() => {
+      if (open === "avatar") {
+        handlePickImage();
+      } else if (focus === "displayName") {
+        const el = document.getElementById("displayName") as HTMLInputElement | null;
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.focus();
+        }
+      }
+      const next = new URLSearchParams(searchParams);
+      next.delete("open");
+      next.delete("focus");
+      setSearchParams(next, { replace: true });
+    }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const saveEmailPref = async (field: "email_on_mention" | "email_on_unread_dm" | "email_on_new_album", value: boolean) => {
     if (!user) return;
     await supabase.from("profiles").update({ [field]: value } as any).eq("user_id", user.id);
