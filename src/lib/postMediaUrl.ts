@@ -15,6 +15,14 @@ export interface SignTransform {
 type CacheEntry = { url: string; expiresAt: number; promise?: Promise<string> };
 const cache = new Map<string, CacheEntry>();
 
+function safeDecodePath(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
 function variantKey(bucket: string, path: string, t?: SignTransform): string {
   const base = `${bucket}|${path}`;
   if (!t) return base;
@@ -37,10 +45,10 @@ export function toBucketPath(
   const marker = `/${bucket}/`;
   const idx = value.indexOf(marker);
   if (idx >= 0) {
-    return value.slice(idx + marker.length).split("?")[0];
+    return safeDecodePath(value.slice(idx + marker.length).split("?")[0]);
   }
   // Already a bare path
-  if (!value.startsWith("http")) return value.replace(/^\/+/, "");
+  if (!value.startsWith("http")) return safeDecodePath(value.replace(/^\/+/, ""));
 
   // Unknown http URL (e.g. external) — return as-is signal
   return null;
