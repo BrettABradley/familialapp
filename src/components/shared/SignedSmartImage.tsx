@@ -104,7 +104,7 @@ export const SignedSmartImage = ({
       style={style}
       onLoad={(e) => {
         const t = e.currentTarget;
-        if (t.src === url) {
+        if (!url || !lowUrl || t.src.includes(url.split("?")[0])) {
           setHiLoaded(true);
           if (onAspect && t.naturalWidth && t.naturalHeight) {
             onAspect(t.naturalWidth / t.naturalHeight);

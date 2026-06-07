@@ -593,6 +593,7 @@ const ProfileView = () => {
 
   return (
     <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
+  const { url: avatarSignedUrl } = useSignedMediaUrl(profileData?.avatar_url, "avatar", "avatars");
       {/* Profile Header */}
       <Card>
         <CardContent className="py-8">
@@ -605,7 +606,7 @@ const ProfileView = () => {
               disabled={!profileData.avatar_url}
             >
               <Avatar className="h-28 w-28 cursor-pointer hover:opacity-90 transition-opacity">
-                <AvatarImage src={profileData.avatar_url || undefined} />
+                <AvatarImage src={avatarSignedUrl || undefined} />
                 <AvatarFallback className="text-3xl font-serif">
                   {profileData.display_name?.charAt(0)?.toUpperCase() || "U"}
                 </AvatarFallback>
@@ -746,7 +747,7 @@ const ProfileView = () => {
               onSwipeDown={() => setAvatarZoomOpen(false)}
             >
               <img
-                src={profileData.avatar_url}
+                src={avatarSignedUrl || profileData.avatar_url}
                 alt={profileData.display_name || "Profile picture"}
                 className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
               />
