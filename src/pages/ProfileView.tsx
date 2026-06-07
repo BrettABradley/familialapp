@@ -25,6 +25,7 @@ import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import { SquareSignedThumbnail } from "@/components/shared/SquareSignedThumbnail";
 import { SignedSmartImage } from "@/components/shared/SignedSmartImage";
 import { useSignedMediaUrl, getPostMediaUrl, getPostMediaUrls, toBucketPath } from "@/lib/postMediaUrl";
+import { PRESET_TRANSFORM } from "@/lib/imageUrl";
 import useEmblaCarousel from "embla-carousel-react";
 
 interface ProfileData {
@@ -174,7 +175,7 @@ const ProfileView = () => {
   const { blockUser, isBlocked } = useBlockedUsers();
   const [reportOpen, setReportOpen] = useState(false);
   const [avatarZoomOpen, setAvatarZoomOpen] = useState(false);
-  const { url: avatarSignedUrl } = useSignedMediaUrl(profileData?.avatar_url, "avatar", "avatars");
+  const { url: avatarSignedUrl } = useSignedMediaUrl(profileData?.avatar_url, PRESET_TRANSFORM.avatar, "avatars");
 
   useEffect(() => {
     if (!userId) return;
