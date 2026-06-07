@@ -185,7 +185,7 @@ const ProfileView = () => {
         supabase.from("profile_images").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
       ]);
 
-      if (profileData) setProfileData(profileRes.data);
+      if (profileRes.data) setProfileData(profileRes.data);
       if (imagesRes.data) {
         const rows = (imagesRes.data as ProfileImage[]).map((r) => ({ ...r, image_url: toProfilePath(r.image_url) }));
         setImages(rows);
@@ -455,24 +455,25 @@ const ProfileView = () => {
     resetUploadState();
   };
 
-  const handleDownload = async (url: string, filename?: string) => {
+  const handleDownload = async (pathOrUrl: string, filename?: string) => {
     try {
+      // The grid + lightbox store bare storage paths; resolve to a signed URL
+      // before handing off to the native/web downloader.
+      const url = await getPostMediaUrl(pathOrUrl, undefined, PROFILE_BUCKET);
+      if (!url) throw new Error("Could not resolve download URL");
       const { downloadFile } = await import("@/lib/nativeDownload");
-      await downloadFile(url, filename || url.split("/").pop()?.split("?")[0]);
+      await downloadFile(url, filename || pathOrUrl.split("/").pop()?.split("?")[0]);
     } catch {
       toast({ title: "Download failed", variant: "destructive" });
     }
   };
 
-  const extractStoragePath = (publicUrl: string): string | null => {
-    // public URL is .../object/public/profile-images/<userId>/<file>
-    const m = publicUrl.match(/\/profile-images\/(.+?)(?:\?|$)/);
-    return m ? m[1] : null;
-  };
-
   const handleDeleteGroup = async (group: ProfileImage[]) => {
     const ids = group.map((g) => g.id);
-    const paths = group.map((g) => extractStoragePath(g.image_url)).filter((p): p is string => !!p);
+    // image_url is already a bare storage path after the fetch normalization.
+    const paths = group
+      .map((g) => (g.image_url && !g.image_url.startsWith("blob:") && !g.image_url.startsWith("data:") ? g.image_url : null))
+      .filter((p): p is string => !!p);
 
     const { error } = await supabase.from("profile_images").delete().in("id", ids);
     if (error) {
@@ -515,9 +516,14 @@ const ProfileView = () => {
     setIsSavingEdit(false);
   };
 
-  const handleEditRecrop = () => {
+  const handleEditRecrop = async () => {
     if (!editingGroup || editingGroup.length !== 1) return;
-    setEditCropSrc(editingGroup[0].image_url);
+    const url = await getPostMediaUrl(editingGroup[0].image_url, undefined, PROFILE_BUCKET);
+    if (!url) {
+      toast({ title: "Could not load image", variant: "destructive" });
+      return;
+    }
+    setEditCropSrc(url);
   };
 
   const handleEditCropComplete = async (blob: Blob) => {
@@ -700,9 +706,9 @@ const ProfileView = () => {
                     aria-label={count > 1 ? `Open post with ${count} items` : "Open post"}
                   >
                     {isVideo ? (
-                      <VideoThumbnail src={cover.image_url} />
+                      <SignedVideoThumbnail path={cover.image_url} />
                     ) : (
-                      <SquareImageThumbnail src={cover.image_url} alt={cover.caption || "Profile photo"} />
+                      <SquareSignedThumbnail path={cover.image_url} bucket={PROFILE_BUCKET} alt={cover.caption || "Profile photo"} />
                     )}
                     {count > 1 && (
                       <div
@@ -919,9 +925,9 @@ const ProfileView = () => {
                 {editingGroup.map((item, i) => (
                   <div key={item.id} className="relative flex-shrink-0 w-20 h-20 rounded-md overflow-hidden bg-muted">
                     {getMediaType(item.image_url) === "video" ? (
-                      <VideoThumbnail src={item.image_url} />
+                      <SignedVideoThumbnail path={item.image_url} />
                     ) : (
-                      <SquareImageThumbnail src={item.image_url} alt={`Item ${i + 1}`} />
+                      <SquareSignedThumbnail path={item.image_url} bucket={PROFILE_BUCKET} alt={`Item ${i + 1}`} />
                     )}
                   </div>
                 ))}
