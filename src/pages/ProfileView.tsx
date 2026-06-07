@@ -22,7 +22,9 @@ import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { VideoThumbnail } from "@/components/shared/VideoThumbnail";
 import { ZoomableImage } from "@/components/shared/ZoomableImage";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
-import { SmartImage } from "@/components/shared/SmartImage";
+import { SquareSignedThumbnail } from "@/components/shared/SquareSignedThumbnail";
+import { SignedSmartImage } from "@/components/shared/SignedSmartImage";
+import { useSignedMediaUrl, getPostMediaUrl, getPostMediaUrls, toBucketPath } from "@/lib/postMediaUrl";
 import useEmblaCarousel from "embla-carousel-react";
 
 interface ProfileData {
@@ -43,48 +45,30 @@ interface ProfileImage {
 }
 
 const MAX_GROUP_ITEMS = 5;
-const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour
+const PROFILE_BUCKET = "profile-images";
 
-// Extracts the storage path from a stored profile-images URL.
-// Handles both legacy public URLs and already-signed URLs.
-const extractProfileImagePath = (url: string): string | null => {
-  if (!url) return null;
-  // Path-only (newer uploads may store just the path)
-  if (!url.startsWith("http")) return url;
-  const m = url.match(/\/profile-images\/(.+?)(?:\?|$)/);
-  return m ? m[1] : null;
+/** Normalize a stored profile_images.image_url (legacy public URL or bare path)
+ *  into a bare storage path. Returns the input unchanged for blob/data URLs. */
+const toProfilePath = (value: string): string => {
+  if (!value) return value;
+  if (value.startsWith("blob:") || value.startsWith("data:")) return value;
+  return toBucketPath(value, PROFILE_BUCKET) ?? value;
 };
 
-// Sign a single profile image; returns the signed URL or the original on failure.
-// Pass `transform` to fetch a CDN-cached WebP variant (only valid for images).
-const signProfileImage = async (
-  image_url: string,
-  transform?: { width?: number; height?: number; quality?: number; resize?: "cover" | "contain" | "fill" },
-): Promise<string> => {
-  const path = extractProfileImagePath(image_url);
-  if (!path) return image_url;
-  const opts = transform ? { transform } : undefined;
-  const { data, error } = await supabase.storage
-    .from("profile-images")
-    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS, opts as any);
-  if (error || !data?.signedUrl) return image_url;
-  return data.signedUrl;
+/** Inline <video> that resolves a bare storage path to a signed URL on the fly. */
+const SignedVideo = ({ path, ...rest }: { path: string } & React.VideoHTMLAttributes<HTMLVideoElement>) => {
+  const { url } = useSignedMediaUrl(path, undefined, PROFILE_BUCKET);
+  if (!url) return <div className="h-full w-full bg-muted" aria-busy />;
+  return <video src={url} {...rest} />;
 };
 
-// Card preset transform — small enough for grid tiles + the lightbox on phone
-// screens, served as a CDN-cached WebP instead of the multi-MB original.
-const PROFILE_CARD_TRANSFORM = { width: 800, quality: 75, resize: "contain" as const };
-
-const signProfileImages = async <T extends { image_url: string }>(rows: T[]): Promise<T[]> => {
-  if (rows.length === 0) return rows;
-  return Promise.all(
-    rows.map(async (r) => {
-      const isImage = getMediaType(r.image_url) === "image";
-      const transform = isImage ? PROFILE_CARD_TRANSFORM : undefined;
-      return { ...r, image_url: await signProfileImage(r.image_url, transform) };
-    }),
-  );
+/** Inline <VideoThumbnail> that resolves a bare path to a signed URL first. */
+const SignedVideoThumbnail = ({ path }: { path: string }) => {
+  const { url } = useSignedMediaUrl(path, undefined, PROFILE_BUCKET);
+  if (!url) return <div className="h-full w-full bg-muted" aria-busy />;
+  return <VideoThumbnail src={url} />;
 };
+
 
 const ProfileMediaLightbox = ({
   group,
