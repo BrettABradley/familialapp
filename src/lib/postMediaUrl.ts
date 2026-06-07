@@ -207,6 +207,47 @@ export function invalidateStorageBlobUrl(
   blobCache.delete(key);
 }
 
+/** Resolve private storage media as a data URL for native WebViews that show
+ *  broken-image placeholders for remote signed/object URLs and blob URLs. */
+export async function getStorageDataUrl(
+  value: string | null | undefined,
+  bucket: string = DEFAULT_BUCKET,
+): Promise<string> {
+  if (!value) return "";
+  if (value.startsWith("data:")) return value;
+  if (value.startsWith("blob:")) return value;
+  if (typeof FileReader === "undefined") return getPostMediaUrl(value, undefined, bucket);
+
+  const path = toBucketPath(value, bucket);
+  if (!path) return value;
+
+  const key = variantKey(bucket, path);
+  const cached = dataUrlCache.get(key);
+  if (cached?.url) return cached.url;
+  if (cached?.promise) return cached.promise;
+
+  const promise = downloadOneAsDataUrl(bucket, path).then((url) => {
+    dataUrlCache.set(key, { url });
+    return url;
+  });
+  dataUrlCache.set(key, { url: "", promise });
+  try {
+    return await promise;
+  } catch (e) {
+    dataUrlCache.delete(key);
+    throw e;
+  }
+}
+
+export function invalidateStorageDataUrl(
+  value: string | null | undefined,
+  bucket: string = DEFAULT_BUCKET,
+): void {
+  const path = toBucketPath(value, bucket);
+  if (!path) return;
+  dataUrlCache.delete(variantKey(bucket, path));
+}
+
 /**
  * Warm the in-memory signed-URL cache AND the browser image cache for an
  * upcoming asset. Safe to call repeatedly — duplicates are deduped by the
