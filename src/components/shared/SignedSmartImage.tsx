@@ -1,6 +1,6 @@
 import { ImgHTMLAttributes, SyntheticEvent, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { invalidateSignedMediaUrl, useSignedMediaUrl } from "@/lib/postMediaUrl";
+import { invalidateSignedMediaUrl, invalidateStorageBlobUrl, useSignedMediaUrl, useStorageBlobUrl } from "@/lib/postMediaUrl";
 import { PRESET_TRANSFORM, ImagePreset } from "@/lib/imageUrl";
 
 interface SignedSmartImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, "src" | "srcSet"> {
@@ -22,6 +22,9 @@ interface SignedSmartImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>
   /** Disable Storage image transforms for surfaces where the native WebView
    *  must receive the original signed object URL (notably iOS profile media). */
   transformImage?: boolean;
+  /** Download private storage media to a local blob URL before rendering.
+   *  This avoids iOS WebView failures on private signed image URLs. */
+  resolveAsBlob?: boolean;
   /** Called after the image decodes with its naturalWidth/naturalHeight
    *  ratio. Lets parents swap the reserved aspect-ratio to the real one. */
   onAspect?: (ratio: number) => void;
@@ -58,6 +61,7 @@ export const SignedSmartImage = ({
   lowPreset,
   reserveAspect,
   transformImage = true,
+  resolveAsBlob = false,
   onAspect,
   className,
   alt = "",
@@ -69,10 +73,12 @@ export const SignedSmartImage = ({
   const [useOriginalFallback, setUseOriginalFallback] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
-  const shouldTransform = transformImage && !useOriginalFallback;
+  const shouldTransform = transformImage && !useOriginalFallback && !resolveAsBlob;
   const transform = shouldTransform ? scaleTransform(PRESET_TRANSFORM[preset]) : undefined;
   const lowTransform = lowPreset && shouldTransform ? scaleTransform(PRESET_TRANSFORM[lowPreset]) : undefined;
-  const { url, loading } = useSignedMediaUrl(path, transform, bucket, retryNonce);
+  const signedMedia = useSignedMediaUrl(resolveAsBlob ? null : path, transform, bucket, retryNonce);
+  const blobMedia = useStorageBlobUrl(resolveAsBlob ? path : null, bucket, retryNonce);
+  const { url, loading } = resolveAsBlob ? blobMedia : signedMedia;
   const { url: lowUrl } = useSignedMediaUrl(lowPreset && shouldTransform ? path : null, lowTransform, bucket, retryNonce);
   const [hiLoaded, setHiLoaded] = useState(false);
 
@@ -81,7 +87,7 @@ export const SignedSmartImage = ({
     setUseOriginalFallback(false);
     setRetryCount(0);
     setRetryNonce((n) => n + 1);
-  }, [path, bucket, preset, lowPreset, transformImage]);
+  }, [path, bucket, preset, lowPreset, transformImage, resolveAsBlob]);
 
   useEffect(() => {
     setHiLoaded(false);
@@ -89,8 +95,9 @@ export const SignedSmartImage = ({
 
   const handleImageError = (e: SyntheticEvent<HTMLImageElement, Event>) => {
     setHiLoaded(false);
-    invalidateSignedMediaUrl(path, transform, bucket);
-    if (!useOriginalFallback && transformImage) {
+    if (resolveAsBlob) invalidateStorageBlobUrl(path, bucket);
+    else invalidateSignedMediaUrl(path, transform, bucket);
+    if (!resolveAsBlob && !useOriginalFallback && transformImage) {
       setUseOriginalFallback(true);
     } else if (retryCount < 1) {
       setRetryCount((n) => n + 1);

@@ -8,6 +8,7 @@ interface SquareSignedThumbnailProps {
   preset?: ImagePreset;
   priority?: boolean;
   transformImage?: boolean;
+  resolveAsBlob?: boolean;
 }
 
 /**
@@ -22,6 +23,7 @@ export const SquareSignedThumbnail = ({
   preset = "thumb",
   priority = false,
   transformImage = true,
+  resolveAsBlob = false,
 }: SquareSignedThumbnailProps) => (
   <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-muted">
     <SignedSmartImage
@@ -29,6 +31,7 @@ export const SquareSignedThumbnail = ({
       bucket={bucket}
       preset={preset}
       transformImage={transformImage}
+      resolveAsBlob={resolveAsBlob}
       alt=""
       aria-hidden="true"
       className="absolute inset-0 h-full w-full scale-105 object-cover opacity-35 blur-xl bg-transparent"
@@ -39,6 +42,7 @@ export const SquareSignedThumbnail = ({
       preset={preset}
       priority={priority}
       transformImage={transformImage}
+      resolveAsBlob={resolveAsBlob}
       alt={alt}
       className="relative z-10 h-auto w-full max-w-none object-contain bg-transparent"
       style={{ objectPosition: "center center" }}
