@@ -16,6 +16,7 @@ type CacheEntry = { url: string; expiresAt: number; promise?: Promise<string> };
 const cache = new Map<string, CacheEntry>();
 type BlobCacheEntry = { url: string; promise?: Promise<string> };
 const blobCache = new Map<string, BlobCacheEntry>();
+const dataUrlCache = new Map<string, BlobCacheEntry>();
 
 function safeDecodePath(path: string): string {
   try {
@@ -142,6 +143,24 @@ async function downloadOne(bucket: string, path: string): Promise<string> {
     throw error ?? new Error("Failed to download media");
   }
   return URL.createObjectURL(data);
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Failed to read media"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function downloadOneAsDataUrl(bucket: string, path: string): Promise<string> {
+  await supabase.auth.getSession();
+  const { data, error } = await supabase.storage.from(bucket).download(path);
+  if (error || !data) {
+    throw error ?? new Error("Failed to download media");
+  }
+  return blobToDataUrl(data);
 }
 
 /** Resolve private storage media by downloading it to a local blob URL.
