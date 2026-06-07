@@ -232,7 +232,7 @@ export const useFeedPosts = () => {
           related_post_id: postId,
           related_user_id: user.id,
           related_circle_id: post.circle_id,
-          link: `/feed?post=${postId}`,
+          link: `/feed?circle=${post.circle_id}&post=${postId}`,
         }).then();
       }
     }
