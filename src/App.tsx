@@ -10,7 +10,6 @@ import { useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { UpdateGate } from "@/components/UpdateGate";
-import ScrollToTop from "@/components/ScrollToTop";
 import Index from "./pages/Index";
 import Unsubscribe from "./pages/Unsubscribe";
 import Auth from "./pages/Auth";
@@ -94,7 +93,6 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <ScrollToTop />
           <NativeUrlOpenBridge />
           <UpdateGate>
           <Routes>
