@@ -711,6 +711,7 @@ const Circles = () => {
           message: `"${circle.name}" has been put on transfer block. Claim ownership to keep it going.`,
           related_circle_id: circle.id,
           related_user_id: user.id,
+          link: `/circles?circle=${circle.id}`,
         }));
       if (notifications.length > 0) {
         await supabase.from("notifications").insert(notifications);
