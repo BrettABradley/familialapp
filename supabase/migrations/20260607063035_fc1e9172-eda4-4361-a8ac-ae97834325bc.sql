@@ -1,0 +1,1 @@
+UPDATE public.app_version_config SET store_url = 'https://apps.apple.com/us/app/familial/id6760382623' WHERE platform = 'ios';
