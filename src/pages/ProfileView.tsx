@@ -95,6 +95,7 @@ const ProfileMediaLightbox = ({
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "center", duration: 34, dragThreshold: 4, containScroll: "trimSnaps", startIndex, watchDrag: () => !zoomedRef.current });
   const [selected, setSelected] = useState(startIndex);
   const current = group[selected];
+  const nativeProfileMedia = useNativeProfileDataUrl();
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -128,7 +129,7 @@ const ProfileMediaLightbox = ({
                     className="w-full h-full flex items-center justify-center"
                     onScaleChange={(s) => { if (isCurrent) zoomedRef.current = s > 1.05; }}
                   >
-                    <SignedSmartImage path={item.image_url} bucket={PROFILE_BUCKET} preset="full" transformImage={false} priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
+                    <SignedSmartImage path={item.image_url} bucket={PROFILE_BUCKET} preset="full" transformImage={false} resolveAsDataUrl={nativeProfileMedia} priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
                   </ZoomableImage>
                 )}
               </div>
@@ -599,6 +600,7 @@ const ProfileView = () => {
   }
 
   const currentSlide = lightbox ? lightbox.group[lightbox.index] : null;
+  const nativeProfileMedia = useNativeProfileDataUrl();
 
   return (
     <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
@@ -717,7 +719,7 @@ const ProfileView = () => {
                     {isVideo ? (
                       <SignedVideoThumbnail path={cover.image_url} />
                     ) : (
-                      <SquareSignedThumbnail path={cover.image_url} bucket={PROFILE_BUCKET} transformImage={false} alt={cover.caption || "Profile photo"} />
+                      <SquareSignedThumbnail path={cover.image_url} bucket={PROFILE_BUCKET} transformImage={false} resolveAsDataUrl={nativeProfileMedia} alt={cover.caption || "Profile photo"} />
                     )}
                     {count > 1 && (
                       <div
@@ -936,7 +938,7 @@ const ProfileView = () => {
                     {getMediaType(item.image_url) === "video" ? (
                       <SignedVideoThumbnail path={item.image_url} />
                     ) : (
-                      <SquareSignedThumbnail path={item.image_url} bucket={PROFILE_BUCKET} transformImage={false} alt={`Item ${i + 1}`} />
+                      <SquareSignedThumbnail path={item.image_url} bucket={PROFILE_BUCKET} transformImage={false} resolveAsDataUrl={nativeProfileMedia} alt={`Item ${i + 1}`} />
                     )}
                   </div>
                 ))}
