@@ -14,6 +14,8 @@ export interface SignTransform {
 
 type CacheEntry = { url: string; expiresAt: number; promise?: Promise<string> };
 const cache = new Map<string, CacheEntry>();
+type BlobCacheEntry = { url: string; promise?: Promise<string> };
+const blobCache = new Map<string, BlobCacheEntry>();
 
 function safeDecodePath(path: string): string {
   try {
@@ -133,6 +135,59 @@ export function invalidateSignedMediaUrl(
   cache.delete(variantKey(bucket, path, transform));
 }
 
+async function downloadOne(bucket: string, path: string): Promise<string> {
+  await supabase.auth.getSession();
+  const { data, error } = await supabase.storage.from(bucket).download(path);
+  if (error || !data) {
+    throw error ?? new Error("Failed to download media");
+  }
+  return URL.createObjectURL(data);
+}
+
+/** Resolve private storage media by downloading it to a local blob URL.
+ *  Used for iOS surfaces that render signed object URLs as broken images. */
+export async function getStorageBlobUrl(
+  value: string | null | undefined,
+  bucket: string = DEFAULT_BUCKET,
+): Promise<string> {
+  if (!value) return "";
+  if (value.startsWith("blob:") || value.startsWith("data:")) return value;
+  if (typeof URL === "undefined") return getPostMediaUrl(value, undefined, bucket);
+
+  const path = toBucketPath(value, bucket);
+  if (!path) return value;
+
+  const key = variantKey(bucket, path);
+  const cached = blobCache.get(key);
+  if (cached?.url) return cached.url;
+  if (cached?.promise) return cached.promise;
+
+  const promise = downloadOne(bucket, path).then((url) => {
+    blobCache.set(key, { url });
+    return url;
+  });
+  blobCache.set(key, { url: "", promise });
+  try {
+    return await promise;
+  } catch (e) {
+    blobCache.delete(key);
+    throw e;
+  }
+}
+
+/** Drop a cached blob URL after the browser reports it as broken. */
+export function invalidateStorageBlobUrl(
+  value: string | null | undefined,
+  bucket: string = DEFAULT_BUCKET,
+): void {
+  const path = toBucketPath(value, bucket);
+  if (!path) return;
+  const key = variantKey(bucket, path);
+  const cached = blobCache.get(key);
+  if (cached?.url?.startsWith("blob:")) URL.revokeObjectURL(cached.url);
+  blobCache.delete(key);
+}
+
 /**
  * Warm the in-memory signed-URL cache AND the browser image cache for an
  * upcoming asset. Safe to call repeatedly — duplicates are deduped by the
@@ -212,6 +267,61 @@ export function useSignedMediaUrl(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, tKey, bucket, refreshKey]);
+
+  return { url, loading };
+}
+
+/** React hook returning a local blob URL from private storage. */
+export function useStorageBlobUrl(
+  value: string | null | undefined,
+  bucket: string = DEFAULT_BUCKET,
+  refreshKey: string | number = 0,
+): {
+  url: string;
+  loading: boolean;
+} {
+  const [url, setUrl] = useState<string>(() => {
+    if (!value) return "";
+    if (value.startsWith("blob:") || value.startsWith("data:")) return value;
+    const path = toBucketPath(value, bucket);
+    if (!path) return value;
+    return blobCache.get(variantKey(bucket, path))?.url ?? "";
+  });
+  const [loading, setLoading] = useState(!url && !!value);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!value) {
+      setUrl("");
+      setLoading(false);
+      return;
+    }
+    if (value.startsWith("blob:") || value.startsWith("data:")) {
+      setUrl(value);
+      setLoading(false);
+      return;
+    }
+    const path = toBucketPath(value, bucket);
+    const cached = path ? blobCache.get(variantKey(bucket, path)) : null;
+    setUrl(cached?.url ?? (path ? "" : value));
+    setLoading(true);
+    getStorageBlobUrl(value, bucket)
+      .then((resolved) => {
+        if (!cancelled) {
+          setUrl(resolved);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUrl("");
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [value, bucket, refreshKey]);
 
   return { url, loading };
 }
