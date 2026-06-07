@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -51,6 +51,13 @@ const Fridge = () => {
   const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pinParam = searchParams.get("pin");
+  const consumePinParam = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("pin");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   
   
   const [pins, setPins] = useState<FridgePin[]>([]);
@@ -587,6 +594,8 @@ const Fridge = () => {
           canDelete={(pin) => pin.pinned_by === user?.id || circles.some(c => c.id === pin.circle_id && c.owner_id === user?.id)}
           onDelete={(pin) => handleDeletePin(pin as unknown as FridgePin)}
           circleName={selectedCircle ? circles.find(c => c.id === selectedCircle)?.name : undefined}
+          initialPinId={pinParam}
+          onInitialPinConsumed={consumePinParam}
         />
       )}
     </main>
