@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useKeyboardDismissOnScroll } from "@/hooks/useKeyboardDismissOnScroll";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,6 +38,7 @@ const Settings = () => {
   const { profile, isLoading: contextLoading, refetchProfile } = useCircleContext();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isPlatformAdmin = useIsPlatformAdmin();
   const mainRef = useRef<HTMLElement>(null);
   useKeyboardDismissOnScroll(mainRef);
