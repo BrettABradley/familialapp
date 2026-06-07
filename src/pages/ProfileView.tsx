@@ -114,13 +114,13 @@ const ProfileMediaLightbox = ({
             return (
               <div key={item.id} className="flex h-full min-w-0 flex-[0_0_100%] items-center justify-center px-2">
                 {getMediaType(item.image_url) === "video" ? (
-                  <video src={item.image_url} controls autoPlay={isCurrent} playsInline className="max-h-full max-w-full select-none object-contain" />
+                  <SignedVideo path={item.image_url} controls autoPlay={isCurrent} playsInline className="max-h-full max-w-full select-none object-contain" />
                 ) : (
                   <ZoomableImage
                     className="w-full h-full flex items-center justify-center"
                     onScaleChange={(s) => { if (isCurrent) zoomedRef.current = s > 1.05; }}
                   >
-                    <SmartImage src={item.image_url} preset="full" priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
+                    <SignedSmartImage path={item.image_url} bucket={PROFILE_BUCKET} preset="full" priority={Math.abs(index - selected) <= 1} alt={item.caption || "Profile photo"} className="max-h-full max-w-full select-none bg-transparent object-contain" />
                   </ZoomableImage>
                 )}
               </div>
@@ -185,10 +185,10 @@ const ProfileView = () => {
         supabase.from("profile_images").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
       ]);
 
-      if (profileRes.data) setProfileData(profileRes.data);
+      if (profileData) setProfileData(profileRes.data);
       if (imagesRes.data) {
-        const signed = await signProfileImages(imagesRes.data as ProfileImage[]);
-        setImages(signed);
+        const rows = (imagesRes.data as ProfileImage[]).map((r) => ({ ...r, image_url: toProfilePath(r.image_url) }));
+        setImages(rows);
       }
       setIsLoading(false);
     };
@@ -413,23 +413,26 @@ const ProfileView = () => {
     }
 
     if (insertedRows.length > 0) {
-      // Sign URLs so the private bucket can be fetched by the client + moderator
-      const signedRows = await signProfileImages(insertedRows);
+      // Store bare storage paths in state; SignedSmartImage signs on render.
+      const pathRows = insertedRows.map((r) => ({ ...r, image_url: toProfilePath(r.image_url) }));
       // Prepend the whole new group at the top
-      setImages((prev) => [...signedRows, ...prev]);
-      toast({ title: signedRows.length > 1 ? `Posted ${signedRows.length} items!` : "Media uploaded!" });
+      setImages((prev) => [...pathRows, ...prev]);
+      toast({ title: pathRows.length > 1 ? `Posted ${pathRows.length} items!` : "Media uploaded!" });
 
-      // Silent background moderation per image (uses signed URLs)
-      const imageRows = signedRows.filter((r) => getMediaType(r.image_url) === "image");
-      if (imageRows.length > 0) {
+      // Silent background moderation per image — sign just-in-time so the
+      // edge function can fetch the private-bucket asset.
+      const imagePaths = pathRows.filter((r) => getMediaType(r.image_url) === "image").map((r) => r.image_url);
+      if (imagePaths.length > 0) {
         (async () => {
           try {
+            const signedUrls = (await getPostMediaUrls(imagePaths, undefined, PROFILE_BUCKET)).filter(Boolean);
+            if (signedUrls.length === 0) return;
             const { data: modResult, error: modError } = await supabase.functions.invoke("moderate-content", {
-              body: { imageUrls: imageRows.map((r) => r.image_url) },
+              body: { imageUrls: signedUrls },
             });
 
             if (!modError && modResult && !modResult.allowed) {
-              const ids = signedRows.map((r) => r.id);
+              const ids = pathRows.map((r) => r.id);
               await supabase.from("profile_images").delete().in("id", ids);
               await supabase.storage.from("profile-images").remove(insertedStoragePaths);
               setImages((prev) => prev.filter((i) => !ids.includes(i.id)));
@@ -544,9 +547,9 @@ const ProfileView = () => {
     if (updateError) {
       toast({ title: "Error", description: "Failed to update image.", variant: "destructive" });
     } else {
-      const signedUrl = await signProfileImage(publicUrlData.publicUrl, PROFILE_CARD_TRANSFORM);
-      setImages((prev) => prev.map((i) => i.id === target.id ? { ...i, image_url: signedUrl } : i));
-      setEditingGroup((prev) => prev ? prev.map((i) => i.id === target.id ? { ...i, image_url: signedUrl } : i) : null);
+      const newPath = toProfilePath(publicUrlData.publicUrl);
+      setImages((prev) => prev.map((i) => i.id === target.id ? { ...i, image_url: newPath } : i));
+      setEditingGroup((prev) => prev ? prev.map((i) => i.id === target.id ? { ...i, image_url: newPath } : i) : null);
       toast({ title: "Image updated!" });
     }
     setIsSavingEdit(false);
