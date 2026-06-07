@@ -47,7 +47,11 @@ interface ProfileImage {
 
 const MAX_GROUP_ITEMS = 5;
 const PROFILE_BUCKET = "profile-images";
-const isNativeProfileDataUrl = () => Capacitor.isNativePlatform();
+const isIOSProfileSurface = () => {
+  if (Capacitor.isNativePlatform()) return true;
+  if (typeof navigator === "undefined") return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+};
 
 /** Normalize a stored profile_images.image_url (legacy public URL or bare path)
  *  into a bare storage path. Returns the input unchanged for blob/data URLs. */
@@ -59,7 +63,7 @@ const toProfilePath = (value: string): string => {
 
 /** Inline <video> that resolves a bare storage path to a signed URL on the fly. */
 const SignedVideo = ({ path, ...rest }: { path: string } & VideoHTMLAttributes<HTMLVideoElement>) => {
-  const nativeProfileMedia = isNativeProfileDataUrl();
+  const nativeProfileMedia = isIOSProfileSurface();
   const signedMedia = useSignedMediaUrl(nativeProfileMedia ? null : path, undefined, PROFILE_BUCKET);
   const dataUrlMedia = useStorageDataUrl(nativeProfileMedia ? path : null, PROFILE_BUCKET);
   const url = nativeProfileMedia ? dataUrlMedia.url : signedMedia.url;
@@ -69,7 +73,7 @@ const SignedVideo = ({ path, ...rest }: { path: string } & VideoHTMLAttributes<H
 
 /** Inline <VideoThumbnail> that resolves a bare path to a signed URL first. */
 const SignedVideoThumbnail = ({ path }: { path: string }) => {
-  const nativeProfileMedia = isNativeProfileDataUrl();
+  const nativeProfileMedia = isIOSProfileSurface();
   const signedMedia = useSignedMediaUrl(nativeProfileMedia ? null : path, undefined, PROFILE_BUCKET);
   const dataUrlMedia = useStorageDataUrl(nativeProfileMedia ? path : null, PROFILE_BUCKET);
   const url = nativeProfileMedia ? dataUrlMedia.url : signedMedia.url;
@@ -95,7 +99,7 @@ const ProfileMediaLightbox = ({
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false, align: "center", duration: 34, dragThreshold: 4, containScroll: "trimSnaps", startIndex, watchDrag: () => !zoomedRef.current });
   const [selected, setSelected] = useState(startIndex);
   const current = group[selected];
-  const nativeProfileMedia = isNativeProfileDataUrl();
+  const nativeProfileMedia = isIOSProfileSurface();
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -600,7 +604,7 @@ const ProfileView = () => {
   }
 
   const currentSlide = lightbox ? lightbox.group[lightbox.index] : null;
-  const nativeProfileMedia = isNativeProfileDataUrl();
+  const nativeProfileMedia = isIOSProfileSurface();
 
   return (
     <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
