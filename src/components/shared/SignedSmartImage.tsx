@@ -75,21 +75,24 @@ export const SignedSmartImage = ({
   ...rest
 }: SignedSmartImageProps) => {
   const [useOriginalFallback, setUseOriginalFallback] = useState(false);
+  const [useSignedFallback, setUseSignedFallback] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
-  const shouldTransform = transformImage && !useOriginalFallback && !resolveAsBlob && !resolveAsDataUrl;
+  const shouldResolveAsDataUrl = resolveAsDataUrl && !useSignedFallback;
+  const shouldTransform = transformImage && !useOriginalFallback && !resolveAsBlob && !shouldResolveAsDataUrl;
   const transform = shouldTransform ? scaleTransform(PRESET_TRANSFORM[preset]) : undefined;
   const lowTransform = lowPreset && shouldTransform ? scaleTransform(PRESET_TRANSFORM[lowPreset]) : undefined;
-  const signedMedia = useSignedMediaUrl(resolveAsBlob || resolveAsDataUrl ? null : path, transform, bucket, retryNonce);
+  const signedMedia = useSignedMediaUrl(resolveAsBlob || shouldResolveAsDataUrl ? null : path, transform, bucket, retryNonce);
   const blobMedia = useStorageBlobUrl(resolveAsBlob ? path : null, bucket, retryNonce);
-  const dataUrlMedia = useStorageDataUrl(resolveAsDataUrl ? path : null, bucket, retryNonce);
-  const { url, loading } = resolveAsDataUrl ? dataUrlMedia : resolveAsBlob ? blobMedia : signedMedia;
+  const dataUrlMedia = useStorageDataUrl(shouldResolveAsDataUrl ? path : null, bucket, retryNonce);
+  const { url, loading } = shouldResolveAsDataUrl ? dataUrlMedia : resolveAsBlob ? blobMedia : signedMedia;
   const { url: lowUrl } = useSignedMediaUrl(lowPreset && shouldTransform ? path : null, lowTransform, bucket, retryNonce);
   const [hiLoaded, setHiLoaded] = useState(false);
 
   useEffect(() => {
     setHiLoaded(false);
     setUseOriginalFallback(false);
+    setUseSignedFallback(false);
     setRetryCount(0);
     setRetryNonce((n) => n + 1);
   }, [path, bucket, preset, lowPreset, transformImage, resolveAsBlob, resolveAsDataUrl]);
@@ -100,10 +103,12 @@ export const SignedSmartImage = ({
 
   const handleImageError = (e: SyntheticEvent<HTMLImageElement, Event>) => {
     setHiLoaded(false);
-    if (resolveAsDataUrl) invalidateStorageDataUrl(path, bucket);
+    if (shouldResolveAsDataUrl) invalidateStorageDataUrl(path, bucket);
     else if (resolveAsBlob) invalidateStorageBlobUrl(path, bucket);
     else invalidateSignedMediaUrl(path, transform, bucket);
-    if (!resolveAsBlob && !resolveAsDataUrl && !useOriginalFallback && transformImage) {
+    if (shouldResolveAsDataUrl) {
+      setUseSignedFallback(true);
+    } else if (!resolveAsBlob && !resolveAsDataUrl && !useOriginalFallback && transformImage) {
       setUseOriginalFallback(true);
     } else if (retryCount < 1) {
       setRetryCount((n) => n + 1);
