@@ -514,7 +514,7 @@ const Messages = () => {
       title: "Added to group chat",
       message: `You were added to "${newGroupName.trim()}"`,
       related_circle_id: circleId,
-      link: "/messages",
+      link: `/messages?circle=${circleId}&group=${group.id}`,
     }));
     if (memberNotifications.length > 0) {
       await supabase.from("notifications").insert(memberNotifications);
