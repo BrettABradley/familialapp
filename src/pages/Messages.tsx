@@ -288,10 +288,11 @@ const Messages = () => {
   }, [messages, groupMessages]);
 
   // Deep-link: ?thread=<userId> opens that DM thread once conversations
-  // (or circle members) have loaded. Falls back gracefully if the user
-  // isn't found in either list yet.
-  const [searchParams] = useSearchParams();
+  // (or circle members) have loaded. ?group=<groupId> opens that group chat.
+  // Falls back gracefully if the user/group isn't found in either list yet.
+  const [searchParams, setSearchParamsMsg] = useSearchParams();
   const threadParam = searchParams.get("thread");
+  const groupParam = searchParams.get("group");
   useEffect(() => {
     if (!threadParam || selectedUser?.user_id === threadParam) return;
     const fromConvos = conversations.find(c => c.user.user_id === threadParam)?.user;
@@ -299,6 +300,18 @@ const Messages = () => {
     const target = fromConvos || fromMembers;
     if (target) setSelectedUser(target);
   }, [threadParam, conversations, circleMembers, selectedUser]);
+
+  useEffect(() => {
+    if (!groupParam || selectedGroup?.id === groupParam) return;
+    const target = groupChats.find(gc => gc.id === groupParam);
+    if (target) {
+      setSelectedGroup(target);
+      setChatView("group");
+      const next = new URLSearchParams(searchParams);
+      next.delete("group");
+      setSearchParamsMsg(next, { replace: true });
+    }
+  }, [groupParam, groupChats, selectedGroup, searchParams, setSearchParamsMsg]);
 
   // Lock the circle switcher whenever a chat is open so users can't switch
   // circles mid-conversation (chats are circle-scoped).
@@ -514,7 +527,7 @@ const Messages = () => {
       title: "Added to group chat",
       message: `You were added to "${newGroupName.trim()}"`,
       related_circle_id: circleId,
-      link: "/messages",
+      link: `/messages?circle=${circleId}&group=${group.id}`,
     }));
     if (memberNotifications.length > 0) {
       await supabase.from("notifications").insert(memberNotifications);
