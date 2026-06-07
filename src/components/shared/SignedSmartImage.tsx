@@ -1,4 +1,4 @@
-import { ImgHTMLAttributes, useState, useEffect } from "react";
+import { ImgHTMLAttributes, SyntheticEvent, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useSignedMediaUrl } from "@/lib/postMediaUrl";
 import { PRESET_TRANSFORM, ImagePreset } from "@/lib/imageUrl";
@@ -59,17 +59,32 @@ export const SignedSmartImage = ({
   alt = "",
   style,
   onLoad,
+  onError,
   ...rest
 }: SignedSmartImageProps) => {
-  const transform = scaleTransform(PRESET_TRANSFORM[preset]);
-  const lowTransform = lowPreset ? scaleTransform(PRESET_TRANSFORM[lowPreset]) : undefined;
+  const [useOriginalFallback, setUseOriginalFallback] = useState(false);
+  const transform = useOriginalFallback ? undefined : scaleTransform(PRESET_TRANSFORM[preset]);
+  const lowTransform = lowPreset && !useOriginalFallback ? scaleTransform(PRESET_TRANSFORM[lowPreset]) : undefined;
   const { url, loading } = useSignedMediaUrl(path, transform, bucket);
   const { url: lowUrl } = useSignedMediaUrl(lowPreset ? path : null, lowTransform, bucket);
   const [hiLoaded, setHiLoaded] = useState(false);
 
   useEffect(() => {
     setHiLoaded(false);
+    setUseOriginalFallback(false);
+  }, [path, bucket, preset, lowPreset]);
+
+  useEffect(() => {
+    setHiLoaded(false);
   }, [url]);
+
+  const handleImageError = (e: SyntheticEvent<HTMLImageElement, Event>) => {
+    if (!useOriginalFallback && url) {
+      setHiLoaded(false);
+      setUseOriginalFallback(true);
+    }
+    onError?.(e);
+  };
 
   const displaySrc = hiLoaded && url ? url : (lowUrl || url);
 
@@ -97,6 +112,7 @@ export const SignedSmartImage = ({
         }
         onLoad?.(e);
       }}
+      onError={handleImageError}
       {...rest}
     />
   );
@@ -127,6 +143,7 @@ export const SignedSmartImage = ({
                 onAspect(t.naturalWidth / t.naturalHeight);
               }
             }}
+            onError={handleImageError}
             style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
           />
         )}
@@ -157,6 +174,7 @@ export const SignedSmartImage = ({
           // @ts-expect-error - fetchpriority is a valid attribute, types lag
           fetchpriority={priority ? "high" : "auto"}
           onLoad={() => setHiLoaded(true)}
+          onError={handleImageError}
           style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
         />
       )}

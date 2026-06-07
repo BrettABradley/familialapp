@@ -52,10 +52,10 @@ export function toPostMediaPath(value: string | null | undefined): string | null
 }
 
 async function signOne(bucket: string, path: string, transform?: SignTransform): Promise<string> {
-  const opts = transform ? { transform } : undefined;
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .createSignedUrl(path, TTL_SECONDS, opts as any);
+  const storage = supabase.storage.from(bucket);
+  const { data, error } = transform
+    ? await storage.createSignedUrl(path, TTL_SECONDS, { transform })
+    : await storage.createSignedUrl(path, TTL_SECONDS);
   if (error || !data?.signedUrl) {
     throw error ?? new Error("Failed to sign URL");
   }
