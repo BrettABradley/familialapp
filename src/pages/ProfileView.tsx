@@ -174,6 +174,7 @@ const ProfileView = () => {
   const { blockUser, isBlocked } = useBlockedUsers();
   const [reportOpen, setReportOpen] = useState(false);
   const [avatarZoomOpen, setAvatarZoomOpen] = useState(false);
+  const { url: avatarSignedUrl } = useSignedMediaUrl(profileData?.avatar_url, "avatar", "avatars");
 
   useEffect(() => {
     if (!userId) return;
@@ -593,7 +594,6 @@ const ProfileView = () => {
 
   return (
     <main ref={mainRef} className="container mx-auto px-4 py-8 max-w-2xl space-y-6">
-  const { url: avatarSignedUrl } = useSignedMediaUrl(profileData?.avatar_url, "avatar", "avatars");
       {/* Profile Header */}
       <Card>
         <CardContent className="py-8">
@@ -747,7 +747,7 @@ const ProfileView = () => {
               onSwipeDown={() => setAvatarZoomOpen(false)}
             >
               <img
-                src={avatarSignedUrl || profileData.avatar_url}
+                src={avatarSignedUrl || undefined}
                 alt={profileData.display_name || "Profile picture"}
                 className="max-h-[80vh] sm:max-h-[90vh] max-w-full sm:max-w-[90vw] w-auto object-contain select-none"
               />
