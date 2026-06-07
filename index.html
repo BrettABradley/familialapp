@@ -70,7 +70,9 @@
             /type=magiclink/.test(hash);
 
           if (!isAuthLanding && looksLikeAuthHash) {
-            window.location.replace("/auth/callback" + search + hash);
+            var isRecovery = /type=recovery/.test(hash) || /type=recovery/.test(search);
+            var target = isRecovery ? "/reset-password" : "/auth/callback";
+            window.location.replace(target + search + hash);
             return;
           }
 

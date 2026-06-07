@@ -1,9 +1,23 @@
 import { useVersionCheck } from "@/hooks/useVersionCheck";
 import { Button } from "@/components/ui/button";
 import { X, Download, AlertTriangle } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 
-const openStore = (url: string | null) => {
+const openStore = async (url: string | null) => {
   if (!url) return;
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { Browser } = await import("@capacitor/browser");
+      await Browser.open({ url });
+      return;
+    } catch (e) {
+      console.warn("[UpdateGate] Browser.open failed, falling back", e);
+      try {
+        window.location.href = url;
+        return;
+      } catch {}
+    }
+  }
   window.open(url, "_blank");
 };
 
