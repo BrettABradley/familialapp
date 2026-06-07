@@ -581,25 +581,25 @@ const Auth = () => {
           </div>
           <CardTitle className="font-serif text-2xl">
             {confirmed
-              ? "Email confirmed!"
+              ? "You're in"
               : verificationSentTo
               ? "Check your email"
               : isForgotPassword
               ? "Reset Password"
               : isLogin
-              ? "Welcome"
-              : "Join Familial"}
+              ? "Welcome back"
+              : "Start your family circle"}
           </CardTitle>
           <CardDescription>
             {confirmed
-              ? "Welcome to Familial"
+              ? "Let's get your family together."
               : verificationSentTo
-              ? "We sent a verification link to finish setting up your account"
+              ? "We just sent a link to confirm it's really you. Open it on this device and we'll bring you right in."
               : isForgotPassword
               ? "Enter your email and we'll send you a reset link"
               : isLogin
-              ? "Sign in or sign up to connect with your family"
-              : "Create an account to start your family circle"}
+              ? "Sign in to catch up with your family."
+              : "A private space for the people who matter most — no algorithms, no ads, just family."}
           </CardDescription>
           {planParam && PLAN_PRICES[planParam] && !confirmed && !verificationSentTo && (
             <p className="text-sm text-primary mt-2">

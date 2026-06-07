@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useKeyboardDismissOnScroll } from "@/hooks/useKeyboardDismissOnScroll";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCircleContext } from "@/contexts/CircleContext";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,6 +38,7 @@ const Settings = () => {
   const { profile, isLoading: contextLoading, refetchProfile } = useCircleContext();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isPlatformAdmin = useIsPlatformAdmin();
   const mainRef = useRef<HTMLElement>(null);
   useKeyboardDismissOnScroll(mainRef);
@@ -84,6 +85,32 @@ const Settings = () => {
       setEmailOnNewAlbum((profile as any).email_on_new_album ?? true);
     }
   }, [profile]);
+
+  // Onboarding deep links: ?open=avatar opens the photo picker, ?focus=displayName
+  // scrolls to and focuses the Display Name field. Strip the param so a refresh
+  // doesn't re-trigger.
+  useEffect(() => {
+    const open = searchParams.get("open");
+    const focus = searchParams.get("focus");
+    if (!open && !focus) return;
+    const t = setTimeout(() => {
+      if (open === "avatar") {
+        handlePickImage();
+      } else if (focus === "displayName") {
+        const el = document.getElementById("displayName") as HTMLInputElement | null;
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.focus();
+        }
+      }
+      const next = new URLSearchParams(searchParams);
+      next.delete("open");
+      next.delete("focus");
+      setSearchParams(next, { replace: true });
+    }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const saveEmailPref = async (field: "email_on_mention" | "email_on_unread_dm" | "email_on_new_album", value: boolean) => {
     if (!user) return;

@@ -191,7 +191,7 @@ function AppLayoutContent() {
           {!circlesLoading && profile && (
             <OnboardingFlow
               hasAvatar={!!profile.avatar_url}
-              hasBio={!!profile.bio}
+              hasDisplayName={!!profile.display_name}
               hasCircles={circles.length > 0}
             />
           )}

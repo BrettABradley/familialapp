@@ -166,7 +166,18 @@ const Circles = () => {
   const [rescueCircleId, setRescueCircleId] = useState<string | null>(null);
 
   const [memberships, setMemberships] = useState<CircleMembership[]>([]);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(() => searchParams.get("open") === "create");
+
+  // Onboarding deep link: strip ?open=create after consuming so refresh doesn't re-open.
+  useEffect(() => {
+    if (searchParams.get("open") === "create") {
+      const next = new URLSearchParams(searchParams);
+      next.delete("open");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);

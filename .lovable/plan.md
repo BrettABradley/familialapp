@@ -1,55 +1,78 @@
-# Fix: Password Reset + Outdated-Version App Store Link
+# Warmer Onboarding + Smarter Deep Links
 
-## Issue 1 — Password reset link goes to the home/feed instead of `/reset-password`
+Make the first-time experience feel like welcoming a new family member, not "setting up an account." Rewrite the signup/welcome copy and rebuild `OnboardingFlow` as a warmer checklist where every step jumps directly to the right action.
 
-**Root cause:** The early auth interceptor in `index.html` (lines 65–75) catches **any** URL hash containing `type=recovery`, `type=signup`, `type=magiclink`, etc. and unconditionally redirects to `/auth/callback`. `AuthCallback` then exchanges the code for a session and routes the user to `/circles`. The `ResetPassword` page never gets a chance to render, so there's no way to set a new password.
+## 1. Signup screen copy (`src/pages/Auth.tsx`, lines 580–608)
 
-**Fix (in `index.html`):** When the hash/search contains `type=recovery`, redirect to `/reset-password` instead of `/auth/callback`. All other auth types (signup / magiclink / invite) keep their current behavior.
+Replace the generic titles/descriptions with family-warm copy.
 
-```js
-// inside the existing interceptor
-if (!isAuthLanding && looksLikeAuthHash) {
-  var isRecovery = /type=recovery/.test(hash) || /type=recovery/.test(search);
-  var target = isRecovery ? "/reset-password" : "/auth/callback";
-  window.location.replace(target + search + hash);
-  return;
-}
-```
+| State | Today | New |
+|---|---|---|
+| Sign-up title | "Join Familial" | "Start your family circle" |
+| Sign-up subtitle | "Create an account to start your family circle" | "A private space for the people who matter most — no algorithms, no ads, just family." |
+| Sign-in title | "Welcome" | "Welcome back" |
+| Sign-in subtitle | "Sign in or sign up to connect with your family" | "Sign in to catch up with your family." |
+| Verification sent title | "Check your email" | (unchanged) |
+| Verification sent body | "We sent a verification link to finish setting up your account" | "We just sent a link to confirm it's really you. Open it on this device and we'll bring you right in." |
+| Email confirmed | "Welcome to Familial" | "You're in. Let's get your family together." |
 
-`ResetPassword.tsx` already listens for `PASSWORD_RECOVERY` / `SIGNED_IN` events and checks `getSession()`, so once the URL lands there supabase-js will detect the recovery session and the form renders correctly.
+## 2. Rebuild `OnboardingFlow` (`src/components/shared/OnboardingFlow.tsx`)
 
-No change needed in `src/pages/Index.tsx` (its own recovery redirect is a fallback for cases where the interceptor didn't fire — still valid).
+Keep the existing modal-checklist shape (per your pick) but warm it up and make every action land in the right place.
 
-## Issue 2 — "Outdated version" prompt doesn't open the App Store on iOS
+**Visual + copy refresh**
+- Title: `"Welcome to Familial 👋"` → **`"Let's get your family together"`** (Playfair serif, no emoji — matches the monochrome warm/nostalgic identity)
+- Subtitle: **`"Three small steps so the people who matter most can find you here."`**
+- Each step shows progress as `1 of 3 done` with a thin progress bar at the top.
+- "Skip for now" stays, but it just hides the dialog this session — the checklist stays available (see #3) until completed.
 
-**Root cause:** `src/components/UpdateGate.tsx` uses `window.open(url, "_blank")` to open the store URL. Inside the Capacitor WebView, `window.open` with `_blank` is unreliable — it often does nothing instead of handing the URL to Safari/App Store. Also, the `store_url` row in `app_version_config` is `https://apps.apple.com/app/id6760382623` (no `/us/app/familial/`), which works but is not the link you specified.
+**Step copy — family-warm**
 
-**Fix:**
+| # | Today | New title | New subcopy |
+|---|---|---|---|
+| 1 | "Add a profile photo" | **"Add a photo of yourself"** | "So Mom, Dad, and the kids know it's you." |
+| 2 | "Tell us about yourself" | **"What should family call you?"** | "Set the name your family will see — first name, nickname, 'Grammy', whatever feels right." |
+| 3 | "Create or join a circle" | **"Start your first circle"** | "A circle is your private family space. Invite your people next." |
 
-1. **`src/components/UpdateGate.tsx`** — replace `openStore` with a native-aware opener:
-   - On native: dynamically import `@capacitor/browser` and call `Browser.open({ url })`. Fall back to `window.location.href = url` if the plugin fails.
-   - On web: keep `window.open(url, "_blank")`.
+**Deep-link behavior (the real fix)**
 
-2. **DB migration** — update the store URL to the canonical link you want:
-   ```sql
-   update public.app_version_config
-   set store_url = 'https://apps.apple.com/us/app/familial/id6760382623'
-   where platform = 'ios';
-   ```
+Each step needs to land on the actual action, not just a page. The cleanest pattern that fits the codebase is a query-param hook the destination pages already-don't-but-will read:
 
-3. **(Already correct, no change)** `UpdatePrompt.tsx` already uses `Browser.open` with a `window.open` fallback — that path works. The hard force-update gate in `UpdateGate.tsx` is what was failing.
+- **Photo** → `navigate("/settings?open=avatar")` — `Settings.tsx` opens the `AvatarCropDialog` on mount when `?open=avatar` is present, then strips the param.
+- **Display name** → `navigate("/settings?focus=displayName")` — `Settings.tsx` scrolls to and focuses the `#displayName` input on mount. (Re-using Settings rather than introducing a new dialog keeps the change small and avoids duplicating the save logic that already writes `display_name`.)
+- **Circle** → `navigate("/circles?open=create")` — `Circles.tsx` sets `isCreateOpen = true` on mount when `?open=create` is present, then strips the param.
 
-## Files changed
+All three params get cleaned with `navigate(location.pathname, { replace: true })` after they fire so a refresh doesn't re-trigger the dialog.
 
-- `index.html` — route `type=recovery` to `/reset-password`
-- `src/components/UpdateGate.tsx` — use Capacitor `Browser.open` on native
-- New migration — update `app_version_config.store_url` for iOS
+**Done-state logic** stays the same (`hasAvatar`, `hasBio`, `hasCircles`) — but the second step's `done` becomes `hasDisplayName` (truthy `profile.display_name`) instead of `hasBio`, matching the new copy and your "Display name" pick. Bio stays as an optional Settings field, just not part of onboarding.
 
-## Verification
+## 3. Lighter dismiss behavior
 
-- Web: click the password reset email link → lands on `/reset-password` with the "Set New Password" form (not the home page). Submitting updates the password and routes to `/circles`.
-- iOS: with installed version below `min_supported_version`, the full-screen "Update Required" gate's **Open App Store** button now launches Safari → App Store at the new URL.
+Today's dismiss is permanent (`localStorage onboarding_dismissed = true`), so a user who taps "Skip" never sees the checklist again even if they never finished. Change to a **per-session** hide:
+- `sessionStorage onboarding_hidden_this_session = "1"` — gone on next app open.
+- Once all three steps are actually `done`, set the permanent `localStorage onboarding_dismissed = "true"` so it doesn't reappear after completion.
+
+`AppLayout` still controls when the modal mounts based on the three completion flags.
+
+## 4. Files changed
+
+- `src/pages/Auth.tsx` — copy refresh in the header block (lines 582–608)
+- `src/components/shared/OnboardingFlow.tsx` — title/subcopy, deep-link query params, session-vs-permanent dismiss, `hasDisplayName` flag
+- `src/components/layout/AppLayout.tsx` — pass `hasDisplayName={!!profile.display_name}` instead of `hasBio`
+- `src/pages/Settings.tsx` — on mount, read `?open=avatar` (open `AvatarCropDialog`) / `?focus=displayName` (scroll + focus the input), then strip the param
+- `src/pages/Circles.tsx` — on mount, read `?open=create` (set `isCreateOpen=true`), then strip the param
+
+## 5. Verification
+
+- Sign up → confirm email → onboarding modal shows the new warm copy.
+- Tap **"Add a photo"** → lands on Settings with the avatar cropper open.
+- Tap **"What should family call you?"** → lands on Settings with the Display Name input focused and scrolled into view.
+- Tap **"Start your first circle"** → lands on Circles with the Create Circle dialog open.
+- Hit "Skip for now" → modal closes for the session; reopens on next app launch until all three are complete.
+- Complete all three → modal disappears permanently.
 
 ## Out of scope
 
-No changes to auth provider, RLS, or the email template itself. The Supabase recovery email already points to `https://familialapp.lovable.app/...#type=recovery&access_token=...` — the interceptor change is all that's needed to route it correctly.
+- No new bio fields, relationship picker, birthday, or invite-family step (you didn't pick those).
+- No full-screen wizard or persistent inline checklist.
+- No DB schema changes — `display_name` already exists on `profiles`.
