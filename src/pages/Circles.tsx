@@ -166,7 +166,7 @@ const Circles = () => {
   const [rescueCircleId, setRescueCircleId] = useState<string | null>(null);
 
   const [memberships, setMemberships] = useState<CircleMembership[]>([]);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(() => searchParams.get("open") === "create");
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isMembersOpen, setIsMembersOpen] = useState(false);
