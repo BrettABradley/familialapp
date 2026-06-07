@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, type VideoHTMLAttributes } from "react";
 import { useKeyboardDismissOnScroll } from "@/hooks/useKeyboardDismissOnScroll";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -56,7 +56,7 @@ const toProfilePath = (value: string): string => {
 };
 
 /** Inline <video> that resolves a bare storage path to a signed URL on the fly. */
-const SignedVideo = ({ path, ...rest }: { path: string } & React.VideoHTMLAttributes<HTMLVideoElement>) => {
+const SignedVideo = ({ path, ...rest }: { path: string } & VideoHTMLAttributes<HTMLVideoElement>) => {
   const { url } = useSignedMediaUrl(path, undefined, PROFILE_BUCKET);
   if (!url) return <div className="h-full w-full bg-muted" aria-busy />;
   return <video src={url} {...rest} />;
