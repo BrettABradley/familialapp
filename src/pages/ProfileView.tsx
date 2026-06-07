@@ -24,7 +24,7 @@ import { ZoomableImage } from "@/components/shared/ZoomableImage";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import { SquareSignedThumbnail } from "@/components/shared/SquareSignedThumbnail";
 import { SignedSmartImage } from "@/components/shared/SignedSmartImage";
-import { useSignedMediaUrl, getPostMediaUrl, getPostMediaUrls, toBucketPath } from "@/lib/postMediaUrl";
+import { useSignedMediaUrl, useStorageDataUrl, getPostMediaUrl, getPostMediaUrls, toBucketPath } from "@/lib/postMediaUrl";
 import { PRESET_TRANSFORM } from "@/lib/imageUrl";
 import useEmblaCarousel from "embla-carousel-react";
 
@@ -47,6 +47,7 @@ interface ProfileImage {
 
 const MAX_GROUP_ITEMS = 5;
 const PROFILE_BUCKET = "profile-images";
+const useNativeProfileDataUrl = () => Capacitor.isNativePlatform();
 
 /** Normalize a stored profile_images.image_url (legacy public URL or bare path)
  *  into a bare storage path. Returns the input unchanged for blob/data URLs. */
@@ -58,14 +59,20 @@ const toProfilePath = (value: string): string => {
 
 /** Inline <video> that resolves a bare storage path to a signed URL on the fly. */
 const SignedVideo = ({ path, ...rest }: { path: string } & VideoHTMLAttributes<HTMLVideoElement>) => {
-  const { url } = useSignedMediaUrl(path, undefined, PROFILE_BUCKET);
+  const nativeProfileMedia = useNativeProfileDataUrl();
+  const signedMedia = useSignedMediaUrl(nativeProfileMedia ? null : path, undefined, PROFILE_BUCKET);
+  const dataUrlMedia = useStorageDataUrl(nativeProfileMedia ? path : null, PROFILE_BUCKET);
+  const url = nativeProfileMedia ? dataUrlMedia.url : signedMedia.url;
   if (!url) return <div className="h-full w-full bg-muted" aria-busy />;
   return <video src={url} {...rest} />;
 };
 
 /** Inline <VideoThumbnail> that resolves a bare path to a signed URL first. */
 const SignedVideoThumbnail = ({ path }: { path: string }) => {
-  const { url } = useSignedMediaUrl(path, undefined, PROFILE_BUCKET);
+  const nativeProfileMedia = useNativeProfileDataUrl();
+  const signedMedia = useSignedMediaUrl(nativeProfileMedia ? null : path, undefined, PROFILE_BUCKET);
+  const dataUrlMedia = useStorageDataUrl(nativeProfileMedia ? path : null, PROFILE_BUCKET);
+  const url = nativeProfileMedia ? dataUrlMedia.url : signedMedia.url;
   if (!url) return <div className="h-full w-full bg-muted" aria-busy />;
   return <VideoThumbnail src={url} />;
 };
