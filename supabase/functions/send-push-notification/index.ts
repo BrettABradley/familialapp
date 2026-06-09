@@ -196,20 +196,43 @@ async function sendFcm(
 }
 
 
+function decodeJwtRole(authHeader: string | null): string | null {
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const parts = authHeader.slice(7).split(".");
+  if (parts.length < 2) return null;
+  try {
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))
+    );
+    return typeof payload?.role === "string" ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
+function isServiceRoleCaller(authHeader: string | null): boolean {
+  if (!authHeader?.startsWith("Bearer ")) return false;
+  if (decodeJwtRole(authHeader) === "service_role") return true;
+  const token = authHeader.slice(7).trim();
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  return !!serviceKey && token === serviceKey;
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // === Auth gate: only the database trigger (using SERVICE_ROLE_KEY) may call this. ===
-  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const authHeader = req.headers.get("Authorization") ?? "";
-  if (!SERVICE_KEY || authHeader !== `Bearer ${SERVICE_KEY}`) {
+  // === Auth gate: accept legacy service_role JWT OR exact SUPABASE_SERVICE_ROLE_KEY ===
+  if (!isServiceRoleCaller(req.headers.get("Authorization"))) {
+    console.warn("send-push-notification: unauthorized caller");
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
+
+  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
   try {
     const { record } = await req.json();
@@ -220,7 +243,7 @@ serve(async (req: Request) => {
       });
     }
 
-    const { user_id, title, message, link, type } = record;
+    const { id: notificationId, user_id, title, message, link, type } = record;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -236,6 +259,7 @@ serve(async (req: Request) => {
 
     if (prefs) {
       if (!prefs.push_enabled) {
+        console.log(`[push] skip notif=${notificationId} user=${user_id} reason=push_disabled`);
         return new Response(JSON.stringify({ skipped: true, reason: "push disabled" }), {
           status: 200,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -247,6 +271,7 @@ serve(async (req: Request) => {
         type &&
         prefs.muted_types.includes(type)
       ) {
+        console.log(`[push] skip notif=${notificationId} user=${user_id} reason=type_muted type=${type}`);
         return new Response(JSON.stringify({ skipped: true, reason: `type "${type}" muted` }), {
           status: 200,
           headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -258,6 +283,8 @@ serve(async (req: Request) => {
       .from("push_tokens")
       .select("device_token, platform")
       .eq("user_id", user_id);
+
+    console.log(`[push] dispatch notif=${notificationId} user=${user_id} tokens=${tokens?.length ?? 0} type=${type}`);
 
     if (tokenError) {
       console.error("fetch tokens error:", tokenError);
