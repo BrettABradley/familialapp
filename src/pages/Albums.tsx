@@ -229,7 +229,7 @@ const AlbumPhotoLightbox = ({
 
 const Albums = () => {
   const { user } = useAuth();
-  const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading, isCircleReadOnly } = useCircleContext();
+  const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading, isCircleReadOnly, setLockCircleSwitcher } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
   const mainRef = useRef<HTMLElement>(null);
@@ -323,6 +323,14 @@ const Albums = () => {
       fetchPhotos();
     }
   }, [selectedAlbum]);
+
+  // Lock the circle switcher whenever the user is viewing a specific album.
+  // Switching circles mid-album would load a stale album from the previous
+  // circle's photos list and create confusing UI state.
+  useEffect(() => {
+    setLockCircleSwitcher(!!selectedAlbum);
+    return () => setLockCircleSwitcher(false);
+  }, [selectedAlbum, setLockCircleSwitcher]);
 
   const fetchAlbums = async () => {
     if (!selectedCircle) return;
