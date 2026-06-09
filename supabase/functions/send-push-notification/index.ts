@@ -360,6 +360,7 @@ serve(async (req: Request) => {
       console.log(`Cleaned ${invalidTokens.length} invalid token(s)`);
     }
 
+    console.log(`[push] result sent=${sent} cleaned=${invalidTokens.length} total=${tokens.length}`);
     return new Response(JSON.stringify({ success: true, sent, cleaned: invalidTokens.length }), {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
