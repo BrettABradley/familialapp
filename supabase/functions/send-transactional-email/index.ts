@@ -68,9 +68,8 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
-  // Enforce service_role caller — block anon JWTs.
-  const callerRole = decodeJwtRole(req.headers.get('Authorization'))
-  if (callerRole !== 'service_role') {
+  // Enforce service_role caller — block anon/user JWTs.
+  if (!isServiceRoleCaller(req.headers.get('Authorization'))) {
     return new Response(
       JSON.stringify({ error: 'Forbidden: service role required' }),
       { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
