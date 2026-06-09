@@ -757,6 +757,13 @@ const Events = () => {
                 </SelectContent>
               </Select>
             </div>
+            <label className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/40 transition-colors">
+              <Checkbox checked={editIsReminder} onCheckedChange={(c) => setEditIsReminder(!!c)} className="mt-0.5" />
+              <span className="space-y-1">
+                <span className="text-sm font-medium flex items-center gap-1.5"><Bell className="w-3.5 h-3.5" />Just a reminder (no RSVP)</span>
+                <span className="block text-xs text-muted-foreground">Use for birthdays, anniversaries, appointments — no Going / Not Going buttons.</span>
+              </span>
+            </label>
               <Button className="w-full" onClick={handleSaveEdit} disabled={!editTitle.trim() || !editDate || isSavingEdit}>
                 {isSavingEdit ? "Saving..." : "Save Changes"}
               </Button>
