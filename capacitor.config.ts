@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'space.manus.familial.mobile.t20260223211425',
+  appId: 'com.familialmedia.familial',
   appName: 'Familial',
   webDir: 'dist',
   plugins: {
