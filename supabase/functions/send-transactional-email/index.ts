@@ -51,15 +51,25 @@ function decodeJwtRole(authHeader: string | null): string | null {
   }
 }
 
+// Accepts caller if either:
+//  - the bearer is a JWT whose `role` claim is `service_role` (legacy keys), OR
+//  - the bearer exactly matches SUPABASE_SERVICE_ROLE_KEY (new `sb_secret_...` format).
+function isServiceRoleCaller(authHeader: string | null): boolean {
+  if (!authHeader?.startsWith('Bearer ')) return false
+  if (decodeJwtRole(authHeader) === 'service_role') return true
+  const token = authHeader.slice(7).trim()
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  return !!serviceKey && token === serviceKey
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
-  // Enforce service_role caller — block anon JWTs.
-  const callerRole = decodeJwtRole(req.headers.get('Authorization'))
-  if (callerRole !== 'service_role') {
+  // Enforce service_role caller — block anon/user JWTs.
+  if (!isServiceRoleCaller(req.headers.get('Authorization'))) {
     return new Response(
       JSON.stringify({ error: 'Forbidden: service role required' }),
       { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

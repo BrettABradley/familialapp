@@ -1,71 +1,48 @@
-## Context
+## Problem
 
-You're transferring the Apple Developer account from Brett Allen Bradley → Familial LLC and keeping the same Bundle ID (`space.manus.familial.mobile.t20260223211425`). Android/FCM is unaffected. iOS push uses APNs token-based auth via three Lovable Cloud secrets — `APPLE_KEY_ID`, `APPLE_ISSUER_ID` (Team ID), `APPLE_PRIVATE_KEY` (.p8). The old `.p8` key was issued under the personal team and **stops working the moment Apple completes the transfer** (the key belongs to the old team, not the App ID's new team).
+When you comped Gayla (`07b2d321-f751-46ea-beeb-92bdc784b6cc`, gaylabrum@aol.com, "Customer Support" note) on 2026-06-05, the comp itself succeeded but the founder-gift email failed with:
 
-No code changes are needed because the Bundle ID and APNS topic stay identical. This is purely a credentials swap plus a token-table cleanup.
-
----
-
-## Your side (Apple + Lovable Cloud secrets)
-
-1. **Finish the App transfer in App Store Connect**
-   - Personal account: Apps → Familial → App Information → "Transfer App"
-   - Familial LLC account: accept transfer. Wait until status shows the app under the LLC team.
-
-2. **Verify the App ID came across**
-   - developer.apple.com → Certificates, IDs & Profiles → Identifiers → confirm `space.manus.familial.mobile.t20260223211425` is listed under Familial LLC and **Push Notifications capability is enabled**. Re-enable if missing.
-
-3. **Generate a new APNs Auth Key under Familial LLC**
-   - Keys → "+" → name "Familial APNs" → check **Apple Push Notifications service (APNs)** → Continue → Register
-   - Download the `.p8` file (one-time download — save it).
-   - Copy the **Key ID** (10 chars).
-   - Copy the **Team ID** from the upper-right of developer.apple.com (Familial LLC team — different from the old personal Team ID).
-   - Optional cleanup: revoke the old personal-account APNs key so it can't be reused.
-
-4. **Update the three Lovable Cloud secrets** (Backend → Settings → Secrets):
-   - `APPLE_KEY_ID` → new Key ID
-   - `APPLE_ISSUER_ID` → new Familial LLC Team ID
-   - `APPLE_PRIVATE_KEY` → full contents of the new `.p8` (including `-----BEGIN PRIVATE KEY-----` / `-----END PRIVATE KEY-----` lines and the inner newlines)
-
-5. **Rebuild & resubmit the iOS app under the new team**
-   - In Xcode, change Signing & Capabilities → Team to Familial LLC; let it regenerate the provisioning profile (must include Push Notifications entitlement).
-   - Bump build number, archive, upload to App Store Connect, ship a TestFlight build.
-   - Device tokens are tied to the APNs environment + app install; tokens from the old-team build will return `BadDeviceToken` against the new key. Users get fresh tokens automatically the first time they launch the new build and the app re-registers.
-
-6. **(Optional) Apple Sign In** — if you use BYOC Apple auth, the Services ID, .p8, and JWT secret also need to be regenerated under Familial LLC and re-pasted in Backend → Users → Auth Settings → Apple. If you're on Lovable's managed Apple auth (default), skip this.
-
----
-
-## My side (code + database)
-
-Only two small actions, both after you've finished steps 1–5:
-
-A. **Purge stale iOS push tokens** so the send-push function stops hitting `BadDeviceToken` for old-team installs. One-line migration:
-   ```sql
-   DELETE FROM public.push_tokens WHERE platform = 'ios';
-   ```
-   The app re-registers and re-inserts a fresh token on next launch of the new build.
-
-B. **Confirm `send-push-notification` is healthy** after secret rotation: tail edge-function logs while you trigger a test notification (e.g., react to a post). Expected: APNs returns 200. If we see `InvalidProviderToken` → the secrets were pasted wrong (usually `APPLE_PRIVATE_KEY` lost its newlines). If we see `BadDeviceToken` → there's still an old-team token in the table; re-run the purge.
-
-No code in `send-push-notification/index.ts`, `capacitor.config.ts`, `ios-post-sync.sh`, or the APNS topic needs to change — they're all keyed off the Bundle ID, which is staying the same.
-
----
-
-## Order of operations
-
-```text
-You: App transfer accepted in App Store Connect
-You: App ID confirmed under Familial LLC w/ Push enabled
-You: New APNs .p8 generated + Key ID + new Team ID captured
-You: 3 Lovable Cloud secrets updated
-You: New Xcode build signed by Familial LLC pushed to TestFlight
-Me:  DELETE FROM push_tokens WHERE platform='ios' migration
-Both: Trigger a test notification, watch edge-fn logs, confirm 200
 ```
+Edge Function returned a non-2xx status code
+```
+
+No row was even written to `email_send_log`, so the email never went out and she never got it.
+
+Same failure has happened several other times in `admin_actions` (e.g. 5-21 "Friend gift" returned `UNAUTHORIZED_INVALID_JWT_FORMAT / Invalid JWT`), and the same `UNAUTHORIZED_INVALID_JWT_FORMAT` error is showing up in `send-unread-message-emails` logs right now.
+
+## Root cause
+
+`send-transactional-email` only accepts callers whose `Authorization: Bearer ...` token is a JWT containing `role: service_role`. It decodes the JWT manually:
+
+```ts
+const callerRole = decodeJwtRole(req.headers.get('Authorization'))
+if (callerRole !== 'service_role') return 403 Forbidden
+```
+
+The project's `SUPABASE_SERVICE_ROLE_KEY` is now the new-format secret key (`sb_secret_...`), not a legacy JWT. That format has no decodable payload, so `decodeJwtRole` returns `null`, and every server-side caller — including `admin-manage-users` invoking the gift email — gets rejected with 403 / `UNAUTHORIZED_INVALID_JWT_FORMAT`. Auth gift sends that did succeed earlier were on the older JWT-format key; the newer ones started failing once the key was rotated to the new format.
+
+## Fix
+
+1. **`supabase/functions/send-transactional-email/index.ts`** — replace the JWT-role check with a check that accepts either:
+   - a JWT whose decoded `role` claim is `service_role` (back-compat with legacy keys), OR
+   - a bearer token that exactly matches `Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')` (new `sb_secret_...` format).
+
+   Keep the same 403 behavior for anything else. No other logic changes.
+
+2. **Deploy** `send-transactional-email` so the fix is live.
+
+3. **Resend Gayla's founder-gift email** by calling `admin-manage-users` (or directly invoking `send-transactional-email`) once with:
+   - `templateName: "founder-gift"`
+   - `recipientEmail: "gaylabrum@aol.com"`
+   - `templateData: { name: "Gayla" }`
+   - `idempotencyKey: "founder-gift-07b2d321-f751-46ea-beeb-92bdc784b6cc-resend-2026-06-09"`
+
+   Then verify a `sent` row appears in `email_send_log`.
+
+4. **Sanity-check** the other server-side callers of `send-transactional-email` (e.g. `send-unread-message-emails`, `admin-manage-users` enterprise welcome) — they all use the same service-role invoke pattern, so the same fix unblocks them too. No code changes needed in those callers.
 
 ## Out of scope
 
-- Android/FCM (unchanged).
-- Stripe account / Apple IAP agreements (separate workstream — let me know if those also moved and I'll plan them).
-- In-app notification routing (the bell links — that work was finished in the previous turn and is unrelated to APNs).
+- Not touching the founder-gift template content.
+- Not changing the admin UI flow or `admin-manage-users` logic.
+- Not back-filling all historical failed gift sends — only Gayla. If you want me to resend the other failed comps (5-21 "Friend gift", 5-21 "Founder Gift" x2, 5-21 "Potential Enterprise"), say the word and I'll do those too in the same pass.
