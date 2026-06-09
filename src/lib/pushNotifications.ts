@@ -171,21 +171,15 @@ async function runPushRegistration(): Promise<PushRegistrationResult> {
       await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
         const link = action.notification?.data?.link;
         if (link && typeof link === 'string') {
-          // Use SPA navigation so the bottom nav, back button, and React Router
-          // state stay intact. window.location.href triggers a full reload and
-          // can trap the user inside a route (e.g. /messages) because the
-          // history stack is wiped and AppLayout remounts in a weird state.
-          try {
-            window.history.pushState({}, '', link);
-            window.dispatchEvent(new PopStateEvent('popstate'));
-            // Tell the circle-sync hook a deep link landed so the header
-            // switches to the linked circle even before React Router rerenders.
-            window.dispatchEvent(new CustomEvent('familial:deep-link', { detail: link }));
-          } catch {
-            window.location.href = link;
-          }
+          // Hand off to the React Router bridge in <App />. The bridge calls
+          // navigate(link) so React Router owns the history entry — no
+          // synthetic popstate, no duplicate pushState, no collisions with
+          // Messages' sentinel history entry. This keeps the back button /
+          // bottom nav fully interactive after a deep-link tap on iOS.
+          window.dispatchEvent(new CustomEvent('familial:deep-link', { detail: link }));
         }
       });
+
 
       console.log('[push] register-called');
       try {
