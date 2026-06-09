@@ -9,11 +9,12 @@ import { Users, ArrowUp, Plus, Loader2 } from "lucide-react";
 import { openExternalUrl } from "@/lib/externalUrl";
 import {
   isIOSNative,
+  isAndroidNative,
   purchaseSubscription,
   purchaseConsumable,
   prewarmProducts,
-  APPLE_PRODUCTS,
-} from "@/lib/iapPurchase";
+  productIdFor,
+} from "@/lib/mobilePurchase";
 import SubscriptionDisclosure from "@/components/shared/SubscriptionDisclosure";
 import { useCircleContext } from "@/contexts/CircleContext";
 import {
@@ -60,11 +61,10 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
   const [upgrading, setUpgrading] = useState(false);
   const [planSource, setPlanSource] = useState<string | null>(null);
 
-  // Pre-warm StoreKit when dialog opens (iOS only) so products are ready
-  // before the user taps a Buy/Upgrade button. Avoids 2.1(b) "Cannot find
-  // product" rejections from App Review on cold-start sandboxes.
+  // Pre-warm StoreKit / Play Billing when dialog opens (native only) so
+  // products are ready before the user taps a Buy/Upgrade button.
   useEffect(() => {
-    if (isOpen && isIOSNative()) {
+    if (isOpen && (isIOSNative() || isAndroidNative())) {
       prewarmProducts();
     }
   }, [isOpen]);
@@ -85,12 +85,15 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
     })();
   }, [isOpen]);
 
-  const onIOSPlatform = isIOSNative();
+  const onNativeMobile = isIOSNative() || isAndroidNative();
+  const storeName = isIOSNative() ? "App Store" : isAndroidNative() ? "Google Play" : "the web";
   const crossPlatformWarning =
-    planSource === "apple" && !onIOSPlatform
+    planSource === "apple" && !isIOSNative()
       ? "You already have an active subscription through the App Store. Manage or change your plan in your iPhone's Settings → Apple ID → Subscriptions to avoid being billed twice."
-      : planSource === "stripe" && onIOSPlatform
-      ? "You already have an active subscription billed on the web. Manage or change your plan from familialmedia.com to avoid being billed twice."
+      : planSource === "google" && !isAndroidNative()
+      ? "You already have an active subscription through Google Play. Manage or change your plan from the Play Store on your Android device to avoid being billed twice."
+      : planSource === "stripe" && onNativeMobile
+      ? `You already have an active subscription billed on the web. Manage or change your plan from familialmedia.com to avoid being billed twice.`
       : null;
 
   const handleCheckout = async (priceId: string, mode: "subscription" | "payment", optionKey: string) => {
@@ -111,13 +114,18 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
     }
   };
 
-  const handleApplePlanPurchase = async (
+  const handleNativePlanPurchase = async (
     plan: "family" | "extended",
     optionKey: string
   ) => {
+    const productId = productIdFor(plan);
+    if (!productId) {
+      toast({ title: "Unavailable", description: "In-app purchases aren't available on this device.", variant: "destructive" });
+      return;
+    }
     setLoadingOption(optionKey);
     try {
-      const success = await purchaseSubscription(APPLE_PRODUCTS[plan]);
+      const success = await purchaseSubscription(productId);
       if (success) {
         // Refresh plan + circles so the UI reflects the new tier (e.g. Extended → 35 members)
         await Promise.all([refetchUserPlan(), refetchCircles()]);
@@ -135,10 +143,15 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
     }
   };
 
-  const handleAppleExtraMembers = async (optionKey: string) => {
+  const handleNativeExtraMembers = async (optionKey: string) => {
+    const productId = productIdFor("extraMembers");
+    if (!productId) {
+      toast({ title: "Unavailable", description: "In-app purchases aren't available on this device.", variant: "destructive" });
+      return;
+    }
     setLoadingOption(optionKey);
     try {
-      const success = await purchaseConsumable(APPLE_PRODUCTS.extraMembers, {
+      const success = await purchaseConsumable(productId, {
         circleId,
         kind: "extra_members",
       });
@@ -206,8 +219,9 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
     return new Date(dateStr).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   };
 
-  // On iOS native, all paid actions must use Apple IAP (App Store guideline 3.1.1).
-  const onIOS = isIOSNative();
+  // On native mobile, paid actions must use the native store
+  // (App Store guideline 3.1.1 / Google Play policy 4.1).
+  const onNative = isIOSNative() || isAndroidNative();
 
   const options = [];
 
@@ -218,8 +232,8 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
       price: "$7/month",
       description: "Up to 20 members per circle, 2 circles",
       action: () =>
-        onIOS
-          ? handleApplePlanPurchase("family", "family")
+        onNative
+          ? handleNativePlanPurchase("family", "family")
           : handleCheckout(PRICES.family, "subscription", "family"),
       icon: <ArrowUp className="w-4 h-4" />,
     });
@@ -229,8 +243,8 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
       price: "$15/month",
       description: "Up to 35 members per circle, 3 circles",
       action: () =>
-        onIOS
-          ? handleApplePlanPurchase("extended", "extended")
+        onNative
+          ? handleNativePlanPurchase("extended", "extended")
           : handleCheckout(PRICES.extended, "subscription", "extended"),
       icon: <ArrowUp className="w-4 h-4" />,
     });
@@ -241,8 +255,8 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
       price: "$15/month",
       description: "Up to 35 members per circle, 3 circles",
       action: () =>
-        onIOS
-          ? handleApplePlanPurchase("extended", "extended")
+        onNative
+          ? handleNativePlanPurchase("extended", "extended")
           : handleUpgradePreview(PRICES.extended, "extended"),
       icon: <ArrowUp className="w-4 h-4" />,
     });
@@ -255,8 +269,8 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
     price: "$5 one-time",
     description: "Adds 7 more member slots to this circle",
     action: () =>
-      onIOS
-        ? handleAppleExtraMembers("extra")
+      onNative
+        ? handleNativeExtraMembers("extra")
         : handleCheckout(PRICES.extraMembers, "payment", "extra"),
     icon: <Plus className="w-4 h-4" />,
   });
