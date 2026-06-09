@@ -1,50 +1,59 @@
-## Goal
-Give you a single reusable command sequence to safely pull Lovable changes into VS Code without losing your local Android files (`google-services.json`, edited `build.gradle`, the whole `android/` folder, `package-lock.json`, etc.).
+# Plan: Fix Comped Circle Limits + Add Reminder Events
 
-## The standard "pull updates" workflow
+## Problem 1: Comped Family/Extended users can't create a second circle
 
-Run this **every time** I tell you there are new changes from Lovable:
-
-```bash
-# 1. Save any local changes (Android native files, lockfile, etc.)
-git stash push -u -m "local-native-files"
-
-# 2. Pull the latest Lovable changes cleanly
-git pull --rebase
-
-# 3. Re-apply your local changes on top
-git stash pop
-
-# 4. Re-install deps in case package.json changed
-npm install --legacy-peer-deps
-
-# 5. Sync web build into native projects
-npm run build
-npx cap sync android
-bash scripts/android-post-sync.sh
-
-# 6. Open Android Studio
-npx cap open android
+**Root cause:** `supabase/functions/admin-manage-users/index.ts` defines:
 ```
-
-If `git stash pop` reports a conflict on a file you've edited (rare — usually only `android/app/build.gradle` if I changed something in it), open the file, keep your edits, and run `git add <file>` + `git stash drop`.
-
-## When iOS is also affected
-Add these between steps 5 and 6:
-```bash
-npx cap sync ios
-bash scripts/ios-post-sync.sh
-npx cap open ios
+family:   { max_circles: 1, max_members_per_circle: 20 }
+extended: { max_circles: 1, max_members_per_circle: 35 }
 ```
+But the real Stripe pricing in `check-subscription/index.ts` uses:
+- family → max_circles **2**
+- extended → max_circles **3**
 
-## Why this is safe
-- `git stash -u` includes **untracked** files, so `android/app/google-services.json` (which isn't in git) is preserved.
-- `--rebase` keeps your history linear and avoids the "ours vs theirs" merge-commit confusion you hit earlier.
-- `--legacy-peer-deps` is required by your project's Capacitor plugin set (per memory).
+So any user comped to Family/Extended is stuck at `max_circles=1`. The "+ Create Circle" button is gated by the `get_circle_count` / `get_circle_limit` RPCs and stays disabled, which matches the user's complaint.
 
-## What I'll do going forward
-Every time I make a change that touches Capacitor config, native scripts, push notifications, IAP, or anything else that needs a rebuild, I'll end my reply with:
+### Fix
+1. Update `PLAN_LIMITS` in `admin-manage-users/index.ts`:
+   - family → `max_circles: 2`
+   - extended → `max_circles: 3`
+2. One-time data backfill (via insert tool) for already-comped users to bring them in line:
+   ```sql
+   UPDATE public.user_plans SET max_circles = 2
+     WHERE source = 'admin_comp' AND plan = 'family' AND max_circles < 2;
+   UPDATE public.user_plans SET max_circles = 3
+     WHERE source = 'admin_comp' AND plan = 'extended' AND max_circles < 3;
+   ```
+   (This includes the complaining user.)
 
-> **To pull this update**, run the standard sequence above (or I'll paste the exact subset if only one step is needed).
+No change to Stripe/IAP paths — they already set the right values.
 
-Want me to save this as a `scripts/pull-updates.sh` one-liner you can just run as `bash scripts/pull-updates.sh`?
+## Problem 2: "Just a reminder" calendar items (no RSVP)
+
+Add an opt-in flag so an event can be a simple reminder (birthday, anniversary, appointment) with no Going / Not Going UI.
+
+### Schema (migration)
+- Add `is_reminder boolean not null default false` to `public.events`.
+
+### UI changes (`src/pages/Events.tsx` and create/edit dialog)
+- Add a Checkbox **"Just a reminder (no RSVP)"** in the create + edit event dialogs.
+- Persist `is_reminder` on insert/update.
+- When rendering an event card where `is_reminder = true`:
+  - Hide the Going / Not Going buttons and the "RSVPs" list.
+  - Show a small "Reminder" badge next to the title.
+- Skip the RSVP fetch/aggregation for reminder events (minor — they just won't have any).
+- Notification copy: keep existing "New Event" notification but drop the "— RSVP now!" suffix when `is_reminder` is true.
+
+### Notification trigger
+Update `notify_on_event_created` to omit "— RSVP now!" when `NEW.is_reminder = true`.
+
+## Files touched
+- `supabase/functions/admin-manage-users/index.ts` — PLAN_LIMITS fix
+- Migration: add `events.is_reminder`, update `notify_on_event_created`
+- Data update: backfill comped Family/Extended `max_circles`
+- `src/pages/Events.tsx` — checkbox in dialog, conditional RSVP UI, badge
+- (Types regenerate automatically)
+
+## Out of scope
+- No changes to Stripe/Apple/Google plan sync paths.
+- No changes to free/founder/enterprise limits.
