@@ -51,6 +51,17 @@ function decodeJwtRole(authHeader: string | null): string | null {
   }
 }
 
+// Accepts caller if either:
+//  - the bearer is a JWT whose `role` claim is `service_role` (legacy keys), OR
+//  - the bearer exactly matches SUPABASE_SERVICE_ROLE_KEY (new `sb_secret_...` format).
+function isServiceRoleCaller(authHeader: string | null): boolean {
+  if (!authHeader?.startsWith('Bearer ')) return false
+  if (decodeJwtRole(authHeader) === 'service_role') return true
+  const token = authHeader.slice(7).trim()
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  return !!serviceKey && token === serviceKey
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
