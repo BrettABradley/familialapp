@@ -686,6 +686,13 @@ const Events = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <label className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/40 transition-colors">
+                <Checkbox checked={isReminder} onCheckedChange={(c) => setIsReminder(!!c)} className="mt-0.5" />
+                <span className="space-y-1">
+                  <span className="text-sm font-medium flex items-center gap-1.5"><Bell className="w-3.5 h-3.5" />Just a reminder (no RSVP)</span>
+                  <span className="block text-xs text-muted-foreground">Use for birthdays, anniversaries, appointments — no Going / Not Going buttons.</span>
+                </span>
+              </label>
               <Button className="w-full" onClick={handleCreateEvent} disabled={!title.trim() || !selectedCircle || !selectedDate || isCreating}>
                 {isCreating ? "Creating..." : "Create Event"}
               </Button>
