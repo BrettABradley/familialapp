@@ -45,7 +45,21 @@ const queryClient = new QueryClient();
 const NativeUrlOpenBridge = () => {
   const navigate = useNavigate();
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
+    // React Router bridge for native push deep-link taps. The push handler
+    // dispatches `familial:deep-link` with the target path; we route through
+    // React Router so the history stack stays consistent and Messages'
+    // sentinel popstate doesn't collide with a synthetic one.
+    const onDeepLink = (e: Event) => {
+      const link = (e as CustomEvent<string>).detail;
+      if (link && typeof link === 'string') {
+        navigate(link);
+      }
+    };
+    window.addEventListener('familial:deep-link', onDeepLink);
+
+    if (!Capacitor.isNativePlatform()) {
+      return () => window.removeEventListener('familial:deep-link', onDeepLink);
+    }
     let remove: (() => void) | undefined;
     (async () => {
       try {
@@ -68,10 +82,14 @@ const NativeUrlOpenBridge = () => {
         console.warn("[appUrlOpen] listener setup failed", e);
       }
     })();
-    return () => { remove?.(); };
+    return () => {
+      window.removeEventListener('familial:deep-link', onDeepLink);
+      remove?.();
+    };
   }, [navigate]);
   return null;
 };
+
 
 const App = () => {
   useVisualViewport();
