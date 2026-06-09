@@ -10,6 +10,13 @@ interface SquareSignedThumbnailProps {
   transformImage?: boolean;
   resolveAsBlob?: boolean;
   resolveAsDataUrl?: boolean;
+  /**
+   * "contain" (default) keeps the original aspect with a blurred backdrop —
+   * matches Feed multi-photo previews. "cover" crops to a true square,
+   * which is what the Profile/Albums grid wants so portrait screenshots
+   * don't end up showing only the middle of the image.
+   */
+  fit?: "contain" | "cover";
 }
 
 /**
@@ -26,30 +33,50 @@ export const SquareSignedThumbnail = ({
   transformImage = true,
   resolveAsBlob = false,
   resolveAsDataUrl = false,
-}: SquareSignedThumbnailProps) => (
-  <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-muted">
-    <SignedSmartImage
-      path={path}
-      bucket={bucket}
-      preset={preset}
-      transformImage={transformImage}
-      resolveAsBlob={resolveAsBlob}
-      resolveAsDataUrl={resolveAsDataUrl}
-      alt=""
-      aria-hidden="true"
-      className="absolute inset-0 h-full w-full scale-105 object-cover opacity-35 blur-xl bg-transparent"
-    />
-    <SignedSmartImage
-      path={path}
-      bucket={bucket}
-      preset={preset}
-      priority={priority}
-      transformImage={transformImage}
-      resolveAsBlob={resolveAsBlob}
-      resolveAsDataUrl={resolveAsDataUrl}
-      alt={alt}
-      className="relative z-10 h-auto w-full max-w-none object-contain bg-transparent"
-      style={{ objectPosition: "center center" }}
-    />
-  </div>
-);
+  fit = "contain",
+}: SquareSignedThumbnailProps) => {
+  if (fit === "cover") {
+    return (
+      <div className="relative h-full w-full overflow-hidden bg-muted">
+        <SignedSmartImage
+          path={path}
+          bucket={bucket}
+          preset={preset}
+          priority={priority}
+          transformImage={transformImage}
+          resolveAsBlob={resolveAsBlob}
+          resolveAsDataUrl={resolveAsDataUrl}
+          alt={alt}
+          className="absolute inset-0 h-full w-full object-cover bg-transparent"
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-muted">
+      <SignedSmartImage
+        path={path}
+        bucket={bucket}
+        preset={preset}
+        transformImage={transformImage}
+        resolveAsBlob={resolveAsBlob}
+        resolveAsDataUrl={resolveAsDataUrl}
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full scale-105 object-cover opacity-35 blur-xl bg-transparent"
+      />
+      <SignedSmartImage
+        path={path}
+        bucket={bucket}
+        preset={preset}
+        priority={priority}
+        transformImage={transformImage}
+        resolveAsBlob={resolveAsBlob}
+        resolveAsDataUrl={resolveAsDataUrl}
+        alt={alt}
+        className="relative z-10 h-auto w-full max-w-none object-contain bg-transparent"
+        style={{ objectPosition: "center center" }}
+      />
+    </div>
+  );
+};
