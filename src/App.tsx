@@ -34,6 +34,7 @@ import Appeal from "./pages/Appeal";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import CookiePolicy from "./pages/CookiePolicy";
+import ChildSafety from "./pages/ChildSafety";
 import About from "./pages/About";
 import Careers from "./pages/Careers";
 import Blog from "./pages/Blog";
@@ -122,6 +123,7 @@ const App = () => {
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/cookies" element={<CookiePolicy />} />
+            <Route path="/child-safety" element={<ChildSafety />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/delete-account" element={<DeleteAccount />} />
             <Route path="/store" element={<Store />} />
