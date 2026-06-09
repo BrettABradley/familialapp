@@ -78,6 +78,54 @@ Deno.serve(async (req) => {
 
       const senderName = alias?.alias || senderProfile?.display_name || 'Someone'
 
+      // Resolve a shared circle so the email's "View" link drops the recipient
+      // into the right circle context (mirrors notify_on_dm() deep link).
+      let circleId: string | null = null
+      try {
+        const { data: senderOwned } = await supabase
+          .from('circles')
+          .select('id')
+          .eq('owner_id', row.sender_id)
+        const { data: senderMemberships } = await supabase
+          .from('circle_memberships')
+          .select('circle_id')
+          .eq('user_id', row.sender_id)
+        const senderCircleIds = new Set<string>([
+          ...((senderOwned ?? []).map((c: any) => c.id)),
+          ...((senderMemberships ?? []).map((m: any) => m.circle_id)),
+        ])
+
+        if (senderCircleIds.size > 0) {
+          const ids = Array.from(senderCircleIds)
+          const { data: recipientOwned } = await supabase
+            .from('circles')
+            .select('id, created_at')
+            .eq('owner_id', row.recipient_id)
+            .in('id', ids)
+            .order('created_at', { ascending: false })
+            .limit(1)
+          if (recipientOwned && recipientOwned.length > 0) {
+            circleId = recipientOwned[0].id
+          } else {
+            const { data: recipientMember } = await supabase
+              .from('circle_memberships')
+              .select('circle_id')
+              .eq('user_id', row.recipient_id)
+              .in('circle_id', ids)
+              .limit(1)
+            if (recipientMember && recipientMember.length > 0) {
+              circleId = recipientMember[0].circle_id
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[unread-dm] circle lookup failed', e)
+      }
+
+      const deepLink = circleId
+        ? `/messages?circle=${circleId}&thread=${row.sender_id}`
+        : `/messages?thread=${row.sender_id}`
+
       // Send the email via send-transactional-email
       const { error: sendError } = await supabase.functions.invoke('send-transactional-email', {
         body: {
@@ -86,7 +134,7 @@ Deno.serve(async (req) => {
           idempotencyKey: `unread-dm-${row.id}-${new Date(row.first_unread_at).getTime()}`,
           templateData: {
             senderName,
-            url: `${SITE_URL}/messages`,
+            url: `${SITE_URL}${deepLink}`,
           },
         },
       })
