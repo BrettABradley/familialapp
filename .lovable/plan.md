@@ -1,23 +1,38 @@
-## Decision
+## Goal
+Align the Android app's package/bundle ID with iOS (`com.familialmedia.familial`) so both platforms share one consistent identifier.
 
-Ignore both findings. Neither represents a real exploit path in this app.
+## Changes
 
-### Finding 1 — Post-media upload "any circle membership" check
-- Storage INSERT requires `(storage.foldername(name))[1] = auth.uid()::text`. That alone restricts every authenticated user to writing inside their own UID folder.
-- The `EXISTS … circle_memberships` clause is redundant; removing or keeping it does not change who can write where.
-- No cross-user write is possible. Files referenced from posts go through `posts` RLS for read access separately.
+### 1. `capacitor.config.ts`
+Update the top-level `appId`:
+- From: `space.manus.familial.mobile.t20260223211425`
+- To: `com.familialmedia.familial`
 
-### Finding 2 — Realtime `group-messages:<uid>` topic scoping
-- The topic string is a channel label, not the security boundary.
-- Row delivery from `group_chat_messages` is gated by the table's RLS, which uses `is_group_chat_member(auth.uid(), group_chat_id)` (SECURITY DEFINER).
-- A user removed from a group loses RLS visibility immediately and stops receiving inserts on that group, regardless of topic name.
+This is the source of truth Capacitor uses when generating native projects. iOS won't be affected on the App Store (Xcode's `PRODUCT_BUNDLE_IDENTIFIER` is already `com.familialmedia.familial` and overrides this), but future `npx cap add` runs will produce consistent native shells.
 
-## Actions
+### 2. `scripts/android-post-sync.sh`
+Update the reminder message that mentions the old placeholder package name, so it tells you to register `com.familialmedia.familial` in Firebase instead.
 
-1. Mark both scanner findings as ignored with the rationale above (`security--manage_security_finding`).
-2. Append a short note to security memory so future scans don't re-flag:
-   - "Storage post-media writes are gated by UID-folder scope (`(storage.foldername(name))[1] = auth.uid()::text`); any extra `circle_memberships` EXISTS clause is decorative."
-   - "Realtime topic names like `group-messages:<uid>` are labels only. Row delivery is gated by RLS on the underlying tables using `is_group_chat_member` / `shares_circle_with` SECURITY DEFINER helpers."
+### 3. Android native folder (`android/`)
+The `android/` folder is generated locally on your Mac and is git-ignored — I can't edit it from here. After you pull the changes above, you will need to do this **once** in VS Code:
 
-## Out of scope
-No code, policy, or migration changes.
+In `android/app/build.gradle`, inside `defaultConfig { ... }`:
+```gradle
+applicationId "com.familialmedia.familial"
+namespace "com.familialmedia.familial"
+```
+
+(Alternative: delete `android/` entirely and run `npx cap add android` again — it will use the new `appId` from `capacitor.config.ts` automatically.)
+
+## What you do after I make these changes
+
+1. `git pull` in VS Code
+2. Edit `android/app/build.gradle` (two lines above) — OR `rm -rf android && npx cap add android`
+3. In Firebase Console → add a new Android app with package `com.familialmedia.familial`, download the fresh `google-services.json`, replace `android/app/google-services.json`
+4. `cd android && ./gradlew clean && cd ..`
+5. `npx cap sync android && bash scripts/android-post-sync.sh && npx cap open android`
+6. In Google Play Console, use `com.familialmedia.familial` as the package name (this is permanent once first uploaded)
+
+## Notes
+- iOS App Store build is unaffected — its bundle ID is locked in the Xcode project, not in `capacitor.config.ts`.
+- The old Firebase Android app entry (with the `space.manus...` package) can be deleted after the new one works.

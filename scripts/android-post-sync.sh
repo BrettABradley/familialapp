@@ -88,8 +88,8 @@ if [ ! -f "$ANDROID_DIR/app/google-services.json" ]; then
   echo ""
   echo "⚠️  android/app/google-services.json is missing."
   echo "   Create a Firebase project, register an Android app with package"
-  echo "   space.manus.familial.mobile.t20260223211425, download"
-  echo "   google-services.json, and drop it into android/app/."
+  echo "   com.familialmedia.familial, download google-services.json,"
+  echo "   and drop it into android/app/."
 fi
 
 echo "▶ Android post-sync done."
