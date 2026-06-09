@@ -723,7 +723,7 @@ const ProfileView = () => {
                     {isVideo ? (
                       <SignedVideoThumbnail path={cover.image_url} />
                     ) : (
-                      <SquareSignedThumbnail path={cover.image_url} bucket={PROFILE_BUCKET} transformImage={false} resolveAsDataUrl={nativeProfileMedia} alt={cover.caption || "Profile photo"} />
+                      <SquareSignedThumbnail path={cover.image_url} bucket={PROFILE_BUCKET} transformImage={false} resolveAsDataUrl={nativeProfileMedia} fit="cover" alt={cover.caption || "Profile photo"} />
                     )}
                     {count > 1 && (
                       <div
@@ -942,7 +942,7 @@ const ProfileView = () => {
                     {getMediaType(item.image_url) === "video" ? (
                       <SignedVideoThumbnail path={item.image_url} />
                     ) : (
-                      <SquareSignedThumbnail path={item.image_url} bucket={PROFILE_BUCKET} transformImage={false} resolveAsDataUrl={nativeProfileMedia} alt={`Item ${i + 1}`} />
+                      <SquareSignedThumbnail path={item.image_url} bucket={PROFILE_BUCKET} transformImage={false} resolveAsDataUrl={nativeProfileMedia} fit="cover" alt={`Item ${i + 1}`} />
                     )}
                   </div>
                 ))}
