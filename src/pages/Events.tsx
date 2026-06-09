@@ -19,7 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, CalendarDays, MapPin, Clock, Trash2, Loader2, Image, Pencil, Check, X, UserCheck, HelpCircle, XCircle, Users } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, CalendarDays, MapPin, Clock, Trash2, Loader2, Image, Pencil, Check, X, UserCheck, HelpCircle, XCircle, Users, Bell } from "lucide-react";
 import ReadOnlyBanner from "@/components/circles/ReadOnlyBanner";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 import { EventLocationPopover } from "@/components/events/EventLocationPopover";
@@ -89,6 +90,7 @@ interface Event {
   location: string | null;
   created_at: string;
   album_id: string | null;
+  is_reminder?: boolean | null;
   circles?: Circle;
   photo_albums?: Album | null;
 }
@@ -115,6 +117,7 @@ const Events = () => {
   const [eventTime, setEventTime] = useState("");
   const [eventLocation, setEventLocation] = useState("");
   const [selectedAlbumId, setSelectedAlbumId] = useState<string>("");
+  const [isReminder, setIsReminder] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isLoadingEvents, setIsLoadingEvents] = useState(true);
   const [hasMore, setHasMore] = useState(false);
@@ -131,6 +134,7 @@ const Events = () => {
   const [editDate, setEditDate] = useState<Date | undefined>();
   const [editEndDate, setEditEndDate] = useState<Date | undefined>();
   const [editAlbumId, setEditAlbumId] = useState<string>("");
+  const [editIsReminder, setEditIsReminder] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const PAGE_SIZE = 50;
@@ -283,7 +287,8 @@ const Events = () => {
         event_time: eventTime || null,
         location: eventLocation || null,
         album_id: selectedAlbumId && selectedAlbumId !== "none" ? selectedAlbumId : null,
-      });
+        is_reminder: isReminder,
+      } as any);
 
     if (error) {
       toast({ title: "Error", description: "Failed to create event. Please try again.", variant: "destructive" });
@@ -295,10 +300,11 @@ const Events = () => {
       setSelectedAlbumId("");
       setSelectedDate(new Date());
       setSelectedEndDate(undefined);
+      setIsReminder(false);
       setIsCreateOpen(false);
       fetchEvents();
       fetchPastEvents();
-      toast({ title: "Event created!", description: "Your event has been added to the calendar." });
+      toast({ title: isReminder ? "Reminder added!" : "Event created!", description: isReminder ? "Your reminder has been added to the calendar." : "Your event has been added to the calendar." });
     }
     setIsCreating(false);
   };
@@ -313,6 +319,7 @@ const Events = () => {
     setEditDate(new Date(year, month - 1, day));
     setEditEndDate(event.end_date ? parseLocalDate(event.end_date) : undefined);
     setEditAlbumId(event.album_id || "none");
+    setEditIsReminder(!!event.is_reminder);
   };
 
   const handleSaveEdit = async () => {
@@ -329,7 +336,8 @@ const Events = () => {
         event_time: editTime || null,
         location: editLocation.trim() || null,
         album_id: editAlbumId && editAlbumId !== "none" ? editAlbumId : null,
-      })
+        is_reminder: editIsReminder,
+      } as any)
       .eq("id", editingEvent.id);
 
     if (error) {
@@ -524,7 +532,12 @@ const Events = () => {
       <CardContent className="py-4">
         <div className="flex items-start justify-between">
           <div className="space-y-1 flex-1">
-            <h3 className="font-semibold text-foreground">{event.title}</h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold text-foreground">{event.title}</h3>
+              {event.is_reminder && (
+                <Badge variant="secondary" className="text-xs h-5 gap-1"><Bell className="w-3 h-3" />Reminder</Badge>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">{event.circles?.name}</p>
             <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mt-2">
               <span className="flex items-center gap-1">
@@ -561,7 +574,7 @@ const Events = () => {
                 {event.photo_albums.name}
               </Link>
             )}
-            {renderRsvpSection(event)}
+            {!event.is_reminder && renderRsvpSection(event)}
           </div>
           {event.created_by === user?.id && (
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -673,6 +686,13 @@ const Events = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <label className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/40 transition-colors">
+                <Checkbox checked={isReminder} onCheckedChange={(c) => setIsReminder(!!c)} className="mt-0.5" />
+                <span className="space-y-1">
+                  <span className="text-sm font-medium flex items-center gap-1.5"><Bell className="w-3.5 h-3.5" />Just a reminder (no RSVP)</span>
+                  <span className="block text-xs text-muted-foreground">Use for birthdays, anniversaries, appointments — no Going / Not Going buttons.</span>
+                </span>
+              </label>
               <Button className="w-full" onClick={handleCreateEvent} disabled={!title.trim() || !selectedCircle || !selectedDate || isCreating}>
                 {isCreating ? "Creating..." : "Create Event"}
               </Button>
@@ -737,6 +757,13 @@ const Events = () => {
                 </SelectContent>
               </Select>
             </div>
+            <label className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/40 transition-colors">
+              <Checkbox checked={editIsReminder} onCheckedChange={(c) => setEditIsReminder(!!c)} className="mt-0.5" />
+              <span className="space-y-1">
+                <span className="text-sm font-medium flex items-center gap-1.5"><Bell className="w-3.5 h-3.5" />Just a reminder (no RSVP)</span>
+                <span className="block text-xs text-muted-foreground">Use for birthdays, anniversaries, appointments — no Going / Not Going buttons.</span>
+              </span>
+            </label>
               <Button className="w-full" onClick={handleSaveEdit} disabled={!editTitle.trim() || !editDate || isSavingEdit}>
                 {isSavingEdit ? "Saving..." : "Save Changes"}
               </Button>

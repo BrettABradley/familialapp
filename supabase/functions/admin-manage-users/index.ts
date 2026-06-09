@@ -6,8 +6,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const PLAN_LIMITS: Record<string, { max_circles: number; max_members_per_circle: number }> = {
   free: { max_circles: 1, max_members_per_circle: 8 },
-  family: { max_circles: 1, max_members_per_circle: 20 },
-  extended: { max_circles: 1, max_members_per_circle: 35 },
+  family: { max_circles: 2, max_members_per_circle: 20 },
+  extended: { max_circles: 3, max_members_per_circle: 35 },
 };
 
 const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY");

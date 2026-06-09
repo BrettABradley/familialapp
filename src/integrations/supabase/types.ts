@@ -721,6 +721,7 @@ export type Database = {
           event_date: string
           event_time: string | null
           id: string
+          is_reminder: boolean
           location: string | null
           title: string
           updated_at: string
@@ -735,6 +736,7 @@ export type Database = {
           event_date: string
           event_time?: string | null
           id?: string
+          is_reminder?: boolean
           location?: string | null
           title: string
           updated_at?: string
@@ -749,6 +751,7 @@ export type Database = {
           event_date?: string
           event_time?: string | null
           id?: string
+          is_reminder?: boolean
           location?: string | null
           title?: string
           updated_at?: string
