@@ -12,7 +12,7 @@ import { useCircleContext } from "@/contexts/CircleContext";
 export function useDeepLinkCircleSync() {
   const [searchParams] = useSearchParams();
   const location = useLocation();
-  const { circles, selectedCircle, setSelectedCircle } = useCircleContext();
+  const { circles, selectedCircle, setSelectedCircle, lockCircleSwitcher } = useCircleContext();
   const [pushTick, setPushTick] = useState(0);
 
   // Re-evaluate when a deep link arrives from a tapped push notification.
@@ -23,6 +23,10 @@ export function useDeepLinkCircleSync() {
   }, []);
 
   useEffect(() => {
+    // Never switch circles while an album lock is active — the user is
+    // viewing a specific album and a circle change would load stale data.
+    if (lockCircleSwitcher) return;
+
     // Prefer the live URL (covers programmatic pushState that React Router
     // hasn't reconciled yet) over the cached searchParams.
     const live = new URLSearchParams(window.location.search);
@@ -38,5 +42,5 @@ export function useDeepLinkCircleSync() {
     if (circles.some((c) => c.id === target)) {
       setSelectedCircle(target);
     }
-  }, [searchParams, circles, selectedCircle, setSelectedCircle, location.pathname, pushTick]);
+  }, [searchParams, circles, selectedCircle, setSelectedCircle, location.pathname, pushTick, lockCircleSwitcher]);
 }

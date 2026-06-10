@@ -230,7 +230,7 @@ const AlbumPhotoLightbox = ({
 
 const Albums = () => {
   const { user } = useAuth();
-  const { circles, selectedCircle, setSelectedCircle, isLoading: contextLoading, isCircleReadOnly, setLockCircleSwitcher } = useCircleContext();
+  const { circles, selectedCircle, setSelectedCircle, forceSetSelectedCircle, isLoading: contextLoading, isCircleReadOnly, setLockCircleSwitcher } = useCircleContext();
   const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
   const mainRef = useRef<HTMLElement>(null);
@@ -298,9 +298,11 @@ const Albums = () => {
 
   useEffect(() => {
     if (circleIdParam && circles.length > 0) {
-      setSelectedCircle(circleIdParam);
+      // Use the force path so this still applies even after the lock engages
+      // (e.g. when the user re-enters the page from a deep link to an album).
+      forceSetSelectedCircle(circleIdParam);
     }
-  }, [circles, circleIdParam, setSelectedCircle]);
+  }, [circles, circleIdParam, forceSetSelectedCircle]);
 
   useEffect(() => {
     if (selectedCircle) {

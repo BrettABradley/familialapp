@@ -1,65 +1,36 @@
-# Plan: Album lock + respect system dark mode in splash/status bar
+## Plan — Harden Album Circle Lock
 
-## 1. Circle switcher locked inside an album
+Focus only on the album lock. The current code hides the header's circle dropdown when an album is open, but it does NOT block circle changes from other paths, so the active circle can still flip mid-album.
 
-Good news — this is **already implemented in the codebase**:
+### Root cause
+`setLockCircleSwitcher(true)` in `src/pages/Albums.tsx` only affects the visible `<Select>` in `CircleHeader`. These paths can still change `selectedCircle` while an album is open:
 
-- `src/pages/Albums.tsx` (lines 328–334) calls `setLockCircleSwitcher(true)` whenever `selectedAlbum` is set and resets it on unmount.
-- `src/contexts/CircleContext.tsx` exposes `lockCircleSwitcher`.
-- `src/components/layout/AppLayout.tsx` passes it as `lockCircle` to `CircleHeader`.
-- `src/components/layout/CircleHeader.tsx` (line 249) renders the circle name as plain text (no `<Select>`) when `lockCircle` is true.
+1. **Deep-link sync** — `src/hooks/useDeepLinkCircleSync.ts` calls `setSelectedCircle(target)` whenever a notification deep-link arrives with `?circle=ID`. Runs even while inside an album.
+2. **URL `?circle=` param** — `Albums.tsx` itself runs `setSelectedCircle(circleIdParam)` on every change of `circles`/`circleIdParam`, which can re-fire after the album is open.
+3. **Any future caller** of `setSelectedCircle` from elsewhere (header sheet, push handler, etc.) bypasses the lock entirely because the lock is UI-only.
 
-So the lock works on all platforms (web / iOS / Android) — it's just code. The reason it may look unfixed in TestFlight is the same caching issue as the splash screen: the old JS bundle is still inside the `.ipa`. Once you `bash scripts/pull-updates.sh` + Clean Build Folder + bump build number + re-archive, the lock will be live.
+### What I'll change
 
-**No code change required for this item.** I'll only verify by re-reading the three files above and confirm no regression.
+1. **`src/contexts/CircleContext.tsx`** — Make the lock authoritative:
+   - Hold `lockCircleSwitcher` in a ref alongside the state so the latest value is readable inside the setter without stale-closure issues.
+   - In `setSelectedCircle`, if the lock is active AND the requested circle differs from the current `selectedCircle`, ignore the call (log a warning, do not write to localStorage). Always allow setting the same circle (no-op) and allow clearing on sign-out.
+   - Expose a small internal escape hatch only used by the album page itself (e.g. an `unsafeSetSelectedCircle` or a "force" arg) so the album page can still apply the initial deep-linked `?circle=` BEFORE it locks. No other caller will use it.
 
-## 2. Stop forcing light mode
+2. **`src/pages/Albums.tsx`** — Tighten interaction with the lock:
+   - When opening an album from the list (user tap), call `setLockCircleSwitcher(true)` synchronously in the same handler that sets `selectedAlbum`, so there's no render gap.
+   - Keep the existing cleanup that releases the lock when `selectedAlbum` becomes null or the page unmounts.
+   - For the `?circle=` deep-link effect, use the new force path so it can sync circle once before locking, but never after.
 
-Today the app pins itself to a white look regardless of the user's system appearance. This shows up in three places:
+3. **`src/hooks/useDeepLinkCircleSync.ts`** — Defensive: check `lockCircleSwitcher` from context and skip switching while it's true. (Redundant with #1, but avoids spurious warnings and keeps intent clear.)
 
-| Where | Current value | Problem |
-|---|---|---|
-| `index.html` `<meta name="theme-color">` | `#ffffff` | Browsers/iOS tint UI chrome white even in dark mode |
-| `index.html` inline `<style>` | `html, body { background-color: #ffffff }` | Web body and splash overlay are always white |
-| `#splash` overlay background | `#ffffff` | Splash flashes white on a dark-mode device |
-| `src/lib/capacitorInit.ts` | `StatusBar.setStyle({ style: Style.Light })` (always) + `apple-mobile-web-app-status-bar-style content="default"` | Status bar icons are wrong color in dark mode |
-
-### Changes
-
-**A. `index.html`**
-- Replace the single `theme-color` meta with two media-scoped tags:
-  ```html
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
-  ```
-- Add `<meta name="color-scheme" content="light dark" />` so the UA knows the page supports both.
-- Update inline CSS so html/body and the `#splash` overlay use the system-appropriate background:
-  ```css
-  html, body { background-color: #ffffff; margin: 0; }
-  #splash { background: #ffffff; ... }
-  @media (prefers-color-scheme: dark) {
-    html, body { background-color: #0a0a0a; }
-    #splash { background: #0a0a0a; }
-  }
-  ```
-- Change `apple-mobile-web-app-status-bar-style` from `default` to `black-translucent` so iOS lets the WebView own status-bar contrast (matches the existing `StatusBar.setOverlaysWebView({ overlay: true })` call).
-
-**B. `src/lib/capacitorInit.ts`**
-Replace the unconditional `Style.Light` call with a runtime decision based on `window.matchMedia('(prefers-color-scheme: dark)')`:
-- Dark system → `Style.Light` (light icons on dark bg)
-- Light system → `Style.Dark` (dark icons on light bg)
-
-Also add a listener so the status-bar style updates live when the user toggles appearance in Settings.
-
-**C. `src/lib/capacitorInit.ts` — splash logo**
-The existing splash overlay shows `splash-logo.png`. The logo PNG has a transparent background so it works on either color. No new asset needed.
+4. **Verify**
+   - Re-grep all callers of `setSelectedCircle` to confirm none try to switch circles while a lock is active in a way that would surprise users.
+   - Walk through three scenarios mentally and confirm the lock holds:
+     a) Open album → tap a push notification for a different circle → stays on current album's circle.
+     b) Open album via `/albums?circle=A&album=X` → URL sync sets circle A, then lock engages, no further switches.
+     c) Close album (back button or selecting another album list) → lock releases cleanly.
 
 ### Out of scope
-- I'm **not** introducing an in-app dark theme toggle or adding `.dark` class wiring on `<html>`. The existing `.dark` token set in `src/index.css` stays untouched. This change only fixes the chrome (splash, status bar, body background pre-React) so it matches the device's system appearance instead of always being white. Adding a full dark UI for the React app itself would be a separate, much larger task — say the word and we can scope it next.
-
-## Files changed
-- `index.html` — theme-color + color-scheme metas, inline CSS for dark fallback, status-bar meta value
-- `src/lib/capacitorInit.ts` — dynamic `StatusBar.setStyle` based on `prefers-color-scheme` + change listener
-
-## Deployment reminder
-This (and the album lock) will only show up in TestFlight after: `bash scripts/pull-updates.sh` → bump Build number in Xcode → Product › Clean Build Folder → Archive → upload → delete old TestFlight app on phone before installing.
+- Splash / dark mode work (untouched per your instruction).
+- Native config changes.
+- Any visual change to the header beyond what's already there.
