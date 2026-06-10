@@ -950,8 +950,10 @@ const Messages = () => {
     const ta = e.target;
     ta.style.height = 'auto';
     ta.style.height = `${Math.min(ta.scrollHeight, 150)}px`;
-    // Scroll latest message into view as input grows
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Only pin to bottom if user is already there; otherwise leave them where
+    // they're reading (the ResizeObserver effect handles auto-pin on layout
+    // changes when at-bottom).
+    pinToBottomIfNeeded(false);
   };
 
   const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
