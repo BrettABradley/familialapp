@@ -24,7 +24,8 @@ import { SignedSmartImage } from "@/components/shared/SignedSmartImage";
 import useEmblaCarousel from "embla-carousel-react";
 import { useSwipeDownClose } from "@/hooks/useSwipeDownClose";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
-import { pickImage } from "@/lib/imagePicker";
+import { pickImage, pickImages } from "@/lib/imagePicker";
+import { isMobileNative } from "@/lib/platform";
 import { getPostMediaUrl, getPostMediaUrls, toPostMediaPath } from "@/lib/postMediaUrl";
 
 interface Circle {
@@ -483,6 +484,24 @@ const Albums = () => {
     await processAndUploadFiles(files);
   };
 
+  const openAlbumPicker = async () => {
+    if (isMobileNative()) {
+      try {
+        const picked = await pickImages({ limit: 100 });
+        if (picked.length === 0) return;
+        await processAndUploadFiles(picked.map((p) => p.file));
+      } catch (err: any) {
+        toast({
+          title: "Couldn't open photo library",
+          description: err?.message || "Please try again.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -736,7 +755,7 @@ const Albums = () => {
                 onChange={handleFileUpload}
                 className="hidden"
               />
-              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading || readOnly}>
+              <Button onClick={openAlbumPicker} disabled={isUploading || readOnly}>
                 <Upload className="w-4 h-4 mr-2" />
                 {isUploading ? `Uploading ${uploadProgress.current}/${uploadProgress.total}...` : "Add Photos"}
               </Button>

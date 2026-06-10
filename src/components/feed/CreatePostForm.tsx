@@ -18,6 +18,8 @@ import { blobToVoiceNoteFile } from "@/lib/voiceNoteFile";
 import { convertHeicFiles } from "@/lib/heicConverter";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import { getPostMediaUrls } from "@/lib/postMediaUrl";
+import { pickImage } from "@/lib/imagePicker";
+import { isMobileNative } from "@/lib/platform";
 
 interface CreatePostFormProps {
   onPostCreated: () => void;
@@ -65,8 +67,8 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
 
   const MAX_FILES = 4;
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    let files = Array.from(e.target.files || []);
+  const processFiles = async (incoming: File[]) => {
+    let files = incoming;
     if (files.length + selectedFiles.length > MAX_FILES) {
       toast({ title: "Too many files", description: `You can upload up to ${MAX_FILES} files per post. For more images, try creating an Album!`, variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
       return;
@@ -86,8 +88,32 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     files.forEach(file => {
       setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]);
     });
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
     // Reset input so the same file can be picked again on Safari/iOS
     if (fileInputRef.current) fileInputRef.current.value = "";
+    await processFiles(files);
+  };
+
+  const openMediaPicker = async () => {
+    // On native, use Capacitor's prompt so Camera/Library are both available.
+    // Web keeps the hidden <input> so users can also pick video files.
+    if (isMobileNative()) {
+      try {
+        const picked = await pickImage({ source: 'prompt' });
+        if (picked) await processFiles([picked.file]);
+      } catch (err: any) {
+        toast({
+          title: "Couldn't open camera",
+          description: err?.message || "Please try again.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+    fileInputRef.current?.click();
   };
 
   const handleVoiceRecording = async (blob: Blob) => {
@@ -327,7 +353,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
             {selectedFiles.length < MAX_FILES && (
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={openMediaPicker}
                 disabled={isPosting}
                 className="w-full aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary hover:bg-secondary/50 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground"
                 aria-label="Add more media"
@@ -341,7 +367,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
         )}
         {previewUrls.length >= 1 && selectedFiles.length < MAX_FILES && (
           <div className="mb-2 flex justify-center">
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isPosting}>
+            <Button variant="outline" size="sm" onClick={openMediaPicker} disabled={isPosting}>
               <Paperclip className="w-4 h-4 mr-2" />Add more ({selectedFiles.length}/{MAX_FILES})
             </Button>
           </div>
@@ -363,7 +389,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
-            <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isPosting || selectedFiles.length >= MAX_FILES}>
+            <Button variant="ghost" size="sm" onClick={openMediaPicker} disabled={isPosting || selectedFiles.length >= MAX_FILES}>
               <Paperclip className="w-4 h-4 mr-2" />Add Media
             </Button>
             <VoiceRecorder onRecordingComplete={handleVoiceRecording} />

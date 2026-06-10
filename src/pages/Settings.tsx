@@ -162,7 +162,7 @@ const Settings = () => {
 
   const handlePickImage = async () => {
     try {
-      const result = await pickImage();
+      const result = await pickImage({ source: 'prompt' });
       if (!result) return;
 
       // Convert HEIC if needed (no-op on iOS native, which already returns JPEG)
