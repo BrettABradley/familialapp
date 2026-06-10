@@ -6,8 +6,9 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   plugins: {
     SplashScreen: {
-      launchShowDuration: 2000,
-      launchAutoHide: true,
+      // Safety cap only — we hide manually after React's first paint.
+      launchShowDuration: 3000,
+      launchAutoHide: false,
       backgroundColor: '#ffffff',
       showSpinner: false,
       androidSplashResourceName: 'splash',
@@ -25,8 +26,10 @@ const config: CapacitorConfig = {
     },
   },
   ios: {
-    // iOS-specific settings (existing behavior preserved).
+    // iOS-specific settings. backgroundColor pins the WKWebView backing
+    // to white so there is no black flash during the splash→app handoff.
     contentInset: 'never',
+    backgroundColor: '#ffffff',
   },
   android: {
     // Match the JS bundle's HTTPS-only posture. The post-sync script also
@@ -34,6 +37,7 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
     captureInput: true,
     webContentsDebuggingEnabled: false,
+    backgroundColor: '#ffffff',
   },
 };
 

@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { initCapacitorPlugins } from "./lib/capacitorInit";
+import { initCapacitorPlugins, hideSplashScreen } from "./lib/capacitorInit";
 import ErrorBoundary from "./components/shared/ErrorBoundary";
 
 console.log("[boot] react-mount-start");
@@ -23,8 +23,21 @@ try {
     </ErrorBoundary>
   );
   console.log("[boot] react-mount-end");
+
+  // Wait for React to commit AND the browser to actually paint a frame
+  // (double rAF) before hiding the native splash. This guarantees a white
+  // app frame is on screen before the splash goes away — no black flash.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      hideSplashScreen().catch((e) =>
+        console.warn("[boot] hideSplashScreen rejected", e)
+      );
+    });
+  });
 } catch (e) {
   console.error("[boot] react render threw", e);
+  // Even if render throws, don't leave the splash up forever.
+  hideSplashScreen().catch(() => {});
 }
 
 // Defer native plugin init until after first paint so a misbehaving plugin
