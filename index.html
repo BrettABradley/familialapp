@@ -44,14 +44,13 @@
       }
     </script>
     <style>
-      /* Pin the page background to white before CSS loads so the
-         splash → app handoff never reveals a black/transparent frame. */
+      /* Pin the page background before CSS loads so the splash → app handoff
+         never reveals a black/transparent frame. Respects system dark mode. */
       html, body { background-color: #ffffff; margin: 0; }
 
       /* Full-screen HTML splash overlay — paints with the first WebView
-         frame so the native splash hands off into an identical white
-         screen with the logo centered (no black flash). React fades it
-         out after ~2.5 s. */
+         frame so the native splash hands off into a matching screen with
+         the logo centered (no black flash). React fades it out after ~2.5s. */
       #splash {
         position: fixed;
         inset: 0;
@@ -71,6 +70,11 @@
         width: 140px;
         height: 140px;
         object-fit: contain;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        html, body { background-color: #0a0a0a; }
+        #splash { background: #0a0a0a; }
       }
     </style>
   </head>
