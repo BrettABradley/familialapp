@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { initCapacitorPlugins } from "./lib/capacitorInit";
+import { initCapacitorPlugins, hideSplashScreen } from "./lib/capacitorInit";
 import ErrorBoundary from "./components/shared/ErrorBoundary";
 
 console.log("[boot] react-mount-start");
