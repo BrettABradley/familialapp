@@ -19,9 +19,16 @@ interface MentionInputProps {
   maxLength?: number;
   rows?: number;
   disabled?: boolean;
-  /** Called with the set of mentioned user_ids whenever content changes */
+  /** Called with the set of mentioned user_ids whenever content changes.
+   *  When `enableEveryone` is true and the text contains `@everyone`, the
+   *  sentinel id `__everyone__` is included in the set. */
   onMentionsChange?: (mentionedIds: Set<string>) => void;
+  /** Add a synthetic "everyone" suggestion that pings the whole circle.
+   *  Only enabled for the Feed composer. */
+  enableEveryone?: boolean;
 }
+
+export const EVERYONE_SENTINEL = "__everyone__";
 
 export const MentionInput = ({
   value,
@@ -33,6 +40,7 @@ export const MentionInput = ({
   rows = 3,
   disabled,
   onMentionsChange,
+  enableEveryone = false,
 }: MentionInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -41,11 +49,16 @@ export const MentionInput = ({
   const [mentionStart, setMentionStart] = useState<number>(-1);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
+  // Effective candidate list, optionally prepended with the "everyone" entry.
+  const candidates: MentionMember[] = enableEveryone
+    ? [{ user_id: EVERYONE_SENTINEL, display_name: "everyone", avatar_url: null }, ...members]
+    : members;
+
   const filteredMembers = mentionQuery
-    ? members.filter((m) =>
+    ? candidates.filter((m) =>
         (m.display_name || "").toLowerCase().includes(mentionQuery.toLowerCase())
       )
-    : members;
+    : candidates;
 
   // Track mentioned user IDs
   useEffect(() => {
@@ -57,8 +70,11 @@ export const MentionInput = ({
         mentioned.add(member.user_id);
       }
     }
+    if (enableEveryone && /(^|[^a-zA-Z0-9])@everyone(\b|$)/i.test(value)) {
+      mentioned.add(EVERYONE_SENTINEL);
+    }
     onMentionsChange(mentioned);
-  }, [value, members, onMentionsChange]);
+  }, [value, members, onMentionsChange, enableEveryone]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
