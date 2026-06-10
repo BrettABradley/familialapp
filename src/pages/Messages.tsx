@@ -164,6 +164,20 @@ const Messages = () => {
   const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
+  const handleChatScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
+  const pinToBottomIfNeeded = (force = false) => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    if (force || isAtBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
+  };
   
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
