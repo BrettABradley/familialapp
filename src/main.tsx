@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { Capacitor } from "@capacitor/core";
 import App from "./App.tsx";
 import "./index.css";
 import { initCapacitorPlugins, hideSplashScreen } from "./lib/capacitorInit";
@@ -31,17 +32,26 @@ try {
   // holds for 2.5s and fades out over 700ms.
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      // Hide the native splash now — the HTML overlay is on top.
+      const isNative = Capacitor.isNativePlatform();
+
+      // On web, the splash overlay is unnecessary — remove it immediately
+      // so the landing page paints without any artificial delay.
+      if (!isNative) {
+        const el = document.getElementById("splash");
+        el?.parentNode?.removeChild(el);
+        return;
+      }
+
+      // Native (iOS/Android): hide native splash, hold the HTML overlay
+      // for ~2.5s, then slowly fade it out.
       hideSplashScreen().catch((e) =>
         console.warn("[boot] hideSplashScreen rejected", e)
       );
 
-      // Hold the HTML splash for ~2.5s, then slowly fade it out.
       setTimeout(() => {
         const el = document.getElementById("splash");
         if (!el) return;
         el.classList.add("splash-hide");
-        // Remove from the DOM after the 700ms CSS fade completes.
         setTimeout(() => {
           el.parentNode?.removeChild(el);
         }, 800);
