@@ -1981,6 +1981,10 @@ export type Database = {
         Args: { _circle_id: string }
         Returns: undefined
       }
+      create_everyone_mention_notifications: {
+        Args: { _circle_id: string; _post_id: string }
+        Returns: undefined
+      }
       create_mention_notifications: {
         Args: {
           _circle_id: string

@@ -11,7 +11,7 @@ import { Send, Paperclip, X, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ToastAction } from "@/components/ui/toast";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
-import { MentionInput } from "@/components/shared/MentionInput";
+import { MentionInput, EVERYONE_SENTINEL } from "@/components/shared/MentionInput";
 import { useCircleMembers } from "@/hooks/useCircleMembers";
 import { validateFileSize, getFileMediaType, getMediaType } from "@/lib/mediaUtils";
 import { blobToVoiceNoteFile } from "@/lib/voiceNoteFile";
@@ -168,11 +168,23 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
 
       // Fire @mention notifications
       if (newPost && mentionedUserIds.size > 0) {
-        supabase.rpc("create_mention_notifications", {
-          _mentioned_user_ids: Array.from(mentionedUserIds),
-          _post_id: newPost.id,
-          _circle_id: selectedCircle,
-        }).then();
+        const hasEveryone = mentionedUserIds.has(EVERYONE_SENTINEL);
+        const realUserIds = Array.from(mentionedUserIds).filter((id) => id !== EVERYONE_SENTINEL);
+        if (realUserIds.length > 0) {
+          supabase.rpc("create_mention_notifications", {
+            _mentioned_user_ids: realUserIds,
+            _post_id: newPost.id,
+            _circle_id: selectedCircle,
+          }).then();
+        }
+        if (hasEveryone) {
+          // Notifies every other circle member; the notifications-insert
+          // trigger fans out push notifications (iOS, Android, web).
+          supabase.rpc("create_everyone_mention_notifications" as any, {
+            _post_id: newPost.id,
+            _circle_id: selectedCircle,
+          }).then();
+        }
       }
 
       // Silent background moderation — fire-and-forget.
@@ -277,10 +289,11 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
       <CardContent className="pt-0">
         <div className="relative mb-4">
           <MentionInput
-            placeholder="What's happening with the family? Use @ to tag someone"
+            placeholder="What's happening with the family? Use @ to tag someone or @everyone to ping the whole circle"
             value={newPostContent}
             onChange={(val) => updatePostContent(val)}
             members={circleMembers}
+            enableEveryone
             onMentionsChange={setMentionedUserIds}
             className="min-h-[100px] resize-none pb-10"
             maxLength={5000}

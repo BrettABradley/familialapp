@@ -164,6 +164,20 @@ const Messages = () => {
   const readOnly = isCircleReadOnly(selectedCircle);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
+  const handleChatScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
+  const pinToBottomIfNeeded = (force = false) => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    if (force || isAtBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
+  };
   
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
@@ -283,9 +297,30 @@ const Messages = () => {
     if (selectedGroup) { fetchGroupMessages(); setChatView("group"); restoreDraft("group", selectedGroup.id); }
   }, [selectedGroup]);
 
+  // When messages change, only pin to bottom if the user is already there.
+  // Prevents the "chat keeps scrolling down as images render" jitter when the
+  // user has scrolled up to read older messages.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    pinToBottomIfNeeded(false);
   }, [messages, groupMessages]);
+
+  // When a chat is first opened, force-scroll to the latest message.
+  useEffect(() => {
+    isAtBottomRef.current = true;
+    requestAnimationFrame(() => pinToBottomIfNeeded(true));
+  }, [selectedUser?.user_id, selectedGroup?.id]);
+
+  // Keep pinned to bottom as media (images/videos) finish loading and reflow
+  // the container, but only if the user was already at the bottom.
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      if (isAtBottomRef.current) el.scrollTop = el.scrollHeight;
+    });
+    Array.from(el.children).forEach((child) => ro.observe(child as Element));
+    return () => ro.disconnect();
+  }, [chatView, selectedUser?.user_id, selectedGroup?.id, messages.length, groupMessages.length]);
 
   // Deep-link: ?thread=<userId> opens that DM thread once conversations
   // (or circle members) have loaded. ?group=<groupId> opens that group chat.
@@ -298,8 +333,16 @@ const Messages = () => {
     const fromConvos = conversations.find(c => c.user.user_id === threadParam)?.user;
     const fromMembers = circleMembers.find(m => m.user_id === threadParam);
     const target = fromConvos || fromMembers;
-    if (target) setSelectedUser(target);
-  }, [threadParam, conversations, circleMembers, selectedUser]);
+    if (target) {
+      setSelectedUser(target);
+      // Strip ?thread= from the URL so back/exit doesn't immediately re-open
+      // the same chat (this caused the "back button does nothing" loop when
+      // entering a chat from a notification).
+      const next = new URLSearchParams(searchParams);
+      next.delete("thread");
+      setSearchParamsMsg(next, { replace: true });
+    }
+  }, [threadParam, conversations, circleMembers, selectedUser, searchParams, setSearchParamsMsg]);
 
   useEffect(() => {
     if (!groupParam || selectedGroup?.id === groupParam) return;
@@ -907,8 +950,10 @@ const Messages = () => {
     const ta = e.target;
     ta.style.height = 'auto';
     ta.style.height = `${Math.min(ta.scrollHeight, 150)}px`;
-    // Scroll latest message into view as input grows
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Only pin to bottom if user is already there; otherwise leave them where
+    // they're reading (the ResizeObserver effect handles auto-pin on layout
+    // changes when at-bottom).
+    pinToBottomIfNeeded(false);
   };
 
   const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1008,7 +1053,7 @@ const Messages = () => {
           )}
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4" onTouchMove={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}>
+        <div ref={scrollContainerRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto p-4 space-y-4" onTouchMove={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}>
           <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-muted/50 text-xs text-muted-foreground">
             <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />
             <span>Messages are encrypted in transit and at rest. <Link to="/privacy" className="underline">Learn more</Link></span>
@@ -1161,7 +1206,7 @@ const Messages = () => {
           </DialogContent>
         </Dialog>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4" onTouchMove={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}>
+        <div ref={scrollContainerRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto p-4 space-y-4" onTouchMove={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}>
           {groupMessages.length === 0 ? (
             <div className="text-center py-12"><MessageSquare className="w-12 h-12 mx-auto text-muted-foreground mb-4" /><p className="text-muted-foreground">Start the group conversation</p></div>
           ) : (

@@ -1,59 +1,45 @@
-# Plan: Fix Comped Circle Limits + Add Reminder Events
+# Fixes: Chat back/scroll + Feed @everyone
 
-## Problem 1: Comped Family/Extended users can't create a second circle
+## 1. Back button from bell → chat doesn't work
 
-**Root cause:** `supabase/functions/admin-manage-users/index.ts` defines:
-```
-family:   { max_circles: 1, max_members_per_circle: 20 }
-extended: { max_circles: 1, max_members_per_circle: 35 }
-```
-But the real Stripe pricing in `check-subscription/index.ts` uses:
-- family → max_circles **2**
-- extended → max_circles **3**
+**Cause:** When a notification links to `/messages?thread=<userId>`, the deep-link `useEffect` (Messages.tsx ~296) re-opens the chat any time `selectedUser` becomes null while `threadParam` is still in the URL. The Android back / sentinel-popstate handler exits the chat, but the URL still has `?thread=`, so the effect immediately re-selects the user → user feels "stuck" in the chat.
 
-So any user comped to Family/Extended is stuck at `max_circles=1`. The "+ Create Circle" button is gated by the `get_circle_count` / `get_circle_limit` RPCs and stays disabled, which matches the user's complaint.
+**Fix:** Mirror the `?group=` pattern — strip `thread` from the URL once the chat is opened, and also strip it inside `handleExitChat`. This way back exits cleanly on iOS, Android, and web. (Single change in `src/pages/Messages.tsx`.)
 
-### Fix
-1. Update `PLAN_LIMITS` in `admin-manage-users/index.ts`:
-   - family → `max_circles: 2`
-   - extended → `max_circles: 3`
-2. One-time data backfill (via insert tool) for already-comped users to bring them in line:
-   ```sql
-   UPDATE public.user_plans SET max_circles = 2
-     WHERE source = 'admin_comp' AND plan = 'family' AND max_circles < 2;
-   UPDATE public.user_plans SET max_circles = 3
-     WHERE source = 'admin_comp' AND plan = 'extended' AND max_circles < 3;
-   ```
-   (This includes the complaining user.)
+## 2. Chat keeps scrolling down as images render
 
-No change to Stripe/IAP paths — they already set the right values.
+**Cause:** `useEffect` calls `messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })` on every `messages` change. As images in older messages finish loading, layout reflows and the smooth-scroll animation keeps re-triggering / fighting the user's manual scroll.
 
-## Problem 2: "Just a reminder" calendar items (no RSVP)
+**Fix:**
+- Track `isAtBottomRef` from the scroll container's scroll position (within ~80px of bottom).
+- Only auto-scroll when (a) a message was sent by the current user, or (b) user was already pinned to the bottom when a new message arrived.
+- Add `onLoad` to chat images: if `isAtBottomRef.current`, do an instant (non-smooth) scroll to bottom; otherwise do nothing. This stops the runaway scroll while keeping the "stay pinned" behavior people expect.
+- Apply to both DM and group views.
 
-Add an opt-in flag so an event can be a simple reminder (birthday, anniversary, appointment) with no Going / Not Going UI.
+Platform-agnostic — fixes iOS, Android, and web simultaneously.
 
-### Schema (migration)
-- Add `is_reminder boolean not null default false` to `public.events`.
+## 3. `@everyone` in feed posts → push everyone in the circle
 
-### UI changes (`src/pages/Events.tsx` and create/edit dialog)
-- Add a Checkbox **"Just a reminder (no RSVP)"** in the create + edit event dialogs.
-- Persist `is_reminder` on insert/update.
-- When rendering an event card where `is_reminder = true`:
-  - Hide the Going / Not Going buttons and the "RSVPs" list.
-  - Show a small "Reminder" badge next to the title.
-- Skip the RSVP fetch/aggregation for reminder events (minor — they just won't have any).
-- Notification copy: keep existing "New Event" notification but drop the "— RSVP now!" suffix when `is_reminder` is true.
+Scope: **Feed posts only** (not comments, not messages).
 
-### Notification trigger
-Update `notify_on_event_created` to omit "— RSVP now!" when `NEW.is_reminder = true`.
+**Backend (migration):** New SECURITY DEFINER RPC `create_everyone_mention_notifications(_circle_id uuid, _post_id uuid)`:
+- Verifies caller is a member/owner of the circle.
+- Inserts one `notifications` row per other circle member with type `mention_everyone`, title "Everyone mention", message "<author> mentioned everyone in <circle>", and `link = /feed?circle=<id>&post=<id>`.
+- Existing `notifications` insert trigger fans out push notifications to iOS/Android/web automatically — no edge function or platform-specific work needed.
 
-## Files touched
-- `supabase/functions/admin-manage-users/index.ts` — PLAN_LIMITS fix
-- Migration: add `events.is_reminder`, update `notify_on_event_created`
-- Data update: backfill comped Family/Extended `max_circles`
-- `src/pages/Events.tsx` — checkbox in dialog, conditional RSVP UI, badge
-- (Types regenerate automatically)
+**Frontend (`MentionInput` + `CreatePostForm`):**
+- Add a synthetic "Everyone" entry to the mention suggestion list (always first when `@e…` matches).
+- Detect literal `@everyone` token in submitted content via regex.
+- After post insert, if matched, call the new RPC (in addition to existing `create_mention_notifications`).
+- Show "@everyone" highlighted in the composer like other mentions.
+- Update placeholder copy to hint at the feature.
 
-## Out of scope
-- No changes to Stripe/Apple/Google plan sync paths.
-- No changes to free/founder/enterprise limits.
+## Technical Details
+
+Files touched:
+- `src/pages/Messages.tsx` — URL cleanup + scroll behavior.
+- `src/components/shared/MentionInput.tsx` — "Everyone" suggestion entry.
+- `src/components/feed/CreatePostForm.tsx` — detect `@everyone`, call new RPC.
+- `supabase/migrations/<new>.sql` — `create_everyone_mention_notifications` RPC with membership check + EXECUTE grant to authenticated.
+
+No iOS/Android rebuild required (all web bundle + DB).
