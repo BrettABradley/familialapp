@@ -10,19 +10,22 @@ import { supabase } from '@/integrations/supabase/client';
  * This function is intentionally fire-and-forget — errors are logged but
  * never rethrown. The WebView must render even if every native plugin fails.
  */
+export async function hideSplashScreen() {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const { SplashScreen } = await import('@capacitor/splash-screen');
+    await SplashScreen.hide({ fadeOutDuration: 150 });
+  } catch (e) {
+    console.warn('[boot] splash hide failed', e);
+  }
+}
+
 export async function initCapacitorPlugins() {
   if (!Capacitor.isNativePlatform()) return;
 
-  // Hide splash screen as soon as we can — never let it linger past launch
-  try {
-    const { SplashScreen } = await import('@capacitor/splash-screen');
-    // Give the JS bundle a beat to mount before hiding, then hide.
-    setTimeout(() => {
-      SplashScreen.hide().catch((e) => console.warn('[boot] splash hide failed', e));
-    }, 300);
-  } catch (e) {
-    console.warn('[boot] splash plugin load failed', e);
-  }
+  // NOTE: Splash hiding is now driven from main.tsx after React's first
+  // paint to eliminate the black flash that occurred when the splash was
+  // hidden before the WebView had committed its first frame.
 
   // Status bar — non-fatal if it fails
   try {
