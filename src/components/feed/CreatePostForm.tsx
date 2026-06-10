@@ -67,8 +67,8 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
 
   const MAX_FILES = 4;
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    let files = Array.from(e.target.files || []);
+  const processFiles = async (incoming: File[]) => {
+    let files = incoming;
     if (files.length + selectedFiles.length > MAX_FILES) {
       toast({ title: "Too many files", description: `You can upload up to ${MAX_FILES} files per post. For more images, try creating an Album!`, variant: "destructive", action: <ToastAction altText="Go to Albums" onClick={() => navigate("/albums")}>Go to Albums</ToastAction> });
       return;
@@ -88,8 +88,32 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     files.forEach(file => {
       setPreviewUrls(prev => [...prev, URL.createObjectURL(file)]);
     });
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
     // Reset input so the same file can be picked again on Safari/iOS
     if (fileInputRef.current) fileInputRef.current.value = "";
+    await processFiles(files);
+  };
+
+  const openMediaPicker = async () => {
+    // On native, use Capacitor's prompt so Camera/Library are both available.
+    // Web keeps the hidden <input> so users can also pick video files.
+    if (isMobileNative()) {
+      try {
+        const picked = await pickImage({ source: 'prompt' });
+        if (picked) await processFiles([picked.file]);
+      } catch (err: any) {
+        toast({
+          title: "Couldn't open camera",
+          description: err?.message || "Please try again.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+    fileInputRef.current?.click();
   };
 
   const handleVoiceRecording = async (blob: Blob) => {
