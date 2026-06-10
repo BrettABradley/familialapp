@@ -367,7 +367,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
         )}
         {previewUrls.length >= 1 && selectedFiles.length < MAX_FILES && (
           <div className="mb-2 flex justify-center">
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isPosting}>
+            <Button variant="outline" size="sm" onClick={openMediaPicker} disabled={isPosting}>
               <Paperclip className="w-4 h-4 mr-2" />Add more ({selectedFiles.length}/{MAX_FILES})
             </Button>
           </div>
