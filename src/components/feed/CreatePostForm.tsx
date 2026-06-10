@@ -353,7 +353,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
             {selectedFiles.length < MAX_FILES && (
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={openMediaPicker}
                 disabled={isPosting}
                 className="w-full aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary hover:bg-secondary/50 transition-colors flex flex-col items-center justify-center gap-2 text-muted-foreground"
                 aria-label="Add more media"
