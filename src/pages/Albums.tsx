@@ -24,7 +24,8 @@ import { SignedSmartImage } from "@/components/shared/SignedSmartImage";
 import useEmblaCarousel from "embla-carousel-react";
 import { useSwipeDownClose } from "@/hooks/useSwipeDownClose";
 import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
-import { pickImage } from "@/lib/imagePicker";
+import { pickImage, pickImages } from "@/lib/imagePicker";
+import { isMobileNative } from "@/lib/platform";
 import { getPostMediaUrl, getPostMediaUrls, toPostMediaPath } from "@/lib/postMediaUrl";
 
 interface Circle {
