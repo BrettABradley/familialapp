@@ -11,7 +11,7 @@ import { Send, Paperclip, X, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ToastAction } from "@/components/ui/toast";
 import { VoiceRecorder } from "@/components/shared/VoiceRecorder";
-import { MentionInput } from "@/components/shared/MentionInput";
+import { MentionInput, EVERYONE_SENTINEL } from "@/components/shared/MentionInput";
 import { useCircleMembers } from "@/hooks/useCircleMembers";
 import { validateFileSize, getFileMediaType, getMediaType } from "@/lib/mediaUtils";
 import { blobToVoiceNoteFile } from "@/lib/voiceNoteFile";
