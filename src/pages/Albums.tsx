@@ -755,7 +755,7 @@ const Albums = () => {
                 onChange={handleFileUpload}
                 className="hidden"
               />
-              <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading || readOnly}>
+              <Button onClick={openAlbumPicker} disabled={isUploading || readOnly}>
                 <Upload className="w-4 h-4 mr-2" />
                 {isUploading ? `Uploading ${uploadProgress.current}/${uploadProgress.total}...` : "Add Photos"}
               </Button>
