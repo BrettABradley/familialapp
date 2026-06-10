@@ -484,6 +484,24 @@ const Albums = () => {
     await processAndUploadFiles(files);
   };
 
+  const openAlbumPicker = async () => {
+    if (isMobileNative()) {
+      try {
+        const picked = await pickImages({ limit: 100 });
+        if (picked.length === 0) return;
+        await processAndUploadFiles(picked.map((p) => p.file));
+      } catch (err: any) {
+        toast({
+          title: "Couldn't open photo library",
+          description: err?.message || "Please try again.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
