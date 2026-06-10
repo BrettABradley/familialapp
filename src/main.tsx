@@ -25,13 +25,27 @@ try {
   console.log("[boot] react-mount-end");
 
   // Wait for React to commit AND the browser to actually paint a frame
-  // (double rAF) before hiding the native splash. This guarantees a white
-  // app frame is on screen before the splash goes away — no black flash.
+  // (double rAF) before starting the splash hand-off. The HTML overlay
+  // (#splash in index.html) covers the WebView the whole time, so the
+  // native splash can hide invisibly underneath it; the overlay then
+  // holds for 2.5s and fades out over 700ms.
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
+      // Hide the native splash now — the HTML overlay is on top.
       hideSplashScreen().catch((e) =>
         console.warn("[boot] hideSplashScreen rejected", e)
       );
+
+      // Hold the HTML splash for ~2.5s, then slowly fade it out.
+      setTimeout(() => {
+        const el = document.getElementById("splash");
+        if (!el) return;
+        el.classList.add("splash-hide");
+        // Remove from the DOM after the 700ms CSS fade completes.
+        setTimeout(() => {
+          el.parentNode?.removeChild(el);
+        }, 800);
+      }, 2500);
     });
   });
 } catch (e) {
