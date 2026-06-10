@@ -1,61 +1,70 @@
-## Problem
+## Goal
 
-On Android (and partially iOS), two flows are missing the native pickers we want:
+- Smooth, full-screen white splash with the Familial logo centered.
+- Holds for ~2.5 seconds, then slowly fades out (~700ms) to the app.
+- No black flash on the iOS / Android handoff.
 
-1. **Feed "Add Media" and Profile avatar** — when tapped, the user only gets a photo-library picker. There is no option to take a real-time photo with the camera.
-   - Feed (`src/components/feed/CreatePostForm.tsx`) uses a raw `<input type="file" accept="image/*,video/*">`. On Android Capacitor's webview this opens straight to the file/gallery picker — no camera choice surfaced.
-   - Profile avatar (`src/pages/ProfileView.tsx` via `pickImage()`) hard-codes `CameraSource.Photos`, so even iOS never offers the camera.
+You do **not** need to touch Xcode for any of this. Everything below is configured in code that `npx cap sync` pushes into the native projects.
 
-2. **Album upload** — on Android, "Add Photos" only lets you pick one image at a time. The web `<input multiple>` does work on iOS Safari/WKWebView but Android's WebView file chooser commonly ignores `multiple` and returns a single file. The native fix is `Camera.pickImages({ limit })`.
+## Approach
 
-iOS phone works "well enough" today for albums, but we should route both platforms through the Capacitor APIs on native so behavior is consistent.
+The native iOS/Android splash assets only run for the brief moment before the WebView is ready. To get the exact "full white + centered logo, 2.5s hold, slow fade" we used to have, we render an HTML/CSS splash overlay inside `index.html` that:
 
-## Fix
+1. Paints with the first WebView frame (so it's already visible when the native splash hides — no black flash).
+2. Looks identical to the native splash (full white, centered logo).
+3. Holds for 2.5s after React mounts, then fades out over 700ms.
 
-### 1. Extend `src/lib/imagePicker.ts`
+This makes the chain feel like one continuous splash: native splash → identical HTML splash → fade → app.
 
-- Add a `source` option to `pickImage()`: `'prompt' | 'photos' | 'camera'` (default `'prompt'`).
-  - On native, map to `CameraSource.Prompt` so the OS shows a "Take Photo / Choose from Library" action sheet. (Keep the existing iPad guard — fall back to `Photos` when running on iPad, since `Prompt`'s action sheet still crashes there without a popover anchor.)
-  - Reuse the existing `normalizeImageOrientation` pipeline.
-- Add a new `pickImages(options?: { limit?: number })` helper:
-  - On native: dynamic-import `@capacitor/camera` and call `Camera.pickImages({ quality: 90, limit })`. Map each returned `path`/`webPath` to a `File` via fetch + blob, then run through `normalizeImageOrientation`.
-  - On web: reuse the existing hidden `<input type="file" multiple>` fallback and return an array of `PickedImage`.
-  - Permission handling mirrors `pickImage()` (request `photos`, friendly error if denied).
+## Changes
 
-### 2. Feed — `src/components/feed/CreatePostForm.tsx`
+### 1. `index.html` — full-screen HTML splash overlay
 
-- Replace the `fileInputRef.current?.click()` triggers with a small helper:
-  - On web: keep the existing hidden `<input>` (so video selection still works in the browser).
-  - On native: call `pickImage({ source: 'prompt' })` for the "Add Media" button so the user gets the Take Photo / Photo Library sheet. (Video capture stays web-only for now — the existing input handles it on web.)
-- Wire the picked file through the existing `handleFileSelect` size/HEIC/preview pipeline (extract its body into a `processFiles(files: File[])` function so both code paths feed into the same validation).
+- Add a `<div id="splash">` directly inside `<body>` (before `<div id="root">`).
+- Inline CSS in the existing `<style>` block:
+  - `#splash`: `position: fixed; inset: 0; background: #ffffff; display: flex; align-items: center; justify-content: center; z-index: 2147483647;` — guarantees a full-screen white layer with the logo perfectly centered.
+  - `.splash-logo`: ~140×140 px, `object-fit: contain`, no animation.
+  - `#splash.splash-hide`: `opacity: 0; transition: opacity 700ms ease; pointer-events: none;` — slow, smooth fade-out.
+- Inline `<script>` safety: if React never mounts within 5s, force `.splash-hide` so users never see a frozen white screen.
+- Reference logo as `/splash-logo.png`.
 
-### 3. Profile avatar — `src/pages/ProfileView.tsx`
+### 2. `public/splash-logo.png` — new
 
-- Change the single `pickImage()` call (line ~326) to `pickImage({ source: 'prompt' })` so users can take a new selfie for their avatar.
+- Copy `src/assets/logo.png` to `public/splash-logo.png` so it's served as a flat static file (no bundler hashing, instantly available on first paint).
 
-### 4. Albums — `src/pages/Albums.tsx`
+### 3. `src/main.tsx` — orchestrate the 2.5s hold + slow fade
 
-- On native: change the "Add Photos" button to call the new `pickImages({ limit: remainingSlots })` and pass the returned `File[]` straight into the existing `handleFileUpload`-equivalent path (refactor it to accept an array of files rather than reading from the `<input>`).
-- On web: keep the current `<input type="file" multiple accept="image/*,.heic,.heif">` flow unchanged.
+After React's first commit + double-rAF:
+1. Hide the native splash (overlay is already painted underneath it, so this is invisible to the user).
+2. Wait **2500 ms** so the HTML splash holds for ~2.5 seconds total.
+3. Add `splash-hide` class → 700 ms CSS fade.
+4. After the fade (`+750 ms`), remove the `#splash` element from the DOM.
 
-### 5. No changes needed to
+### 4. `src/lib/capacitorInit.ts` — match native fade to overlay fade
 
-- HEIC conversion (`heicConverter.ts`) — already applied downstream.
-- Storage paths, RLS, or any backend.
-- iOS native build — `@capacitor/camera` is already installed and configured.
+- Bump `SplashScreen.hide({ fadeOutDuration: 150 })` to `400` so the native splash also fades softly when it hands off to the overlay (even though the overlay covers any abrupt cut, this avoids a visible "step" on slower devices).
+
+### 5. `capacitor.config.ts` — keep current settings
+
+- `launchAutoHide: false`, `backgroundColor: '#ffffff'`, `ios.backgroundColor: '#ffffff'`, `android.backgroundColor: '#ffffff'` all stay.
+- `launchShowDuration: 3000` stays (safety cap — overlay handles real timing now).
+
+## Why this is better than tweaking Xcode
+
+- Splash *duration* and *fade* live in the Capacitor config + our JS timer, not Xcode — Xcode only owns the static `LaunchScreen.storyboard` image (which displays for milliseconds before the WebView takes over).
+- A "full white + centered logo" launch image in Xcode would still get replaced by the WebView's first frame the moment that frame is ready, so the visible 2.5-second splash *must* be HTML-driven. The overlay approach gives us pixel-perfect control on both iOS and Android with one source of truth.
 
 ## Files touched
 
 ```
-src/lib/imagePicker.ts                       (extend + add pickImages)
-src/components/feed/CreatePostForm.tsx       (native-aware add-media path)
-src/pages/ProfileView.tsx                    (pass source: 'prompt')
-src/pages/Albums.tsx                         (native pickImages multi-select)
+index.html                       (HTML splash overlay + safety timer)
+public/splash-logo.png           (copy of src/assets/logo.png)
+src/main.tsx                     (2.5s hold + 700ms fade orchestration)
+src/lib/capacitorInit.ts         (fadeOutDuration 150 → 400)
 ```
 
 ## After implementation
 
-Run `bash scripts/pull-updates.sh` then `npx cap open android` (and `ios`) and verify:
-- Feed → Add Media → action sheet with Camera + Photo Library on both platforms.
-- Profile → change avatar → same action sheet.
-- Album → Add Photos → native multi-select returns multiple images on Android.
+1. `bash scripts/pull-updates.sh`
+2. `npx cap open ios` / `npx cap open android`
+3. Cold-launch the app: full-white splash with centered logo holds for ~2.5 seconds, then slowly fades into the app — no black flash, no small-square logo, no Xcode changes required.

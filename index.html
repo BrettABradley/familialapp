@@ -45,10 +45,36 @@
       /* Pin the page background to white before CSS loads so the
          splash → app handoff never reveals a black/transparent frame. */
       html, body { background-color: #ffffff; margin: 0; }
+
+      /* Full-screen HTML splash overlay — paints with the first WebView
+         frame so the native splash hands off into an identical white
+         screen with the logo centered (no black flash). React fades it
+         out after ~2.5 s. */
+      #splash {
+        position: fixed;
+        inset: 0;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2147483647;
+        transition: opacity 700ms ease;
+        opacity: 1;
+      }
+      #splash.splash-hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #splash .splash-logo {
+        width: 140px;
+        height: 140px;
+        object-fit: contain;
+      }
     </style>
   </head>
 
   <body>
+    <div id="splash"><img class="splash-logo" src="/splash-logo.png" alt="" aria-hidden="true" /></div>
     <div id="root"></div>
     <script>
       // EARLY auth-token interceptor — runs before the module script imports
@@ -96,6 +122,19 @@
           console && console.warn && console.warn("[boot] auth interceptor failed", e);
         }
       })();
+    </script>
+
+    <script>
+      // Safety net: if React fails to mount for any reason, force the
+      // splash overlay to fade out after 5s so users never see a frozen
+      // white screen.
+      setTimeout(function () {
+        var s = document.getElementById("splash");
+        if (s && !s.classList.contains("splash-hide")) {
+          s.classList.add("splash-hide");
+          setTimeout(function () { s && s.parentNode && s.parentNode.removeChild(s); }, 800);
+        }
+      }, 5000);
     </script>
 
     <script type="module" src="/src/main.tsx"></script>

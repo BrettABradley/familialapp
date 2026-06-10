@@ -14,7 +14,7 @@ export async function hideSplashScreen() {
   if (!Capacitor.isNativePlatform()) return;
   try {
     const { SplashScreen } = await import('@capacitor/splash-screen');
-    await SplashScreen.hide({ fadeOutDuration: 150 });
+    await SplashScreen.hide({ fadeOutDuration: 400 });
   } catch (e) {
     console.warn('[boot] splash hide failed', e);
   }
