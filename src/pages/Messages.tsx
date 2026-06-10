@@ -333,8 +333,16 @@ const Messages = () => {
     const fromConvos = conversations.find(c => c.user.user_id === threadParam)?.user;
     const fromMembers = circleMembers.find(m => m.user_id === threadParam);
     const target = fromConvos || fromMembers;
-    if (target) setSelectedUser(target);
-  }, [threadParam, conversations, circleMembers, selectedUser]);
+    if (target) {
+      setSelectedUser(target);
+      // Strip ?thread= from the URL so back/exit doesn't immediately re-open
+      // the same chat (this caused the "back button does nothing" loop when
+      // entering a chat from a notification).
+      const next = new URLSearchParams(searchParams);
+      next.delete("thread");
+      setSearchParamsMsg(next, { replace: true });
+    }
+  }, [threadParam, conversations, circleMembers, selectedUser, searchParams, setSearchParamsMsg]);
 
   useEffect(() => {
     if (!groupParam || selectedGroup?.id === groupParam) return;
