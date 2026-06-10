@@ -18,6 +18,8 @@ import { blobToVoiceNoteFile } from "@/lib/voiceNoteFile";
 import { convertHeicFiles } from "@/lib/heicConverter";
 import { SquareImageThumbnail } from "@/components/shared/SquareMediaThumbnail";
 import { getPostMediaUrls } from "@/lib/postMediaUrl";
+import { pickImage } from "@/lib/imagePicker";
+import { isMobileNative } from "@/lib/platform";
 
 interface CreatePostFormProps {
   onPostCreated: () => void;
