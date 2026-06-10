@@ -1,70 +1,50 @@
-## Goal
+# TestFlight Splash Fix
 
-- Smooth, full-screen white splash with the Familial logo centered.
-- Holds for ~2.5 seconds, then slowly fades out (~700ms) to the app.
-- No black flash on the iOS / Android handoff.
+## What's actually happening on TestFlight
 
-You do **not** need to touch Xcode for any of this. Everything below is configured in code that `npx cap sync` pushes into the native projects.
+From the screen recording: the splash is a **small white card with the logo on a gray background**, then it cuts straight to the auth page with no slow fade. Two separate issues:
 
-## Approach
+1. **Native iOS LaunchScreen is gray, not white.** The default Capacitor `LaunchScreen.storyboard` uses `systemBackground`, which renders **gray/black in dark mode**. Your test device is in dark mode, so iOS paints the launch screen gray with only the splash image asset (a white square containing the logo) sitting in the middle.
+2. **The HTML fade overlay (full white + centered logo, 2.5s hold, 700ms fade) is not visible.** This is either because (a) the IPA was archived before the new web code was synced into `ios/App/App/public/`, or (b) it's there but the gray native splash makes the transition look jarring regardless.
 
-The native iOS/Android splash assets only run for the brief moment before the WebView is ready. To get the exact "full white + centered logo, 2.5s hold, slow fade" we used to have, we render an HTML/CSS splash overlay inside `index.html` that:
-
-1. Paints with the first WebView frame (so it's already visible when the native splash hides — no black flash).
-2. Looks identical to the native splash (full white, centered logo).
-3. Holds for 2.5s after React mounts, then fades out over 700ms.
-
-This makes the chain feel like one continuous splash: native splash → identical HTML splash → fade → app.
+Fix both at once so TestFlight matches what you saw in the emulator.
 
 ## Changes
 
-### 1. `index.html` — full-screen HTML splash overlay
+### 1. `scripts/ios-post-sync.sh` — force white launch background
 
-- Add a `<div id="splash">` directly inside `<body>` (before `<div id="root">`).
-- Inline CSS in the existing `<style>` block:
-  - `#splash`: `position: fixed; inset: 0; background: #ffffff; display: flex; align-items: center; justify-content: center; z-index: 2147483647;` — guarantees a full-screen white layer with the logo perfectly centered.
-  - `.splash-logo`: ~140×140 px, `object-fit: contain`, no animation.
-  - `#splash.splash-hide`: `opacity: 0; transition: opacity 700ms ease; pointer-events: none;` — slow, smooth fade-out.
-- Inline `<script>` safety: if React never mounts within 5s, force `.splash-hide` so users never see a frozen white screen.
-- Reference logo as `/splash-logo.png`.
+Append two blocks at the end:
 
-### 2. `public/splash-logo.png` — new
+- **Force the app into Light appearance during launch** by adding `UIUserInterfaceStyle = Light` to `Info.plist`. This guarantees the LaunchScreen storyboard's `systemBackground` resolves to **white** regardless of the user's iOS dark-mode setting (the WebView itself is already white).
+- **Patch `ios/App/App/Base.lproj/LaunchScreen.storyboard`** to explicitly set the root view's `backgroundColor` to white (`red=1 green=1 blue=1 alpha=1`) instead of `systemBackground`. Use a small `perl -0pi -e` substitution that replaces the existing `<color key="backgroundColor" systemColor="systemBackgroundColor" .../>` line with a hard white color tag. Idempotent — safe to re-run.
 
-- Copy `src/assets/logo.png` to `public/splash-logo.png` so it's served as a flat static file (no bundler hashing, instantly available on first paint).
+This guarantees the screen iOS shows before our WebView paints is the **same pure white** as the HTML overlay, so the handoff is seamless.
 
-### 3. `src/main.tsx` — orchestrate the 2.5s hold + slow fade
+### 2. Verify the HTML overlay actually ships
 
-After React's first commit + double-rAF:
-1. Hide the native splash (overlay is already painted underneath it, so this is invisible to the user).
-2. Wait **2500 ms** so the HTML splash holds for ~2.5 seconds total.
-3. Add `splash-hide` class → 700 ms CSS fade.
-4. After the fade (`+750 ms`), remove the `#splash` element from the DOM.
+No code change needed — the overlay code in `index.html` and `src/main.tsx` is already correct. But for TestFlight to include it, the Mac-side build/archive sequence must be:
 
-### 4. `src/lib/capacitorInit.ts` — match native fade to overlay fade
+```text
+bash scripts/pull-updates.sh        # rebuilds dist/ + cap sync copies into ios/App/App/public/
+# Xcode:
+#   1. Select the "App" target → General → bump Build number (e.g. 47 → 48)
+#   2. Product → Clean Build Folder (Shift+Cmd+K)
+#   3. Product → Archive → Distribute App → TestFlight
+#   4. Wait for "Processing" to finish in App Store Connect
+#   5. DELETE the existing app from your device, then reinstall from TestFlight
+```
 
-- Bump `SplashScreen.hide({ fadeOutDuration: 150 })` to `400` so the native splash also fades softly when it hands off to the overlay (even though the overlay covers any abrupt cut, this avoids a visible "step" on slower devices).
+If you skip the Clean Build Folder step or don't bump the Build number, Xcode often re-uses the previous `public/` snapshot baked into derived data.
 
-### 5. `capacitor.config.ts` — keep current settings
+## How to verify the fix on TestFlight
 
-- `launchAutoHide: false`, `backgroundColor: '#ffffff'`, `ios.backgroundColor: '#ffffff'`, `android.backgroundColor: '#ffffff'` all stay.
-- `launchShowDuration: 3000` stays (safety cap — overlay handles real timing now).
+After installing the new build with a deleted-then-reinstalled app:
 
-## Why this is better than tweaking Xcode
-
-- Splash *duration* and *fade* live in the Capacitor config + our JS timer, not Xcode — Xcode only owns the static `LaunchScreen.storyboard` image (which displays for milliseconds before the WebView takes over).
-- A "full white + centered logo" launch image in Xcode would still get replaced by the WebView's first frame the moment that frame is ready, so the visible 2.5-second splash *must* be HTML-driven. The overlay approach gives us pixel-perfect control on both iOS and Android with one source of truth.
+1. Cold-launch: you should see a **full white screen edge-to-edge** (no gray border) for ~2.5 s with the logo centered.
+2. Then a slow **700 ms fade** into the auth page (not a hard cut).
+3. If you still see gray edges, the LaunchScreen storyboard patch didn't apply — re-run `bash scripts/pull-updates.sh` and check the script's output for the storyboard patch log line.
 
 ## Files touched
 
-```
-index.html                       (HTML splash overlay + safety timer)
-public/splash-logo.png           (copy of src/assets/logo.png)
-src/main.tsx                     (2.5s hold + 700ms fade orchestration)
-src/lib/capacitorInit.ts         (fadeOutDuration 150 → 400)
-```
-
-## After implementation
-
-1. `bash scripts/pull-updates.sh`
-2. `npx cap open ios` / `npx cap open android`
-3. Cold-launch the app: full-white splash with centered logo holds for ~2.5 seconds, then slowly fades into the app — no black flash, no small-square logo, no Xcode changes required.
+- `scripts/ios-post-sync.sh` — add `UIUserInterfaceStyle=Light` plist key + storyboard background patch
+- No changes to `index.html`, `src/main.tsx`, `capacitor.config.ts` (already correct)
