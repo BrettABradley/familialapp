@@ -27,11 +27,31 @@ export async function initCapacitorPlugins() {
   // paint to eliminate the black flash that occurred when the splash was
   // hidden before the WebView had committed its first frame.
 
-  // Status bar — non-fatal if it fails
+  // Status bar — non-fatal if it fails. Match the system color scheme so
+  // the status-bar icons stay legible whether the user is in light or dark
+  // mode (Style.Light = light icons for dark backgrounds; Style.Dark =
+  // dark icons for light backgrounds).
   try {
     const { StatusBar, Style } = await import('@capacitor/status-bar');
     try { await StatusBar.setOverlaysWebView({ overlay: true }); } catch (e) { console.warn('[boot] StatusBar.setOverlaysWebView failed', e); }
-    try { await StatusBar.setStyle({ style: Style.Light }); } catch (e) { console.warn('[boot] StatusBar.setStyle failed', e); }
+
+    const applyStatusBarStyle = async () => {
+      try {
+        const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+        await StatusBar.setStyle({ style: prefersDark ? Style.Light : Style.Dark });
+      } catch (e) {
+        console.warn('[boot] StatusBar.setStyle failed', e);
+      }
+    };
+    await applyStatusBarStyle();
+
+    try {
+      window
+        .matchMedia('(prefers-color-scheme: dark)')
+        .addEventListener('change', () => { applyStatusBarStyle(); });
+    } catch (e) {
+      console.warn('[boot] prefers-color-scheme listener failed', e);
+    }
   } catch (e) {
     console.warn('[boot] StatusBar plugin load failed', e);
   }
