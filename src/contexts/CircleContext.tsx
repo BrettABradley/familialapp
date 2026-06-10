@@ -257,6 +257,7 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
         circles,
         selectedCircle,
         setSelectedCircle,
+        forceSetSelectedCircle,
         profile,
         userPlan,
         isLoading,
