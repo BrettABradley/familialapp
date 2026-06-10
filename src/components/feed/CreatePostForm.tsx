@@ -168,11 +168,23 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
 
       // Fire @mention notifications
       if (newPost && mentionedUserIds.size > 0) {
-        supabase.rpc("create_mention_notifications", {
-          _mentioned_user_ids: Array.from(mentionedUserIds),
-          _post_id: newPost.id,
-          _circle_id: selectedCircle,
-        }).then();
+        const hasEveryone = mentionedUserIds.has(EVERYONE_SENTINEL);
+        const realUserIds = Array.from(mentionedUserIds).filter((id) => id !== EVERYONE_SENTINEL);
+        if (realUserIds.length > 0) {
+          supabase.rpc("create_mention_notifications", {
+            _mentioned_user_ids: realUserIds,
+            _post_id: newPost.id,
+            _circle_id: selectedCircle,
+          }).then();
+        }
+        if (hasEveryone) {
+          // Notifies every other circle member; the notifications-insert
+          // trigger fans out push notifications (iOS, Android, web).
+          supabase.rpc("create_everyone_mention_notifications" as any, {
+            _post_id: newPost.id,
+            _circle_id: selectedCircle,
+          }).then();
+        }
       }
 
       // Silent background moderation — fire-and-forget.
