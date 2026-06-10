@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+
 
 interface Circle {
   id: string;
@@ -36,6 +37,12 @@ interface CircleContextType {
   circles: Circle[];
   selectedCircle: string;
   setSelectedCircle: (circleId: string) => void;
+  /**
+   * Bypass the album lock — ONLY for callers that need to apply an initial
+   * deep-linked circle before the lock engages (e.g. Albums page syncing
+   * `?circle=` on mount). Do not use elsewhere.
+   */
+  forceSetSelectedCircle: (circleId: string) => void;
   profile: Profile | null;
   userPlan: UserPlan | null;
   isLoading: boolean;
@@ -58,18 +65,41 @@ export const CircleProvider = ({ children }: { children: ReactNode }) => {
     return localStorage.getItem("selectedCircle") || "";
   });
 
-  const setSelectedCircle = (circleId: string) => {
+  const lockRef = useRef(false);
+  const selectedCircleRef = useRef<string>(selectedCircle);
+  selectedCircleRef.current = selectedCircle;
+
+  const forceSetSelectedCircle = useCallback((circleId: string) => {
     setSelectedCircleState(circleId);
     if (circleId) {
       localStorage.setItem("selectedCircle", circleId);
     } else {
       localStorage.removeItem("selectedCircle");
     }
-  };
+  }, []);
+
+  const setSelectedCircle = useCallback((circleId: string) => {
+    // Album-lock guard: while viewing a specific album, ignore any attempt
+    // to switch circles (header dropdown is already hidden, but other paths
+    // like deep-link sync, push handlers, and URL effects could still fire).
+    if (lockRef.current && circleId && circleId !== selectedCircleRef.current) {
+      console.warn("[CircleContext] setSelectedCircle blocked by album lock", {
+        attempted: circleId,
+        current: selectedCircleRef.current,
+      });
+      return;
+    }
+    forceSetSelectedCircle(circleId);
+  }, [forceSetSelectedCircle]);
+
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userPlan, setUserPlan] = useState<UserPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [lockCircleSwitcher, setLockCircleSwitcher] = useState(false);
+  const [lockCircleSwitcher, setLockCircleSwitcherState] = useState(false);
+  const setLockCircleSwitcher = useCallback((locked: boolean) => {
+    lockRef.current = locked;
+    setLockCircleSwitcherState(locked);
+  }, []);
 
   const fetchCircles = async () => {
     if (!user) {
