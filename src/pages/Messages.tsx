@@ -297,9 +297,30 @@ const Messages = () => {
     if (selectedGroup) { fetchGroupMessages(); setChatView("group"); restoreDraft("group", selectedGroup.id); }
   }, [selectedGroup]);
 
+  // When messages change, only pin to bottom if the user is already there.
+  // Prevents the "chat keeps scrolling down as images render" jitter when the
+  // user has scrolled up to read older messages.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    pinToBottomIfNeeded(false);
   }, [messages, groupMessages]);
+
+  // When a chat is first opened, force-scroll to the latest message.
+  useEffect(() => {
+    isAtBottomRef.current = true;
+    requestAnimationFrame(() => pinToBottomIfNeeded(true));
+  }, [selectedUser?.user_id, selectedGroup?.id]);
+
+  // Keep pinned to bottom as media (images/videos) finish loading and reflow
+  // the container, but only if the user was already at the bottom.
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      if (isAtBottomRef.current) el.scrollTop = el.scrollHeight;
+    });
+    Array.from(el.children).forEach((child) => ro.observe(child as Element));
+    return () => ro.disconnect();
+  }, [chatView, selectedUser?.user_id, selectedGroup?.id, messages.length, groupMessages.length]);
 
   // Deep-link: ?thread=<userId> opens that DM thread once conversations
   // (or circle members) have loaded. ?group=<groupId> opens that group chat.
