@@ -101,7 +101,30 @@ else
   echo "⚠️  $APP_DELEGATE not found — skipping push bridge injection"
 fi
 
-echo "✅ Info.plist updated: encryption compliance + privacy strings + push background mode"
+# Force Light appearance so the LaunchScreen storyboard's systemBackground
+# always resolves to white (otherwise dark-mode devices render the launch
+# screen with a gray background, producing the "small white card on gray"
+# look reported on TestFlight).
+$PB -c "Delete :UIUserInterfaceStyle" "$PLIST" 2>/dev/null
+$PB -c "Add :UIUserInterfaceStyle string Light" "$PLIST"
+
+# Patch LaunchScreen.storyboard to pin the root view's backgroundColor to
+# pure white instead of systemBackground. Idempotent — re-running just
+# rewrites the same line.
+STORYBOARD="ios/App/App/Base.lproj/LaunchScreen.storyboard"
+if [ -f "$STORYBOARD" ]; then
+  # Replace any <color key="backgroundColor" ... systemColor="systemBackgroundColor" .../>
+  # with an explicit white color. Matches both self-closing and paired tags.
+  perl -0pi -e 's|<color key="backgroundColor"[^/]*systemColor="systemBackgroundColor"[^/]*/>|<color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>|g' "$STORYBOARD"
+  # Also catch the variant Capacitor sometimes emits with white=... cocoaTouchSystemColor=...
+  perl -0pi -e 's|<color key="backgroundColor"[^/]*cocoaTouchSystemColor="systemBackgroundColor"[^/]*/>|<color key="backgroundColor" red="1" green="1" blue="1" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>|g' "$STORYBOARD"
+  echo "✅ LaunchScreen.storyboard pinned to white background"
+else
+  echo "⚠️  $STORYBOARD not found — skipping storyboard white-background patch"
+fi
+
+echo "✅ Info.plist updated: encryption compliance + privacy strings + push background mode + Light appearance"
+
 echo ""
 echo "ℹ️  Push notifications are sent directly to Apple APNs (no third party)."
 echo "   Required Lovable Cloud secrets: APPLE_KEY_ID, APPLE_ISSUER_ID (Team ID), APPLE_PRIVATE_KEY (.p8)."
