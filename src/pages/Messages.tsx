@@ -1053,7 +1053,7 @@ const Messages = () => {
           )}
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4" onTouchMove={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}>
+        <div ref={scrollContainerRef} onScroll={handleChatScroll} className="flex-1 overflow-y-auto p-4 space-y-4" onTouchMove={() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); }}>
           <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-muted/50 text-xs text-muted-foreground">
             <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0" />
             <span>Messages are encrypted in transit and at rest. <Link to="/privacy" className="underline">Learn more</Link></span>
