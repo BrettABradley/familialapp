@@ -1,6 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 import { registerForPushNotifications } from './pushNotifications';
 import { supabase } from '@/integrations/supabase/client';
+import { drainPendingIapReceipts, isIOSNative } from './iapPurchase';
+
 
 /**
  * Initialize Capacitor plugins. Every plugin call is isolated in its own
