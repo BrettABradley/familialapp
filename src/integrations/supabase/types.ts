@@ -1761,6 +1761,54 @@ export type Database = {
         }
         Relationships: []
       }
+      unverified_apple_receipts: {
+        Row: {
+          attempts: number
+          circle_id: string | null
+          first_seen_at: string
+          jws_representation: string | null
+          kind: string
+          last_attempt_at: string
+          last_error_code: string | null
+          last_error_detail: string | null
+          product_id: string
+          raw: Json | null
+          rescue_circle_id: string | null
+          transaction_id: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          circle_id?: string | null
+          first_seen_at?: string
+          jws_representation?: string | null
+          kind: string
+          last_attempt_at?: string
+          last_error_code?: string | null
+          last_error_detail?: string | null
+          product_id: string
+          raw?: Json | null
+          rescue_circle_id?: string | null
+          transaction_id: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          circle_id?: string | null
+          first_seen_at?: string
+          jws_representation?: string | null
+          kind?: string
+          last_attempt_at?: string
+          last_error_code?: string | null
+          last_error_detail?: string | null
+          product_id?: string
+          raw?: Json | null
+          rescue_circle_id?: string | null
+          transaction_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_appeals: {
         Row: {
           created_at: string
