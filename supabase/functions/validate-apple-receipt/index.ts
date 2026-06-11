@@ -13,6 +13,8 @@ const PRODUCT_TO_PLAN: Record<string, { plan: string; max_circles: number; max_m
 
 const EXTRA_MEMBERS_PRODUCT = "com.familialmedia.familial.extramembers";
 const EXTRA_MEMBERS_INCREMENT = 7;
+// App Store Connect listing id 6760382623 is tied to this bundle ID.
+// Do not use the Capacitor dev appId here unless the Apple listing changes.
 const BUNDLE_ID = "space.manus.familial.mobile.t20260223211425";
 
 // === Apple App Store Server API helpers ===
@@ -138,7 +140,7 @@ async function fetchAppleTransaction(transactionId: string): Promise<AppleLookup
         console.warn(`[validate-apple-receipt] Apple ${env} ${res.status}: ${txt}`);
         lastDetail = `Apple ${env} ${res.status}: ${txt.slice(0, 200)}`;
         if (res.status === 401) sawCredentialFailure = true;
-        if (res.status === 404) sawNotFound = true;
+        if (res.status === 400 || res.status === 404) sawNotFound = true;
       }
     } catch (err: any) {
       console.warn(`[validate-apple-receipt] Apple ${env} fetch error: ${err.message}`);

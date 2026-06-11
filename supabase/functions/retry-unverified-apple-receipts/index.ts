@@ -181,7 +181,7 @@ async function fetchTxn(transactionId: string): Promise<{ ok: true; txn: any } |
         const txt = await res.text();
         last = `${res.status}: ${txt.slice(0, 200)}`;
         if (res.status === 401) sawCred = true;
-        if (res.status === 404) sawNF = true;
+        if (res.status === 400 || res.status === 404) sawNF = true;
       }
     } catch (e: any) {
       last = e?.message ?? String(e);
