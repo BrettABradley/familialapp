@@ -2074,6 +2074,7 @@ export type Database = {
       }
     }
     Functions: {
+      can_buy_extra_seats: { Args: { _circle_id: string }; Returns: boolean }
       can_create_circle: { Args: { _user_id: string }; Returns: boolean }
       claim_circle_ownership: {
         Args: { _circle_id: string }

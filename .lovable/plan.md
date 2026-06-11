@@ -1,59 +1,61 @@
-## What actually happened
+# Restrict Extra Member Purchases to Subscribers
 
-Apple charged your test purchase, but our backend got `401 Unauthenticated` from Apple **production** (sandbox responded normally). That fingerprint means the API key you generated is a **"Sandbox Testing" key**, not a full **App Store Server API** key — Sandbox Testing keys are only authorized against Apple's sandbox endpoint and always fail on production.
+## Goal
+Selling "+7 seats for $5" on Free-plan circles undermines the subscription model. Lock that purchase to circle owners with an active paid subscription. Existing extras remain (grandfathered).
 
-Our code correctly refused to credit seats from an unverifiable receipt (we never trust a client-supplied JWS without verifying it against Apple), which is why you got the "contact support" message. That's the right security behavior — but the UX and operator tooling around it need work.
+## Eligibility Rule
+A circle is eligible to buy +7 extra seats **only if the circle's OWNER** has one of these plans:
+- `family`
+- `extended`
+- `enterprise`
+- `founder`
+- Any plan with `comped_by_admin_at` set (admin comp)
+- Apple-sourced subscription (`source = 'apple'`) on family/extended
 
-## Plan
+Free plan owners → button disabled with label **"Subscription required to add seats"** and a tap opens `/upgrade`.
 
-### 1. Credit you immediately
-You own one circle (`Smith`, currently 8 + 14 extra = 22 cap). Add the 7 seats from the charged purchase:
-- Bump `circles.extra_members` from 14 → 21 on the `Smith` circle.
-- Insert a corresponding row into `apple_iap_grants` so the ledger reflects the manual credit (marked `source: 'manual_support_credit'`, referencing transaction `360003156596…`) — prevents accidental double-credit if Apple ever does verify the same txn later.
+Grandfathering: we do nothing to existing `circles.extra_members` values — they stay. The rule only blocks NEW purchases going forward.
 
-### 2. Tighten the "verification failed" UX
-Right now the user sees a long support email message buried in a toast. Improve:
-- Detect `code: APPLE_CREDENTIALS_INVALID` and `APPLE_TXN_NOT_FOUND` on the client and show a dedicated dialog: "Your payment was received by Apple. We'll finish crediting your seats automatically — usually within a few minutes. You can close the app safely."
-- Stop saying "contact support" as the first line — only show that after 3+ failed retries from the pending queue.
-- Add a "Retry now" button on the dialog that re-drains the pending receipt queue immediately instead of waiting for next launch.
+## Changes
 
-### 3. Add an admin "force-credit" tool
-For exactly this case (Apple charged, our backend can't verify):
-- New admin-only page `/admin/iap-credits` listing entries from `pendingAppleReceipts` reported via a new `report-pending-receipt` edge function (client uploads its local queue when it sees `APPLE_CREDENTIALS_INVALID`).
-- Admin clicks "Verify & credit" → calls `validate-apple-receipt` again (in case creds are now fixed), or "Manual credit" → bumps seats / activates subscription and writes a `manual_support_credit` ledger row.
-- Restricted to `is_platform_admin(auth.uid())`.
+### 1. Frontend — `src/pages/Circles.tsx` (Members dialog)
+- Fetch the circle owner's plan via a new SECURITY DEFINER RPC `can_buy_extra_seats(_circle_id uuid) returns boolean` (returns true if owner plan is paid/comped/enterprise/founder).
+- If `false`: render disabled button labeled **"Subscription required to add seats"**; clicking it navigates to `/upgrade` (only for the circle owner — non-owners just see disabled with a hint "Ask the owner to upgrade").
+- If `true`: existing "Add 7 Extra Members — $5" button works as today.
 
-### 4. Capture pending-receipt context server-side
-Currently the only record of a failed-but-charged purchase lives in `localStorage` on the user's device. If they uninstall, it's gone. Add:
-- New table `unverified_apple_receipts` (transaction_id PK, user_id, product_id, circle_id, kind, last_error_code, attempts, first_seen_at, last_attempt_at).
-- `validate-apple-receipt` writes/updates this row whenever Apple verification fails with `credentials`, `not_found`, or `transient`.
-- Removed automatically when a later retry succeeds (the existing idempotent ledger insert tells us the txn finally cleared).
+### 2. Frontend — `src/components/circles/UpgradePlanDialog.tsx`
+- Hide / disable the "Add 7 Extra Members" tile when the user's own plan is `free`. Show inline note pointing them to a paid plan first.
 
-### 5. Auto-retry server-side too
-A pg_cron job every 15 min picks unverified receipts older than 5 min and re-runs `validate-apple-receipt` (via service-role). Once you fix the Apple credentials, every stuck purchase clears itself without anyone touching the app.
+### 3. Backend — Stripe path: `supabase/functions/create-checkout/index.ts`
+- When `priceId === extra-members price` AND `circleId` provided: look up the circle's owner's `user_plans` row. If plan is `free` and not comped → return 403 with `{ error: "SUBSCRIPTION_REQUIRED" }`.
 
-### 6. Surface the real Apple-key fix (not code — instructions for you)
-After implementation, I'll give you the exact App Store Connect steps to regenerate the correct key:
-- Users and Access → Integrations → **In-App Purchase** tab
-- Under **Active** (not "Sandbox Testing"), generate a key with **App Manager** access
-- Replace `APPLE_PRIVATE_KEY`, `APPLE_KEY_ID`, `APPLE_ISSUER_ID` with the new values
+### 4. Backend — iOS IAP: `supabase/functions/validate-apple-receipt/index.ts`
+- Before crediting `extra_members` for `kind === "extra_members"`: same owner-plan check. If ineligible → don't credit, refund-style response (record in `apple_iap_grants` with `status = 'rejected_no_subscription'` so we don't retry), and surface a clear client error.
 
-Once those creds are in, the cron job from step 5 will retro-verify every charged-but-stuck receipt automatically.
+### 5. Backend — Google Play: `supabase/functions/validate-google-receipt/index.ts`
+- Mirror the Apple check.
 
-## Files touched
+### 6. DB — new helper function (migration)
+```sql
+create or replace function public.can_buy_extra_seats(_circle_id uuid)
+returns boolean language plpgsql stable security definer set search_path = public as $$
+declare v_owner uuid; v_plan text; v_comped timestamptz; v_source text;
+begin
+  select owner_id into v_owner from circles where id = _circle_id;
+  if v_owner is null then return false; end if;
+  select plan, comped_by_admin_at, source into v_plan, v_comped, v_source
+    from user_plans where user_id = v_owner;
+  return v_plan in ('family','extended','enterprise','founder')
+      or v_comped is not null
+      or v_source in ('admin_comp','apple','enterprise');
+end $$;
+grant execute on function public.can_buy_extra_seats(uuid) to authenticated;
+```
 
-- **Migration:** new `unverified_apple_receipts` table + cron job
-- **Edge function:** `supabase/functions/validate-apple-receipt/index.ts` — record/clear unverified receipts
-- **New edge function:** `supabase/functions/report-pending-receipt/index.ts` — client uploads its local queue
-- **New edge function:** `supabase/functions/admin-credit-receipt/index.ts` — admin manual credit / retry
-- **Client:** `src/lib/iapPurchase.ts` — better error mapping, upload pending receipts to server
-- **Client:** Purchase UI — replace toast with the new dialog + "Retry now" button
-- **New page:** `src/pages/AdminIapCredits.tsx`
-- **Data fix:** `circles.extra_members` 14 → 21 on Smith + `apple_iap_grants` insert
+## Out of Scope
+- No changes to existing `extra_members` counts on any circle.
+- No refunds for past Free-plan purchases.
+- Per-seat pricing stays at $5 / 7 seats.
 
-## Out of scope (deliberately)
-
-- Trusting client-supplied JWS as a fallback when Apple is unreachable. That's a free-seats exploit waiting to happen and our memory already says don't do this.
-- Refunding via Stripe — this is an Apple IAP, refunds go through Apple.
-
-Approve and I'll build it.
+## Open Question
+None — confirming the rule set above matches your intent. Ready to implement on approval.
