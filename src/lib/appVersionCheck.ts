@@ -1,6 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 
-const BUNDLE_ID = "app.lovable.f745440093af4f4390a60d52ff08c778";
+const BUNDLE_ID = "space.manus.familial.mobile.t20260223211425";
 // TODO: replace with numeric App Store ID once the app is live.
 // While in TestFlight-only, the App Store URL won't resolve; we fall back to
 // a generic apps.apple.com search that opens TestFlight if installed.

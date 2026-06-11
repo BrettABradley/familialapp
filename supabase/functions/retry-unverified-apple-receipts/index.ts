@@ -21,14 +21,31 @@ const MAX_PER_RUN = 25;
 // Skip rows we touched in the last 4 minutes — give Apple a moment to publish.
 const COOLDOWN_MS = 4 * 60 * 1000;
 
+function decodeJwtRole(authHeader: string | null): string | null {
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const parts = authHeader.slice(7).split(".");
+  if (parts.length < 2) return null;
+  try {
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof payload?.role === "string" ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
+function isServiceRoleCaller(authHeader: string | null): boolean {
+  if (!authHeader?.startsWith("Bearer ")) return false;
+  if (decodeJwtRole(authHeader) === "service_role") return true;
+  return authHeader.slice(7).trim() === SERVICE_ROLE_KEY;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Must be called with the service-role bearer token (set in the cron job).
-  const auth = req.headers.get("Authorization") ?? "";
-  if (auth !== `Bearer ${SERVICE_ROLE_KEY}`) {
+  // Must be called with a service-role bearer token (set in the cron job).
+  if (!isServiceRoleCaller(req.headers.get("Authorization"))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -64,28 +81,6 @@ serve(async (req) => {
 
   for (const row of rows) {
     try {
-      // Mint a short-lived service-role-signed JWT for the user so
-      // validate-apple-receipt (which expects an Authorization header for the
-      // owning user) accepts the call. We can't use the user's session, so
-      // call validate-apple-receipt directly using its service-role-compatible
-      // path: we replicate the credit logic here for simplicity and safety.
-      //
-      // Re-verify with Apple directly, then write to apple_iap_grants ourselves.
-      const verifyRes = await fetch(`${SUPABASE_URL}/functions/v1/validate-apple-receipt`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          // The function reads the user from Authorization. Use the service
-          // role token AS the bearer so it identifies as service role; the
-          // function rejects with "Not authenticated" because supabase.auth
-          // .getUser(service_role_jwt) returns null. So instead, we call the
-          // Apple verification + grant code path inline below. Skip HTTP.
-        },
-        body: JSON.stringify({}),
-      }).catch(() => null);
-      // Ignore — we go inline.
-      void verifyRes;
-
       const credited_row = await retryOne(service, row);
       if (credited_row) {
         credited += 1;
@@ -105,7 +100,7 @@ serve(async (req) => {
 
 // ---- Inline Apple verification + grant (avoids the user-auth requirement) ----
 
-const BUNDLE_ID = "com.familialmedia.familial";
+const BUNDLE_ID = "space.manus.familial.mobile.t20260223211425";
 const EXTRA_MEMBERS_PRODUCT = "com.familialmedia.familial.extramembers";
 const EXTRA_MEMBERS_INCREMENT = 7;
 const PRODUCT_TO_PLAN: Record<string, { plan: string; max_circles: number; max_members_per_circle: number }> = {
@@ -141,9 +136,9 @@ function b64uDecode(s: string): Uint8Array {
 }
 
 async function appleJwt(): Promise<string | null> {
-  const issuerId = Deno.env.get("APPLE_ISSUER_ID");
-  const keyId = Deno.env.get("APPLE_KEY_ID");
-  const pem = Deno.env.get("APPLE_PRIVATE_KEY");
+  const issuerId = Deno.env.get("APPLE_ISSUER_ID")?.trim();
+  const keyId = Deno.env.get("APPLE_KEY_ID")?.trim();
+  const pem = Deno.env.get("APPLE_PRIVATE_KEY")?.trim();
   if (!issuerId || !keyId || !pem) return null;
   const header = { alg: "ES256", kid: keyId, typ: "JWT" };
   const now = Math.floor(Date.now() / 1000);
@@ -186,7 +181,7 @@ async function fetchTxn(transactionId: string): Promise<{ ok: true; txn: any } |
         const txt = await res.text();
         last = `${res.status}: ${txt.slice(0, 200)}`;
         if (res.status === 401) sawCred = true;
-        if (res.status === 404) sawNF = true;
+        if (res.status === 400 || res.status === 404) sawNF = true;
       }
     } catch (e: any) {
       last = e?.message ?? String(e);
