@@ -45,9 +45,9 @@ function pemToPkcs8(pem: string): Uint8Array {
 }
 
 async function generateAppleJWT(): Promise<string> {
-  const issuerId = Deno.env.get("APPLE_ISSUER_ID");
-  const keyId = Deno.env.get("APPLE_KEY_ID");
-  const privateKeyPem = Deno.env.get("APPLE_PRIVATE_KEY");
+  const issuerId = Deno.env.get("APPLE_ISSUER_ID")?.trim();
+  const keyId = Deno.env.get("APPLE_KEY_ID")?.trim();
+  const privateKeyPem = Deno.env.get("APPLE_PRIVATE_KEY")?.trim();
   if (!issuerId || !keyId || !privateKeyPem) {
     throw new Error("Apple App Store credentials are not configured");
   }
