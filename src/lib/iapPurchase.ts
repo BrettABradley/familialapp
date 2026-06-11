@@ -20,11 +20,161 @@ const loadPlugin = async () => {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Module-level cache of StoreKit Product objects, keyed by productIdentifier.
-// Populated by prewarmProducts() so subsequent purchase attempts hit a warm
-// cache and the UI can render Apple-validated localized prices.
 const productCache: Record<string, any> = {};
 
 const RETRY_DELAYS_MS = [800, 1500];
+
+// === Pending IAP receipt queue ===========================================
+// If validate-apple-receipt fails (network, Apple 401, backend down), we MUST
+// NOT lose the receipt. We persist it in localStorage and retry on:
+//   - next app launch (drainPendingIapReceipts() called from capacitorInit)
+//   - app resume from background
+//   - user tapping "Restore Purchases"
+// The backend uses a unique index on transaction_id, so retries can never
+// double-credit even if the user re-launches multiple times.
+
+const PENDING_KEY = "pendingAppleReceipts.v1";
+
+type PendingReceipt = {
+  id: string;                       // local id (random)
+  kind: "subscription" | "extra_members";
+  productId: string;
+  transactionId: string;
+  circleId?: string;
+  rescue_circle_id?: string;
+  jwsRepresentation?: string | null;
+  receipt?: string | null;
+  createdAt: number;
+  lastAttemptAt?: number;
+  attempts: number;
+  lastError?: string;
+};
+
+const readPending = (): PendingReceipt[] => {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const writePending = (list: PendingReceipt[]) => {
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.warn("[IAP] writePending failed", e);
+  }
+};
+
+const enqueuePending = (entry: Omit<PendingReceipt, "id" | "createdAt" | "attempts">) => {
+  const list = readPending();
+  // Dedupe by transactionId so the same purchase only sits in the queue once.
+  if (list.some((p) => p.transactionId === entry.transactionId)) return;
+  list.push({
+    id: (globalThis.crypto?.randomUUID?.() ?? `pr-${Date.now()}-${Math.random()}`),
+    createdAt: Date.now(),
+    attempts: 0,
+    ...entry,
+  });
+  writePending(list);
+  console.log("[IAP] enqueued pending receipt", { transactionId: entry.transactionId, kind: entry.kind });
+};
+
+const removePending = (transactionId: string) => {
+  const list = readPending().filter((p) => p.transactionId !== transactionId);
+  writePending(list);
+};
+
+const markPendingFailure = (transactionId: string, err: string) => {
+  const list = readPending();
+  const item = list.find((p) => p.transactionId === transactionId);
+  if (item) {
+    item.attempts += 1;
+    item.lastAttemptAt = Date.now();
+    item.lastError = err.slice(0, 300);
+    writePending(list);
+  }
+};
+
+export const getPendingReceiptCount = () => readPending().length;
+
+/**
+ * Submit a single pending receipt to the backend. Returns:
+ *  - 'credited' on success or duplicate (we no longer need this receipt)
+ *  - 'retry'    on transient failure (Apple 401, 503, network)
+ *  - 'failed'   on permanent failure (bundle mismatch, revoked, etc.)
+ */
+async function submitReceipt(entry: PendingReceipt): Promise<"credited" | "retry" | "failed"> {
+  try {
+    const { data, error } = await supabase.functions.invoke("validate-apple-receipt", {
+      body: {
+        kind: entry.kind,
+        transactionId: entry.transactionId,
+        productId: entry.productId,
+        circleId: entry.circleId,
+        rescue_circle_id: entry.rescue_circle_id,
+        receipt: entry.receipt ?? null,
+        jwsRepresentation: entry.jwsRepresentation ?? null,
+      },
+    });
+
+    // supabase.functions.invoke surfaces non-2xx as `error`, but the body is
+    // still available on `data`. We check both.
+    const payload: any = data ?? {};
+    if (payload?.success) return "credited";
+
+    const code = payload?.code ?? "";
+    const retryable = payload?.retry === true ||
+      code === "APPLE_CREDENTIALS_INVALID" ||
+      code === "APPLE_TXN_NOT_FOUND" ||
+      code === "APPLE_TRANSIENT";
+
+    if (error && retryable) {
+      markPendingFailure(entry.transactionId, payload?.error ?? error.message);
+      return "retry";
+    }
+    if (retryable) {
+      markPendingFailure(entry.transactionId, payload?.error ?? "retryable");
+      return "retry";
+    }
+    if (error) {
+      markPendingFailure(entry.transactionId, payload?.error ?? error.message);
+      // For unknown errors prefer retry over discard — we'd rather try again
+      // on next launch than silently drop a real purchase.
+      return "retry";
+    }
+    return "credited";
+  } catch (err: any) {
+    markPendingFailure(entry.transactionId, err?.message ?? String(err));
+    return "retry";
+  }
+}
+
+/**
+ * Drain pending receipts. Safe to call repeatedly. Returns how many were
+ * credited so callers can refresh their UI.
+ */
+export const drainPendingIapReceipts = async (): Promise<number> => {
+  const list = readPending();
+  if (list.length === 0) return 0;
+  console.log(`[IAP] draining ${list.length} pending receipt(s)`);
+  let credited = 0;
+  for (const entry of list) {
+    const result = await submitReceipt(entry);
+    if (result === "credited") {
+      removePending(entry.transactionId);
+      credited += 1;
+    } else if (result === "failed") {
+      // Permanent — give up so it doesn't sit in the queue forever.
+      removePending(entry.transactionId);
+    }
+    // 'retry' → leave it queued for next time.
+  }
+  return credited;
+};
 
 const parseProductList = (res: any): any[] => {
   if (!res) return [];
@@ -34,14 +184,7 @@ const parseProductList = (res: any): any[] => {
 };
 
 /**
- * Pre-warm StoreKit by fetching all known product IDs once. Call on mount
- * of any screen that may trigger a purchase (Pricing page, Upgrade dialog,
- * Rescue dialog) so by the time the user taps Buy, the product is cached.
- *
- * Required by App Store guideline 2.1(b) — reviewers were hitting "Cannot
- * find product" because StoreKit hadn't finished loading on cold start.
- *
- * Returns the list of loaded products (empty if iOS not native or load failed).
+ * Pre-warm StoreKit by fetching all known product IDs once.
  */
 export const prewarmProducts = async (): Promise<any[]> => {
   if (!isIOSNative()) return [];
@@ -84,11 +227,6 @@ export const prewarmProducts = async (): Promise<any[]> => {
 
 export const getCachedProducts = (): Record<string, any> => productCache;
 
-/**
- * Fetch the product from StoreKit with up to 3 attempts and incremental
- * backoff. App Review's sandbox cold start sometimes takes >1s to surface
- * products, so we retry generously to avoid spurious 2.1(b) rejections.
- */
 const ensureProductLoaded = async (
   NativePurchases: any,
   productId: string
@@ -133,9 +271,15 @@ const isCancelError = (err: any) => {
 };
 
 /**
- * Purchase a subscription via Apple IAP.
- * Optional `extras` are forwarded to validate-apple-receipt for circle
- * rescue / membership transfer flows.
+ * Purchase a subscription via Apple IAP. Receipt is saved locally before
+ * we try to validate, so a backend failure never loses the purchase.
+ *
+ * Returns:
+ *  - true  → credited, the user's plan was applied
+ *  - false → the user canceled the Apple sheet (no charge, no toast needed)
+ *  - throws → the purchase was charged AND queued for retry. The thrown
+ *             Error has a user-friendly message that callers can show in a
+ *             toast.
  */
 export const purchaseSubscription = async (
   productId: string,
@@ -145,10 +289,6 @@ export const purchaseSubscription = async (
 
   const { NativePurchases, PURCHASE_TYPE } = await loadPlugin();
 
-  // Pre-load the product so StoreKit has it cached before we trigger the
-  // purchase sheet. If it can't be loaded, surface a clear error rather
-  // than letting purchaseProduct fail silently (the #1 cause of App Review
-  // IAP rejections).
   const ready = await ensureProductLoaded(NativePurchases, productId);
   if (!ready) {
     throw new Error(
@@ -169,36 +309,46 @@ export const purchaseSubscription = async (
 
   const transactionId = result?.transactionId;
   if (!transactionId) {
-    throw new Error("Purchase completed but no transaction was returned.");
+    // StoreKit returned without a transactionId — purchase did NOT complete.
+    return false;
   }
 
-  // Server-side validation MUST succeed for the plan to be applied.
-  // Previously this was best-effort and silently swallowed errors, which
-  // caused users to see "Plan upgraded!" while user_plans stayed on free.
-  const { data, error } = await supabase.functions.invoke("validate-apple-receipt", {
-    body: {
-      kind: "subscription",
-      transactionId,
-      productId,
-      receipt: result?.receipt ?? null,
-      jwsRepresentation: result?.jwsRepresentation ?? null,
-      ...(extras ?? {}),
-    },
+  // Persist BEFORE calling the backend so a failure never loses the receipt.
+  enqueuePending({
+    kind: "subscription",
+    productId,
+    transactionId: String(transactionId),
+    circleId: extras?.circleId,
+    rescue_circle_id: extras?.rescue_circle_id,
+    receipt: result?.receipt ?? null,
+    jwsRepresentation: result?.jwsRepresentation ?? null,
   });
 
-  if (error || (data as any)?.error) {
-    const detail = (data as any)?.error || error?.message || "Unknown validation error";
-    console.error("[IAP] validate-apple-receipt failed:", detail, { data, error });
-    throw new Error(
-      `Payment went through, but we couldn't activate your plan automatically. ` +
-      `Please tap "Restore Purchases" or contact support@familialmedia.com — your purchase is safe. (${detail})`
-    );
+  const submission = await submitReceipt({
+    id: "", createdAt: 0, attempts: 0,
+    kind: "subscription",
+    productId,
+    transactionId: String(transactionId),
+    circleId: extras?.circleId,
+    rescue_circle_id: extras?.rescue_circle_id,
+    receipt: result?.receipt ?? null,
+    jwsRepresentation: result?.jwsRepresentation ?? null,
+  });
+
+  if (submission === "credited") {
+    removePending(String(transactionId));
+    return true;
   }
-  return true;
+
+  throw new Error(
+    "Your purchase went through and is safely saved on this device. " +
+    "We'll finish activating your plan automatically — reopen the app or tap Restore Purchases in Settings."
+  );
 };
 
 /**
  * Purchase a one-time consumable via Apple IAP (e.g. extra member seats).
+ * Same return contract as purchaseSubscription.
  */
 export const purchaseConsumable = async (
   productId: string,
@@ -227,33 +377,41 @@ export const purchaseConsumable = async (
   }
 
   const transactionId = result?.transactionId;
-  if (!transactionId) {
-    throw new Error("Purchase completed but no transaction was returned.");
-  }
+  if (!transactionId) return false;
 
-  const { error } = await supabase.functions.invoke("validate-apple-receipt", {
-    body: {
-      kind: extras.kind,
-      transactionId,
-      productId,
-      circleId: extras.circleId,
-      receipt: result?.receipt ?? null,
-      jwsRepresentation: result?.jwsRepresentation ?? null,
-    },
+  enqueuePending({
+    kind: extras.kind,
+    productId,
+    transactionId: String(transactionId),
+    circleId: extras.circleId,
+    receipt: result?.receipt ?? null,
+    jwsRepresentation: result?.jwsRepresentation ?? null,
   });
 
-  if (error) {
-    // Consumables MUST be granted server-side. Don't silently swallow.
-    throw new Error(
-      "Payment succeeded but we couldn't add the seats. Please contact support@familialmedia.com — your purchase is safe."
-    );
+  const submission = await submitReceipt({
+    id: "", createdAt: 0, attempts: 0,
+    kind: extras.kind,
+    productId,
+    transactionId: String(transactionId),
+    circleId: extras.circleId,
+    receipt: result?.receipt ?? null,
+    jwsRepresentation: result?.jwsRepresentation ?? null,
+  });
+
+  if (submission === "credited") {
+    removePending(String(transactionId));
+    return true;
   }
 
-  return true;
+  throw new Error(
+    "Your purchase went through and is safely saved on this device. " +
+    "We'll finish adding the seats automatically — reopen the app or tap Restore Purchases in Settings."
+  );
 };
 
 /**
  * Restore previous purchases (required by Apple guidelines).
+ * Also drains any locally-queued pending receipts.
  */
 export const restorePurchases = async (): Promise<boolean> => {
   if (!isIOSNative()) return false;
@@ -266,12 +424,18 @@ export const restorePurchases = async (): Promise<boolean> => {
       body: { restore: true },
     });
 
+    // Drain any consumable receipts that never made it through.
+    const credited = await drainPendingIapReceipts();
+    console.log("[IAP] restorePurchases drained", { credited });
+
     return !error;
   } catch (err) {
     console.warn("[IAP] restorePurchases failed:", err);
+    await drainPendingIapReceipts();
     return false;
   }
 };
+
 
 /**
  * Open Apple's subscription management page.

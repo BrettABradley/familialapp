@@ -1,36 +1,97 @@
-## Plan — Harden Album Circle Lock
+## Diagnosis
 
-Focus only on the album lock. The current code hides the header's circle dropdown when an album is open, but it does NOT block circle changes from other paths, so the active circle can still flip mid-album.
+The screenshot error means StoreKit returned a transaction to the app, then our backend failed while trying to verify/credit it.
 
-### Root cause
-`setLockCircleSwitcher(true)` in `src/pages/Albums.tsx` only affects the visible `<Select>` in `CircleHeader`. These paths can still change `selectedCircle` while an album is open:
+The backend logs confirm the exact cause:
 
-1. **Deep-link sync** — `src/hooks/useDeepLinkCircleSync.ts` calls `setSelectedCircle(target)` whenever a notification deep-link arrives with `?circle=ID`. Runs even while inside an album.
-2. **URL `?circle=` param** — `Albums.tsx` itself runs `setSelectedCircle(circleIdParam)` on every change of `circles`/`circleIdParam`, which can re-fire after the album is open.
-3. **Any future caller** of `setSelectedCircle` from elsewhere (header sheet, push handler, etc.) bypasses the lock entirely because the lock is UI-only.
+```text
+validate-apple-receipt
+kind: extra_members
+productId: com.familialmedia.familial.extramembers
+transactionId: 360003156574…
+Apple production 401: Unauthenticated
+Apple sandbox 401: Unauthenticated
+```
 
-### What I'll change
+So this is not a UI problem. The iOS app is calling the receipt-validation function, but Apple is rejecting our App Store Server API credentials. That is why **all iOS IAPs** can show “Purchase failed” after the Apple sheet.
 
-1. **`src/contexts/CircleContext.tsx`** — Make the lock authoritative:
-   - Hold `lockCircleSwitcher` in a ref alongside the state so the latest value is readable inside the setter without stale-closure issues.
-   - In `setSelectedCircle`, if the lock is active AND the requested circle differs from the current `selectedCircle`, ignore the call (log a warning, do not write to localStorage). Always allow setting the same circle (no-op) and allow clearing on sign-out.
-   - Expose a small internal escape hatch only used by the album page itself (e.g. an `unsafeSetSelectedCircle` or a "force" arg) so the album page can still apply the initial deep-linked `?circle=` BEFORE it locks. No other caller will use it.
+## Plan
 
-2. **`src/pages/Albums.tsx`** — Tighten interaction with the lock:
-   - When opening an album from the list (user tap), call `setLockCircleSwitcher(true)` synchronously in the same handler that sets `selectedAlbum`, so there's no render gap.
-   - Keep the existing cleanup that releases the lock when `selectedAlbum` becomes null or the page unmounts.
-   - For the `?circle=` deep-link effect, use the new force path so it can sync circle once before locking, but never after.
+### 1. Credit Londa immediately
+Credit the Reina Bible Study circle manually with the Extra Members add-on:
 
-3. **`src/hooks/useDeepLinkCircleSync.ts`** — Defensive: check `lockCircleSwitcher` from context and skip switching while it's true. (Redundant with #1, but avoids spurious warnings and keeps intent clear.)
+- Circle: `Reina Bible Study`
+- Current: `4/8 members`
+- Add-on: `+7 seats`
+- Result: `4/15 members`
 
-4. **Verify**
-   - Re-grep all callers of `setSelectedCircle` to confirm none try to switch circles while a lock is active in a way that would surprise users.
-   - Walk through three scenarios mentally and confirm the lock holds:
-     a) Open album → tap a push notification for a different circle → stays on current album's circle.
-     b) Open album via `/albums?circle=A&album=X` → URL sync sets circle A, then lock engages, no further switches.
-     c) Close album (back button or selecting another album list) → lock releases cleanly.
+This should be done even if we later confirm Apple did not charge her, since you specifically want her credited.
 
-### Out of scope
-- Splash / dark mode work (untouched per your instruction).
-- Native config changes.
-- Any visual change to the header beyond what's already there.
+### 2. Fix the real IAP failure
+The backend has Apple credential secrets present, but Apple is rejecting them with `401 Unauthenticated`. I will update the IAP verification flow so failures are clearer and easier to diagnose, but the root fix is that the Apple App Store Server API credentials must be valid.
+
+Likely issue:
+
+- The current `APPLE_PRIVATE_KEY`, `APPLE_KEY_ID`, or `APPLE_ISSUER_ID` is wrong, expired/revoked, copied incorrectly, or not an App Store Connect API key with App Store Server API access.
+- A Sign in with Apple key will not work for App Store purchase verification.
+
+Required Apple credentials:
+
+- App Store Connect API Key `.p8`
+- Key ID
+- Issuer ID
+- Access level that can call App Store Server API
+
+### 3. Improve backend error handling
+Update `validate-apple-receipt` so Apple `401` returns a support-grade message instead of a generic “couldn’t add seats” message.
+
+New behavior:
+
+- If Apple rejects credentials: return `APPLE_CREDENTIALS_INVALID`.
+- If Apple is temporarily unavailable: return retryable error.
+- If transaction verifies: credit the plan/seats.
+- If duplicate transaction: do not double-credit.
+
+### 4. Add an idempotent IAP grant ledger
+Create a new table such as `apple_iap_grants` to record successful Apple IAP grants.
+
+It will track:
+
+- user ID
+- circle ID when relevant
+- product ID
+- transaction ID
+- original transaction ID
+- grant type: subscription or extra members
+- seats added
+- created timestamp
+
+This prevents duplicate credits when the app retries.
+
+### 5. Add a local pending receipt retry queue
+Update the iOS client so once StoreKit returns a transaction ID, the app saves it locally before calling the backend.
+
+If backend verification fails because of network, credentials, or app backgrounding:
+
+- The receipt stays queued.
+- The app retries on next launch/resume.
+- The user sees: “Purchase received. We’ll retry crediting automatically.”
+
+### 6. Fix all iOS IAP purchase paths
+Apply the same reliability pattern to:
+
+- Extra Members one-time add-on
+- Family subscription
+- Extended subscription
+- Restore Purchases
+
+### 7. Refresh UI after credit
+After a successful IAP credit:
+
+- Refresh circles/profile/plan data.
+- Update the visible member cap immediately.
+- Show a clear success toast.
+
+## What I need during implementation
+
+If the current Apple secrets are wrong, I’ll need you to replace them with the correct App Store Connect API key values. The code can be fixed now, but Apple verification will keep failing until those credentials are valid.
