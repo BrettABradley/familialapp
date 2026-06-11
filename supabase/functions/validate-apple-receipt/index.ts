@@ -204,19 +204,48 @@ serve(async (req) => {
     }
 
     // === Verify with Apple's App Store Server API (no unsigned fallback) ===
-    const txn = await fetchAppleTransaction(String(transactionId));
-    if (!txn) {
+    const lookup = await fetchAppleTransaction(String(transactionId));
+    if (!lookup.ok) {
+      if (lookup.reason === "credentials") {
+        // Our App Store Connect API key is invalid/expired. The user did
+        // nothing wrong — they should not see a generic error. Tell the
+        // client to keep the receipt queued and contact support.
+        return new Response(
+          JSON.stringify({
+            error:
+              "We received your purchase but couldn't verify it with Apple right now. " +
+              "Your receipt is saved and will retry automatically. " +
+              "If this persists, contact support@familialmedia.com — your purchase is safe.",
+            code: "APPLE_CREDENTIALS_INVALID",
+            retry: true,
+            detail: lookup.detail,
+          }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (lookup.reason === "not_found") {
+        return new Response(
+          JSON.stringify({
+            error:
+              "Apple hasn't published this transaction yet. We'll retry automatically.",
+            code: "APPLE_TXN_NOT_FOUND",
+            retry: true,
+            detail: lookup.detail,
+          }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       return new Response(
         JSON.stringify({
           error: "Apple is temporarily unable to verify this transaction. Please try again in a moment.",
+          code: "APPLE_TRANSIENT",
           retry: true,
+          detail: lookup.detail,
         }),
-        {
-          status: 503,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    const txn = lookup.txn;
     console.log("[validate-apple-receipt] txn decoded", {
       source: "apple-server-api",
       bundleId: txn.bundleId,
@@ -264,6 +293,32 @@ serve(async (req) => {
       if (circleErr || !circle) throw new Error("Circle not found");
       if (circle.owner_id !== user.id) throw new Error("Only the circle owner can add seats");
 
+      // Idempotent ledger insert — if this Apple transaction was already
+      // processed (e.g. client retried after a network blip), the unique
+      // constraint on transaction_id returns 23505 and we no-op.
+      const { error: ledgerErr } = await serviceClient
+        .from("apple_iap_grants")
+        .insert({
+          user_id: user.id,
+          circle_id: circleId,
+          product_id: productId,
+          transaction_id: String(transactionId),
+          original_transaction_id: txn.originalTransactionId ?? null,
+          kind: "extra_members",
+          seats_added: EXTRA_MEMBERS_INCREMENT,
+          raw: { bundleId: txn.bundleId, type: txn.type },
+        });
+      if (ledgerErr) {
+        if ((ledgerErr as any).code === "23505") {
+          console.log("[validate-apple-receipt] duplicate extra_members txn — already credited", { transactionId });
+          return new Response(
+            JSON.stringify({ success: true, kind: "extra_members", added: 0, duplicate: true }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        throw ledgerErr;
+      }
+
       const { error: updErr } = await serviceClient
         .from("circles")
         .update({ extra_members: (circle.extra_members ?? 0) + EXTRA_MEMBERS_INCREMENT })
@@ -280,6 +335,30 @@ serve(async (req) => {
     if (!planConfig) {
       throw new Error("Unknown product ID");
     }
+
+    // Idempotent ledger insert for the subscription transaction. A duplicate
+    // just means the client retried — return success without re-applying.
+    const { error: subLedgerErr } = await serviceClient
+      .from("apple_iap_grants")
+      .insert({
+        user_id: user.id,
+        circle_id: null,
+        product_id: productId,
+        transaction_id: String(transactionId),
+        original_transaction_id: txn.originalTransactionId ?? null,
+        kind: "subscription",
+        seats_added: 0,
+        plan: planConfig.plan,
+        raw: { bundleId: txn.bundleId, type: txn.type, expiresDate: txn.expiresDate ?? null },
+      });
+    if (subLedgerErr && (subLedgerErr as any).code === "23505") {
+      console.log("[validate-apple-receipt] duplicate subscription txn — already applied", { transactionId });
+      return new Response(
+        JSON.stringify({ success: true, plan: planConfig.plan, duplicate: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (subLedgerErr) throw subLedgerErr;
 
     const { error: updateError } = await serviceClient
       .from("user_plans")
@@ -324,6 +403,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ success: true, plan: planConfig.plan }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+
   } catch (error: any) {
     console.error("[validate-apple-receipt] ERROR:", error?.message ?? error, error?.stack ?? "");
     return new Response(JSON.stringify({ error: error?.message ?? String(error) }), {
