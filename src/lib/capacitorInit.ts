@@ -216,4 +216,47 @@ export async function initCapacitorPlugins() {
   } catch (e) {
     console.warn('[boot] push setup failed', e);
   }
+
+  // iOS IAP recovery: if a previous purchase didn't make it through to the
+  // backend (e.g. Apple App Store Server API was briefly returning 401, or
+  // the network died right after Apple Pay), the receipt is queued locally.
+  // Retry on launch and on every app resume so the user never has to manually
+  // tap Restore Purchases to recover a paid purchase.
+  if (isIOSNative()) {
+    const tryDrain = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) return; // Need to be signed in to call the function
+        const credited = await drainPendingIapReceipts();
+        if (credited > 0) {
+          console.log(`[boot] IAP recovery credited ${credited} pending purchase(s)`);
+          // Best-effort UI nudge — reload so member caps / plan badges refresh.
+          try { window.dispatchEvent(new CustomEvent('iap-credited', { detail: { credited } })); } catch {}
+        }
+      } catch (e) {
+        console.warn('[boot] drainPendingIapReceipts failed', e);
+      }
+    };
+
+    // Initial drain shortly after launch (let auth settle first).
+    setTimeout(tryDrain, 2500);
+
+    // Drain again whenever the app comes back to the foreground.
+    try {
+      const { App } = await import('@capacitor/app');
+      App.addListener('appStateChange', (state) => {
+        if (state.isActive) tryDrain();
+      });
+    } catch (e) {
+      console.warn('[boot] App.addListener failed', e);
+    }
+
+    // Drain after sign-in too (a user might be on /auth when the queue exists).
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+        setTimeout(tryDrain, 500);
+      }
+    });
+  }
 }
+
