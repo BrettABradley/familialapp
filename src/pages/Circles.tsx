@@ -213,6 +213,24 @@ const Circles = () => {
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [visibleCodeId, setVisibleCodeId] = useState<string | null>(null);
+  const [canBuyExtraSeats, setCanBuyExtraSeats] = useState(false);
+
+  // Refresh eligibility (owner must have a paid/comped/store subscription) whenever
+  // the Members dialog opens for a different circle.
+  useEffect(() => {
+    if (!isMembersOpen || !selectedCircle) {
+      setCanBuyExtraSeats(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.rpc("can_buy_extra_seats" as any, {
+        _circle_id: selectedCircle.id,
+      });
+      if (!cancelled) setCanBuyExtraSeats(!error && data === true);
+    })();
+    return () => { cancelled = true; };
+  }, [isMembersOpen, selectedCircle]);
   const [refreshingCodeId, setRefreshingCodeId] = useState<string | null>(null);
   // memberPlans state removed — was only used for transfer ownership dialogs
 
