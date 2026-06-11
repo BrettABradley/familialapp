@@ -271,23 +271,21 @@ const isCancelError = (err: any) => {
 };
 
 /**
- * Result type so callers can distinguish "user canceled" (no charge) from
- * "purchase saved but not yet credited" (charged, will retry).
- */
-export type PurchaseResult =
-  | { status: "credited" }
-  | { status: "canceled" }
-  | { status: "queued"; reason: string };
-
-/**
  * Purchase a subscription via Apple IAP. Receipt is saved locally before
  * we try to validate, so a backend failure never loses the purchase.
+ *
+ * Returns:
+ *  - true  → credited, the user's plan was applied
+ *  - false → the user canceled the Apple sheet (no charge, no toast needed)
+ *  - throws → the purchase was charged AND queued for retry. The thrown
+ *             Error has a user-friendly message that callers can show in a
+ *             toast.
  */
 export const purchaseSubscription = async (
   productId: string,
   extras?: { circleId?: string; rescue_circle_id?: string }
-): Promise<PurchaseResult> => {
-  if (!isIOSNative()) return { status: "canceled" };
+): Promise<boolean> => {
+  if (!isIOSNative()) return false;
 
   const { NativePurchases, PURCHASE_TYPE } = await loadPlugin();
 
@@ -305,19 +303,17 @@ export const purchaseSubscription = async (
       productType: PURCHASE_TYPE.SUBS,
     });
   } catch (err: any) {
-    if (isCancelError(err)) return { status: "canceled" };
+    if (isCancelError(err)) return false;
     throw err;
   }
 
   const transactionId = result?.transactionId;
   if (!transactionId) {
-    // StoreKit returned without a transactionId. This usually means the
-    // purchase did NOT complete (sandbox quirk, Apple ID prompt dismissed).
-    // We don't queue anything because there's nothing to credit.
-    return { status: "canceled" };
+    // StoreKit returned without a transactionId — purchase did NOT complete.
+    return false;
   }
 
-  // Persist the receipt BEFORE calling the backend so we can always retry.
+  // Persist BEFORE calling the backend so a failure never loses the receipt.
   enqueuePending({
     kind: "subscription",
     productId,
@@ -341,24 +337,24 @@ export const purchaseSubscription = async (
 
   if (submission === "credited") {
     removePending(String(transactionId));
-    return { status: "credited" };
+    return true;
   }
 
-  return {
-    status: "queued",
-    reason:
-      "Your purchase is safe and saved on this device. We'll finish activating your plan automatically — just reopen the app or tap Restore Purchases.",
-  };
+  throw new Error(
+    "Your purchase went through and is safely saved on this device. " +
+    "We'll finish activating your plan automatically — reopen the app or tap Restore Purchases in Settings."
+  );
 };
 
 /**
  * Purchase a one-time consumable via Apple IAP (e.g. extra member seats).
+ * Same return contract as purchaseSubscription.
  */
 export const purchaseConsumable = async (
   productId: string,
   extras: { circleId: string; kind: "extra_members" }
-): Promise<PurchaseResult> => {
-  if (!isIOSNative()) return { status: "canceled" };
+): Promise<boolean> => {
+  if (!isIOSNative()) return false;
 
   const { NativePurchases, PURCHASE_TYPE } = await loadPlugin();
 
@@ -376,14 +372,12 @@ export const purchaseConsumable = async (
       productType: PURCHASE_TYPE.INAPP,
     });
   } catch (err: any) {
-    if (isCancelError(err)) return { status: "canceled" };
+    if (isCancelError(err)) return false;
     throw err;
   }
 
   const transactionId = result?.transactionId;
-  if (!transactionId) {
-    return { status: "canceled" };
-  }
+  if (!transactionId) return false;
 
   enqueuePending({
     kind: extras.kind,
@@ -406,23 +400,21 @@ export const purchaseConsumable = async (
 
   if (submission === "credited") {
     removePending(String(transactionId));
-    return { status: "credited" };
+    return true;
   }
 
-  return {
-    status: "queued",
-    reason:
-      "Your purchase is safe and saved on this device. We'll finish adding the seats automatically — just reopen the app or tap Restore Purchases.",
-  };
+  throw new Error(
+    "Your purchase went through and is safely saved on this device. " +
+    "We'll finish adding the seats automatically — reopen the app or tap Restore Purchases in Settings."
+  );
 };
 
 /**
  * Restore previous purchases (required by Apple guidelines).
  * Also drains any locally-queued pending receipts.
  */
-export const restorePurchases = async (): Promise<{ restored: boolean; credited: number }> => {
-  let credited = 0;
-  if (!isIOSNative()) return { restored: false, credited };
+export const restorePurchases = async (): Promise<boolean> => {
+  if (!isIOSNative()) return false;
 
   try {
     const { NativePurchases } = await loadPlugin();
@@ -433,21 +425,14 @@ export const restorePurchases = async (): Promise<{ restored: boolean; credited:
     });
 
     // Drain any consumable receipts that never made it through.
-    credited = await drainPendingIapReceipts();
+    const credited = await drainPendingIapReceipts();
+    console.log("[IAP] restorePurchases drained", { credited });
 
-    return { restored: !error, credited };
+    return !error;
   } catch (err) {
     console.warn("[IAP] restorePurchases failed:", err);
-    credited = await drainPendingIapReceipts();
-    return { restored: false, credited };
+    await drainPendingIapReceipts();
+    return false;
   }
 };
 
-/**
- * Open Apple's subscription management page.
- */
-export const openAppleSubscriptionManagement = () => {
-  if (isIOSNative()) {
-    window.open("https://apps.apple.com/account/subscriptions", "_blank");
-  }
-};
