@@ -246,6 +246,20 @@ serve(async (req) => {
       if (circleErr || !circle) throw new Error("Circle not found");
       if (circle.owner_id !== user.id) throw new Error("Only the circle owner can add seats");
 
+      // Gate: owner must have an active paid/comped/store subscription.
+      // Existing extras already on the circle are grandfathered.
+      const { data: eligible, error: gateErr } = await serviceClient.rpc(
+        "can_buy_extra_seats",
+        { _circle_id: circleId },
+      );
+      if (gateErr) throw gateErr;
+      if (eligible !== true) {
+        return new Response(
+          JSON.stringify({ error: "SUBSCRIPTION_REQUIRED" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
       const { error: updErr } = await serviceClient
         .from("circles")
         .update({ extra_members: (circle.extra_members ?? 0) + EXTRA_MEMBERS_INCREMENT })
