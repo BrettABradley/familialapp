@@ -27,6 +27,34 @@ serve(async (req) => {
     const { priceId, mode, circleId, rescue_circle_id } = await req.json();
     if (!priceId) throw new Error("priceId is required");
 
+    // Gate "+7 extra members" purchases to circles whose owner has a paid /
+    // comped / store subscription. Free-plan owners must subscribe first.
+    const EXTRA_MEMBERS_PRICE = "price_1T3N5zCiWDzualH52rsDSBlu";
+    if (priceId === EXTRA_MEMBERS_PRICE) {
+      if (!circleId) {
+        return new Response(JSON.stringify({ error: "circleId is required for extra seats" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
+      }
+      const serviceClient = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+        { auth: { persistSession: false } },
+      );
+      const { data: eligible, error: rpcErr } = await serviceClient.rpc(
+        "can_buy_extra_seats",
+        { _circle_id: circleId },
+      );
+      if (rpcErr) throw rpcErr;
+      if (eligible !== true) {
+        return new Response(JSON.stringify({ error: "SUBSCRIPTION_REQUIRED" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 403,
+        });
+      }
+    }
+
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
     });
