@@ -112,6 +112,56 @@ export type Database = {
         }
         Relationships: []
       }
+      apple_iap_grants: {
+        Row: {
+          circle_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          original_transaction_id: string | null
+          plan: string | null
+          product_id: string
+          raw: Json | null
+          seats_added: number
+          transaction_id: string
+          user_id: string
+        }
+        Insert: {
+          circle_id?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          original_transaction_id?: string | null
+          plan?: string | null
+          product_id: string
+          raw?: Json | null
+          seats_added?: number
+          transaction_id: string
+          user_id: string
+        }
+        Update: {
+          circle_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          original_transaction_id?: string | null
+          plan?: string | null
+          product_id?: string
+          raw?: Json | null
+          seats_added?: number
+          transaction_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apple_iap_grants_circle_id_fkey"
+            columns: ["circle_id"]
+            isOneToOne: false
+            referencedRelation: "circles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       banned_emails: {
         Row: {
           banned_at: string
