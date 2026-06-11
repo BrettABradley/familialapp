@@ -93,15 +93,24 @@ function decodeJwsPayload(jws: string): any {
 /**
  * Calls Apple's App Store Server API to fetch + verify a transaction.
  * Tries production first, falls back to sandbox (TestFlight & sandbox tester accounts).
- * Returns the decoded JWS payload (transaction info), or null if lookup fails.
+ *
+ * Returns a structured result so the caller can distinguish:
+ *  - { ok: true, txn }                     transaction verified
+ *  - { ok: false, reason: 'credentials' }  Apple returned 401 — our App Store Connect API key is invalid/expired
+ *  - { ok: false, reason: 'not_found' }    Apple returned 404 — sandbox/prod mismatch or txn unknown
+ *  - { ok: false, reason: 'transient' }    network or 5xx — safe to retry
  */
-async function fetchAppleTransaction(transactionId: string): Promise<any | null> {
+type AppleLookupResult =
+  | { ok: true; txn: any }
+  | { ok: false; reason: "credentials" | "not_found" | "transient"; detail?: string };
+
+async function fetchAppleTransaction(transactionId: string): Promise<AppleLookupResult> {
   let jwt: string;
   try {
     jwt = await generateAppleJWT();
   } catch (err: any) {
     console.warn(`[validate-apple-receipt] JWT generation failed: ${err.message}`);
-    return null;
+    return { ok: false, reason: "credentials", detail: `JWT generation failed: ${err.message}` };
   }
   const headers = { Authorization: `Bearer ${jwt}` };
 
@@ -109,6 +118,10 @@ async function fetchAppleTransaction(transactionId: string): Promise<any | null>
     `https://api.storekit.itunes.apple.com/inApps/v1/transactions/${transactionId}`,
     `https://api.storekit-sandbox.itunes.apple.com/inApps/v1/transactions/${transactionId}`,
   ];
+
+  let sawCredentialFailure = false;
+  let sawNotFound = false;
+  let lastDetail: string | undefined;
 
   for (const url of endpoints) {
     const env = url.includes("sandbox") ? "sandbox" : "production";
@@ -118,17 +131,24 @@ async function fetchAppleTransaction(transactionId: string): Promise<any | null>
         const data = await res.json();
         if (data?.signedTransactionInfo) {
           console.log(`[validate-apple-receipt] Apple ${env} OK for txn ${transactionId}`);
-          return decodeJwsPayload(data.signedTransactionInfo);
+          return { ok: true, txn: decodeJwsPayload(data.signedTransactionInfo) };
         }
       } else {
         const txt = await res.text();
         console.warn(`[validate-apple-receipt] Apple ${env} ${res.status}: ${txt}`);
+        lastDetail = `Apple ${env} ${res.status}: ${txt.slice(0, 200)}`;
+        if (res.status === 401) sawCredentialFailure = true;
+        if (res.status === 404) sawNotFound = true;
       }
     } catch (err: any) {
       console.warn(`[validate-apple-receipt] Apple ${env} fetch error: ${err.message}`);
+      lastDetail = `Apple ${env} fetch error: ${err.message}`;
     }
   }
-  return null;
+
+  if (sawCredentialFailure) return { ok: false, reason: "credentials", detail: lastDetail };
+  if (sawNotFound) return { ok: false, reason: "not_found", detail: lastDetail };
+  return { ok: false, reason: "transient", detail: lastDetail };
 }
 
 // NOTE: We intentionally do NOT decode the client JWS as a fallback.
@@ -136,6 +156,7 @@ async function fetchAppleTransaction(transactionId: string): Promise<any | null>
 // JWS and trigger a free plan upgrade whenever Apple's server API is briefly
 // unreachable. If Apple's API fails, we surface a 503 and let the client retry
 // (StoreKit retains the entitlement client-side, so nothing is lost).
+
 
 
 serve(async (req) => {
