@@ -262,18 +262,21 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
     });
   }
 
-  // Extra members available on ALL tiers
-  options.push({
-    key: "extra",
-    title: "Add 7 Extra Members",
-    price: "$5 one-time",
-    description: "Adds 7 more member slots to this circle",
-    action: () =>
-      onNative
-        ? handleNativeExtraMembers("extra")
-        : handleCheckout(PRICES.extraMembers, "payment", "extra"),
-    icon: <Plus className="w-4 h-4" />,
-  });
+  // Extra members are a paid-plan perk only — Free users must subscribe first.
+  // Existing extras stay grandfathered; this only blocks NEW purchases.
+  if (currentPlan !== "free") {
+    options.push({
+      key: "extra",
+      title: "Add 7 Extra Members",
+      price: "$5 one-time",
+      description: "Adds 7 more member slots to this circle",
+      action: () =>
+        onNative
+          ? handleNativeExtraMembers("extra")
+          : handleCheckout(PRICES.extraMembers, "payment", "extra"),
+      icon: <Plus className="w-4 h-4" />,
+    });
+  }
 
   return (
     <>
