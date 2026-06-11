@@ -100,7 +100,7 @@ serve(async (req) => {
 
 // ---- Inline Apple verification + grant (avoids the user-auth requirement) ----
 
-const BUNDLE_ID = "com.familialmedia.familial";
+const BUNDLE_ID = "space.manus.familial.mobile.t20260223211425";
 const EXTRA_MEMBERS_PRODUCT = "com.familialmedia.familial.extramembers";
 const EXTRA_MEMBERS_INCREMENT = 7;
 const PRODUCT_TO_PLAN: Record<string, { plan: string; max_circles: number; max_members_per_circle: number }> = {
