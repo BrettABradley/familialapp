@@ -405,9 +405,10 @@ export const purchaseConsumable = async (
   }
 
   throw new Error(
-    "Your purchase went through and is safely saved on this device. " +
-    "We'll finish adding the seats automatically — reopen the app or tap Restore Purchases in Settings."
+    "Apple confirmed your payment. We'll finish adding your seats automatically — usually within a few minutes. " +
+    "You can close the app safely; no further action is needed."
   );
+
 };
 
 /**
