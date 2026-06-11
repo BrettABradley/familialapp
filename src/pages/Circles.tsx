@@ -213,6 +213,24 @@ const Circles = () => {
   const [isCropOpen, setIsCropOpen] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [visibleCodeId, setVisibleCodeId] = useState<string | null>(null);
+  const [canBuyExtraSeats, setCanBuyExtraSeats] = useState(false);
+
+  // Refresh eligibility (owner must have a paid/comped/store subscription) whenever
+  // the Members dialog opens for a different circle.
+  useEffect(() => {
+    if (!isMembersOpen || !selectedCircle) {
+      setCanBuyExtraSeats(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.rpc("can_buy_extra_seats" as any, {
+        _circle_id: selectedCircle.id,
+      });
+      if (!cancelled) setCanBuyExtraSeats(!error && data === true);
+    })();
+    return () => { cancelled = true; };
+  }, [isMembersOpen, selectedCircle]);
   const [refreshingCodeId, setRefreshingCodeId] = useState<string | null>(null);
   // memberPlans state removed — was only used for transfer ownership dialogs
 
@@ -1008,40 +1026,71 @@ const Circles = () => {
               ))
             )}
           </div>
-          {/* Add Members button - available to all circle members */}
+          {/* Add Members button - subscribers only (existing extras are grandfathered) */}
           {selectedCircle && (
             <div className="mt-4 pt-4 border-t border-border">
-              <Button
-                variant="outline"
-                className="w-full mb-2"
-                onClick={async () => {
-                  setIsMembersOpen(false);
-                  try {
-                    if (isIOSNative()) {
-                      const success = await purchaseConsumable(APPLE_PRODUCTS.extraMembers, {
-                        circleId: selectedCircle.id,
-                        kind: "extra_members",
-                      });
-                      if (success) {
-                        await Promise.all([refetchCircles(), refetchUserPlan(), fetchMemberInfo()]);
-                        toast({ title: "Seats added!", description: "7 extra member slots added to this circle." });
+              {canBuyExtraSeats ? (
+                <Button
+                  variant="outline"
+                  className="w-full mb-2"
+                  onClick={async () => {
+                    setIsMembersOpen(false);
+                    try {
+                      if (isIOSNative()) {
+                        const success = await purchaseConsumable(APPLE_PRODUCTS.extraMembers, {
+                          circleId: selectedCircle.id,
+                          kind: "extra_members",
+                        });
+                        if (success) {
+                          await Promise.all([refetchCircles(), refetchUserPlan(), fetchMemberInfo()]);
+                          toast({ title: "Seats added!", description: "7 extra member slots added to this circle." });
+                        }
+                        return;
                       }
-                      return;
+                      const { data, error } = await supabase.functions.invoke("create-checkout", {
+                        body: { priceId: "price_1T3N5zCiWDzualH52rsDSBlu", mode: "payment", circleId: selectedCircle.id },
+                      });
+                      if (error) throw error;
+                      if (data?.error === "SUBSCRIPTION_REQUIRED") {
+                        toast({
+                          title: "Subscription required",
+                          description: "Upgrade to a paid plan first to add extra seats.",
+                          variant: "destructive",
+                        });
+                        navigate("/upgrade");
+                        return;
+                      }
+                      if (data?.url) {
+                        window.location.href = data.url;
+                      }
+                    } catch (err: any) {
+                      toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });
                     }
-                    const { data, error } = await supabase.functions.invoke("create-checkout", {
-                      body: { priceId: "price_1T3N5zCiWDzualH52rsDSBlu", mode: "payment", circleId: selectedCircle.id },
-                    });
-                    if (error) throw error;
-                    if (data?.url) {
-                      window.location.href = data.url;
-                    }
-                  } catch (err: any) {
-                    toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });
-                  }
-                }}
-              >
-                <Plus className="w-4 h-4 mr-2" />Add 7 Extra Members — $5
-              </Button>
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />Add 7 Extra Members — $5
+                </Button>
+              ) : isOwner(selectedCircle) ? (
+                <>
+                  <Button
+                    variant="outline"
+                    className="w-full mb-2"
+                    onClick={() => {
+                      setIsMembersOpen(false);
+                      navigate("/upgrade");
+                    }}
+                  >
+                    <ArrowUp className="w-4 h-4 mr-2" />Subscription required to add seats
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Extra member packs are available on Family, Extended, and Enterprise plans.
+                  </p>
+                </>
+              ) : (
+                <Button variant="outline" className="w-full mb-2" disabled>
+                  <Plus className="w-4 h-4 mr-2" />Owner subscription required to add seats
+                </Button>
+              )}
             </div>
           )}
           {selectedCircle && isOwner(selectedCircle) && memberships.filter(m => m.user_id !== user?.id).length > 0 && (
