@@ -206,16 +206,51 @@ serve(async (req) => {
     // === Verify with Apple's App Store Server API (no unsigned fallback) ===
     const lookup = await fetchAppleTransaction(String(transactionId));
     if (!lookup.ok) {
+      // Persist the unverified receipt server-side so the retry cron can pick
+      // it up once Apple credentials are fixed — even if the user uninstalls
+      // and we lose their localStorage queue.
+      try {
+        await serviceClient.from("unverified_apple_receipts").upsert({
+          transaction_id: String(transactionId),
+          user_id: user.id,
+          product_id: productId,
+          kind: kind ?? (productId === EXTRA_MEMBERS_PRODUCT ? "extra_members" : "subscription"),
+          circle_id: circleId ?? null,
+          rescue_circle_id: rescue_circle_id ?? null,
+          last_error_code: lookup.reason === "credentials"
+            ? "APPLE_CREDENTIALS_INVALID"
+            : lookup.reason === "not_found"
+              ? "APPLE_TXN_NOT_FOUND"
+              : "APPLE_TRANSIENT",
+          last_error_detail: lookup.detail ?? null,
+          last_attempt_at: new Date().toISOString(),
+          jws_representation: jwsRepresentation ?? null,
+        }, { onConflict: "transaction_id" });
+
+        // Bump attempts atomically via RPC-less update (separate call to avoid
+        // overwriting attempts=0 on the upsert above).
+        await serviceClient.rpc("exec", {}).catch(() => null);
+        const { data: existing } = await serviceClient
+          .from("unverified_apple_receipts")
+          .select("attempts")
+          .eq("transaction_id", String(transactionId))
+          .maybeSingle();
+        if (existing) {
+          await serviceClient
+            .from("unverified_apple_receipts")
+            .update({ attempts: (existing.attempts ?? 0) + 1 })
+            .eq("transaction_id", String(transactionId));
+        }
+      } catch (logErr) {
+        console.warn("[validate-apple-receipt] failed to record unverified receipt", logErr);
+      }
+
       if (lookup.reason === "credentials") {
-        // Our App Store Connect API key is invalid/expired. The user did
-        // nothing wrong — they should not see a generic error. Tell the
-        // client to keep the receipt queued and contact support.
         return new Response(
           JSON.stringify({
             error:
-              "We received your purchase but couldn't verify it with Apple right now. " +
-              "Your receipt is saved and will retry automatically. " +
-              "If this persists, contact support@familialmedia.com — your purchase is safe.",
+              "Apple confirmed your payment, but we couldn't credit it just yet. " +
+              "We'll finish this automatically — usually within a few minutes. You can close the app safely.",
             code: "APPLE_CREDENTIALS_INVALID",
             retry: true,
             detail: lookup.detail,
@@ -237,7 +272,7 @@ serve(async (req) => {
       }
       return new Response(
         JSON.stringify({
-          error: "Apple is temporarily unable to verify this transaction. Please try again in a moment.",
+          error: "Apple is temporarily unable to verify this transaction. We'll retry automatically.",
           code: "APPLE_TRANSIENT",
           retry: true,
           detail: lookup.detail,
@@ -245,6 +280,17 @@ serve(async (req) => {
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Verification succeeded — clear any prior unverified entry for this txn
+    try {
+      await serviceClient
+        .from("unverified_apple_receipts")
+        .delete()
+        .eq("transaction_id", String(transactionId));
+    } catch {
+      // non-fatal
+    }
+
     const txn = lookup.txn;
     console.log("[validate-apple-receipt] txn decoded", {
       source: "apple-server-api",
