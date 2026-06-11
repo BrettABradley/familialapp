@@ -141,9 +141,9 @@ function b64uDecode(s: string): Uint8Array {
 }
 
 async function appleJwt(): Promise<string | null> {
-  const issuerId = Deno.env.get("APPLE_ISSUER_ID");
-  const keyId = Deno.env.get("APPLE_KEY_ID");
-  const pem = Deno.env.get("APPLE_PRIVATE_KEY");
+  const issuerId = Deno.env.get("APPLE_ISSUER_ID")?.trim();
+  const keyId = Deno.env.get("APPLE_KEY_ID")?.trim();
+  const pem = Deno.env.get("APPLE_PRIVATE_KEY")?.trim();
   if (!issuerId || !keyId || !pem) return null;
   const header = { alg: "ES256", kid: keyId, typ: "JWT" };
   const now = Math.floor(Date.now() / 1000);
