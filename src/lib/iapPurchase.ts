@@ -436,3 +436,12 @@ export const restorePurchases = async (): Promise<boolean> => {
   }
 };
 
+
+/**
+ * Open Apple's subscription management page.
+ */
+export const openAppleSubscriptionManagement = () => {
+  if (isIOSNative()) {
+    window.open("https://apps.apple.com/account/subscriptions", "_blank");
+  }
+};
