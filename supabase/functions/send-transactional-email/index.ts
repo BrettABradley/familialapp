@@ -62,14 +62,31 @@ function isServiceRoleCaller(authHeader: string | null): boolean {
   return !!serviceKey && token === serviceKey
 }
 
+// Constant-time comparison so a timing attack can't probe the secret.
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+function isTriggerSecretCaller(req: Request): boolean {
+  const header = req.headers.get('x-trigger-secret')
+  const expected = Deno.env.get('PUSH_TRIGGER_SECRET') ?? ''
+  return !!header && !!expected && timingSafeEqual(header, expected)
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
-  // Enforce service_role caller — block anon/user JWTs.
-  if (!isServiceRoleCaller(req.headers.get('Authorization'))) {
+  // Enforce service_role caller OR DB-trigger shared secret header.
+  if (
+    !isServiceRoleCaller(req.headers.get('Authorization')) &&
+    !isTriggerSecretCaller(req)
+  ) {
     return new Response(
       JSON.stringify({ error: 'Forbidden: service role required' }),
       { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
