@@ -54,16 +54,18 @@ const TransferBlockBanner = () => {
     }
 
     // Notify the old owner only when someone else claimed it
+    // (caller is now the new owner; old owner becomes an admin member via claim_circle_ownership)
     if (!wasReclaim) {
-      await supabase.from("notifications").insert({
-        user_id: oldOwnerId,
-        type: "transfer_block",
-        title: "Ownership Claimed",
-        message: `${profile?.display_name || "A member"} has claimed ownership of "${circle.name}".`,
-        related_circle_id: circle.id,
-        related_user_id: user.id,
+      await supabase.rpc("notify_circle_members_fan", {
+        _circle_id: circle.id,
+        _type: "ownership_claimed",
+        _title: "Ownership Claimed",
+        _message: `${profile?.display_name || "A member"} has claimed ownership of "${circle.name}".`,
+        _link: `/circles?circle=${circle.id}`,
+        _user_ids: [oldOwnerId],
       });
     }
+
 
     toast({
       title: wasReclaim ? "Ownership reclaimed" : "Ownership claimed!",

@@ -697,27 +697,16 @@ const Circles = () => {
     }
 
     // Notify all members
-    const { data: members } = await supabase
-      .from("circle_memberships")
-      .select("user_id")
-      .eq("circle_id", circle.id);
+    // Owner-only fan-out via SECURITY DEFINER RPC
+    await supabase.rpc("notify_circle_members_fan", {
+      _circle_id: circle.id,
+      _type: "transfer_block",
+      _title: "Circle Needs a New Owner",
+      _message: `"${circle.name}" has been put on transfer block. Claim ownership to keep it going.`,
+      _link: `/circles?circle=${circle.id}`,
+      _user_ids: null,
+    });
 
-    if (members) {
-      const notifications = members
-        .filter(m => m.user_id !== user.id)
-        .map(m => ({
-          user_id: m.user_id,
-          type: "transfer_block",
-          title: "Circle Needs a New Owner",
-          message: `"${circle.name}" has been put on transfer block. Claim ownership to keep it going.`,
-          related_circle_id: circle.id,
-          related_user_id: user.id,
-          link: `/circles?circle=${circle.id}`,
-        }));
-      if (notifications.length > 0) {
-        await supabase.from("notifications").insert(notifications);
-      }
-    }
 
     toast({ title: "Transfer block activated", description: "All members have been notified. Anyone can now claim ownership." });
     await refetchCircles();

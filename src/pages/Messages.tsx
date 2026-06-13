@@ -563,18 +563,17 @@ const Messages = () => {
 
     await supabase.from("group_chat_members").insert(members);
 
-    // Notify added members (excluding self)
-    const memberNotifications = Array.from(selectedMemberIds).map(uid => ({
-      user_id: uid,
-      type: "group_chat",
-      title: "Added to group chat",
-      message: `You were added to "${newGroupName.trim()}"`,
-      related_circle_id: circleId,
-      link: `/messages?circle=${circleId}&group=${group.id}`,
-    }));
-    if (memberNotifications.length > 0) {
-      await supabase.from("notifications").insert(memberNotifications);
+    // Notify added members via SECURITY DEFINER RPC
+    const recipientIds = Array.from(selectedMemberIds);
+    if (recipientIds.length > 0) {
+      await supabase.rpc("notify_group_chat_added", {
+        _group_chat_id: group.id,
+        _user_ids: recipientIds,
+        _group_name: newGroupName.trim(),
+        _circle_id: circleId,
+      });
     }
+
 
     setNewGroupName("");
     setSelectedMemberIds(new Set());
