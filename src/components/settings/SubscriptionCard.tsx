@@ -150,31 +150,19 @@ const SubscriptionCard = () => {
         status: "open",
       } as any);
 
-      // Notify all members
-      const { data: members } = await supabase
-        .from("circle_memberships")
-        .select("user_id")
-        .eq("circle_id", circle.id);
-
-      if (members) {
-        const displayName = (await supabase.from("profiles").select("display_name").eq("user_id", user.id).single()).data?.display_name || "The owner";
-        const notifications = members
-          .filter((m) => m.user_id !== user.id)
-          .map((m) => ({
-            user_id: m.user_id,
-            type: "circle_rescue",
-            title: "Circle needs a new owner",
-            message: `${displayName} is downgrading their plan. "${circle.name}" will become read-only on ${formatDate(planData.current_period_end)} unless someone takes over.`,
-            related_circle_id: circle.id,
-            link: `/circles?rescue=${circle.id}`,
-          }));
-
-        if (notifications.length > 0) {
-          await supabase.from("notifications").insert(notifications);
-        }
-      }
+      // Owner-only fan-out via SECURITY DEFINER RPC
+      const displayName = (await supabase.from("profiles").select("display_name").eq("user_id", user.id).single()).data?.display_name || "The owner";
+      await supabase.rpc("notify_circle_members_fan", {
+        _circle_id: circle.id,
+        _type: "circle_rescue",
+        _title: "Circle needs a new owner",
+        _message: `${displayName} is downgrading their plan. "${circle.name}" will become read-only on ${formatDate(planData.current_period_end)} unless someone takes over.`,
+        _link: `/circles?rescue=${circle.id}`,
+        _user_ids: null,
+      });
     }
   };
+
 
   const handleCancelConfirm = async () => {
     setCancelLoading(true);
