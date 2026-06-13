@@ -1563,11 +1563,45 @@ export type Database = {
         }
         Relationships: []
       }
+      push_delivery_log: {
+        Row: {
+          attempts: number
+          created_at: string
+          id: string
+          notification_id: string | null
+          platform: string | null
+          reason: string | null
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          notification_id?: string | null
+          platform?: string | null
+          reason?: string | null
+          status: string
+          user_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          notification_id?: string | null
+          platform?: string | null
+          reason?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       push_tokens: {
         Row: {
           created_at: string
           device_token: string
           id: string
+          last_used_at: string
           platform: string
           user_id: string
         }
@@ -1575,6 +1609,7 @@ export type Database = {
           created_at?: string
           device_token: string
           id?: string
+          last_used_at?: string
           platform?: string
           user_id: string
         }
@@ -1582,6 +1617,7 @@ export type Database = {
           created_at?: string
           device_token?: string
           id?: string
+          last_used_at?: string
           platform?: string
           user_id?: string
         }
@@ -2076,6 +2112,10 @@ export type Database = {
     Functions: {
       can_buy_extra_seats: { Args: { _circle_id: string }; Returns: boolean }
       can_create_circle: { Args: { _user_id: string }; Returns: boolean }
+      can_dm: {
+        Args: { _recipient: string; _sender: string }
+        Returns: boolean
+      }
       claim_circle_ownership: {
         Args: { _circle_id: string }
         Returns: undefined
@@ -2182,6 +2222,35 @@ export type Database = {
         }
         Returns: number
       }
+      notify_circle_members_fan: {
+        Args: {
+          _circle_id: string
+          _link?: string
+          _message: string
+          _title: string
+          _type: string
+          _user_ids?: string[]
+        }
+        Returns: number
+      }
+      notify_comment: {
+        Args: {
+          _content: string
+          _parent_comment_id?: string
+          _post_id: string
+        }
+        Returns: undefined
+      }
+      notify_group_chat_added: {
+        Args: {
+          _circle_id: string
+          _group_chat_id: string
+          _group_name: string
+          _user_ids: string[]
+        }
+        Returns: number
+      }
+      notify_upgrade_request: { Args: { _circle_id: string }; Returns: boolean }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
