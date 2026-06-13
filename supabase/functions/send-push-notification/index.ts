@@ -242,7 +242,13 @@ serve(async (req: Request) => {
     !isServiceRoleCaller(req.headers.get("Authorization")) &&
     !isTriggerSecretCaller(req)
   ) {
-    console.warn("send-push-notification: unauthorized caller");
+    console.warn(
+      "send-push-notification: unauthorized caller",
+      "hasTriggerHeader=", !!req.headers.get("x-trigger-secret"),
+      "hasEnvSecret=", !!Deno.env.get("PUSH_TRIGGER_SECRET"),
+      "headerLen=", (req.headers.get("x-trigger-secret") ?? "").length,
+      "envLen=", (Deno.env.get("PUSH_TRIGGER_SECRET") ?? "").length,
+    );
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json", ...corsHeaders },
