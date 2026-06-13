@@ -335,6 +335,11 @@ const Messages = () => {
     const target = fromConvos || fromMembers;
     if (target) {
       setSelectedUser(target);
+      // Explicitly switch view alongside selectedUser so the sentinel-push
+      // effect's `inChat` check fires on the same render — otherwise the
+      // sentinel can be skipped for one frame after a push-notification
+      // deep-link, leaving the back button "dead".
+      setChatView("dm");
       // Strip ?thread= from the URL so back/exit doesn't immediately re-open
       // the same chat (this caused the "back button does nothing" loop when
       // entering a chat from a notification).
@@ -364,10 +369,9 @@ const Messages = () => {
     return () => setLockCircleSwitcher(false);
   }, [chatView, selectedUser, selectedGroup, setLockCircleSwitcher]);
 
-  // Bulletproof chat-exit: always returns to the conversations list.
-  // Used by every back/close affordance so we never rely on Radix portal
-  // onOpenChange (which previously bounced the user to the home tab).
-  const handleExitChat = () => {
+  // Pure state reset — used by both the manual back arrow and the popstate
+  // listener. Does NOT touch history; the wrapper handleExitChat owns that.
+  const closeChatState = () => {
     setLightbox(null);
     setSelectedUser(null);
     setSelectedGroup(null);
@@ -376,17 +380,44 @@ const Messages = () => {
     setGroupMessages([]);
     clearMediaState();
   };
+  const closeChatStateRef = useRef(closeChatState);
+  closeChatStateRef.current = closeChatState;
+
+  // Tracks whether we currently own a sentinel history entry for the open
+  // chat. Without this, the back arrow only clears state — leaving an orphan
+  // sentinel on the stack so the user's next back tap appears to do nothing
+  // (especially noticeable on cold-launch from a push notification).
+  const sentinelPushedRef = useRef(false);
+
+  // Public exit handler: if we own a sentinel, pop it (popstate listener
+  // will clear state exactly once). Otherwise clear state directly.
+  const handleExitChat = () => {
+    if (sentinelPushedRef.current) {
+      window.history.back();
+    } else {
+      closeChatStateRef.current();
+    }
+  };
   const handleExitChatRef = useRef(handleExitChat);
   handleExitChatRef.current = handleExitChat;
 
-  // Android hardware back / browser back: pop out of the open chat instead of
-  // leaving the Messages page entirely. Push a sentinel history entry when a
-  // chat opens; on popstate, exit the chat.
+  // Android hardware back / browser back / swipe-back: pop out of the open
+  // chat instead of leaving Messages entirely. Push a sentinel history entry
+  // when a chat opens; on popstate, clear chat state and release the ref.
   useEffect(() => {
     const inChat = (chatView === "dm" && !!selectedUser) || (chatView === "group" && !!selectedGroup);
     if (!inChat) return;
-    window.history.pushState({ familialChat: true }, "");
-    const onPop = () => { handleExitChatRef.current(); };
+    // Don't stack a second sentinel if one is already in flight (e.g. a
+    // second push notification opens a different chat while the first is
+    // still on screen).
+    if (!sentinelPushedRef.current) {
+      window.history.pushState({ familialChat: true }, "");
+      sentinelPushedRef.current = true;
+    }
+    const onPop = () => {
+      sentinelPushedRef.current = false;
+      closeChatStateRef.current();
+    };
     window.addEventListener("popstate", onPop);
     return () => { window.removeEventListener("popstate", onPop); };
   }, [chatView, selectedUser, selectedGroup]);
@@ -658,9 +689,9 @@ const Messages = () => {
     if (error) {
       toast({ title: "Error", description: "Failed to delete group chat.", variant: "destructive" });
     } else {
-      setSelectedGroup(null);
-      setChatView("list");
-      setGroupChats(prev => prev.filter(g => g.id !== selectedGroup.id));
+      const deletedId = selectedGroup.id;
+      handleExitChatRef.current();
+      setGroupChats(prev => prev.filter(g => g.id !== deletedId));
       setIsDeleteGroupOpen(false);
     }
   };
@@ -676,8 +707,7 @@ const Messages = () => {
       return;
     }
     setGroupChats(prev => prev.filter(g => g.id !== groupId));
-    setSelectedGroup(null);
-    setChatView("list");
+    handleExitChatRef.current();
     toast({ title: "You left the group" });
   };
 
@@ -688,10 +718,9 @@ const Messages = () => {
       toast({ title: "Error", description: error.message || "Failed to delete chat.", variant: "destructive" });
       return;
     }
-    setMessages([]);
-    setConversations(prev => prev.filter(c => c.user.user_id !== selectedUser.user_id));
-    setSelectedUser(null);
-    setChatView("list");
+    const removedUserId = selectedUser.user_id;
+    setConversations(prev => prev.filter(c => c.user.user_id !== removedUserId));
+    handleExitChatRef.current();
     toast({ title: "Chat deleted" });
   };
 

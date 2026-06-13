@@ -1,94 +1,43 @@
-## Goal
+## Problem
 
-Two tracks, independent and additive:
+When a message push notification opens a DM or group chat, the in‑chat back arrow only clears React state — it never pops the synthetic history entry we push when a chat opens. The result on iOS / native:
 
-1. **Harden push notifications** so transient APNs/FCM failures, credential drift, and stale device tokens stop silently dropping pushes.
-2. **Close the two security warnings** on `notifications` and `private_messages` without breaking any working feature.
+1. Push tap → `navigate('/messages?circle=X&thread=USERID')`
+2. Messages opens the chat → effect calls `history.pushState({familialChat:true}, '')` (sentinel)
+3. User taps the in‑chat back arrow → `handleExitChat()` clears state, but the sentinel stays on the stack
+4. Next back (swipe‑back / nav back) pops the orphan sentinel → `popstate` fires → `handleExitChat()` runs again as a no‑op → the user sees "nothing happened" and has to press back a second time to actually leave Messages
 
-Nothing in here removes a working call path — every client write that currently works keeps working, just routed through a `SECURITY DEFINER` function that enforces the rules.
+Cold‑launching from a notification makes this worse because the history stack is very shallow, so the dead sentinel is the next thing in line.
 
----
+## Fix
 
-## Track 1 — Push reliability
+Front‑end only. No business‑logic, no DB, no push pipeline changes.
 
-### Edge function (`send-push-notification`)
+### `src/pages/Messages.tsx`
 
-Today: single attempt per token, JWT cached 50 min, no retry, no auth-failure self-heal, no audit trail.
+1. **Track sentinel ownership with a ref** (`sentinelPushedRef`). Set it `true` after `history.pushState({familialChat:true}, '')`, set it `false` inside the `popstate` listener and after we consume it via `history.back()`.
 
-Changes:
-- **Retry with backoff** (3 attempts, 250ms → 1s → 2s) for transient APNs/FCM responses: HTTP 429, 500, 502, 503, 504, network errors. Permanent failures (410 Unregistered, 400 BadDeviceToken, FCM `UNREGISTERED`/`INVALID_ARGUMENT`) skip retry and go straight to token cleanup — same behavior as today.
-- **Self-heal credential cache**: if APNs returns `403 InvalidProviderToken` or `ExpiredProviderToken`, clear `cachedJwt` and retry once. Same for FCM `UNAUTHENTICATED`/401 — clear `cachedFcm`.
-- **Per-token timeout** (~8s) using `AbortController` so a hung APNs/FCM socket can't stall the whole notification.
-- **Send tokens in parallel** with `Promise.allSettled` instead of the current sequential loop, capped at 10 concurrent. Faster and one bad token can't block the rest.
-- **Structured outcome log** to a new `push_delivery_log` table: `notification_id`, `user_id`, `platform`, `status` (`sent` / `retried` / `failed` / `skipped_pref` / `invalid_token`), `reason`, `attempts`, `created_at`. Bounded retention (cron-delete >30 days).
-- **Credential-failure alert**: if APNs returns `InvalidProviderToken` even after the cache-bust retry, insert a `platform_admins` notification ("APNs auth failing — re-check Team ID / Key ID / .p8") at most once per hour (debounced via the log table). This is what would have surfaced the recent breakage immediately.
+2. **Guard the sentinel‑push effect** so we never stack two sentinels if the deep‑link effect re‑opens a chat while one is already open (e.g. a second notification tap while in a chat).
 
-### Trigger path (`trigger_push_notification`)
+3. **Route every manual chat exit through the sentinel**:
+   - Refactor `handleExitChat` into `closeChatState()` (pure state reset) and a public `handleExitChat()` that:
+     - if `sentinelPushedRef.current` → call `window.history.back()` (lets the existing `popstate` listener clear state exactly once)
+     - else → call `closeChatState()` directly
+   - Update the `popstate` listener to call `closeChatState()` (not the public `handleExitChat`) and flip the ref to `false`, so it cannot recursively re‑invoke `history.back()`.
+   - Apply the same path to the other call sites that already reset chat state inline (`handleDeleteGroup`, `handleLeaveGroup`, `handleDeletePrivateConversation`) so they also consume the sentinel when present.
 
-- Keep the existing `pg_net.http_post` enqueue, but **also write the request_id** so we can correlate with `net._http_response` for forensics. Add a `RAISE LOG` line with the notification id + request id on failure.
-- No behavioral change for the happy path.
+4. **Parity for the DM deep‑link effect** (lines 331‑345): also call `setChatView("dm")` explicitly, matching the group handler. This avoids a one‑render window where `selectedUser` is set but `chatView` is still `"list"`, which currently skips the sentinel push for that frame.
 
-### Token hygiene
+### Out of scope
 
-- Add `last_used_at timestamptz` to `push_tokens`. The edge function updates it on a successful send. A weekly cron deletes tokens unused for 90+ days (stale device, app uninstalled, user changed phones).
-- No change to the existing on-failure cleanup (`410 Unregistered` etc.).
-
-### Canary / health check
-
-- New edge function `push-credentials-health` (service-role gated): mints an APNs JWT and an FCM access token, returns `{ apns: "ok"|reason, fcm: "ok"|reason }`. No actual push sent. Lets the admin panel surface "credentials valid" without waiting for a real notification.
-
----
-
-## Track 2 — Security findings
-
-### Finding 1 — `notifications` impersonation
-
-Today: `INSERT` policy is `auth.uid() = user_id` (recipient must be self), so a user can write fake "system" notifications to their own inbox. Cross-user client inserts in the codebase (comment replies, transfer-block fan-out, group-chat add, upgrade requests, plan-change fan-out, etc.) currently rely on this policy and either succeed because user_id is the caller, or silently fail when user_id is another user. We're going to make this honest.
-
-- **Drop the client `INSERT` policy on `notifications`.** Only `service_role` and `SECURITY DEFINER` functions can insert after this.
-- Add `SECURITY DEFINER` RPCs that wrap each currently-client-driven flow and enforce authorization server-side:
-  - `notify_comment(_post_id, _content, _parent_comment_id)` — caller must be post-circle member; notifies post author + parent-comment author.
-  - `notify_upgrade_request(_circle_id)` — caller must be circle member, owner is recipient, reuses the existing 24h rate-limit logic in SQL.
-  - `notify_transfer_block(_circle_id)` — caller must currently own the circle; fans out to members.
-  - `notify_group_chat_added(_group_chat_id, _user_ids[])` — caller must be the group creator; recipients must be members of the same circle.
-  - `notify_plan_change(_circle_id, _message)` — caller must be circle owner; fans out to members.
-- Update the six client call-sites (`useFeedPosts.ts`, `Circles.tsx` x2, `Messages.tsx`, `TransferBlockBanner.tsx`, `SubscriptionCard.tsx`, `Pricing.tsx`) to call the new RPCs instead of `.from('notifications').insert(...)`.
-- Existing trigger-driven notifications (`notify_on_dm`, `notify_on_fridge_pin`, `notify_on_album_created`, `notify_on_event_created`, `notify_on_campfire_story`, mention RPCs, invite notification, etc.) are already `SECURITY DEFINER` and unaffected.
-
-### Finding 2 — `private_messages` to anyone / blocked users
-
-Today: `INSERT WITH CHECK (auth.uid() = sender_id)` — no recipient gate.
-
-- Tighten the `INSERT` policy to also require:
-  - `public.shares_circle_with(auth.uid(), recipient_id)` (already exists), **and**
-  - `NOT EXISTS (SELECT 1 FROM blocked_users WHERE blocker_id = recipient_id AND blocked_id = auth.uid())` — recipient hasn't blocked sender,
-  - and the symmetric block in the other direction.
-- Wrap the two block-existence checks in a small `SECURITY DEFINER` helper `public.can_dm(_sender, _recipient)` to keep the policy expression readable and avoid the policy needing `SELECT` on `blocked_users`.
-- The existing UI already prevents starting a thread with non-circle/blocked users, so legitimate sends are unaffected; this just enforces it at the DB.
-
-### Out of scope for this pass
-
-- The 24 already-ignored findings shown under "Show ignored issues" — not touching.
-
----
-
-## Migrations summary
-
-1. `push_delivery_log` table + GRANTs + RLS (service_role only) + 30-day cleanup cron.
-2. `push_tokens.last_used_at` column + 90-day stale-token cleanup cron.
-3. Drop client `INSERT` policy on `notifications`; add the five `SECURITY DEFINER` notify_* RPCs with `GRANT EXECUTE ... TO authenticated`.
-4. Tighten `private_messages` `INSERT` policy via `public.can_dm` helper.
-
-## Code summary
-
-- Rewrite `supabase/functions/send-push-notification/index.ts` with retry/backoff, cache-bust on auth failure, parallel sends, structured logging, debounced admin alert.
-- New `supabase/functions/push-credentials-health/index.ts`.
-- Update six client files to call the new RPCs instead of inserting directly into `notifications`.
+- `src/lib/pushNotifications.ts` and `src/App.tsx` deep‑link bridge stay as‑is — they correctly use React Router `navigate(link)`.
+- No changes to the push edge function, RLS, or notification payload shape.
 
 ## Verification
 
-- Re-run a test push to the known device — expect `sent=1`, a `push_delivery_log` row with `status=sent`, `last_used_at` bumped on the matching token.
-- Manually break the APNs cache (force `InvalidProviderToken` by temporarily setting a bad kid) → confirm one retry, then admin notification appears, then real credentials restore cleanly.
-- Try a client `.from('notifications').insert(...)` from the browser console → expect RLS denial.
-- Try `private_messages` insert to a user not sharing a circle → expect RLS denial. Existing in-circle DMs still send.
-- Re-run security scan; both warnings should drop off.
+1. Cold‑launch from a DM push → chat opens → tap header back arrow once → lands on conversations list on the first tap.
+2. From conversations list, swipe‑back / nav back → leaves Messages on the first tap (no orphan sentinel).
+3. Warm app already on `/circles` → tap message push → chat opens → back arrow → conversations list → back → `/circles`.
+4. Tap a second message push while a chat is already open → switches to the new chat with exactly one sentinel on the stack (back still closes in one tap).
+5. Group chat push behaves identically to DM push.
+6. Deleting / leaving a chat from inside the chat view closes cleanly without leaving a dead sentinel.
