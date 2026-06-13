@@ -689,9 +689,9 @@ const Messages = () => {
     if (error) {
       toast({ title: "Error", description: "Failed to delete group chat.", variant: "destructive" });
     } else {
-      setSelectedGroup(null);
-      setChatView("list");
-      setGroupChats(prev => prev.filter(g => g.id !== selectedGroup.id));
+      const deletedId = selectedGroup.id;
+      handleExitChatRef.current();
+      setGroupChats(prev => prev.filter(g => g.id !== deletedId));
       setIsDeleteGroupOpen(false);
     }
   };
@@ -707,8 +707,7 @@ const Messages = () => {
       return;
     }
     setGroupChats(prev => prev.filter(g => g.id !== groupId));
-    setSelectedGroup(null);
-    setChatView("list");
+    handleExitChatRef.current();
     toast({ title: "You left the group" });
   };
 
@@ -719,10 +718,9 @@ const Messages = () => {
       toast({ title: "Error", description: error.message || "Failed to delete chat.", variant: "destructive" });
       return;
     }
-    setMessages([]);
-    setConversations(prev => prev.filter(c => c.user.user_id !== selectedUser.user_id));
-    setSelectedUser(null);
-    setChatView("list");
+    const removedUserId = selectedUser.user_id;
+    setConversations(prev => prev.filter(c => c.user.user_id !== removedUserId));
+    handleExitChatRef.current();
     toast({ title: "Chat deleted" });
   };
 
