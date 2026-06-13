@@ -234,15 +234,16 @@ async function isTriggerSecretCaller(req: Request): Promise<boolean> {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
-    const { data, error } = await admin
-      .schema("private")
-      .from("trigger_config")
-      .select("value")
-      .eq("key", "push_trigger_secret")
-      .maybeSingle();
-    if (error || !data?.value) return false;
-    return timingSafeEqual(header, data.value);
-  } catch {
+    const { data, error } = await admin.rpc("get_trigger_secret", {
+      _key: "push_trigger_secret",
+    });
+    if (error || !data) {
+      console.error("get_trigger_secret rpc error:", error);
+      return false;
+    }
+    return timingSafeEqual(header, data as string);
+  } catch (e) {
+    console.error("isTriggerSecretCaller threw:", e);
     return false;
   }
 }
