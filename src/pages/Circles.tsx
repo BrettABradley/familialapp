@@ -322,37 +322,20 @@ const Circles = () => {
     setRequestingUpgrade(circle.id);
 
     try {
-      // Rate limit: check if already requested in last 24h
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const { data: existing } = await supabase
-        .from("notifications")
-        .select("id")
-        .eq("user_id", circle.owner_id)
-        .eq("type", "upgrade_request")
-        .eq("related_circle_id", circle.id)
-        .eq("related_user_id", user.id)
-        .gte("created_at", oneDayAgo)
-        .limit(1);
+      // 24h dedupe and insert are both handled inside notify_upgrade_request RPC
 
-      if (existing && existing.length > 0) {
+
+      const { data: sent, error } = await supabase.rpc("notify_upgrade_request", {
+        _circle_id: circle.id,
+      });
+      if (error) throw error;
+      if (sent === false) {
         toast({ title: "Already requested", description: "You've already sent an upgrade request for this circle recently." });
         setRequestingUpgrade(null);
         return;
       }
-
-      const info = memberInfo[circle.id];
-      const { error } = await supabase.from("notifications").insert({
-        user_id: circle.owner_id,
-        type: "upgrade_request",
-        title: "Upgrade Request",
-        message: `${profile.display_name || "A member"} is requesting you upgrade ${circle.name} (${info?.count ?? "?"}/${info?.limit ?? "?"} members)`,
-        related_circle_id: circle.id,
-        related_user_id: user.id,
-        link: "/circles",
-      });
-
-      if (error) throw error;
       toast({ title: "Request sent!", description: "The circle owner has been notified." });
+
     } catch {
       toast({ title: "Error", description: "Failed to send upgrade request.", variant: "destructive" });
     }
