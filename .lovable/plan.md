@@ -1,72 +1,94 @@
-# Fix: iOS push notifications silently broken
+## Goal
 
-## What's actually wrong
+Two tracks, independent and additive:
 
-Push notifications aren't reaching iOS because **the database trigger that calls `send-push-notification` is silently returning without ever firing the HTTP request**. The edge function itself is fine — it just never gets called.
+1. **Harden push notifications** so transient APNs/FCM failures, credential drift, and stale device tokens stop silently dropping pushes.
+2. **Close the two security warnings** on `notifications` and `private_messages` without breaking any working feature.
 
-### Evidence
-- `pg_trigger`: `on_notification_insert_push` is enabled on `notifications` ✅
-- 6 notifications were inserted in the last 24h (direct_message, mention, gift) ✅
-- `net._http_response` for those timestamps (05:53, 07:59, 08:00 UTC today): **zero rows** ❌
-- `net.http_request_queue`: empty ❌
-- `send-push-notification` edge function logs: **no invocations at all**, only function boots from past deploys
-- Cron-driven calls (e.g. `process-email-queue`) DO show up every 5 min, so `pg_net` itself is working
+Nothing in here removes a working call path — every client write that currently works keeps working, just routed through a `SECURITY DEFINER` function that enforces the rules.
 
-### Root cause
-The current `public.trigger_push_notification()` (migrations `20260601041610` and `20260609194832`) reads `SUPABASE_SERVICE_ROLE_KEY` from `vault.decrypted_secrets`. On this project that lookup returns NULL, so the trigger hits this branch and quietly exits:
+---
 
-```sql
-IF v_service_key IS NULL THEN
-  RAISE LOG 'Skipping push notification for notification % - no service role key found in vault', NEW.id;
-  RETURN NEW;
-END IF;
-```
+## Track 1 — Push reliability
 
-This is also why the recent `trigger_notification_email` mention/new-album emails have stopped — same vault dependency, same silent skip.
+### Edge function (`send-push-notification`)
 
-`send-push-notification` requires a service-role caller (`isServiceRoleCaller`), so even if we sent the call without auth it would be rejected with 401. We need a credential the trigger can actually obtain without vault.
+Today: single attempt per token, JWT cached 50 min, no retry, no auth-failure self-heal, no audit trail.
 
-## The fix
+Changes:
+- **Retry with backoff** (3 attempts, 250ms → 1s → 2s) for transient APNs/FCM responses: HTTP 429, 500, 502, 503, 504, network errors. Permanent failures (410 Unregistered, 400 BadDeviceToken, FCM `UNREGISTERED`/`INVALID_ARGUMENT`) skip retry and go straight to token cleanup — same behavior as today.
+- **Self-heal credential cache**: if APNs returns `403 InvalidProviderToken` or `ExpiredProviderToken`, clear `cachedJwt` and retry once. Same for FCM `UNAUTHENTICATED`/401 — clear `cachedFcm`.
+- **Per-token timeout** (~8s) using `AbortController` so a hung APNs/FCM socket can't stall the whole notification.
+- **Send tokens in parallel** with `Promise.allSettled` instead of the current sequential loop, capped at 10 concurrent. Faster and one bad token can't block the rest.
+- **Structured outcome log** to a new `push_delivery_log` table: `notification_id`, `user_id`, `platform`, `status` (`sent` / `retried` / `failed` / `skipped_pref` / `invalid_token`), `reason`, `attempts`, `created_at`. Bounded retention (cron-delete >30 days).
+- **Credential-failure alert**: if APNs returns `InvalidProviderToken` even after the cache-bust retry, insert a `platform_admins` notification ("APNs auth failing — re-check Team ID / Key ID / .p8") at most once per hour (debounced via the log table). This is what would have surfaced the recent breakage immediately.
 
-Stop depending on `vault.decrypted_secrets`. Switch to a shared trigger secret that lives in two places we control:
+### Trigger path (`trigger_push_notification`)
 
-1. **Postgres GUC** (`app.push_trigger_secret`) set via `ALTER DATABASE ... SET ...` in a migration, readable by the trigger with `current_setting(..., true)`.
-2. **Lovable Cloud edge secret** (`PUSH_TRIGGER_SECRET`) with the same value, checked by the edge function.
+- Keep the existing `pg_net.http_post` enqueue, but **also write the request_id** so we can correlate with `net._http_response` for forensics. Add a `RAISE LOG` line with the notification id + request id on failure.
+- No behavioral change for the happy path.
 
-The trigger passes the secret in an `x-trigger-secret` header. The edge function accepts the call if the header matches (in addition to the existing service-role path, which we keep for the `push-self-test` and any future admin invocations).
+### Token hygiene
 
-### Steps
+- Add `last_used_at timestamptz` to `push_tokens`. The edge function updates it on a successful send. A weekly cron deletes tokens unused for 90+ days (stale device, app uninstalled, user changed phones).
+- No change to the existing on-failure cleanup (`410 Unregistered` etc.).
 
-1. **Generate a random secret value** (UUID) used in both step 2 and step 3.
+### Canary / health check
 
-2. **New migration** (`supabase/migrations/<ts>_fix_push_trigger.sql`):
-   - `ALTER DATABASE postgres SET app.push_trigger_secret = '<uuid>';` so all new sessions inherit it.
-   - `SELECT set_config('app.push_trigger_secret', '<uuid>', false);` so the current pg_net session sees it immediately.
-   - `CREATE OR REPLACE FUNCTION public.trigger_push_notification()` that:
-     - Hardcodes `v_url := 'https://qxkwxolssapayqyfdwqc.supabase.co'` (the fallback is already in the existing function).
-     - Reads `v_secret := current_setting('app.push_trigger_secret', true)`.
-     - If `v_secret IS NULL OR ''`, `RAISE LOG` and `RETURN NEW` (same safe no-op behavior).
-     - Calls `net.http_post(...)` with headers `Content-Type`, `x-trigger-secret: v_secret` (drops `Authorization` / `apikey`).
-   - Apply the same pattern to `public.trigger_notification_email()` so mention/new-album emails come back too.
+- New edge function `push-credentials-health` (service-role gated): mints an APNs JWT and an FCM access token, returns `{ apns: "ok"|reason, fcm: "ok"|reason }`. No actual push sent. Lets the admin panel surface "credentials valid" without waiting for a real notification.
 
-3. **Add Lovable secret** `PUSH_TRIGGER_SECRET` = same uuid via `secrets--add_secret`.
+---
 
-4. **Update `supabase/functions/send-push-notification/index.ts`**:
-   - Add a helper `isTriggerSecretCaller(req)` that compares `req.headers.get('x-trigger-secret')` to `Deno.env.get('PUSH_TRIGGER_SECRET')` using a constant-time check.
-   - Change the auth gate from `if (!isServiceRoleCaller(...))` to `if (!isServiceRoleCaller(...) && !isTriggerSecretCaller(req))`.
-   - Keep CORS headers, including `x-trigger-secret` in `Access-Control-Allow-Headers`.
+## Track 2 — Security findings
 
-5. **Verify** after deploy:
-   - Insert a test row in `notifications` for the developer's own user_id (via psql) and confirm `net._http_response` records a 200 and `send-push-notification` logs `[push] dispatch ...`.
-   - On a TestFlight build, send a DM to a second account and confirm a banner arrives on its iOS device.
+### Finding 1 — `notifications` impersonation
 
-## What stays the same
-- Client `src/lib/pushNotifications.ts` (token registration + `registerForPushNotifications`) is healthy — 47 ios tokens are present in `push_tokens`.
-- `register-push-token` / `unregister-push-token` edge functions unchanged.
-- APNs JWT logic, APNs topic (`space.manus.familial.mobile.t20260223211425`), invalid-token cleanup all unchanged.
-- iOS native config (entitlement, AppDelegate bridge, Info.plist) unchanged.
+Today: `INSERT` policy is `auth.uid() = user_id` (recipient must be self), so a user can write fake "system" notifications to their own inbox. Cross-user client inserts in the codebase (comment replies, transfer-block fan-out, group-chat add, upgrade requests, plan-change fan-out, etc.) currently rely on this policy and either succeed because user_id is the caller, or silently fail when user_id is another user. We're going to make this honest.
 
-## Risks / notes
-- `ALTER DATABASE postgres SET ...` requires the migration role to own the database. On Lovable Cloud the migration role does — same pattern is used by other Supabase projects for GUCs. If it fails at apply time, fall back to a small `private.trigger_config(key text primary key, value text)` table read by the trigger.
-- Rotating `PUSH_TRIGGER_SECRET` later means re-running the migration with a new value AND updating the Lovable secret. Document this in the migration comment.
-- Android FCM path is unaffected (same edge function, same auth gate fix benefits it equally).
+- **Drop the client `INSERT` policy on `notifications`.** Only `service_role` and `SECURITY DEFINER` functions can insert after this.
+- Add `SECURITY DEFINER` RPCs that wrap each currently-client-driven flow and enforce authorization server-side:
+  - `notify_comment(_post_id, _content, _parent_comment_id)` — caller must be post-circle member; notifies post author + parent-comment author.
+  - `notify_upgrade_request(_circle_id)` — caller must be circle member, owner is recipient, reuses the existing 24h rate-limit logic in SQL.
+  - `notify_transfer_block(_circle_id)` — caller must currently own the circle; fans out to members.
+  - `notify_group_chat_added(_group_chat_id, _user_ids[])` — caller must be the group creator; recipients must be members of the same circle.
+  - `notify_plan_change(_circle_id, _message)` — caller must be circle owner; fans out to members.
+- Update the six client call-sites (`useFeedPosts.ts`, `Circles.tsx` x2, `Messages.tsx`, `TransferBlockBanner.tsx`, `SubscriptionCard.tsx`, `Pricing.tsx`) to call the new RPCs instead of `.from('notifications').insert(...)`.
+- Existing trigger-driven notifications (`notify_on_dm`, `notify_on_fridge_pin`, `notify_on_album_created`, `notify_on_event_created`, `notify_on_campfire_story`, mention RPCs, invite notification, etc.) are already `SECURITY DEFINER` and unaffected.
+
+### Finding 2 — `private_messages` to anyone / blocked users
+
+Today: `INSERT WITH CHECK (auth.uid() = sender_id)` — no recipient gate.
+
+- Tighten the `INSERT` policy to also require:
+  - `public.shares_circle_with(auth.uid(), recipient_id)` (already exists), **and**
+  - `NOT EXISTS (SELECT 1 FROM blocked_users WHERE blocker_id = recipient_id AND blocked_id = auth.uid())` — recipient hasn't blocked sender,
+  - and the symmetric block in the other direction.
+- Wrap the two block-existence checks in a small `SECURITY DEFINER` helper `public.can_dm(_sender, _recipient)` to keep the policy expression readable and avoid the policy needing `SELECT` on `blocked_users`.
+- The existing UI already prevents starting a thread with non-circle/blocked users, so legitimate sends are unaffected; this just enforces it at the DB.
+
+### Out of scope for this pass
+
+- The 24 already-ignored findings shown under "Show ignored issues" — not touching.
+
+---
+
+## Migrations summary
+
+1. `push_delivery_log` table + GRANTs + RLS (service_role only) + 30-day cleanup cron.
+2. `push_tokens.last_used_at` column + 90-day stale-token cleanup cron.
+3. Drop client `INSERT` policy on `notifications`; add the five `SECURITY DEFINER` notify_* RPCs with `GRANT EXECUTE ... TO authenticated`.
+4. Tighten `private_messages` `INSERT` policy via `public.can_dm` helper.
+
+## Code summary
+
+- Rewrite `supabase/functions/send-push-notification/index.ts` with retry/backoff, cache-bust on auth failure, parallel sends, structured logging, debounced admin alert.
+- New `supabase/functions/push-credentials-health/index.ts`.
+- Update six client files to call the new RPCs instead of inserting directly into `notifications`.
+
+## Verification
+
+- Re-run a test push to the known device — expect `sent=1`, a `push_delivery_log` row with `status=sent`, `last_used_at` bumped on the matching token.
+- Manually break the APNs cache (force `InvalidProviderToken` by temporarily setting a bad kid) → confirm one retry, then admin notification appears, then real credentials restore cleanly.
+- Try a client `.from('notifications').insert(...)` from the browser console → expect RLS denial.
+- Try `private_messages` insert to a user not sharing a circle → expect RLS denial. Existing in-circle DMs still send.
+- Re-run security scan; both warnings should drop off.
