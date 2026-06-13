@@ -2136,6 +2136,7 @@ export type Database = {
           status: string
         }[]
       }
+      get_trigger_secret: { Args: { _key: string }; Returns: string }
       has_circle_role: {
         Args: {
           _circle_id: string
