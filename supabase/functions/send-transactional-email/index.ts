@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
   // Enforce service_role caller OR DB-trigger shared secret header.
   if (
     !isServiceRoleCaller(req.headers.get('Authorization')) &&
-    !isTriggerSecretCaller(req)
+    !(await isTriggerSecretCaller(req))
   ) {
     return new Response(
       JSON.stringify({ error: 'Forbidden: service role required' }),
