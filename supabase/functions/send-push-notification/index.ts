@@ -238,10 +238,15 @@ async function isTriggerSecretCaller(req: Request): Promise<boolean> {
       _key: "push_trigger_secret",
     });
     if (error || !data) {
-      console.error("get_trigger_secret rpc error:", error);
+      console.error("get_trigger_secret rpc error:", error, "data=", JSON.stringify(data));
       return false;
     }
-    return timingSafeEqual(header, data as string);
+    const expected = String(data);
+    const match = timingSafeEqual(header, expected);
+    if (!match) {
+      console.warn("trigger secret mismatch hdrLen=", header.length, "expLen=", expected.length, "hdrHead=", header.slice(0,4), "expHead=", expected.slice(0,4));
+    }
+    return match;
   } catch (e) {
     console.error("isTriggerSecretCaller threw:", e);
     return false;
