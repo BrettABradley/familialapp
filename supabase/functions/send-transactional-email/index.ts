@@ -70,10 +70,25 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0
 }
 
-function isTriggerSecretCaller(req: Request): boolean {
+async function isTriggerSecretCaller(req: Request): Promise<boolean> {
   const header = req.headers.get('x-trigger-secret')
-  const expected = Deno.env.get('PUSH_TRIGGER_SECRET') ?? ''
-  return !!header && !!expected && timingSafeEqual(header, expected)
+  if (!header) return false
+  try {
+    const admin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+    const { data, error } = await admin
+      .schema('private')
+      .from('trigger_config')
+      .select('value')
+      .eq('key', 'push_trigger_secret')
+      .maybeSingle()
+    if (error || !data?.value) return false
+    return timingSafeEqual(header, data.value as string)
+  } catch {
+    return false
+  }
 }
 
 Deno.serve(async (req) => {
