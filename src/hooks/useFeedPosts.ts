@@ -189,56 +189,18 @@ export const useFeedPosts = () => {
       setCommentInputs(prev => ({ ...prev, [postId]: content }));
       toast({ title: "Error", description: "Failed to add comment.", variant: "destructive" });
     } else {
-      // Create notification for post author (comment) or parent comment author (reply)
-      const post = posts.find(p => p.id === postId);
-      const displayName = profile?.display_name || "Someone";
-
-      // Helper to get alias or fallback to display name
-      const getActorName = async (recipientId: string): Promise<string> => {
-        if (!user) return displayName;
-        const { data } = await supabase
-          .from("member_aliases" as any)
-          .select("alias")
-          .eq("user_id", recipientId)
-          .eq("target_user_id", user.id)
-          .maybeSingle();
-        return (data as any)?.alias || displayName;
-      };
-
-      if (parentCommentId) {
-        const parentComment = post?.comments?.find(c => c.id === parentCommentId);
-        if (parentComment && parentComment.author_id !== user.id) {
-          const actorName = await getActorName(parentComment.author_id);
-          supabase.from("notifications").insert({
-            user_id: parentComment.author_id,
-            type: "comment_reply",
-            title: "Reply to your comment",
-            message: `${actorName} replied: "${content.slice(0, 100)}"`,
-            related_post_id: postId,
-            related_user_id: user.id,
-            related_circle_id: post?.circle_id || null,
-            link: post?.circle_id ? `/feed?circle=${post.circle_id}&post=${postId}` : `/feed?post=${postId}`,
-          }).then();
-        }
-      }
-
-      if (post && post.author_id !== user.id) {
-        const actorName = await getActorName(post.author_id);
-        supabase.from("notifications").insert({
-          user_id: post.author_id,
-          type: "comment",
-          title: parentCommentId ? "New reply on your post" : "New comment on your post",
-          message: `${actorName}: "${content.slice(0, 100)}"`,
-          related_post_id: postId,
-          related_user_id: user.id,
-          related_circle_id: post.circle_id,
-          link: `/feed?circle=${post.circle_id}&post=${postId}`,
-        }).then();
-      }
+      // Cross-user notifications are created server-side via SECURITY DEFINER RPC
+      // (the RPC handles alias lookup, snippet trimming, and skips self).
+      await supabase.rpc("notify_comment", {
+        _post_id: postId,
+        _content: content,
+        _parent_comment_id: parentCommentId ?? null,
+      });
     }
 
     setIsSubmittingComment(null);
   };
+
 
   const toggleComments = (postId: string) => {
     setExpandedComments(prev => {
