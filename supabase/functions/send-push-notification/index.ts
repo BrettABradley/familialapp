@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.39.0";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-trigger-secret, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 // APNs host — production by default. Set APNS_ENV=sandbox for local Xcode dev builds
@@ -218,13 +218,30 @@ function isServiceRoleCaller(authHeader: string | null): boolean {
   return !!serviceKey && token === serviceKey;
 }
 
+// Constant-time comparison so a timing attack can't probe the secret.
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+function isTriggerSecretCaller(req: Request): boolean {
+  const header = req.headers.get("x-trigger-secret");
+  const expected = Deno.env.get("PUSH_TRIGGER_SECRET") ?? "";
+  return !!header && !!expected && timingSafeEqual(header, expected);
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // === Auth gate: accept legacy service_role JWT OR exact SUPABASE_SERVICE_ROLE_KEY ===
-  if (!isServiceRoleCaller(req.headers.get("Authorization"))) {
+  // === Auth gate: service_role bearer OR DB-trigger shared secret header ===
+  if (
+    !isServiceRoleCaller(req.headers.get("Authorization")) &&
+    !isTriggerSecretCaller(req)
+  ) {
     console.warn("send-push-notification: unauthorized caller");
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
