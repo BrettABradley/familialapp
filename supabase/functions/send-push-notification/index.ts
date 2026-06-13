@@ -226,10 +226,26 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-function isTriggerSecretCaller(req: Request): boolean {
+async function isTriggerSecretCaller(req: Request): Promise<boolean> {
   const header = req.headers.get("x-trigger-secret");
-  const expected = Deno.env.get("PUSH_TRIGGER_SECRET") ?? "";
-  return !!header && !!expected && timingSafeEqual(header, expected);
+  if (!header) return false;
+  try {
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+    const { data, error } = await admin.rpc("get_trigger_secret", {
+      _key: "push_trigger_secret",
+    });
+    if (error || !data) {
+      console.error("get_trigger_secret rpc error:", error);
+      return false;
+    }
+    return timingSafeEqual(header, String(data));
+  } catch (e) {
+    console.error("isTriggerSecretCaller threw:", e);
+    return false;
+  }
 }
 
 serve(async (req: Request) => {
@@ -240,15 +256,9 @@ serve(async (req: Request) => {
   // === Auth gate: service_role bearer OR DB-trigger shared secret header ===
   if (
     !isServiceRoleCaller(req.headers.get("Authorization")) &&
-    !isTriggerSecretCaller(req)
+    !(await isTriggerSecretCaller(req))
   ) {
-    console.warn(
-      "send-push-notification: unauthorized caller",
-      "hasTriggerHeader=", !!req.headers.get("x-trigger-secret"),
-      "hasEnvSecret=", !!Deno.env.get("PUSH_TRIGGER_SECRET"),
-      "headerLen=", (req.headers.get("x-trigger-secret") ?? "").length,
-      "envLen=", (Deno.env.get("PUSH_TRIGGER_SECRET") ?? "").length,
-    );
+    console.warn("send-push-notification: unauthorized caller");
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json", ...corsHeaders },
