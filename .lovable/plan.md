@@ -1,44 +1,45 @@
-## Problems
+# Fix Android Launcher Icon Rejection
 
-1. **Discard button overlaps text in the composer.** When you type a long post, the text wraps right under the red "Discard" button. The button is absolutely positioned inside the textarea wrapper (`absolute bottom-2 right-2`), so wrapped text sits behind it.
-2. **Share / "Post" button drops below the keyboard.** The composer card sits in the scrollable feed, so when the iOS/Android keyboard opens the Share button ends up below the visible area and the user has to dismiss the keyboard to find it.
-3. **Videos don't show up on the feed (mobile).** On native iOS/Android, "Add Media" calls Capacitor's `pickImage`, which only returns photos. There is no video path at all on native — so any "video" picked from a phone is silently dropped or never reaches the composer. (Web works because the hidden `<input accept="image/*,video/*">` is used.)
+## What Google flagged
+The Play Console screenshot shows two different icons for your app:
+- **App icon (Store listing)** — the black "FG" Familial mark ✅
+- **Launcher icon (installed app)** — the default blue Capacitor "X" on a white square ❌
 
-## Fix Plan
+Google rejects this because the icon installed on the user's phone doesn't match the brand icon shown on the Play Store. Right now, your Android build ships the stock Capacitor placeholder because we never replaced the files in `android/app/src/main/res/mipmap-*/`.
 
-All changes are frontend-only. **A new iOS + Android build will be required** because `src/components/feed/CreatePostForm.tsx` and `src/lib/imagePicker.ts` are bundled into the native apps.
+## Root cause
+The `android/` folder is generated locally by `npx cap add android` and is not committed to this repo. When Capacitor scaffolds it, it drops in default `ic_launcher.png` / `ic_launcher_round.png` / `ic_launcher_foreground.png` placeholders across five density buckets (mdpi → xxxhdpi). Nothing in `scripts/android-post-sync.sh` overwrites them, so every `cap sync` keeps the placeholder.
 
-### 1. `src/components/feed/CreatePostForm.tsx` — Discard button
+## Plan
 
-- Remove the absolutely-positioned Discard button overlay.
-- Render Discard as a normal inline control in the header row (right side, next to the circle selector) or as a small right-aligned button immediately **above** the textarea. It only appears when there is text or attached media (same condition as today).
-- Drop the `pb-10` reserved padding on the textarea since nothing overlays it anymore.
+1. **Add a branded master icon** at `resources/icon.png` (1024×1024, the black "FG" mark on a warm cream background so it reads on both dark and light home screens — matching your Play Store listing).
+2. **Add an adaptive-icon foreground** at `resources/icon-foreground.png` (1024×1024, transparent background, FG mark centered with ~25% safe-area padding so Android's mask doesn't clip it).
+3. **Install `@capacitor/assets`** as a dev dependency. This is the official Capacitor tool that generates every required density (mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi) plus adaptive icon XML in one command.
+4. **Extend `scripts/android-post-sync.sh`** to:
+   - Run `npx @capacitor/assets generate --android` after `cap sync`.
+   - Write `android/app/src/main/res/values/ic_launcher_background.xml` with the brand background color so adaptive icons render correctly on Android 8+.
+5. **Update `scripts/pull-updates.sh`** flow notes so the regeneration happens automatically on every build.
+6. **Bump `versionCode`/`versionName`** via the existing `bump-android-version.mjs` so you can upload a fresh AAB to Play Console.
 
-Result: typed text never collides with Discard; behavior is identical.
+## Technical details
 
-### 2. `src/components/feed/CreatePostForm.tsx` — Share visible above keyboard
+- `@capacitor/assets generate --android` reads `resources/icon.png` (legacy square icon) and `resources/icon-foreground.png` + a background color/image to produce:
+  - `mipmap-*/ic_launcher.png`
+  - `mipmap-*/ic_launcher_round.png`
+  - `mipmap-anydpi-v26/ic_launcher.xml` (adaptive)
+  - `mipmap-anydpi-v26/ic_launcher_round.xml`
+  - `mipmap-*/ic_launcher_foreground.png`
+- We'll add the resource files to the **post-sync script** rather than committing the generated PNGs, because `android/` itself isn't in the repo on your local machine until you run `npx cap add android`.
 
-- On `MentionInput` focus, scroll the Share button into view: `shareButtonRef.current?.scrollIntoView({ block: "end", behavior: "smooth" })` after a short timeout (let the WebView resize first).
-- Add `scroll-margin-bottom: 96px` (via Tailwind `scroll-mb-24`) to the Share button container so the scroll lands above the bottom nav / keyboard accessory.
-- Keep the existing global `resize: body` keyboard behavior — no native config changes.
+## What you'll do after I ship this
+1. `bash scripts/pull-updates.sh` (pulls + installs + builds + cap sync — the post-sync step regenerates the icons).
+2. Open Android Studio → Build → Generate Signed App Bundle.
+3. Upload the new AAB to Play Console and resubmit. The launcher icon will now be the Familial FG mark.
 
-Result: keyboard opens → composer auto-scrolls so Share stays visible.
+## One question before I build
+The Play Store icon is the **black FG mark on transparent/white**. Do you want the launcher icon to be:
+- **(A)** Black FG mark on a **cream/warm off-white** square (matches your in-app brand palette, looks premium on both light and dark home screens), **OR**
+- **(B)** White FG mark on a **solid black** square (max contrast, more "app-like"), **OR**
+- **(C)** Black FG mark on **pure white** (exact match to the Play Store listing tile)?
 
-### 3. `src/lib/imagePicker.ts` + `CreatePostForm.openMediaPicker` — Allow video uploads on native
-
-- Add a new helper `pickMedia()` (or extend `pickImage`) that, on native, presents an action sheet: **Take Photo · Choose Photo · Choose Video**. The Video option uses a hidden `<input type="file" accept="video/*">` (iOS/Android WebView both support the native picker through `<input type=file>`), avoiding the Capacitor Camera plugin's image-only limitation.
-- Alternative (simpler) implementation: on native, always use the hidden `<input accept="image/*,video/*">` flow that the web build already uses. We lose the native Camera/Library prompt but instantly gain video support.
-- Recommendation: ship the simpler `<input>` flow now (unblocks video same release), and revisit the action-sheet UX after.
-
-Result: users on iOS/Android can attach a video; it then flows through the existing upload/feed/`PostCard` video rendering, which already supports `mp4` / `mov`.
-
-### Verification
-
-- Type a long post in the composer on mobile preview — Discard no longer overlaps text.
-- Focus the textarea — Share button scrolls into view above the keyboard.
-- Pick a `.mov` / `.mp4` from the iOS/Android photo library — preview shows, post creates, video plays inline in the feed (`PostCard` already handles it).
-- Confirm web behavior is unchanged.
-
-### Deployment
-
-Yes — you need to push a new iOS and Android build (`bash scripts/pull-updates.sh` → `npx cap sync ios --legacy-peer-deps` / `android` → archive + upload). The server-side feed/storage code is unchanged.
+I'll generate the master icon accordingly and wire up the pipeline.

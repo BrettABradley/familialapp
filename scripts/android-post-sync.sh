@@ -92,4 +92,23 @@ if [ ! -f "$ANDROID_DIR/app/google-services.json" ]; then
   echo "   and drop it into android/app/."
 fi
 
+# --- 6. Launcher icons (fixes Play Console "default icon" rejection) -------
+# Regenerates mipmap-* PNGs + adaptive icon XML from resources/icon.png and
+# resources/icon-foreground.png so the installed app matches the Play Store
+# brand mark instead of the stock Capacitor placeholder.
+if [ -f "resources/icon.png" ] && [ -f "resources/icon-foreground.png" ]; then
+  echo "▶ Regenerating Android launcher icons from resources/…"
+  npx @capacitor/assets generate \
+    --android \
+    --iconBackgroundColor '#FFFFFF' \
+    --iconBackgroundColorDark '#FFFFFF' \
+    --splashBackgroundColor '#FFFFFF' \
+    --splashBackgroundColorDark '#FFFFFF' \
+    2>&1 | sed 's/^/   /' || echo "⚠️  @capacitor/assets failed — run 'npm i -D @capacitor/assets' and retry."
+  echo "✅ Launcher icons regenerated (mipmap-mdpi → xxxhdpi + adaptive)"
+else
+  echo "⚠️  resources/icon.png or resources/icon-foreground.png missing — launcher icons NOT regenerated."
+fi
+
 echo "▶ Android post-sync done."
+
