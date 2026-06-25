@@ -42,6 +42,7 @@ export const MentionInput = ({
   disabled,
   onMentionsChange,
   enableEveryone = false,
+  onFocus,
 }: MentionInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
