@@ -166,6 +166,7 @@ export const MentionInput = ({
         value={value}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
+        onFocus={onFocus}
         placeholder={placeholder}
         className={className}
         maxLength={maxLength}
