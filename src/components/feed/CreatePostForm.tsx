@@ -389,7 +389,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
             </div>
           </div>
         )}
-        <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-2 scroll-mb-24">
           <div className="flex items-center gap-2">
             <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
             <Button variant="ghost" size="sm" onClick={openMediaPicker} disabled={isPosting || selectedFiles.length >= MAX_FILES}>
@@ -397,7 +397,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
             </Button>
             <VoiceRecorder onRecordingComplete={handleVoiceRecording} />
           </div>
-          <Button onClick={() => { import("@/lib/haptics").then(({ haptic }) => haptic.medium()); handleCreatePost(); }} disabled={(!newPostContent.trim() && selectedFiles.length === 0) || isPosting}>
+          <Button ref={shareButtonRef} onClick={() => { import("@/lib/haptics").then(({ haptic }) => haptic.medium()); handleCreatePost(); }} disabled={(!newPostContent.trim() && selectedFiles.length === 0) || isPosting} className="scroll-mb-24">
             <Send className="w-4 h-4 mr-2" />{isPosting ? "Uploading..." : "Share"}
           </Button>
         </div>
