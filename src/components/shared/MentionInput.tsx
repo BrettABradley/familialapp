@@ -26,6 +26,7 @@ interface MentionInputProps {
   /** Add a synthetic "everyone" suggestion that pings the whole circle.
    *  Only enabled for the Feed composer. */
   enableEveryone?: boolean;
+  onFocus?: React.FocusEventHandler<HTMLTextAreaElement>;
 }
 
 export const EVERYONE_SENTINEL = "__everyone__";
