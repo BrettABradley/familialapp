@@ -99,21 +99,10 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   };
 
   const openMediaPicker = async () => {
-    // On native, use Capacitor's prompt so Camera/Library are both available.
-    // Web keeps the hidden <input> so users can also pick video files.
-    if (isMobileNative()) {
-      try {
-        const picked = await pickImage({ source: 'prompt' });
-        if (picked) await processFiles([picked.file]);
-      } catch (err: any) {
-        toast({
-          title: "Couldn't open camera",
-          description: err?.message || "Please try again.",
-          variant: "destructive",
-        });
-      }
-      return;
-    }
+    // Use the hidden <input accept="image/*,video/*"> on both web and native.
+    // iOS/Android WebView surfaces a system picker that includes photos AND
+    // videos — Capacitor's Camera plugin is photo-only, which is why video
+    // posts from mobile weren't reaching the composer at all.
     fileInputRef.current?.click();
   };
 
