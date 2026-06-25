@@ -1,43 +1,44 @@
-## Problem
+## Problems
 
-When a message push notification opens a DM or group chat, the in‑chat back arrow only clears React state — it never pops the synthetic history entry we push when a chat opens. The result on iOS / native:
+1. **Discard button overlaps text in the composer.** When you type a long post, the text wraps right under the red "Discard" button. The button is absolutely positioned inside the textarea wrapper (`absolute bottom-2 right-2`), so wrapped text sits behind it.
+2. **Share / "Post" button drops below the keyboard.** The composer card sits in the scrollable feed, so when the iOS/Android keyboard opens the Share button ends up below the visible area and the user has to dismiss the keyboard to find it.
+3. **Videos don't show up on the feed (mobile).** On native iOS/Android, "Add Media" calls Capacitor's `pickImage`, which only returns photos. There is no video path at all on native — so any "video" picked from a phone is silently dropped or never reaches the composer. (Web works because the hidden `<input accept="image/*,video/*">` is used.)
 
-1. Push tap → `navigate('/messages?circle=X&thread=USERID')`
-2. Messages opens the chat → effect calls `history.pushState({familialChat:true}, '')` (sentinel)
-3. User taps the in‑chat back arrow → `handleExitChat()` clears state, but the sentinel stays on the stack
-4. Next back (swipe‑back / nav back) pops the orphan sentinel → `popstate` fires → `handleExitChat()` runs again as a no‑op → the user sees "nothing happened" and has to press back a second time to actually leave Messages
+## Fix Plan
 
-Cold‑launching from a notification makes this worse because the history stack is very shallow, so the dead sentinel is the next thing in line.
+All changes are frontend-only. **A new iOS + Android build will be required** because `src/components/feed/CreatePostForm.tsx` and `src/lib/imagePicker.ts` are bundled into the native apps.
 
-## Fix
+### 1. `src/components/feed/CreatePostForm.tsx` — Discard button
 
-Front‑end only. No business‑logic, no DB, no push pipeline changes.
+- Remove the absolutely-positioned Discard button overlay.
+- Render Discard as a normal inline control in the header row (right side, next to the circle selector) or as a small right-aligned button immediately **above** the textarea. It only appears when there is text or attached media (same condition as today).
+- Drop the `pb-10` reserved padding on the textarea since nothing overlays it anymore.
 
-### `src/pages/Messages.tsx`
+Result: typed text never collides with Discard; behavior is identical.
 
-1. **Track sentinel ownership with a ref** (`sentinelPushedRef`). Set it `true` after `history.pushState({familialChat:true}, '')`, set it `false` inside the `popstate` listener and after we consume it via `history.back()`.
+### 2. `src/components/feed/CreatePostForm.tsx` — Share visible above keyboard
 
-2. **Guard the sentinel‑push effect** so we never stack two sentinels if the deep‑link effect re‑opens a chat while one is already open (e.g. a second notification tap while in a chat).
+- On `MentionInput` focus, scroll the Share button into view: `shareButtonRef.current?.scrollIntoView({ block: "end", behavior: "smooth" })` after a short timeout (let the WebView resize first).
+- Add `scroll-margin-bottom: 96px` (via Tailwind `scroll-mb-24`) to the Share button container so the scroll lands above the bottom nav / keyboard accessory.
+- Keep the existing global `resize: body` keyboard behavior — no native config changes.
 
-3. **Route every manual chat exit through the sentinel**:
-   - Refactor `handleExitChat` into `closeChatState()` (pure state reset) and a public `handleExitChat()` that:
-     - if `sentinelPushedRef.current` → call `window.history.back()` (lets the existing `popstate` listener clear state exactly once)
-     - else → call `closeChatState()` directly
-   - Update the `popstate` listener to call `closeChatState()` (not the public `handleExitChat`) and flip the ref to `false`, so it cannot recursively re‑invoke `history.back()`.
-   - Apply the same path to the other call sites that already reset chat state inline (`handleDeleteGroup`, `handleLeaveGroup`, `handleDeletePrivateConversation`) so they also consume the sentinel when present.
+Result: keyboard opens → composer auto-scrolls so Share stays visible.
 
-4. **Parity for the DM deep‑link effect** (lines 331‑345): also call `setChatView("dm")` explicitly, matching the group handler. This avoids a one‑render window where `selectedUser` is set but `chatView` is still `"list"`, which currently skips the sentinel push for that frame.
+### 3. `src/lib/imagePicker.ts` + `CreatePostForm.openMediaPicker` — Allow video uploads on native
 
-### Out of scope
+- Add a new helper `pickMedia()` (or extend `pickImage`) that, on native, presents an action sheet: **Take Photo · Choose Photo · Choose Video**. The Video option uses a hidden `<input type="file" accept="video/*">` (iOS/Android WebView both support the native picker through `<input type=file>`), avoiding the Capacitor Camera plugin's image-only limitation.
+- Alternative (simpler) implementation: on native, always use the hidden `<input accept="image/*,video/*">` flow that the web build already uses. We lose the native Camera/Library prompt but instantly gain video support.
+- Recommendation: ship the simpler `<input>` flow now (unblocks video same release), and revisit the action-sheet UX after.
 
-- `src/lib/pushNotifications.ts` and `src/App.tsx` deep‑link bridge stay as‑is — they correctly use React Router `navigate(link)`.
-- No changes to the push edge function, RLS, or notification payload shape.
+Result: users on iOS/Android can attach a video; it then flows through the existing upload/feed/`PostCard` video rendering, which already supports `mp4` / `mov`.
 
-## Verification
+### Verification
 
-1. Cold‑launch from a DM push → chat opens → tap header back arrow once → lands on conversations list on the first tap.
-2. From conversations list, swipe‑back / nav back → leaves Messages on the first tap (no orphan sentinel).
-3. Warm app already on `/circles` → tap message push → chat opens → back arrow → conversations list → back → `/circles`.
-4. Tap a second message push while a chat is already open → switches to the new chat with exactly one sentinel on the stack (back still closes in one tap).
-5. Group chat push behaves identically to DM push.
-6. Deleting / leaving a chat from inside the chat view closes cleanly without leaving a dead sentinel.
+- Type a long post in the composer on mobile preview — Discard no longer overlaps text.
+- Focus the textarea — Share button scrolls into view above the keyboard.
+- Pick a `.mov` / `.mp4` from the iOS/Android photo library — preview shows, post creates, video plays inline in the feed (`PostCard` already handles it).
+- Confirm web behavior is unchanged.
+
+### Deployment
+
+Yes — you need to push a new iOS and Android build (`bash scripts/pull-updates.sh` → `npx cap sync ios --legacy-peer-deps` / `android` → archive + upload). The server-side feed/storage code is unchanged.

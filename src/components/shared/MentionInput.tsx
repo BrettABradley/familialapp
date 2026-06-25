@@ -26,6 +26,7 @@ interface MentionInputProps {
   /** Add a synthetic "everyone" suggestion that pings the whole circle.
    *  Only enabled for the Feed composer. */
   enableEveryone?: boolean;
+  onFocus?: React.FocusEventHandler<HTMLTextAreaElement>;
 }
 
 export const EVERYONE_SENTINEL = "__everyone__";
@@ -41,6 +42,7 @@ export const MentionInput = ({
   disabled,
   onMentionsChange,
   enableEveryone = false,
+  onFocus,
 }: MentionInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -164,6 +166,7 @@ export const MentionInput = ({
         value={value}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
+        onFocus={onFocus}
         placeholder={placeholder}
         className={className}
         maxLength={maxLength}
