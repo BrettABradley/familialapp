@@ -31,6 +31,7 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const shareButtonRef = useRef<HTMLButtonElement>(null);
 
 
   const circleMembers = useCircleMembers();
