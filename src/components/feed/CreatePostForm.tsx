@@ -279,6 +279,23 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
     );
   };
 
+  const hasDraft = newPostContent.trim().length > 0 || selectedFiles.length > 0;
+
+  const handleDiscard = () => {
+    updatePostContent("");
+    previewUrls.forEach(url => URL.revokeObjectURL(url));
+    setSelectedFiles([]);
+    setPreviewUrls([]);
+  };
+
+  const handleComposerFocus = () => {
+    // Keep the Share button visible above the on-screen keyboard.
+    // Run after the WebView finishes the resize: body shrink.
+    window.setTimeout(() => {
+      shareButtonRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+    }, 300);
+  };
+
   return (
     <Card className="mb-8">
       <CardHeader className="pb-4">
@@ -287,8 +304,8 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
             <AvatarImage src={profile?.avatar_url || undefined} />
             <AvatarFallback>{profile?.display_name?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
           </Avatar>
-          <div className="flex-1">
-            <p className="font-medium text-foreground">{profile?.display_name || "You"}</p>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-foreground truncate">{profile?.display_name || "You"}</p>
             <Select value={selectedCircle} onValueChange={setSelectedCircle}>
               <SelectTrigger className="w-fit h-7 text-xs border-none p-0 text-muted-foreground">
                 <SelectValue placeholder="Select circle" />
@@ -300,10 +317,21 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
               </SelectContent>
             </Select>
           </div>
+          {hasDraft && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-2 text-xs shrink-0"
+              onClick={handleDiscard}
+              disabled={isPosting}
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1" />Discard
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="relative mb-4">
+        <div className="mb-4">
           <MentionInput
             placeholder="What's happening with the family? Use @ to tag someone or @everyone to ping the whole circle"
             value={newPostContent}
@@ -311,26 +339,11 @@ export const CreatePostForm = ({ onPostCreated }: CreatePostFormProps) => {
             members={circleMembers}
             enableEveryone
             onMentionsChange={setMentionedUserIds}
-            className="min-h-[100px] resize-none pb-10"
+            onFocus={handleComposerFocus}
+            className="min-h-[100px] resize-none"
             maxLength={5000}
             disabled={isPosting}
           />
-          {(newPostContent.trim() || selectedFiles.length > 0) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute bottom-2 right-2 text-destructive hover:text-destructive hover:bg-destructive/10 h-7 px-2 text-xs"
-              onClick={() => {
-                updatePostContent("");
-                previewUrls.forEach(url => URL.revokeObjectURL(url));
-                setSelectedFiles([]);
-                setPreviewUrls([]);
-              }}
-              disabled={isPosting}
-            >
-              <Trash2 className="w-3.5 h-3.5 mr-1" />Discard
-            </Button>
-          )}
         </div>
         {previewUrls.length === 1 && (
           <div className="mb-4 mx-auto max-w-sm">{renderPreview(previewUrls[0], 0)}</div>
