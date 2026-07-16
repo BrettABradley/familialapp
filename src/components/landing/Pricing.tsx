@@ -261,13 +261,14 @@ const Pricing = () => {
     const currentRank = PLAN_RANK[currentPlan || "free"] ?? 0;
     const targetRank = PLAN_RANK[plan] ?? 0;
 
-    // iOS native: try Apple IAP first, fall back to Stripe checkout via in-app browser
-    if (isIOSNative()) {
-      const appleProductId = APPLE_PRODUCTS[plan as keyof typeof APPLE_PRODUCTS];
-      if (appleProductId) {
+    // Native mobile (iOS/Android): must use platform IAP.
+    // iOS = App Store guideline 3.1.1; Android = Play policy 3.4.
+    if (isMobileNative()) {
+      const nativeProductId = productIdFor(plan as "family" | "extended");
+      if (nativeProductId) {
         setLoadingPlan(plan);
         try {
-          const success = await purchaseSubscription(appleProductId);
+          const success = await purchaseSubscription(nativeProductId);
           if (success) {
             const { data } = await supabase.from("user_plans").select("plan, cancel_at_period_end, current_period_end, pending_plan").eq("user_id", user.id).single();
             if (data) {
@@ -284,15 +285,15 @@ const Pricing = () => {
           setLoadingPlan(null);
           return;
         } catch (err: any) {
-          // iOS native must NEVER fall back to Stripe (App Store guideline 3.1.1)
+          // Native must NEVER fall back to Stripe (store policy).
           console.error("IAP failed:", err?.message);
           toast({ title: "Purchase failed", description: err?.message || "Could not complete purchase. Please try again.", variant: "destructive" });
           setLoadingPlan(null);
           return;
         }
       }
-      // No matching Apple product — show error rather than falling back to Stripe
-      toast({ title: "Unavailable", description: "This plan isn't available for purchase in the iOS app.", variant: "destructive" });
+      // No matching native product — show error rather than falling back to Stripe
+      toast({ title: "Unavailable", description: "This plan isn't available for purchase in the mobile app.", variant: "destructive" });
       return;
     }
 
@@ -343,10 +344,10 @@ const Pricing = () => {
 
 
   const handleCancelConfirm = async () => {
-    // Apple-managed subscriptions can't be cancelled via Stripe — hand off to App Store
-    if (planSource === "apple" || isIOSNative()) {
+    // Store-managed subscriptions can't be cancelled via Stripe — hand off to the native store
+    if (planSource === "apple" || planSource === "google" || isMobileNative()) {
       setConfirmDialog(null);
-      openAppleSubscriptionManagement();
+      openNativeSubscriptionManagement(confirmDialog?.targetPlan);
       return;
     }
     setCancelingPlan(true);
@@ -513,16 +514,19 @@ const Pricing = () => {
     }
 
     const isApple = planSource === "apple" || isIOSNative();
+    const isGoogle = planSource === "google" || isAndroidNative();
+    const isStoreManaged = isApple || isGoogle;
 
-    if (isApple) {
+    if (isStoreManaged) {
+      const label = isGoogle && !isApple ? "Manage in Google Play" : "Manage in App Store";
       return (
         <Button
           variant="outline"
           className="w-full"
           size="lg"
-          onClick={() => openAppleSubscriptionManagement()}
+          onClick={() => openNativeSubscriptionManagement(tierPlan as "family" | "extended")}
         >
-          Manage in App Store
+          {label}
         </Button>
       );
     }
