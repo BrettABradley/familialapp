@@ -622,7 +622,7 @@ const Pricing = () => {
                 </ul>
                 <div className="pt-4">
                   {getButtonForTier(tier.plan, tier.popular, tier.cta)}
-                  {isIOSNative() && tier.plan !== "free" && (
+                  {isMobileNative() && tier.plan !== "free" && (
                     <SubscriptionDisclosure variant="compact" className="mt-3 text-center" />
                   )}
                 </div>
@@ -631,8 +631,8 @@ const Pricing = () => {
           ))}
         </div>
 
-        {/* Restore Purchases — iOS only */}
-        {isIOSNative() && user && (
+        {/* Restore Purchases — native mobile only */}
+        {isMobileNative() && user && (
           <div className="text-center mb-8">
             <Button
               variant="link"
