@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { isMobileNative, purchaseSubscription, prewarmProducts, productIdFor } from "@/lib/mobilePurchase";
-import { openExternalUrl } from "@/lib/externalUrl";
+import { openInAppBrowser } from "@/lib/externalUrl";
 import SubscriptionDisclosure from "@/components/shared/SubscriptionDisclosure";
 
 const PRICES: Record<string, { priceId: string; name: string; price: string }> = {
@@ -129,7 +129,7 @@ const CircleRescueDialog = ({ circleId, open, onOpenChange }: CircleRescueDialog
 
       if (error) throw error;
       if (data?.url) {
-        await openExternalUrl(data.url);
+        await openInAppBrowser(data.url);
       }
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });

@@ -26,7 +26,7 @@ import UpgradePlanDialog from "@/components/circles/UpgradePlanDialog";
 import CircleRescueDialog from "@/components/circles/CircleRescueDialog";
 import { checkCircleCapacity, getCircleMemberCount, getCircleMemberLimit } from "@/lib/circleLimits";
 import { isMobileNative, purchaseConsumable, productIdFor } from "@/lib/mobilePurchase";
-import { openExternalUrl } from "@/lib/externalUrl";
+import { openExternalUrl, openInAppBrowser } from "@/lib/externalUrl";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 
 interface Circle {
@@ -1039,7 +1039,7 @@ const Circles = () => {
                         return;
                       }
                       if (data?.url) {
-                        await openExternalUrl(data.url);
+                        await openInAppBrowser(data.url);
                       }
                     } catch (err: any) {
                       toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });

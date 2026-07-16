@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import logo from "@/assets/logo.png";
 import { isMobileNative, purchaseSubscription, productIdFor } from "@/lib/mobilePurchase";
+import { openInAppBrowser } from "@/lib/externalUrl";
 import { Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 
@@ -218,7 +219,7 @@ const Auth = () => {
           toast({ title: "Checkout error", description: "Could not start checkout. Please try again from your circles page.", variant: "destructive" });
           navigate("/circles");
         } else {
-          window.location.href = data.url;
+          await openInAppBrowser(data.url);
         }
       });
       return; // Don't navigate to /circles yet
