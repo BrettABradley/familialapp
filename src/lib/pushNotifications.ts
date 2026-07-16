@@ -164,8 +164,14 @@ async function runPushRegistration(): Promise<PushRegistrationResult> {
               'Without the aps-environment entitlement APNs cannot issue a token.'
           );
         }
+        if (Capacitor.getPlatform() === 'android' && /FirebaseApp|google-services|FIS_AUTH|SERVICE_NOT_AVAILABLE/i.test(msg)) {
+          console.error(
+            '[push] android-fcm-not-configured — google-services.json is missing or invalid. ' +
+              'Drop android/app/google-services.json from Firebase console and rebuild the AAB.'
+          );
+        }
         registrationAttempted = false; // allow retry on next sign-in
-        settle({ ok: false, status: 'registration_error', message: msg || 'iOS could not register this device with APNs.' });
+        settle({ ok: false, status: 'registration_error', message: msg || 'This device could not be registered for push notifications.' });
       });
 
       await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {

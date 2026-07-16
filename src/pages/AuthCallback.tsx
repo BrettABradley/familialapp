@@ -176,6 +176,20 @@ const AuthCallback = () => {
           <p className="text-sm text-muted-foreground">
             You may proceed back to the app.
           </p>
+          {!isNative && /android/i.test(navigator.userAgent) && (
+            <Button
+              variant="outline"
+              className="mt-2"
+              onClick={() => {
+                // Try to hand off to the installed Android app via the
+                // verified App Link. If assetlinks.json is set up, this
+                // opens Familial directly; otherwise Chrome stays put.
+                window.location.href = "https://familialmedia.com/circles";
+              }}
+            >
+              Open in Familial app
+            </Button>
+          )}
         </div>
       )}
 
