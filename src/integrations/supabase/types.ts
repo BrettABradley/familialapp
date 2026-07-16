@@ -960,6 +960,42 @@ export type Database = {
           },
         ]
       }
+      google_iap_grants: {
+        Row: {
+          circle_id: string | null
+          created_at: string
+          granted_at: string
+          id: string
+          kind: string
+          product_id: string
+          purchase_token: string
+          source: string
+          user_id: string
+        }
+        Insert: {
+          circle_id?: string | null
+          created_at?: string
+          granted_at?: string
+          id?: string
+          kind: string
+          product_id: string
+          purchase_token: string
+          source?: string
+          user_id: string
+        }
+        Update: {
+          circle_id?: string | null
+          created_at?: string
+          granted_at?: string
+          id?: string
+          kind?: string
+          product_id?: string
+          purchase_token?: string
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       google_play_events: {
         Row: {
           created_at: string
