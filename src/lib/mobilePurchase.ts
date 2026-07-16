@@ -7,7 +7,7 @@
  * back-compat. New code, and any call site that should work on both
  * platforms, should import from here.
  */
-import { isIOSNative, isAndroidNative } from "./platform";
+import { isIOSNative, isAndroidNative, isMobileNative } from "./platform";
 import * as Apple from "./iapPurchase";
 import * as Google from "./googlePlayPurchase";
 
@@ -21,14 +21,22 @@ export const productIdFor = (
 };
 
 export const prewarmProducts = async () => {
-  if (isIOSNative()) return Apple.prewarmProducts();
-  if (isAndroidNative()) return Google.prewarmProducts();
+  try {
+    if (isIOSNative()) return await Apple.prewarmProducts();
+    if (isAndroidNative()) return await Google.prewarmProducts();
+  } catch (err) {
+    console.warn("[mobilePurchase] prewarmProducts failed:", err);
+  }
   return [];
 };
 
 export const getCachedProducts = (): Record<string, any> => {
-  if (isIOSNative()) return Apple.getCachedProducts();
-  if (isAndroidNative()) return Google.getCachedProducts();
+  try {
+    if (isIOSNative()) return Apple.getCachedProducts();
+    if (isAndroidNative()) return Google.getCachedProducts();
+  } catch (err) {
+    console.warn("[mobilePurchase] getCachedProducts failed:", err);
+  }
   return {};
 };
 
@@ -51,8 +59,12 @@ export const purchaseConsumable = async (
 };
 
 export const restorePurchases = async (): Promise<boolean> => {
-  if (isIOSNative()) return Apple.restorePurchases();
-  if (isAndroidNative()) return Google.restorePurchases();
+  try {
+    if (isIOSNative()) return await Apple.restorePurchases();
+    if (isAndroidNative()) return await Google.restorePurchases();
+  } catch (err) {
+    console.warn("[mobilePurchase] restorePurchases failed:", err);
+  }
   return false;
 };
 
@@ -61,16 +73,33 @@ export const restorePurchases = async (): Promise<boolean> => {
  * iOS → App Store account subscriptions.
  * Android → Google Play account subscriptions.
  * Web → no-op (caller should route to Stripe customer portal).
+ *
+ * Accepts either a raw store product id or a plan kind for convenience.
  */
-export const openNativeSubscriptionManagement = (productId?: string) => {
-  if (isIOSNative()) {
-    Apple.openAppleSubscriptionManagement();
-    return;
-  }
-  if (isAndroidNative()) {
-    Google.openPlaySubscriptionManagement(productId);
-    return;
+export const openNativeSubscriptionManagement = (
+  productIdOrKind?: string | "family" | "extended" | "extraMembers"
+) => {
+  try {
+    if (isIOSNative()) {
+      Apple.openAppleSubscriptionManagement();
+      return;
+    }
+    if (isAndroidNative()) {
+      // If the caller passed a plan kind, resolve to the Google product id.
+      let productId = productIdOrKind;
+      if (
+        productIdOrKind === "family" ||
+        productIdOrKind === "extended" ||
+        productIdOrKind === "extraMembers"
+      ) {
+        productId = Google.GOOGLE_PRODUCTS[productIdOrKind];
+      }
+      Google.openPlaySubscriptionManagement(productId as string | undefined);
+      return;
+    }
+  } catch (err) {
+    console.warn("[mobilePurchase] openNativeSubscriptionManagement failed:", err);
   }
 };
 
-export { isIOSNative, isAndroidNative };
+export { isIOSNative, isAndroidNative, isMobileNative };

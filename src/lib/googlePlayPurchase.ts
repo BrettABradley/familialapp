@@ -29,9 +29,16 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const RETRY_DELAYS_MS = [800, 1500];
 
 const loadPlugin = async () => {
-  // @vite-ignore — only loaded on Android native, never bundled into web SSR paths.
-  const mod = await import("@capgo/capacitor-purchases");
-  return mod;
+  try {
+    // @vite-ignore — only loaded on Android native, never bundled into web SSR paths.
+    const mod = await import("@capgo/capacitor-purchases");
+    return mod;
+  } catch (err) {
+    console.warn("[GoogleIAP] plugin load failed:", err);
+    throw new Error(
+      "In-app purchases aren't available right now. Please update the app from Google Play and try again."
+    );
+  }
 };
 
 const parseProductList = (res: any): any[] => {
