@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Phone, Mail, ArrowRight, Loader2, Camera, Calendar, MessageCircle, Smartphone, Users, Bell, Shield, Image, Video, Settings, Globe, StickyNote } from "lucide-react";
-import { openExternalUrl } from "@/lib/externalUrl";
+import { openExternalUrl, openInAppBrowser } from "@/lib/externalUrl";
 import {
   isIOSNative,
   isAndroidNative,
@@ -307,7 +307,7 @@ const Pricing = () => {
         });
         if (error) throw error;
         if (data?.url) {
-          openExternalUrl(data.url);
+          await openInAppBrowser(data.url);
         }
       } catch (err: any) {
         toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });

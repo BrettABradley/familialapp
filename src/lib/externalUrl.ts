@@ -35,6 +35,29 @@ export async function openExternalUrl(url: string): Promise<void> {
 }
 
 /**
+ * Opens a URL in an **in-app browser** that returns cleanly to the app:
+ * - Android → Chrome Custom Tabs (via @capacitor/browser)
+ * - iOS     → SFSafariViewController (via @capacitor/browser)
+ * - Web     → new tab
+ *
+ * Use this for flows like Stripe Checkout where the user MUST come back
+ * to the app after finishing (as opposed to `openExternalUrl`, which
+ * launches the system browser and leaves the app entirely).
+ */
+export async function openInAppBrowser(url: string): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url, presentationStyle: 'fullscreen' });
+      return;
+    } catch (err) {
+      console.warn('[openInAppBrowser] Browser plugin failed, falling back:', err);
+    }
+  }
+  window.open(url, '_blank');
+}
+
+/**
  * Opens a maps app for the given location/query. On native, we try the
  * platform's native scheme first (so iOS Apple Maps opens the actual app,
  * not Safari), then fall back to the universal https:// link.
