@@ -12,7 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { isIOSNative, purchaseSubscription, prewarmProducts, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import { isMobileNative, purchaseSubscription, prewarmProducts, productIdFor } from "@/lib/mobilePurchase";
+import { openExternalUrl } from "@/lib/externalUrl";
 import SubscriptionDisclosure from "@/components/shared/SubscriptionDisclosure";
 
 const PRICES: Record<string, { priceId: string; name: string; price: string }> = {
@@ -44,9 +45,9 @@ const CircleRescueDialog = ({ circleId, open, onOpenChange }: CircleRescueDialog
   const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   useEffect(() => {
-    if (open && isIOSNative()) {
-      // Pre-warm StoreKit so the Take Over → Apple IAP sheet has the
-      // product cached. Required to avoid 2.1(b) "Cannot find product".
+    if (open && isMobileNative()) {
+      // Pre-warm the native store so the Take Over → IAP sheet has the
+      // product cached. Required on iOS to avoid 2.1(b) "Cannot find product".
       prewarmProducts();
     }
     if (!circleId || !open) return;
@@ -97,9 +98,15 @@ const CircleRescueDialog = ({ circleId, open, onOpenChange }: CircleRescueDialog
     setCheckoutLoading(true);
 
     try {
-      // iOS native: Apple IAP only (App Store guideline 3.1.1)
-      if (isIOSNative()) {
-        const success = await purchaseSubscription(APPLE_PRODUCTS.family, {
+      // Native mobile: use platform IAP only (store policy).
+      if (isMobileNative()) {
+        const nativeId = productIdFor("family");
+        if (!nativeId) {
+          toast({ title: "Unavailable", description: "Rescue purchases aren't available in this app version.", variant: "destructive" });
+          setCheckoutLoading(false);
+          return;
+        }
+        const success = await purchaseSubscription(nativeId, {
           rescue_circle_id: offer.circle_id,
         });
         if (success) {
@@ -122,7 +129,7 @@ const CircleRescueDialog = ({ circleId, open, onOpenChange }: CircleRescueDialog
 
       if (error) throw error;
       if (data?.url) {
-        window.location.href = data.url;
+        await openExternalUrl(data.url);
       }
     } catch (err: any) {
       toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });
@@ -168,7 +175,7 @@ const CircleRescueDialog = ({ circleId, open, onOpenChange }: CircleRescueDialog
         </DialogHeader>
         {offer && !isExpired && !isOwner && !loading && (
           <>
-            {isIOSNative() && (
+            {isMobileNative() && (
               <SubscriptionDisclosure variant="compact" className="px-1" />
             )}
             <DialogFooter className="flex flex-col gap-2 sm:flex-row">
