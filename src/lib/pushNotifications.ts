@@ -108,7 +108,8 @@ async function runPushRegistration(): Promise<PushRegistrationResult> {
     if (perm.receive !== 'granted') {
       console.warn('[push] permission not granted — aborting:', perm.receive);
       registrationAttempted = false; // allow retry if user re-enables in Settings
-      return { ok: false, status: 'permission_denied', message: 'Push permission is not enabled for Familial in iOS Settings.' };
+      const settingsLabel = Capacitor.getPlatform() === 'android' ? 'Android Settings' : 'iOS Settings';
+      return { ok: false, status: 'permission_denied', message: `Push permission is not enabled for Familial in ${settingsLabel}.` };
     }
 
     await PushNotifications.removeAllListeners();
@@ -198,11 +199,24 @@ async function runPushRegistration(): Promise<PushRegistrationResult> {
       }
 
       registrationWatchdog = window.setTimeout(() => {
-        console.warn(
-          '[push] no registration callback after 15s. If permission was granted, add the AppDelegate bridge from Capacitor PushNotifications docs, then run npm run cap:sync:ios and upload a new TestFlight build.'
-        );
+        const isAndroid = Capacitor.getPlatform() === 'android';
+        if (isAndroid) {
+          console.warn(
+            '[push] no registration callback after 15s on Android. Confirm android/app/google-services.json is present and that Firebase Cloud Messaging is enabled for the project.'
+          );
+        } else {
+          console.warn(
+            '[push] no registration callback after 15s. If permission was granted, add the AppDelegate bridge from Capacitor PushNotifications docs, then run npm run cap:sync:ios and upload a new TestFlight build.'
+          );
+        }
         registrationAttempted = false;
-        settle({ ok: false, status: 'timeout', message: 'iOS did not return an APNs token. Rebuild after running the iOS sync script so the AppDelegate push bridge is included.' });
+        settle({
+          ok: false,
+          status: 'timeout',
+          message: isAndroid
+            ? 'This device did not return a push token. Rebuild after confirming google-services.json is included and FCM is enabled.'
+            : 'iOS did not return an APNs token. Rebuild after running the iOS sync script so the AppDelegate push bridge is included.',
+        });
       }, 15000);
     });
   } catch (e) {

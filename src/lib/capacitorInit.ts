@@ -2,6 +2,9 @@ import { Capacitor } from '@capacitor/core';
 import { registerForPushNotifications } from './pushNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import { drainPendingIapReceipts, isIOSNative } from './iapPurchase';
+import { isAndroidNative } from './platform';
+import { drainPendingGoogleReceipts } from './googlePlayReceiptQueue';
+
 
 
 /**
@@ -258,5 +261,43 @@ export async function initCapacitorPlugins() {
       }
     });
   }
+
+  // Android IAP recovery: mirrors the iOS block above. Google Play purchases
+  // that failed to reach validate-google-receipt (network blip, backend cold
+  // start) are persisted in localStorage and retried here. Server-side
+  // google_iap_grants unique index makes retries safe.
+  if (isAndroidNative()) {
+    const tryDrainGoogle = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) return;
+        const credited = await drainPendingGoogleReceipts();
+        if (credited > 0) {
+          console.log(`[boot] Google IAP recovery credited ${credited} pending purchase(s)`);
+          try { window.dispatchEvent(new CustomEvent('iap-credited', { detail: { credited } })); } catch {}
+        }
+      } catch (e) {
+        console.warn('[boot] drainPendingGoogleReceipts failed', e);
+      }
+    };
+
+    setTimeout(tryDrainGoogle, 2500);
+
+    try {
+      const { App } = await import('@capacitor/app');
+      App.addListener('appStateChange', (state) => {
+        if (state.isActive) tryDrainGoogle();
+      });
+    } catch (e) {
+      console.warn('[boot] App.addListener (android) failed', e);
+    }
+
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+        setTimeout(tryDrainGoogle, 500);
+      }
+    });
+  }
 }
+
 

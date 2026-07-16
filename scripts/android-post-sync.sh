@@ -129,17 +129,24 @@ else
   echo "⚠️  resources/icon.png or resources/icon-foreground.png missing — launcher icons NOT regenerated."
 fi
 
+# --- 7. assetlinks.json fingerprint check (blocks App Links from shipping unverified) ---
+if [ -f "scripts/check-assetlinks.mjs" ]; then
+  if ! node scripts/check-assetlinks.mjs; then
+    echo ""
+    echo "❌ Aborting Android post-sync — fix assetlinks.json before rebuilding the AAB."
+    exit 1
+  fi
+fi
+
 echo "▶ Android post-sync done."
 echo ""
 echo "🧪 Pre-upload checklist:"
 echo "   1. Confirm android/app/google-services.json exists (or accept push-less build)."
 echo "   2. Install the AAB on a clean device/emulator and verify it opens past splash."
 echo "   3. Check adb logcat for FATAL EXCEPTION during launch before shipping to Play."
-echo "   4. Confirm public/.well-known/assetlinks.json contains the SHA-256 fingerprint"
-echo "      from Play Console → App integrity → App signing (both 'App signing key'"
-echo "      and 'Upload key' fingerprints). Without this, email verification links"
-echo "      won't open the app and reviewers get stuck on the browser page."
-echo "   5. Send yourself a test verification email and tap it on the review device"
+echo "   4. Send yourself a test verification email and tap it on the review device"
 echo "      to confirm /auth/callback opens in the app (not Chrome)."
+echo "   5. Make a small test purchase — force-quit the app mid-validation to confirm"
+echo "      the pending-receipt queue drains on next launch (no support ticket needed)."
 
 
