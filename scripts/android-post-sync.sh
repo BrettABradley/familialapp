@@ -135,4 +135,11 @@ echo "🧪 Pre-upload checklist:"
 echo "   1. Confirm android/app/google-services.json exists (or accept push-less build)."
 echo "   2. Install the AAB on a clean device/emulator and verify it opens past splash."
 echo "   3. Check adb logcat for FATAL EXCEPTION during launch before shipping to Play."
+echo "   4. Confirm public/.well-known/assetlinks.json contains the SHA-256 fingerprint"
+echo "      from Play Console → App integrity → App signing (both 'App signing key'"
+echo "      and 'Upload key' fingerprints). Without this, email verification links"
+echo "      won't open the app and reviewers get stuck on the browser page."
+echo "   5. Send yourself a test verification email and tap it on the review device"
+echo "      to confirm /auth/callback opens in the app (not Chrome)."
+
 

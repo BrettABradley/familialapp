@@ -1,47 +1,47 @@
-## Google Play "Broken Functionality" — diagnosis & fix plan
+## Android reviewer-crash follow-up — plan
 
-Google's reviewer saw the app fail to open on install. Given our current Android setup, the most likely crash-on-launch causes are all in the native Android glue, not the web bundle:
+No stack trace exists (Play Console gave a policy notice, not a crash record). Backend signals show no 5xx or auth errors during reviewer activity, so the failure is client-side/native. Previous turn already patched the two boot-time crash risks (conditional Firebase plugin, guarded push init, faster splash, 8s WebView fallback, version 66.0.4). This plan closes the remaining reviewer-visible gaps.
 
-### Root cause candidates (highest → lowest likelihood)
+### Focus
 
-1. **Firebase / google-services plugin applied without `google-services.json`.**
-   `scripts/android-post-sync.sh` unconditionally appends `apply plugin: 'com.google.gms.google-services'` and the classpath. If a build is produced without `android/app/google-services.json` in place, the app crashes at boot with `Default FirebaseApp is not initialized` the moment `@capacitor/push-notifications` (or FCM) touches Firebase. Reviewer bundles are commonly built this way.
-2. **Push registration runs at launch without a session and can throw on Android** if FCM isn't wired, taking down the WebView bridge in some device configs.
-3. **Splash overlay held for 2.5s + 0.7s fade** on top of the native splash. Reviewers who tap-and-wait briefly can perceive "does not load", especially on low-end devices where the WebView is still hydrating.
-4. **`android:usesCleartextTraffic="false"`** combined with any transitively-loaded `http://` asset (rare, but possible in dev-only WebView error pages).
+1. **Verify Android App Links wiring so the email verification link opens the app.**
+   - Read `public/.well-known/assetlinks.json` and confirm `package_name: com.familialmedia.familial` plus at least one `sha256_cert_fingerprints` entry.
+   - If the release-keystore fingerprint is missing or unknown, add a placeholder entry + inline instructions so the user can paste in the fingerprint from Play Console → App integrity → App signing → "SHA-256 certificate fingerprint" without hunting for the file.
+   - Confirm the intent-filter injected by `scripts/android-post-sync.sh` targets both `familialmedia.com` and `www.familialmedia.com` with `pathPrefix="/auth/callback"` and `android:autoVerify="true"` (it already does — no change).
 
-Nothing in the frontend appears broken — the web bundle loads fine in the browser and in TestFlight — so the fix has to make the Android shell resilient to those startup hazards without changing app behavior.
+2. **Harden `AuthCallback` for the case where the email link opens in the Android browser instead of the app.**
+   - Verify `src/pages/AuthCallback.tsx` still completes the PKCE exchange from the URL if the user lands there in Chrome (not the WebView). If it currently only works inside the Capacitor shell, add a browser-safe fallback so at minimum the user gets a "Open in Familial" button + a clear next-step message.
 
-### Fixes (Android-only, no user-facing behavior change)
+3. **Explicit missing-FCM diagnostic on Android.**
+   - In `src/lib/pushNotifications.ts`, when `Capacitor.getPlatform() === 'android'` and the register call throws a `FirebaseApp` error, log a single distinctive line (`[push] android-fcm-not-configured — google-services.json missing`) so the next reviewer build's `adb logcat` immediately identifies the cause. No behavior change — it already fails silently.
 
-1. **Make Firebase apply conditional on `google-services.json`** in `scripts/android-post-sync.sh`. Only inject the classpath + `apply plugin` when the JSON exists; otherwise strip them back out if previously injected. This guarantees a bundle built without FCM keys will still launch (push simply won't register — a graceful degrade the app already handles).
-2. **Harden push init on Android.** In `src/lib/pushNotifications.ts`, wrap the `PushNotifications.register()` path in a defensive try/catch that swallows FCM-init errors and returns `setup_failed` instead of letting the exception surface into the plugin bridge.
-3. **Shorten the splash hand-off** in `src/main.tsx` from 2500ms hold + 700ms fade to 600ms hold + 400ms fade. Native splash still hides on first paint; this only affects the HTML overlay above the app.
-4. **Add a WebView safety net** in `index.html`: if the module script fails to execute within 8s (e.g. bundle chunk fails), swap in a minimal "Reload" button instead of a blank white screen — this is what Google sees when a chunk 404s post-install.
-5. **Version bump** to `66.0.4` via `scripts/bump-android-version.mjs` so the new AAB can be uploaded to Play.
-6. **Add a launch smoke test hint** to `scripts/android-post-sync.sh`: after sync, print a checklist reminding the user to verify `google-services.json` is in place and to install the AAB on a clean device before uploading.
+4. **README / user-facing setup doc snippet in `scripts/android-post-sync.sh`.**
+   - Add one extra line to the pre-upload checklist reminding the user to (a) confirm `assetlinks.json` fingerprint matches the release keystore, and (b) test the email verification link on a physical device before uploading.
+
+5. **No native code, no plugin bumps, no DB or edge-function changes.** Everything above is either documentation, a JSON edit, or a log line.
 
 ### Files touched
 
-- `scripts/android-post-sync.sh` — conditional google-services block + checklist
-- `src/lib/pushNotifications.ts` — Android-safe try/catch around FCM register
-- `src/main.tsx` — shorter splash overlay timings
-- `index.html` — 8s "failed to load" fallback with reload button
-- `package.json` / `package-lock.json` / `android/app/build.gradle` (via `bump-android-version.mjs`) — 66.0.3 → 66.0.4
+- `public/.well-known/assetlinks.json` — verify/patch fingerprints structure only
+- `src/pages/AuthCallback.tsx` — browser-safe fallback path (small conditional)
+- `src/lib/pushNotifications.ts` — one extra diagnostic log line on Android FCM failure
+- `scripts/android-post-sync.sh` — two extra checklist lines
 
-### What is NOT changed
+### Explicitly NOT changed
 
-- No RLS / DB / edge function changes.
-- No UI, routing, auth, or business logic changes.
-- No plugin version bumps (avoids surprise regressions before re-submission).
-- `capacitor.config.ts` is untouched — no `server.url`, still HTTPS-only.
+- No modification to Capacitor config, Gradle, MainActivity, or plugin versions.
+- No auth-flow or session logic changes.
+- No changes to `src/main.tsx`, `index.html`, or splash timing (already done last turn).
+- No version bump — 66.0.4 from last turn is still the target AAB.
 
-### After merge — user steps on their Mac
+### After merge — user steps
 
 ```
-bash scripts/pull-updates.sh          # rebuilds + cap sync android + post-sync
-node scripts/bump-android-version.mjs # optional if not already bumped
-npx cap open android                  # Build → Generate Signed Bundle → upload
+bash scripts/pull-updates.sh
+# Get release SHA-256 from Play Console → App integrity → App signing
+# Paste it into public/.well-known/assetlinks.json (if missing)
+npm run build && npx cap sync android && bash scripts/android-post-sync.sh
+npx cap open android   # rebuild signed AAB → upload
 ```
 
-Then in Play Console, respond to the policy review with the new AAB (versionCode 660004).
+Once uploaded, the reviewer's verification email link will open directly in the app on Android, closing the most likely "app does not open or load" path.
