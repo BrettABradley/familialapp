@@ -1,47 +1,69 @@
-## Android reviewer-crash follow-up — plan
+## Android ⇄ iOS workflow parity — plan
 
-No stack trace exists (Play Console gave a policy notice, not a crash record). Backend signals show no 5xx or auth errors during reviewer activity, so the failure is client-side/native. Previous turn already patched the two boot-time crash risks (conditional Firebase plugin, guarded push init, faster splash, 8s WebView fallback, version 66.0.4). This plan closes the remaining reviewer-visible gaps.
+Comparison of the Android and iOS code paths found the boot, splash, status-bar, keyboard, safe-area, push-registration, deep-link listener, and root-route redirect are already platform-generic and fire identically. Real divergences remaining are three focused items. Fixing them brings Android's user-visible workflow to parity with iOS without touching any legitimate platform-specific plumbing (APNs vs FCM, StoreKit vs Play Billing APIs, etc.).
 
-### Focus
+### Gap 1 — Google Play IAP receipt reliability (highest impact)
 
-1. **Verify Android App Links wiring so the email verification link opens the app.**
-   - Read `public/.well-known/assetlinks.json` and confirm `package_name: com.familialmedia.familial` plus at least one `sha256_cert_fingerprints` entry.
-   - If the release-keystore fingerprint is missing or unknown, add a placeholder entry + inline instructions so the user can paste in the fingerprint from Play Console → App integrity → App signing → "SHA-256 certificate fingerprint" without hunting for the file.
-   - Confirm the intent-filter injected by `scripts/android-post-sync.sh` targets both `familialmedia.com` and `www.familialmedia.com` with `pathPrefix="/auth/callback"` and `android:autoVerify="true"` (it already does — no change).
+iOS persists every purchase to `localStorage` under `pendingAppleReceipts.v1` *before* calling the backend, then drains the queue on boot (via `capacitorInit.ts`), on `appStateChange` foreground resume, and after sign-in/token-refresh. A charged-but-un-validated purchase self-heals. Google Play has none of this — `googlePlayPurchase.ts` calls `validate-google-receipt` inline and throws a "contact support" error on failure.
 
-2. **Harden `AuthCallback` for the case where the email link opens in the Android browser instead of the app.**
-   - Verify `src/pages/AuthCallback.tsx` still completes the PKCE exchange from the URL if the user lands there in Chrome (not the WebView). If it currently only works inside the Capacitor shell, add a browser-safe fallback so at minimum the user gets a "Open in Familial" button + a clear next-step message.
+**Mirror the Apple pattern on Android:**
 
-3. **Explicit missing-FCM diagnostic on Android.**
-   - In `src/lib/pushNotifications.ts`, when `Capacitor.getPlatform() === 'android'` and the register call throws a `FirebaseApp` error, log a single distinctive line (`[push] android-fcm-not-configured — google-services.json missing`) so the next reviewer build's `adb logcat` immediately identifies the cause. No behavior change — it already fails silently.
+- Add `src/lib/googlePlayReceiptQueue.ts` exposing `enqueuePendingGoogleReceipt(entry)`, `drainPendingGoogleReceipts()`, and a `PENDING_KEY = "pendingGoogleReceipts.v1"` — structurally identical to the Apple counterpart in `iapPurchase.ts`.
+- In `src/lib/googlePlayPurchase.ts`, `enqueue` the `{ purchaseToken, productId, packageName, userId, kind }` payload *before* calling `validate-google-receipt`. On success, remove from queue. On failure, leave it in place and swallow the throw into a friendlier "we'll finish this shortly" message.
+- In `src/lib/capacitorInit.ts`, add an `isAndroidNative()` branch parallel to the existing `isIOSNative()` block that:
+  - Calls `drainPendingGoogleReceipts()` 2.5s after boot.
+  - Registers the same `App.addListener('appStateChange', ...)` foreground-resume drain.
+  - Registers the same auth-state drain hook.
+- Server-side: add a `google_iap_grants` idempotent ledger table (`{ id, user_id, purchase_token UNIQUE, product_id, granted_at, source }`) and have `validate-google-receipt` insert on that unique key before mutating `circles`/`user_plans`. On conflict → return the prior grant unchanged. This mirrors `apple_iap_grants` and makes client retries safe.
 
-4. **README / user-facing setup doc snippet in `scripts/android-post-sync.sh`.**
-   - Add one extra line to the pre-upload checklist reminding the user to (a) confirm `assetlinks.json` fingerprint matches the release keystore, and (b) test the email verification link on a physical device before uploading.
+### Gap 2 — Android App Links / email-verify deep-link handoff
 
-5. **No native code, no plugin bumps, no DB or edge-function changes.** Everything above is either documentation, a JSON edit, or a log line.
+`public/.well-known/assetlinks.json` still contains `REPLACE_WITH_PLAY_APP_SIGNING_SHA256` / `REPLACE_WITH_UPLOAD_KEY_SHA256`. Android will not verify the App Link → email verification email opens Chrome instead of the app; iOS is unaffected because AASA has real values.
 
-### Files touched
+- This is a user-supplied secret (the SHA-256 fingerprints only exist in Play Console → App integrity → App signing), so the fix cannot be silently coded. Instead:
+  - Confirm the previous checklist lines in `scripts/android-post-sync.sh` (added last turn) are still present.
+  - Add a build-time script `scripts/check-assetlinks.mjs` invoked from `android-post-sync.sh` that fails loudly (non-zero exit) if `assetlinks.json` still contains any `REPLACE_WITH_` placeholder, blocking the AAB from being uploaded with unverified App Links.
+  - Add one line to `README.md` (or the Android section of it, wherever the release checklist lives) with the exact two fingerprint locations in Play Console.
+- No JSON auto-edit — user must paste real values themselves.
 
-- `public/.well-known/assetlinks.json` — verify/patch fingerprints structure only
-- `src/pages/AuthCallback.tsx` — browser-safe fallback path (small conditional)
-- `src/lib/pushNotifications.ts` — one extra diagnostic log line on Android FCM failure
-- `scripts/android-post-sync.sh` — two extra checklist lines
+### Gap 3 — Receipt PDF export on Android WebView
+
+`src/pages/ReceiptHistory.tsx:60` gates the native Filesystem-write + Share sheet on `Capacitor.getPlatform() === "ios"`. Android native drops into the browser `<a href=blob download>` path, which typically no-ops silently inside the Android WebView (no user feedback, no file saved).
+
+- Broaden the branch to `Capacitor.isNativePlatform()` so Android also gets the Filesystem+Share treatment. `@capacitor/filesystem` and `@capacitor/share` already work on Android; no new dependency.
+
+### Cosmetic — iOS-flavored push message strings
+
+`src/lib/pushNotifications.ts` messages say "iOS Settings" / "iOS did not return an APNs token" even on Android. The workflow itself is already platform-generic; only the user/log copy needs to branch on `Capacitor.getPlatform()` to say "Android Settings" / "This device did not return a push token" when appropriate. Small quality-of-life fix, no functional change.
 
 ### Explicitly NOT changed
 
-- No modification to Capacitor config, Gradle, MainActivity, or plugin versions.
-- No auth-flow or session logic changes.
-- No changes to `src/main.tsx`, `index.html`, or splash timing (already done last turn).
-- No version bump — 66.0.4 from last turn is still the target AAB.
+- No changes to Capacitor plugin versions, Gradle files, or MainActivity.
+- No changes to splash timing, boot sequence, or root-route redirect (already at parity).
+- No changes to iOS code paths.
+- No changes to `capacitor.config.ts`.
+- No secret injection into `assetlinks.json` — the user pastes fingerprints, the script only enforces they're not placeholders.
 
-### After merge — user steps
+### Files changed
+
+- `src/lib/googlePlayReceiptQueue.ts` (new)
+- `src/lib/googlePlayPurchase.ts` (enqueue-before-validate, friendlier failure copy)
+- `src/lib/capacitorInit.ts` (Android drain branch + listeners)
+- `supabase/functions/validate-google-receipt/index.ts` (write to ledger before mutating plans)
+- `supabase/migrations/<new>.sql` (create `google_iap_grants` table with GRANTs + RLS)
+- `scripts/check-assetlinks.mjs` (new — placeholder check)
+- `scripts/android-post-sync.sh` (call the checker)
+- `src/pages/ReceiptHistory.tsx` (broaden native branch)
+- `src/lib/pushNotifications.ts` (message copy only)
+
+### User steps after merge
 
 ```
 bash scripts/pull-updates.sh
-# Get release SHA-256 from Play Console → App integrity → App signing
-# Paste it into public/.well-known/assetlinks.json (if missing)
+# Paste real SHA-256s into public/.well-known/assetlinks.json (from Play Console)
 npm run build && npx cap sync android && bash scripts/android-post-sync.sh
+# (post-sync will now fail if fingerprints are still placeholders)
 npx cap open android   # rebuild signed AAB → upload
 ```
 
-Once uploaded, the reviewer's verification email link will open directly in the app on Android, closing the most likely "app does not open or load" path.
+Result: Android email-verify links open the app, Android purchases self-heal the same way iOS purchases already do, Android PDF exports actually save/share, and push copy no longer says "iOS" on Android.

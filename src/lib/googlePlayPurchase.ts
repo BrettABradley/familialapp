@@ -1,5 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import { isAndroidNative } from "./platform";
+import {
+  enqueuePendingGoogleReceipt,
+  removePendingGoogleReceipt,
+  submitGoogleReceipt,
+} from "./googlePlayReceiptQueue";
+
 
 /**
  * Google Play product IDs — must match Play Console SKUs.
@@ -111,24 +117,35 @@ export const purchaseSubscription = async (
     throw new Error("Purchase completed but no purchase token was returned.");
   }
 
-  const { data, error } = await supabase.functions.invoke("validate-google-receipt", {
-    body: {
-      kind: "subscription",
-      productId,
-      purchaseToken,
-      ...(extras ?? {}),
-    },
+  // Persist BEFORE calling the backend so a failure never loses the receipt.
+  // The queue drains on launch / resume / sign-in and the server-side
+  // google_iap_grants unique index makes retries safe.
+  enqueuePendingGoogleReceipt({
+    kind: "subscription",
+    productId,
+    purchaseToken,
+    circleId: extras?.circleId,
+    rescue_circle_id: extras?.rescue_circle_id,
   });
 
-  if (error || (data as any)?.error) {
-    const detail = (data as any)?.error || error?.message || "Unknown validation error";
-    console.error("[GoogleIAP] validate-google-receipt failed:", detail);
-    throw new Error(
-      `Payment went through, but we couldn't activate your plan automatically. ` +
-      `Please tap "Restore Purchases" or contact support@familialmedia.com — your purchase is safe. (${detail})`
-    );
+  const submission = await submitGoogleReceipt({
+    id: "", createdAt: 0, attempts: 0,
+    kind: "subscription",
+    productId,
+    purchaseToken,
+    circleId: extras?.circleId,
+    rescue_circle_id: extras?.rescue_circle_id,
+  });
+
+  if (submission === "credited") {
+    removePendingGoogleReceipt(purchaseToken);
+    return true;
   }
-  return true;
+
+  throw new Error(
+    "Google confirmed your payment. We'll finish activating your plan automatically — usually within a few minutes. " +
+    "You can close the app safely; no further action is needed."
+  );
 };
 
 export const purchaseConsumable = async (
@@ -156,22 +173,30 @@ export const purchaseConsumable = async (
     throw new Error("Purchase completed but no purchase token was returned.");
   }
 
-  const { error } = await supabase.functions.invoke("validate-google-receipt", {
-    body: {
-      kind: extras.kind,
-      productId,
-      purchaseToken,
-      circleId: extras.circleId,
-    },
+  enqueuePendingGoogleReceipt({
+    kind: extras.kind,
+    productId,
+    purchaseToken,
+    circleId: extras.circleId,
   });
 
-  if (error) {
-    throw new Error(
-      "Payment succeeded but we couldn't add the seats. Please contact support@familialmedia.com — your purchase is safe."
-    );
+  const submission = await submitGoogleReceipt({
+    id: "", createdAt: 0, attempts: 0,
+    kind: extras.kind,
+    productId,
+    purchaseToken,
+    circleId: extras.circleId,
+  });
+
+  if (submission === "credited") {
+    removePendingGoogleReceipt(purchaseToken);
+    return true;
   }
 
-  return true;
+  throw new Error(
+    "Google confirmed your payment. We'll finish adding your seats automatically — usually within a few minutes. " +
+    "You can close the app safely; no further action is needed."
+  );
 };
 
 export const restorePurchases = async (): Promise<boolean> => {
@@ -183,9 +208,17 @@ export const restorePurchases = async (): Promise<boolean> => {
     const { error } = await supabase.functions.invoke("validate-google-receipt", {
       body: { restore: true },
     });
+    // Also drain any queued receipts that never made it through.
+    const { drainPendingGoogleReceipts } = await import("./googlePlayReceiptQueue");
+    const credited = await drainPendingGoogleReceipts();
+    console.log("[GoogleIAP] restorePurchases drained", { credited });
     return !error;
   } catch (err) {
     console.warn("[GoogleIAP] restorePurchases failed:", err);
+    try {
+      const { drainPendingGoogleReceipts } = await import("./googlePlayReceiptQueue");
+      await drainPendingGoogleReceipts();
+    } catch {}
     return false;
   }
 };

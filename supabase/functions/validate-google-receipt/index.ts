@@ -219,6 +219,28 @@ serve(async (req) => {
       throw new Error("productId and purchaseToken are required");
     }
 
+    // === Idempotency: check google_iap_grants ledger ===
+    // If we've already credited this purchase_token, return success without
+    // re-running the plan/circle mutation. Mirrors apple_iap_grants and makes
+    // client-side retry queues safe (network blip + relaunch = no double-grant).
+    const { data: priorGrant } = await serviceClient
+      .from("google_iap_grants")
+      .select("id, kind, product_id, granted_at")
+      .eq("purchase_token", purchaseToken)
+      .maybeSingle();
+
+    if (priorGrant) {
+      console.log("[validate-google-receipt] duplicate purchase_token — returning prior grant", {
+        userId: user.id,
+        productId,
+        grantedAt: priorGrant.granted_at,
+      });
+      return new Response(
+        JSON.stringify({ success: true, duplicate: true, kind: priorGrant.kind }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     // === Extra Members consumable ===
     if (kind === "extra_members" || productId === EXTRA_MEMBERS_PRODUCT) {
       if (!circleId) throw new Error("circleId is required for extra_members");
@@ -260,6 +282,27 @@ serve(async (req) => {
         );
       }
 
+      // Record the grant BEFORE mutating so a race between duplicate calls
+      // can't double-credit. If insert loses the unique-index race, the
+      // other caller already handled it — return success and skip mutation.
+      const { error: ledgerErr } = await serviceClient
+        .from("google_iap_grants")
+        .insert({
+          user_id: user.id,
+          purchase_token: purchaseToken,
+          product_id: productId,
+          kind: "extra_members",
+          circle_id: circleId,
+          source: "google",
+        });
+      if (ledgerErr) {
+        console.log("[validate-google-receipt] extra_members ledger insert lost race — returning success", ledgerErr.message);
+        return new Response(
+          JSON.stringify({ success: true, duplicate: true, kind: "extra_members" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
       const { error: updErr } = await serviceClient
         .from("circles")
         .update({ extra_members: (circle.extra_members ?? 0) + EXTRA_MEMBERS_INCREMENT })
@@ -295,6 +338,25 @@ serve(async (req) => {
     const expiresMs = sub.expiryTimeMillis ? Number(sub.expiryTimeMillis) : null;
     if (expiresMs && expiresMs < Date.now()) {
       throw new Error("Subscription has expired");
+    }
+
+    // Record grant BEFORE mutating user_plans so a race between duplicate
+    // calls cannot double-apply the plan.
+    const { error: subLedgerErr } = await serviceClient
+      .from("google_iap_grants")
+      .insert({
+        user_id: user.id,
+        purchase_token: purchaseToken,
+        product_id: productId,
+        kind: "subscription",
+        source: "google",
+      });
+    if (subLedgerErr) {
+      console.log("[validate-google-receipt] subscription ledger insert lost race — returning success", subLedgerErr.message);
+      return new Response(
+        JSON.stringify({ success: true, duplicate: true, plan: planConfig.plan }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     const { error: updateError } = await serviceClient

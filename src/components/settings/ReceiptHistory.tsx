@@ -57,8 +57,10 @@ const ReceiptHistory = () => {
       const filename = `Familial-Receipt-${new Date(receipt.date).toLocaleDateString("en-US").replace(/\//g, "-")}.pdf`;
 
       const { Capacitor } = await import("@capacitor/core");
-      if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios") {
-        // iOS WKWebView: write to filesystem and open native share sheet
+      if (Capacitor.isNativePlatform()) {
+        // iOS + Android native: write to filesystem and open native share sheet.
+        // Android WebView silently ignores <a download> blob URLs, so the
+        // Filesystem+Share path is the only reliable native export.
         const arrayBuf = await blob.arrayBuffer();
         const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
         const { Filesystem, Directory } = await import("@capacitor/filesystem");
