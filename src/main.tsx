@@ -54,8 +54,8 @@ try {
         el.classList.add("splash-hide");
         setTimeout(() => {
           el.parentNode?.removeChild(el);
-        }, 800);
-      }, 2500);
+        }, 400);
+      }, 600);
     });
   });
 } catch (e) {

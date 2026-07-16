@@ -59,7 +59,7 @@
         align-items: center;
         justify-content: center;
         z-index: 2147483647;
-        transition: opacity 700ms ease;
+        transition: opacity 400ms ease;
         opacity: 1;
       }
       #splash.splash-hide {
@@ -138,9 +138,33 @@
         var s = document.getElementById("splash");
         if (s && !s.classList.contains("splash-hide")) {
           s.classList.add("splash-hide");
-          setTimeout(function () { s && s.parentNode && s.parentNode.removeChild(s); }, 800);
+          setTimeout(function () { s && s.parentNode && s.parentNode.removeChild(s); }, 400);
         }
       }, 5000);
+    </script>
+
+    <script>
+      // Bundle-load failure fallback — if the module bundle hasn't executed
+      // within 8s (e.g. a chunk 404'd after an install on Android), replace
+      // the blank white screen with a minimal reload UI so the WebView
+      // never appears "stuck loading" to a reviewer.
+      window.__familialBootOk = false;
+      setTimeout(function () {
+        if (window.__familialBootOk) return;
+        try {
+          var root = document.getElementById("root");
+          var splash = document.getElementById("splash");
+          if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
+          if (root) {
+            root.innerHTML =
+              '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#fff;color:#0a0a0a;font-family:-apple-system,system-ui,sans-serif;text-align:center">' +
+              '<div><h1 style="font-size:20px;margin:0 0 12px">Familial couldn\u2019t load</h1>' +
+              '<p style="margin:0 0 20px;color:#555;font-size:14px">Please check your connection and try again.</p>' +
+              '<button onclick="window.location.reload()" style="background:#0a0a0a;color:#fff;border:0;border-radius:10px;padding:12px 20px;font-size:14px;font-weight:600">Reload</button>' +
+              '</div></div>';
+          }
+        } catch (e) { /* non-fatal */ }
+      }, 8000);
     </script>
 
     <script type="module" src="/src/main.tsx"></script>
