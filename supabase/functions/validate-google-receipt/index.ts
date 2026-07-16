@@ -340,6 +340,25 @@ serve(async (req) => {
       throw new Error("Subscription has expired");
     }
 
+    // Record grant BEFORE mutating user_plans so a race between duplicate
+    // calls cannot double-apply the plan.
+    const { error: subLedgerErr } = await serviceClient
+      .from("google_iap_grants")
+      .insert({
+        user_id: user.id,
+        purchase_token: purchaseToken,
+        product_id: productId,
+        kind: "subscription",
+        source: "google",
+      });
+    if (subLedgerErr) {
+      console.log("[validate-google-receipt] subscription ledger insert lost race — returning success", subLedgerErr.message);
+      return new Response(
+        JSON.stringify({ success: true, duplicate: true, plan: planConfig.plan }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const { error: updateError } = await serviceClient
       .from("user_plans")
       .update({
