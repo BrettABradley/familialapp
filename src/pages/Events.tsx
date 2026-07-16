@@ -174,6 +174,30 @@ const Events = () => {
     }
   }, [circles, selectedCircle, contextLoading]);
 
+  // Re-fetch at the next Upcoming/Past boundary (12:00 or 00:00 local) so a
+  // user with the page open sees today's event move to Past on time.
+  useEffect(() => {
+    if (circles.length === 0) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const schedule = () => {
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        fetchEvents();
+        fetchPastEvents();
+        schedule();
+      }, msUntilNextEventBoundary());
+    };
+    schedule();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [circles, selectedCircle]);
+
+
+
   // Deep-link: scroll to a specific event when eventId is in the URL
   useEffect(() => {
     if (!deepLinkEventId || isLoadingEvents || scrolledRef.current) return;
