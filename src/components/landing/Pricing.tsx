@@ -123,14 +123,16 @@ const Pricing = () => {
   // Also captures live localized prices to render in the tier cards (App Store
   // guideline 3.1.2(c) requires displaying the actual price at point of purchase).
   useEffect(() => {
-    if (!isIOSNative()) return;
+    if (!isMobileNative()) return;
     prewarmProducts().then((products) => {
+      const familyId = productIdFor("family");
+      const extendedId = productIdFor("extended");
       const map: Record<string, string> = {};
       for (const p of products) {
-        const id = p?.identifier ?? p?.productIdentifier;
+        const id = p?.identifier ?? p?.productIdentifier ?? p?.productId;
         const price = p?.priceString ?? p?.localizedPrice ?? p?.price;
-        if (id === APPLE_PRODUCTS.family && price) map.family = String(price);
-        if (id === APPLE_PRODUCTS.extended && price) map.extended = String(price);
+        if (id === familyId && price) map.family = String(price);
+        if (id === extendedId && price) map.extended = String(price);
       }
       if (Object.keys(map).length > 0) setLivePrices(map);
     });
