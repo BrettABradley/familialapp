@@ -214,7 +214,7 @@ const Auth = () => {
       const { priceId, mode } = PLAN_PRICES[planParam];
       supabase.functions.invoke("create-checkout", {
         body: { priceId, mode },
-      }).then(({ data, error }) => {
+      }).then(async ({ data, error }) => {
         if (error || !data?.url) {
           toast({ title: "Checkout error", description: "Could not start checkout. Please try again from your circles page.", variant: "destructive" });
           navigate("/circles");
