@@ -39,6 +39,31 @@ const formatDateToYMD = (date: Date): string => {
   return `${y}-${m}-${d}`;
 };
 
+/**
+ * Boundary date between "Upcoming" and "Past" tabs, computed in LOCAL time.
+ * - Before noon local: cutoff = today (today's events stay in Upcoming).
+ * - At/after noon local: cutoff = tomorrow (today's events move to Past).
+ * Returns "YYYY-MM-DD" in local timezone.
+ */
+const getEventCutoffDate = (): string => {
+  const now = new Date();
+  if (now.getHours() >= 12) now.setDate(now.getDate() + 1);
+  return formatDateToYMD(now);
+};
+
+/** ms until the next 00:00 or 12:00 local, whichever comes first. */
+const msUntilNextEventBoundary = (): number => {
+  const now = new Date();
+  const next = new Date(now);
+  if (now.getHours() < 12) {
+    next.setHours(12, 0, 0, 0);
+  } else {
+    next.setDate(next.getDate() + 1);
+    next.setHours(0, 0, 0, 0);
+  }
+  return Math.max(1000, next.getTime() - now.getTime());
+};
+
 const formatTime12h = (time: string): string => {
   try {
     const parsed = parse(time, "HH:mm:ss", new Date());
@@ -149,6 +174,30 @@ const Events = () => {
     }
   }, [circles, selectedCircle, contextLoading]);
 
+  // Re-fetch at the next Upcoming/Past boundary (12:00 or 00:00 local) so a
+  // user with the page open sees today's event move to Past on time.
+  useEffect(() => {
+    if (circles.length === 0) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const schedule = () => {
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        fetchEvents();
+        fetchPastEvents();
+        schedule();
+      }, msUntilNextEventBoundary());
+    };
+    schedule();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [circles, selectedCircle]);
+
+
+
   // Deep-link: scroll to a specific event when eventId is in the URL
   useEffect(() => {
     if (!deepLinkEventId || isLoadingEvents || scrolledRef.current) return;
@@ -227,11 +276,13 @@ const Events = () => {
     const circleIds = selectedCircle ? [selectedCircle] : circles.map(c => c.id);
     const cursor = !reset && events.length > 0 ? events[events.length - 1].event_date : null;
 
+    const cutoff = getEventCutoffDate();
+
     let query = supabase
       .from("events")
       .select(`*, circles!events_circle_id_fkey(id, name), photo_albums(id, name, circle_id)`)
       .in("circle_id", circleIds)
-      .gte("event_date", new Date().toISOString().split("T")[0])
+      .or(`event_date.gte.${cutoff},end_date.gte.${cutoff}`)
       .order("event_date", { ascending: true })
       .limit(PAGE_SIZE);
 
@@ -252,11 +303,14 @@ const Events = () => {
     const circleIds = selectedCircle ? [selectedCircle] : circles.map(c => c.id);
     const cursor = !reset && pastEvents.length > 0 ? pastEvents[pastEvents.length - 1].event_date : null;
 
+    const cutoff = getEventCutoffDate();
+
     let query = supabase
       .from("events")
       .select(`*, circles!events_circle_id_fkey(id, name), photo_albums(id, name, circle_id)`)
       .in("circle_id", circleIds)
-      .lt("event_date", new Date().toISOString().split("T")[0])
+      .lt("event_date", cutoff)
+      .or(`end_date.is.null,end_date.lt.${cutoff}`)
       .order("event_date", { ascending: false })
       .limit(PAGE_SIZE);
 
