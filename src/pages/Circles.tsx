@@ -25,7 +25,8 @@ import PendingInvites from "@/components/circles/PendingInvites";
 import UpgradePlanDialog from "@/components/circles/UpgradePlanDialog";
 import CircleRescueDialog from "@/components/circles/CircleRescueDialog";
 import { checkCircleCapacity, getCircleMemberCount, getCircleMemberLimit } from "@/lib/circleLimits";
-import { isIOSNative, purchaseConsumable, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import { isMobileNative, purchaseConsumable, productIdFor } from "@/lib/mobilePurchase";
+import { openExternalUrl } from "@/lib/externalUrl";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 
 interface Circle {
@@ -1008,8 +1009,13 @@ const Circles = () => {
                   onClick={async () => {
                     setIsMembersOpen(false);
                     try {
-                      if (isIOSNative()) {
-                        const success = await purchaseConsumable(APPLE_PRODUCTS.extraMembers, {
+                      if (isMobileNative()) {
+                        const extraId = productIdFor("extraMembers");
+                        if (!extraId) {
+                          toast({ title: "Unavailable", description: "Extra seats aren't available in this app version.", variant: "destructive" });
+                          return;
+                        }
+                        const success = await purchaseConsumable(extraId, {
                           circleId: selectedCircle.id,
                           kind: "extra_members",
                         });
@@ -1033,7 +1039,7 @@ const Circles = () => {
                         return;
                       }
                       if (data?.url) {
-                        window.location.href = data.url;
+                        await openExternalUrl(data.url);
                       }
                     } catch (err: any) {
                       toast({ title: "Error", description: err.message || "Failed to start checkout.", variant: "destructive" });
