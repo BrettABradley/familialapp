@@ -10,6 +10,7 @@ import { openExternalUrl } from "@/lib/externalUrl";
 import {
   isIOSNative,
   isAndroidNative,
+  isMobileNative,
   purchaseSubscription,
   purchaseConsumable,
   prewarmProducts,
@@ -323,7 +324,7 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
                       </Button>
                     </div>
                   </div>
-                  {isIOSNative() && option.key !== "extra" && (
+                  {isMobileNative() && option.key !== "extra" && (
                     <SubscriptionDisclosure variant="compact" className="mt-3" />
                   )}
                 </CardContent>
@@ -336,7 +337,7 @@ const UpgradePlanDialog = ({ isOpen, onClose, currentPlan, currentCount, limit, 
               </p>
             )}
 
-            {isIOSNative() && (
+            {isMobileNative() && (
               <SubscriptionDisclosure variant="full" className="mt-2" />
             )}
           </div>

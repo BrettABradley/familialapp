@@ -3,7 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Phone, Mail, ArrowRight, Loader2, Camera, Calendar, MessageCircle, Smartphone, Users, Bell, Shield, Image, Video, Settings, Globe, StickyNote } from "lucide-react";
 import { openExternalUrl } from "@/lib/externalUrl";
-import { isIOSNative, purchaseSubscription, restorePurchases, prewarmProducts, APPLE_PRODUCTS, openAppleSubscriptionManagement } from "@/lib/iapPurchase";
+import {
+  isIOSNative,
+  isAndroidNative,
+  isMobileNative,
+  purchaseSubscription,
+  restorePurchases,
+  prewarmProducts,
+  productIdFor,
+  openNativeSubscriptionManagement,
+} from "@/lib/mobilePurchase";
 import SubscriptionDisclosure from "@/components/shared/SubscriptionDisclosure";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -114,14 +123,16 @@ const Pricing = () => {
   // Also captures live localized prices to render in the tier cards (App Store
   // guideline 3.1.2(c) requires displaying the actual price at point of purchase).
   useEffect(() => {
-    if (!isIOSNative()) return;
+    if (!isMobileNative()) return;
     prewarmProducts().then((products) => {
+      const familyId = productIdFor("family");
+      const extendedId = productIdFor("extended");
       const map: Record<string, string> = {};
       for (const p of products) {
-        const id = p?.identifier ?? p?.productIdentifier;
+        const id = p?.identifier ?? p?.productIdentifier ?? p?.productId;
         const price = p?.priceString ?? p?.localizedPrice ?? p?.price;
-        if (id === APPLE_PRODUCTS.family && price) map.family = String(price);
-        if (id === APPLE_PRODUCTS.extended && price) map.extended = String(price);
+        if (id === familyId && price) map.family = String(price);
+        if (id === extendedId && price) map.extended = String(price);
       }
       if (Object.keys(map).length > 0) setLivePrices(map);
     });
@@ -250,13 +261,14 @@ const Pricing = () => {
     const currentRank = PLAN_RANK[currentPlan || "free"] ?? 0;
     const targetRank = PLAN_RANK[plan] ?? 0;
 
-    // iOS native: try Apple IAP first, fall back to Stripe checkout via in-app browser
-    if (isIOSNative()) {
-      const appleProductId = APPLE_PRODUCTS[plan as keyof typeof APPLE_PRODUCTS];
-      if (appleProductId) {
+    // Native mobile (iOS/Android): must use platform IAP.
+    // iOS = App Store guideline 3.1.1; Android = Play policy 3.4.
+    if (isMobileNative()) {
+      const nativeProductId = productIdFor(plan as "family" | "extended");
+      if (nativeProductId) {
         setLoadingPlan(plan);
         try {
-          const success = await purchaseSubscription(appleProductId);
+          const success = await purchaseSubscription(nativeProductId);
           if (success) {
             const { data } = await supabase.from("user_plans").select("plan, cancel_at_period_end, current_period_end, pending_plan").eq("user_id", user.id).single();
             if (data) {
@@ -273,15 +285,15 @@ const Pricing = () => {
           setLoadingPlan(null);
           return;
         } catch (err: any) {
-          // iOS native must NEVER fall back to Stripe (App Store guideline 3.1.1)
+          // Native must NEVER fall back to Stripe (store policy).
           console.error("IAP failed:", err?.message);
           toast({ title: "Purchase failed", description: err?.message || "Could not complete purchase. Please try again.", variant: "destructive" });
           setLoadingPlan(null);
           return;
         }
       }
-      // No matching Apple product — show error rather than falling back to Stripe
-      toast({ title: "Unavailable", description: "This plan isn't available for purchase in the iOS app.", variant: "destructive" });
+      // No matching native product — show error rather than falling back to Stripe
+      toast({ title: "Unavailable", description: "This plan isn't available for purchase in the mobile app.", variant: "destructive" });
       return;
     }
 
@@ -332,10 +344,10 @@ const Pricing = () => {
 
 
   const handleCancelConfirm = async () => {
-    // Apple-managed subscriptions can't be cancelled via Stripe — hand off to App Store
-    if (planSource === "apple" || isIOSNative()) {
+    // Store-managed subscriptions can't be cancelled via Stripe — hand off to the native store
+    if (planSource === "apple" || planSource === "google" || isMobileNative()) {
       setConfirmDialog(null);
-      openAppleSubscriptionManagement();
+      openNativeSubscriptionManagement(confirmDialog?.targetPlan);
       return;
     }
     setCancelingPlan(true);
@@ -502,16 +514,19 @@ const Pricing = () => {
     }
 
     const isApple = planSource === "apple" || isIOSNative();
+    const isGoogle = planSource === "google" || isAndroidNative();
+    const isStoreManaged = isApple || isGoogle;
 
-    if (isApple) {
+    if (isStoreManaged) {
+      const label = isGoogle && !isApple ? "Manage in Google Play" : "Manage in App Store";
       return (
         <Button
           variant="outline"
           className="w-full"
           size="lg"
-          onClick={() => openAppleSubscriptionManagement()}
+          onClick={() => openNativeSubscriptionManagement(tierPlan as "family" | "extended")}
         >
-          Manage in App Store
+          {label}
         </Button>
       );
     }
@@ -607,7 +622,7 @@ const Pricing = () => {
                 </ul>
                 <div className="pt-4">
                   {getButtonForTier(tier.plan, tier.popular, tier.cta)}
-                  {isIOSNative() && tier.plan !== "free" && (
+                  {isMobileNative() && tier.plan !== "free" && (
                     <SubscriptionDisclosure variant="compact" className="mt-3 text-center" />
                   )}
                 </div>
@@ -616,8 +631,8 @@ const Pricing = () => {
           ))}
         </div>
 
-        {/* Restore Purchases — iOS only */}
-        {isIOSNative() && user && (
+        {/* Restore Purchases — native mobile only */}
+        {isMobileNative() && user && (
           <div className="text-center mb-8">
             <Button
               variant="link"

@@ -18,7 +18,7 @@ import AvatarCropDialog from "@/components/profile/AvatarCropDialog";
 import { convertHeicToJpeg } from "@/lib/heicConverter";
 import { pickImage } from "@/lib/imagePicker";
 import SubscriptionCard from "@/components/settings/SubscriptionCard";
-import { isIOSNative, openAppleSubscriptionManagement } from "@/lib/iapPurchase";
+import { isIOSNative, isAndroidNative, isMobileNative, openNativeSubscriptionManagement } from "@/lib/mobilePurchase";
 import { registerForPushNotifications } from "@/lib/pushNotifications";
 import ReceiptHistory from "@/components/settings/ReceiptHistory";
 import { useIsPlatformAdmin } from "@/hooks/useIsPlatformAdmin";
@@ -364,8 +364,15 @@ const Settings = () => {
       <SubscriptionCard />
       {isIOSNative() && (
         <div className="mt-4">
-          <Button variant="outline" className="w-full" onClick={openAppleSubscriptionManagement}>
+          <Button variant="outline" className="w-full" onClick={() => openNativeSubscriptionManagement()}>
             Manage Subscription (Apple)
+          </Button>
+        </div>
+      )}
+      {isAndroidNative() && (
+        <div className="mt-4">
+          <Button variant="outline" className="w-full" onClick={() => openNativeSubscriptionManagement()}>
+            Manage Subscription (Google Play)
           </Button>
         </div>
       )}
@@ -410,7 +417,7 @@ const Settings = () => {
               onCheckedChange={async (v) => {
                 setPushEnabled(v);
                 await saveNotifPrefs({ push_enabled: v });
-                if (v && isIOSNative()) {
+                if (v && isMobileNative()) {
                   const result = await registerForPushNotifications({ force: true });
                   if (!result.ok) {
                     toast({ title: "Push setup failed", description: result.message, variant: "destructive" });
@@ -627,8 +634,8 @@ const Settings = () => {
               const text = await res.text();
               const filename = `familial-data-${new Date().toISOString().split("T")[0]}.json`;
 
-              if (isIOSNative()) {
-                // iOS WKWebView blocks <a download> — use Filesystem + Share sheet
+              if (isMobileNative()) {
+                // Native WebViews (iOS/Android) block <a download> — use Filesystem + Share sheet
                 const { Filesystem, Directory, Encoding } = await import("@capacitor/filesystem");
                 const { Share } = await import("@capacitor/share");
                 const writeRes = await Filesystem.writeFile({

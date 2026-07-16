@@ -1,69 +1,76 @@
-## Android ⇄ iOS workflow parity — plan
+## Harden Android user flow — mirror iOS parity, remove crash-prone Stripe fallbacks
 
-Comparison of the Android and iOS code paths found the boot, splash, status-bar, keyboard, safe-area, push-registration, deep-link listener, and root-route redirect are already platform-generic and fire identically. Real divergences remaining are three focused items. Fixing them brings Android's user-visible workflow to parity with iOS without touching any legitimate platform-specific plumbing (APNs vs FCM, StoreKit vs Play Billing APIs, etc.).
+The iOS flow is stable because every purchase / restore / manage / push branch is explicitly gated to `isIOSNative()` **and** routed to StoreKit. On Android, most of those same branches silently fall through the iOS gate and hit the Stripe path — which either fails Play policy 3.4, forces a `window.location.href = stripeUrl` out of the WebView (looks like a crash), or leaves the user stuck.
 
-### Gap 1 — Google Play IAP receipt reliability (highest impact)
+The `src/lib/mobilePurchase.ts` facade already routes Apple ⇄ Google correctly. It's just barely used — most call sites import `iapPurchase` (Apple) directly. This plan routes every purchase surface through the facade so Android automatically gets the Play Billing path with the same hardened queue + retry the last turn added.
 
-iOS persists every purchase to `localStorage` under `pendingAppleReceipts.v1` *before* calling the backend, then drains the queue on boot (via `capacitorInit.ts`), on `appStateChange` foreground resume, and after sign-in/token-refresh. A charged-but-un-validated purchase self-heals. Google Play has none of this — `googlePlayPurchase.ts` calls `validate-google-receipt` inline and throws a "contact support" error on failure.
+### Gap A — `src/pages/Auth.tsx` post-signup purchase (line 187-210)
 
-**Mirror the Apple pattern on Android:**
+`if (isIOSNative()) { purchaseSubscription(APPLE_PRODUCTS...) } else { create-checkout → window.location.href = data.url }`. On Android native, the else branch tries to leave the WebView for a Stripe URL — Play reviewers reject this as broken.
 
-- Add `src/lib/googlePlayReceiptQueue.ts` exposing `enqueuePendingGoogleReceipt(entry)`, `drainPendingGoogleReceipts()`, and a `PENDING_KEY = "pendingGoogleReceipts.v1"` — structurally identical to the Apple counterpart in `iapPurchase.ts`.
-- In `src/lib/googlePlayPurchase.ts`, `enqueue` the `{ purchaseToken, productId, packageName, userId, kind }` payload *before* calling `validate-google-receipt`. On success, remove from queue. On failure, leave it in place and swallow the throw into a friendlier "we'll finish this shortly" message.
-- In `src/lib/capacitorInit.ts`, add an `isAndroidNative()` branch parallel to the existing `isIOSNative()` block that:
-  - Calls `drainPendingGoogleReceipts()` 2.5s after boot.
-  - Registers the same `App.addListener('appStateChange', ...)` foreground-resume drain.
-  - Registers the same auth-state drain hook.
-- Server-side: add a `google_iap_grants` idempotent ledger table (`{ id, user_id, purchase_token UNIQUE, product_id, granted_at, source }`) and have `validate-google-receipt` insert on that unique key before mutating `circles`/`user_plans`. On conflict → return the prior grant unchanged. This mirrors `apple_iap_grants` and makes client retries safe.
+Fix: replace with `mobilePurchase.productIdFor(plan)` + `mobilePurchase.purchaseSubscription(id)`. Fall through to Stripe only when `!isMobileNative()` (web).
 
-### Gap 2 — Android App Links / email-verify deep-link handoff
+### Gap B — `src/pages/Circles.tsx` extra-members button (line 1011-1030)
 
-`public/.well-known/assetlinks.json` still contains `REPLACE_WITH_PLAY_APP_SIGNING_SHA256` / `REPLACE_WITH_UPLOAD_KEY_SHA256`. Android will not verify the App Link → email verification email opens Chrome instead of the app; iOS is unaffected because AASA has real values.
+Same pattern for the consumable. Route through `mobilePurchase.purchaseConsumable(productIdFor('extraMembers'))`. Web-only fallback to Stripe.
 
-- This is a user-supplied secret (the SHA-256 fingerprints only exist in Play Console → App integrity → App signing), so the fix cannot be silently coded. Instead:
-  - Confirm the previous checklist lines in `scripts/android-post-sync.sh` (added last turn) are still present.
-  - Add a build-time script `scripts/check-assetlinks.mjs` invoked from `android-post-sync.sh` that fails loudly (non-zero exit) if `assetlinks.json` still contains any `REPLACE_WITH_` placeholder, blocking the AAB from being uploaded with unverified App Links.
-  - Add one line to `README.md` (or the Android section of it, wherever the release checklist lives) with the exact two fingerprint locations in Play Console.
-- No JSON auto-edit — user must paste real values themselves.
+### Gap C — `src/components/landing/Pricing.tsx` (lines 117, 254, 336, 504, 610, 620)
 
-### Gap 3 — Receipt PDF export on Android WebView
+Six iOS-only gates:
+- **117** — StoreKit prewarm useEffect. Also prewarm Google on Android via facade.
+- **254** — Upgrade click iOS-only branch → widen to any native platform via facade.
+- **336, 504** — "Manage in App Store" button. Show "Manage in Google Play" on Android via `openNativeSubscriptionManagement(productId)`.
+- **610, 620** — `SubscriptionDisclosure` + "Restore Purchases" button rendered only on iOS. Show both on Android too (Play has similar consumer-disclosure requirements and Restore is needed to trigger the queue drain).
 
-`src/pages/ReceiptHistory.tsx:60` gates the native Filesystem-write + Share sheet on `Capacitor.getPlatform() === "ios"`. Android native drops into the browser `<a href=blob download>` path, which typically no-ops silently inside the Android WebView (no user feedback, no file saved).
+### Gap D — `src/pages/Settings.tsx` (lines 365-371, 413, 630)
 
-- Broaden the branch to `Capacitor.isNativePlatform()` so Android also gets the Filesystem+Share treatment. `@capacitor/filesystem` and `@capacitor/share` already work on Android; no new dependency.
+- **365-371** — "Manage Subscription (Apple)" button hidden on Android. Add an equivalent Google button that calls `openPlaySubscriptionManagement(productId)` when `isAndroidNative()`.
+- **413** — push toggle re-registers only on iOS. Widen to `isMobileNative()` so Android push registration also fires when the user re-enables the toggle.
+- **630** — "Download My Data" uses `Filesystem+Share` on iOS only; Android falls to `<a download>` which no-ops in the WebView (same bug pattern we already fixed for ReceiptHistory last turn). Broaden to `isMobileNative()`.
 
-### Cosmetic — iOS-flavored push message strings
+### Gap E — `src/components/circles/CircleRescueDialog.tsx` (lines 47, 101, 171)
 
-`src/lib/pushNotifications.ts` messages say "iOS Settings" / "iOS did not return an APNs token" even on Android. The workflow itself is already platform-generic; only the user/log copy needs to branch on `Capacitor.getPlatform()` to say "Android Settings" / "This device did not return a push token" when appropriate. Small quality-of-life fix, no functional change.
+- **47** — prewarm iOS-only. Widen via facade.
+- **101** — Take-Over purchase iOS-only; Android falls to Stripe. Widen via facade.
+- **171** — `SubscriptionDisclosure` shown iOS-only. Render on Android too.
+
+### Gap F — `src/components/circles/UpgradePlanDialog.tsx` (line 326, 339)
+
+Consumer-disclosure copy + Restore/Manage row iOS-only. Mirror on Android.
+
+### Gap G — `src/components/settings/SubscriptionCard.tsx` (line 116-127)
+
+Already correct (iOS → App Store, Android → Play, web → Stripe portal). No change — keep as reference implementation.
+
+### Cross-cutting hardening
+
+- **Wrap every dynamic `import("@capgo/capacitor-purchases")`** load in a try/catch that logs and returns `false`, so a missing/broken plugin on Android can never propagate an unhandled rejection to `window.addEventListener('unhandledrejection')` in `main.tsx` (which Play could log as an error).
+- **`openExternalUrl` guard** — audit calls that pass Stripe URLs on native mobile; on native, route through `@capacitor/browser` (in-app browser tab) instead of `window.location.href`, so a Stripe fallback that DOES fire (e.g. web-purchased plan managed inside the Android app) opens a Custom Tab instead of tearing the WebView down.
+- **Startup drain**: last turn already added the Google receipt queue drain to `capacitorInit.ts`. Confirm it stays on the boot path.
 
 ### Explicitly NOT changed
 
-- No changes to Capacitor plugin versions, Gradle files, or MainActivity.
-- No changes to splash timing, boot sequence, or root-route redirect (already at parity).
-- No changes to iOS code paths.
-- No changes to `capacitor.config.ts`.
-- No secret injection into `assetlinks.json` — the user pastes fingerprints, the script only enforces they're not placeholders.
+- No refactor of `mobilePurchase.ts` shape — call sites just start using it.
+- No changes to native project files (`android/`, `ios/` — not in repo).
+- No changes to `capacitor.config.ts`, splash timing, status bar, keyboard, or push-registration bridge.
+- No changes to `iapPurchase.ts`, `googlePlayPurchase.ts`, or the `google_iap_grants` ledger.
+- No changes to iOS-only visuals (App Store button label stays as-is when on iOS).
 
 ### Files changed
 
-- `src/lib/googlePlayReceiptQueue.ts` (new)
-- `src/lib/googlePlayPurchase.ts` (enqueue-before-validate, friendlier failure copy)
-- `src/lib/capacitorInit.ts` (Android drain branch + listeners)
-- `supabase/functions/validate-google-receipt/index.ts` (write to ledger before mutating plans)
-- `supabase/migrations/<new>.sql` (create `google_iap_grants` table with GRANTs + RLS)
-- `scripts/check-assetlinks.mjs` (new — placeholder check)
-- `scripts/android-post-sync.sh` (call the checker)
-- `src/pages/ReceiptHistory.tsx` (broaden native branch)
-- `src/lib/pushNotifications.ts` (message copy only)
+- `src/pages/Auth.tsx`
+- `src/pages/Circles.tsx`
+- `src/pages/Settings.tsx`
+- `src/components/landing/Pricing.tsx`
+- `src/components/circles/CircleRescueDialog.tsx`
+- `src/components/circles/UpgradePlanDialog.tsx`
+- `src/lib/googlePlayPurchase.ts` (try/catch around plugin dynamic import)
+- Possibly one small helper in `src/lib/mobilePurchase.ts` if a shared "open subscription management with productId lookup" wrapper reduces duplication.
 
-### User steps after merge
+### Expected outcome
 
-```
-bash scripts/pull-updates.sh
-# Paste real SHA-256s into public/.well-known/assetlinks.json (from Play Console)
-npm run build && npx cap sync android && bash scripts/android-post-sync.sh
-# (post-sync will now fail if fingerprints are still placeholders)
-npx cap open android   # rebuild signed AAB → upload
-```
-
-Result: Android email-verify links open the app, Android purchases self-heal the same way iOS purchases already do, Android PDF exports actually save/share, and push copy no longer says "iOS" on Android.
+- Every Android purchase surface routes through Play Billing, not Stripe — no more WebView-crashing `window.location.href` handoff.
+- Restore + Manage buttons work on Android, letting users recover from a queued receipt without a support ticket.
+- Push-permission toggle actually re-registers on Android.
+- Native file exports (Download Data, Receipts) use the share sheet on Android instead of silently failing.
+- All plugin loads are try/catch-guarded so a corrupted `@capgo/capacitor-purchases` install on a specific device can't hard-crash the app.

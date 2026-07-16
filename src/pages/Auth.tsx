@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 import logo from "@/assets/logo.png";
-import { isIOSNative, purchaseSubscription, APPLE_PRODUCTS } from "@/lib/iapPurchase";
+import { isMobileNative, purchaseSubscription, productIdFor } from "@/lib/mobilePurchase";
 import { Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
 import { PullToRefreshWrapper } from "@/components/shared/PullToRefreshWrapper";
 
@@ -187,13 +187,14 @@ const Auth = () => {
     if (!loading && user && planParam && PLAN_PRICES[planParam] && !checkoutTriggered.current) {
       checkoutTriggered.current = true;
 
-      // iOS native: must use Apple IAP (App Store guideline 3.1.1)
-      if (isIOSNative()) {
-        const appleProductId = APPLE_PRODUCTS[planParam as keyof typeof APPLE_PRODUCTS];
-        if (appleProductId) {
+      // Native mobile (iOS/Android): must use the platform's IAP
+      // (App Store guideline 3.1.1 / Play policy 3.4).
+      if (isMobileNative()) {
+        const nativeProductId = productIdFor(planParam as "family" | "extended");
+        if (nativeProductId) {
           (async () => {
             try {
-              const success = await purchaseSubscription(appleProductId);
+              const success = await purchaseSubscription(nativeProductId);
               if (success) {
                 toast({ title: "Plan activated!", description: `You're now on the ${planParam.charAt(0).toUpperCase() + planParam.slice(1)} plan.` });
               }
