@@ -62,14 +62,33 @@ if [ -f "$MANIFEST" ]; then
 fi
 
 # --- 3. Google Services Gradle plugin (FCM) --------------------------------
-if [ -f "$ROOT_GRADLE" ] && ! grep -q 'com.google.gms:google-services' "$ROOT_GRADLE"; then
-  perl -0pi -e 's|(dependencies\s*\{)|$1\n        classpath "com.google.gms:google-services:4.4.2"|' "$ROOT_GRADLE"
-  echo "✅ root build.gradle: google-services classpath added"
-fi
-if [ -f "$APP_GRADLE" ] && ! grep -q "com.google.gms.google-services" "$APP_GRADLE"; then
-  echo "" >> "$APP_GRADLE"
-  echo "apply plugin: 'com.google.gms.google-services'" >> "$APP_GRADLE"
-  echo "✅ app build.gradle: google-services plugin applied"
+# Only apply the google-services plugin when google-services.json exists,
+# otherwise the app crashes on launch with "Default FirebaseApp is not
+# initialized". If the JSON was later removed, strip previously-injected
+# lines so an FCM-less build still boots cleanly.
+GS_JSON="$ANDROID_DIR/app/google-services.json"
+if [ -f "$GS_JSON" ]; then
+  if [ -f "$ROOT_GRADLE" ] && ! grep -q 'com.google.gms:google-services' "$ROOT_GRADLE"; then
+    perl -0pi -e 's|(dependencies\s*\{)|$1\n        classpath "com.google.gms:google-services:4.4.2"|' "$ROOT_GRADLE"
+    echo "✅ root build.gradle: google-services classpath added"
+  fi
+  if [ -f "$APP_GRADLE" ] && ! grep -q "com.google.gms.google-services" "$APP_GRADLE"; then
+    echo "" >> "$APP_GRADLE"
+    echo "apply plugin: 'com.google.gms.google-services'" >> "$APP_GRADLE"
+    echo "✅ app build.gradle: google-services plugin applied"
+  fi
+else
+  # Strip google-services wiring if it was previously injected — an app
+  # with the plugin applied but no google-services.json will hard-crash at
+  # boot, which is what Play reviewers flag as "Broken Functionality".
+  if [ -f "$ROOT_GRADLE" ] && grep -q 'com.google.gms:google-services' "$ROOT_GRADLE"; then
+    perl -0pi -e 's|\s*classpath "com.google.gms:google-services:[^"]+"\n?||g' "$ROOT_GRADLE"
+    echo "⚠️  root build.gradle: google-services classpath REMOVED (no google-services.json present)"
+  fi
+  if [ -f "$APP_GRADLE" ] && grep -q "com.google.gms.google-services" "$APP_GRADLE"; then
+    perl -0pi -e "s|\napply plugin: 'com.google.gms.google-services'\n?|\n|g" "$APP_GRADLE"
+    echo "⚠️  app build.gradle: google-services plugin REMOVED (no google-services.json present)"
+  fi
 fi
 
 # --- 4. versionCode/versionName from package.json --------------------------
@@ -111,4 +130,9 @@ else
 fi
 
 echo "▶ Android post-sync done."
+echo ""
+echo "🧪 Pre-upload checklist:"
+echo "   1. Confirm android/app/google-services.json exists (or accept push-less build)."
+echo "   2. Install the AAB on a clean device/emulator and verify it opens past splash."
+echo "   3. Check adb logcat for FATAL EXCEPTION during launch before shipping to Play."
 

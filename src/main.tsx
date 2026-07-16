@@ -6,6 +6,7 @@ import { initCapacitorPlugins, hideSplashScreen } from "./lib/capacitorInit";
 import ErrorBoundary from "./components/shared/ErrorBoundary";
 
 console.log("[boot] react-mount-start");
+(window as any).__familialBootOk = true;
 
 // Global guards — never let an unhandled rejection escape to the native
 // WKWebView host where it could be interpreted as a crash by Apple's
@@ -54,8 +55,8 @@ try {
         el.classList.add("splash-hide");
         setTimeout(() => {
           el.parentNode?.removeChild(el);
-        }, 800);
-      }, 2500);
+        }, 400);
+      }, 600);
     });
   });
 } catch (e) {
