@@ -279,11 +279,14 @@ const Events = () => {
     const circleIds = selectedCircle ? [selectedCircle] : circles.map(c => c.id);
     const cursor = !reset && pastEvents.length > 0 ? pastEvents[pastEvents.length - 1].event_date : null;
 
+    const cutoff = getEventCutoffDate();
+
     let query = supabase
       .from("events")
       .select(`*, circles!events_circle_id_fkey(id, name), photo_albums(id, name, circle_id)`)
       .in("circle_id", circleIds)
-      .lt("event_date", new Date().toISOString().split("T")[0])
+      .lt("event_date", cutoff)
+      .or(`end_date.is.null,end_date.lt.${cutoff}`)
       .order("event_date", { ascending: false })
       .limit(PAGE_SIZE);
 
