@@ -44,28 +44,12 @@ async function sendTemplateEmail(
   idempotencyKey: string,
   _authHeader: string,
 ) {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceKey) {
-    return { requested: true, queued: false, error: "Email service is not configured" };
-  }
-
   try {
-    // send-transactional-email requires a service_role JWT (locked down to
-    // prevent abuse). Invoke with the service-role key, not the caller's JWT.
-    const client = createClient(supabaseUrl, serviceKey);
-    const { data, error } = await client.functions.invoke("send-transactional-email", {
-      body: { templateName, recipientEmail, templateData, idempotencyKey },
+    const result = await sendAndLogTemplateEmail(templateName, recipientEmail, {
+      templateData,
+      idempotencyKey,
     });
-    if (error) {
-      console.error(`${templateName} email failed`, { recipientEmail, error: error.message });
-      return { requested: true, queued: false, error: error.message };
-    }
-    if (data?.error) {
-      console.error(`${templateName} email failed`, { recipientEmail, error: data.error });
-      return { requested: true, queued: false, error: data.error };
-    }
-    if (data?.reason === "email_suppressed") {
+    if (!result.sent) {
       return { requested: true, queued: false, suppressed: true };
     }
     return { requested: true, queued: true };
