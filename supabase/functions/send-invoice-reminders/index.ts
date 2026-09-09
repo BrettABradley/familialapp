@@ -2,7 +2,7 @@
 // Sends an internal reminder email to brettbradley007@gmail.com when an
 // enterprise account's next_invoice_due_at falls 7 days away or today.
 // Idempotent per (enterprise_account_id, due_date, days_until_due) via
-// the send-transactional-email idempotencyKey.
+// the managed email idempotency key.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { sendAndLogTemplateEmail } from "../_shared/transactional-email-templates/send-and-log.ts";
 
