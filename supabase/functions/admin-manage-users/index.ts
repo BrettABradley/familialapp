@@ -3,6 +3,7 @@
 // "free-tier-only" rule for comps so paying customers are never overwritten.
 import { corsHeaders, jsonResponse, requireAdmin, logAdminAction } from "../_shared/admin-guard.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { sendAndLogTemplateEmail } from "../_shared/transactional-email-templates/send-and-log.ts";
 
 const PLAN_LIMITS: Record<string, { max_circles: number; max_members_per_circle: number }> = {
   free: { max_circles: 1, max_members_per_circle: 8 },
