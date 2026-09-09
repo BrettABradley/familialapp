@@ -4,6 +4,7 @@
 // Idempotent per (enterprise_account_id, due_date, days_until_due) via
 // the send-transactional-email idempotencyKey.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendAndLogTemplateEmail } from "../_shared/transactional-email-templates/send-and-log.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
