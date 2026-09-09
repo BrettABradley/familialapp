@@ -32,8 +32,6 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 
-  const sendUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-transactional-email`;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   let sent = 0;
 
   for (const acc of accounts ?? []) {
