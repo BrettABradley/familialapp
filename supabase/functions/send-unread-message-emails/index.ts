@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { sendAndLogTemplateEmail } from '../_shared/transactional-email-templates/send-and-log.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -126,20 +127,16 @@ Deno.serve(async (req) => {
         ? `/messages?circle=${circleId}&thread=${row.sender_id}`
         : `/messages?thread=${row.sender_id}`
 
-      // Send the email via send-transactional-email
-      const { error: sendError } = await supabase.functions.invoke('send-transactional-email', {
-        body: {
-          templateName: 'unseen-message',
-          recipientEmail,
+      // Send the email through Lovable's managed email delivery
+      try {
+        await sendAndLogTemplateEmail('unseen-message', recipientEmail, {
           idempotencyKey: `unread-dm-${row.id}-${new Date(row.first_unread_at).getTime()}`,
           templateData: {
             senderName,
             url: `${SITE_URL}${deepLink}`,
           },
-        },
-      })
-
-      if (sendError) {
+        })
+      } catch (sendError) {
         console.error('Failed to send unread-dm email', { row: row.id, error: sendError })
         continue
       }

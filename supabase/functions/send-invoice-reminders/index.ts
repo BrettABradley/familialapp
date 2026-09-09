@@ -2,8 +2,9 @@
 // Sends an internal reminder email to brettbradley007@gmail.com when an
 // enterprise account's next_invoice_due_at falls 7 days away or today.
 // Idempotent per (enterprise_account_id, due_date, days_until_due) via
-// the send-transactional-email idempotencyKey.
+// the managed email idempotency key.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendAndLogTemplateEmail } from "../_shared/transactional-email-templates/send-and-log.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,8 +32,6 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 
-  const sendUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-transactional-email`;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   let sent = 0;
 
   for (const acc of accounts ?? []) {
@@ -55,25 +54,27 @@ Deno.serve(async (req: Request) => {
     const dueDate = dueDay.toISOString().slice(0, 10);
     const idempotencyKey = `ent-invoice-${acc.id}-${dueDate}-${diffDays}`;
 
-    const res = await fetch(sendUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-      body: JSON.stringify({
-        templateName: "enterprise-invoice-reminder",
-        recipientEmail: "brettbradley007@gmail.com",
-        idempotencyKey,
-        templateData: {
-          customerName,
-          contactEmail: acc.contact_email,
-          amountUsd,
-          cadence: acc.billing_cadence,
-          dueDate,
-          daysUntilDue: diffDays,
+    try {
+      const result = await sendAndLogTemplateEmail(
+        "enterprise-invoice-reminder",
+        "brettbradley007@gmail.com",
+        {
+          idempotencyKey,
+          templateData: {
+            customerName,
+            contactEmail: acc.contact_email,
+            amountUsd,
+            cadence: acc.billing_cadence,
+            dueDate,
+            daysUntilDue: diffDays,
+          },
         },
-      }),
-    });
-    if (res.ok) sent++;
-    else console.error("send failed", await res.text());
+      );
+      if (result.sent) sent++;
+      else console.warn("send skipped", { reason: result.reason });
+    } catch (e) {
+      console.error("send failed", e);
+    }
   }
 
   return new Response(JSON.stringify({ ok: true, sent }), {

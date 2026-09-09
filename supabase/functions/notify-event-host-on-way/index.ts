@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
+import { sendAndLogTemplateEmail } from '../_shared/transactional-email-templates/send-and-log.ts'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -111,17 +112,13 @@ Deno.serve(async (req) => {
     const hostEmail = hostUser?.user?.email
     if (hostEmail) {
       try {
-        await admin.functions.invoke('send-transactional-email', {
-          body: {
-            templateName: 'event-on-my-way',
-            recipientEmail: hostEmail,
-            idempotencyKey: `event-on-my-way-${event.id}-${callerId}-${Math.floor(Date.now() / (30 * 60 * 1000))}`,
-            templateData: {
-              actorName: displayActor,
-              eventTitle: event.title,
-              circleName,
-              url: `https://www.familialmedia.com${link}`,
-            },
+        await sendAndLogTemplateEmail('event-on-my-way', hostEmail, {
+          idempotencyKey: `event-on-my-way-${event.id}-${callerId}-${Math.floor(Date.now() / (30 * 60 * 1000))}`,
+          templateData: {
+            actorName: displayActor,
+            eventTitle: event.title,
+            circleName,
+            url: `https://www.familialmedia.com${link}`,
           },
         })
       } catch (e) {

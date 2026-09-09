@@ -3,6 +3,7 @@
 // "free-tier-only" rule for comps so paying customers are never overwritten.
 import { corsHeaders, jsonResponse, requireAdmin, logAdminAction } from "../_shared/admin-guard.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { sendAndLogTemplateEmail } from "../_shared/transactional-email-templates/send-and-log.ts";
 
 const PLAN_LIMITS: Record<string, { max_circles: number; max_members_per_circle: number }> = {
   free: { max_circles: 1, max_members_per_circle: 8 },
@@ -44,28 +45,12 @@ async function sendTemplateEmail(
   idempotencyKey: string,
   _authHeader: string,
 ) {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceKey) {
-    return { requested: true, queued: false, error: "Email service is not configured" };
-  }
-
   try {
-    // send-transactional-email requires a service_role JWT (locked down to
-    // prevent abuse). Invoke with the service-role key, not the caller's JWT.
-    const client = createClient(supabaseUrl, serviceKey);
-    const { data, error } = await client.functions.invoke("send-transactional-email", {
-      body: { templateName, recipientEmail, templateData, idempotencyKey },
+    const result = await sendAndLogTemplateEmail(templateName, recipientEmail, {
+      templateData,
+      idempotencyKey,
     });
-    if (error) {
-      console.error(`${templateName} email failed`, { recipientEmail, error: error.message });
-      return { requested: true, queued: false, error: error.message };
-    }
-    if (data?.error) {
-      console.error(`${templateName} email failed`, { recipientEmail, error: data.error });
-      return { requested: true, queued: false, error: data.error };
-    }
-    if (data?.reason === "email_suppressed") {
+    if (!result.sent) {
       return { requested: true, queued: false, suppressed: true };
     }
     return { requested: true, queued: true };
