@@ -79,4 +79,7 @@ project_id = "qxkwxolssapayqyfdwqc"
     verify_jwt = false
   [functions.google-play-rtdn]
     verify_jwt = false
-
+  [functions.send-notification-email]
+    verify_jwt = false
+  [functions.handle-email-events]
+    verify_jwt = false
