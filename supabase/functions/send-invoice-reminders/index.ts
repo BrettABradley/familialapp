@@ -54,25 +54,27 @@ Deno.serve(async (req: Request) => {
     const dueDate = dueDay.toISOString().slice(0, 10);
     const idempotencyKey = `ent-invoice-${acc.id}-${dueDate}-${diffDays}`;
 
-    const res = await fetch(sendUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-      body: JSON.stringify({
-        templateName: "enterprise-invoice-reminder",
-        recipientEmail: "brettbradley007@gmail.com",
-        idempotencyKey,
-        templateData: {
-          customerName,
-          contactEmail: acc.contact_email,
-          amountUsd,
-          cadence: acc.billing_cadence,
-          dueDate,
-          daysUntilDue: diffDays,
+    try {
+      const result = await sendAndLogTemplateEmail(
+        "enterprise-invoice-reminder",
+        "brettbradley007@gmail.com",
+        {
+          idempotencyKey,
+          templateData: {
+            customerName,
+            contactEmail: acc.contact_email,
+            amountUsd,
+            cadence: acc.billing_cadence,
+            dueDate,
+            daysUntilDue: diffDays,
+          },
         },
-      }),
-    });
-    if (res.ok) sent++;
-    else console.error("send failed", await res.text());
+      );
+      if (result.sent) sent++;
+      else console.warn("send skipped", { reason: result.reason });
+    } catch (e) {
+      console.error("send failed", e);
+    }
   }
 
   return new Response(JSON.stringify({ ok: true, sent }), {
