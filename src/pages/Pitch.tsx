@@ -111,9 +111,9 @@ const SLIDES: Slide[] = [
   },
 ];
 
-export default function Pitch() {
+export default function Pitch({ publicAccess = false }: { publicAccess?: boolean }) {
   const { user, loading: authLoading } = useAuth();
-  const isAdmin = useIsPlatformAdmin();
+  const isAdmin = useIsPlatformAdmin() || publicAccess;
   const navigate = useNavigate();
   const [index, setIndex] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
