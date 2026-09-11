@@ -154,7 +154,7 @@ export default function Pitch({ publicAccess = false }: { publicAccess?: boolean
     } catch { /* not supported */ }
   };
 
-  if (authLoading || (!isAdmin && !checked)) {
+  if (!publicAccess && (authLoading || (!isAdmin && !checked))) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
