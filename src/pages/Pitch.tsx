@@ -162,7 +162,7 @@ export default function Pitch({ publicAccess = false }: { publicAccess?: boolean
     );
   }
 
-  if (!user || !isAdmin) {
+  if (!publicAccess && (!user || !isAdmin)) {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background px-6 text-center">
         <Helmet><meta name="robots" content="noindex,nofollow" /></Helmet>
