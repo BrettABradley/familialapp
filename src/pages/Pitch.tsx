@@ -198,7 +198,7 @@ export default function Pitch({ publicAccess = false }: { publicAccess?: boolean
       <main className="flex-1 flex items-center justify-center px-6 py-10">
         <article key={index} className="w-full max-w-3xl animate-page-fade-in">
           <div className="flex items-center gap-3 mb-6">
-            <img src={logo} alt="Familial" className="h-6 w-auto opacity-70" />
+            <img src={logo} alt="Familial" className="h-12 sm:h-16 w-auto opacity-90" />
             <span className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
               {slide.kicker}
             </span>
