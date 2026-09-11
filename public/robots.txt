@@ -16,3 +16,4 @@ Allow: /
 Sitemap: https://www.familialmedia.com/sitemap.xml
 
 Disallow: /pitch
+Disallow: /deck

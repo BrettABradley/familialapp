@@ -97,11 +97,11 @@ const SLIDES: Slide[] = [
     kicker: "Proof",
     title: "Where we are today.",
     bullets: [
-      "[ACTIVE CIRCLES — replace with real number]",
-      "[ACTIVE MEMBERS — replace with real number]",
       "Live on the web, iOS, and Android",
+      "Families, churches, and small teams already running private circles",
+      "Built and shipping fast — new features every week",
     ],
-    footnote: "Replace the bracketed figures before presenting.",
+    footnote: "No ads. No tracking. No algorithm. Ever.",
   },
   {
     kicker: "The ask",
@@ -111,9 +111,9 @@ const SLIDES: Slide[] = [
   },
 ];
 
-export default function Pitch() {
+export default function Pitch({ publicAccess = false }: { publicAccess?: boolean }) {
   const { user, loading: authLoading } = useAuth();
-  const isAdmin = useIsPlatformAdmin();
+  const isAdmin = useIsPlatformAdmin() || publicAccess;
   const navigate = useNavigate();
   const [index, setIndex] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
@@ -154,7 +154,7 @@ export default function Pitch() {
     } catch { /* not supported */ }
   };
 
-  if (authLoading || (!isAdmin && !checked)) {
+  if (!publicAccess && (authLoading || (!isAdmin && !checked))) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -162,7 +162,7 @@ export default function Pitch() {
     );
   }
 
-  if (!user || !isAdmin) {
+  if (!publicAccess && (!user || !isAdmin)) {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background px-6 text-center">
         <Helmet><meta name="robots" content="noindex,nofollow" /></Helmet>

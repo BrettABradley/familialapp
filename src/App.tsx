@@ -135,6 +135,7 @@ const App = () => {
             <Route path="/admin" element={<Admin />} />
             <Route path="/appeal" element={<Appeal />} />
             <Route path="/pitch" element={<Pitch />} />
+            <Route path="/deck/familial-2026" element={<Pitch publicAccess />} />
             
             {/* Authenticated routes with persistent layout */}
             <Route element={<AppLayout />}>
