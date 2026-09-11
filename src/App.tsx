@@ -31,6 +31,7 @@ import Upgrade from "./pages/Upgrade";
 import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
 import Appeal from "./pages/Appeal";
+import Pitch from "./pages/Pitch";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import CookiePolicy from "./pages/CookiePolicy";
@@ -133,6 +134,7 @@ const App = () => {
             <Route path="/support" element={<Support />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/appeal" element={<Appeal />} />
+            <Route path="/pitch" element={<Pitch />} />
             
             {/* Authenticated routes with persistent layout */}
             <Route element={<AppLayout />}>
