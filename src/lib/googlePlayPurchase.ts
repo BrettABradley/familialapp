@@ -1,11 +1,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { isAndroidNative } from "./platform";
+import { openInAppBrowser } from "./externalUrl";
 import {
   enqueuePendingGoogleReceipt,
   removePendingGoogleReceipt,
   submitGoogleReceipt,
+  drainPendingGoogleReceipts,
 } from "./googlePlayReceiptQueue";
-
 
 /**
  * Google Play product IDs — must match Play Console SKUs.
@@ -28,10 +29,16 @@ const productCache: Record<string, any> = {};
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const RETRY_DELAYS_MS = [800, 1500];
 
+/**
+ * Android uses the SAME plugin as iOS (@capgo/native-purchases, Google Play
+ * Billing 8 under the hood). The previous @capgo/capacitor-purchases plugin
+ * only supported Capacitor 5 and was crashing the Android app at launch
+ * during native plugin registration.
+ */
 const loadPlugin = async () => {
   try {
-    // @vite-ignore — only loaded on Android native, never bundled into web SSR paths.
-    const mod = await import("@capgo/capacitor-purchases");
+    // @vite-ignore — only loaded on Android native.
+    const mod = await import("@capgo/native-purchases");
     return mod;
   } catch (err) {
     console.warn("[GoogleIAP] plugin load failed:", err);
@@ -58,11 +65,10 @@ export const prewarmProducts = async (): Promise<any[]> => {
   ];
 
   try {
-    const plugin: any = await loadPlugin();
-    const PurchasesPlugin = plugin.Purchases ?? plugin.CapacitorPurchases ?? plugin.default;
+    const { NativePurchases } = await loadPlugin();
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const res: any = await PurchasesPlugin.getProducts({ productIdentifiers: productIds });
+        const res: any = await NativePurchases.getProducts({ productIdentifiers: productIds });
         const list = parseProductList(res);
         if (list.length > 0) {
           for (const p of list) {
@@ -84,6 +90,33 @@ export const prewarmProducts = async (): Promise<any[]> => {
 
 export const getCachedProducts = (): Record<string, any> => productCache;
 
+const ensureProductLoaded = async (
+  NativePurchases: any,
+  productId: string
+): Promise<boolean> => {
+  if (productCache[productId]) return true;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res: any = await NativePurchases.getProducts({
+        productIdentifiers: [productId],
+      });
+      const list = parseProductList(res);
+      if (list.length > 0) {
+        for (const p of list) {
+          const id = p?.identifier ?? p?.productIdentifier ?? p?.productId;
+          if (id) productCache[id] = p;
+        }
+        return true;
+      }
+    } catch (err) {
+      console.warn("[GoogleIAP] getProducts attempt failed:", attempt + 1, err);
+    }
+    if (attempt < 2) await sleep(RETRY_DELAYS_MS[attempt] ?? 1500);
+  }
+  return false;
+};
+
 const isCancelError = (err: any) => {
   const msg = String(err?.message ?? err ?? "").toLowerCase();
   return (
@@ -95,8 +128,8 @@ const isCancelError = (err: any) => {
 
 const extractPurchaseToken = (result: any): string | null =>
   result?.purchaseToken ??
-  result?.transactionId ??
   result?.purchase?.purchaseToken ??
+  result?.transactionId ??
   null;
 
 export const purchaseSubscription = async (
@@ -105,14 +138,20 @@ export const purchaseSubscription = async (
 ): Promise<boolean> => {
   if (!isAndroidNative()) return false;
 
-  const plugin: any = await loadPlugin();
-  const PurchasesPlugin = plugin.Purchases ?? plugin.CapacitorPurchases ?? plugin.default;
+  const { NativePurchases, PURCHASE_TYPE } = await loadPlugin();
+
+  const ready = await ensureProductLoaded(NativePurchases, productId);
+  if (!ready) {
+    throw new Error(
+      "This subscription isn't available from Google Play right now. Make sure you're signed in to the Play Store, then try again."
+    );
+  }
 
   let result: any;
   try {
-    result = await PurchasesPlugin.purchaseProduct({
+    result = await NativePurchases.purchaseProduct({
       productIdentifier: productId,
-      productType: "subs",
+      productType: PURCHASE_TYPE.SUBS,
     });
   } catch (err: any) {
     if (isCancelError(err)) return false;
@@ -161,14 +200,20 @@ export const purchaseConsumable = async (
 ): Promise<boolean> => {
   if (!isAndroidNative()) return false;
 
-  const plugin: any = await loadPlugin();
-  const PurchasesPlugin = plugin.Purchases ?? plugin.CapacitorPurchases ?? plugin.default;
+  const { NativePurchases, PURCHASE_TYPE } = await loadPlugin();
+
+  const ready = await ensureProductLoaded(NativePurchases, productId);
+  if (!ready) {
+    throw new Error(
+      "This add-on isn't available from Google Play right now. Make sure you're signed in to the Play Store, then try again."
+    );
+  }
 
   let result: any;
   try {
-    result = await PurchasesPlugin.purchaseProduct({
+    result = await NativePurchases.purchaseProduct({
       productIdentifier: productId,
-      productType: "inapp",
+      productType: PURCHASE_TYPE.INAPP,
     });
   } catch (err: any) {
     if (isCancelError(err)) return false;
@@ -209,21 +254,18 @@ export const purchaseConsumable = async (
 export const restorePurchases = async (): Promise<boolean> => {
   if (!isAndroidNative()) return false;
   try {
-    const plugin: any = await loadPlugin();
-    const PurchasesPlugin = plugin.Purchases ?? plugin.CapacitorPurchases ?? plugin.default;
-    await PurchasesPlugin.restorePurchases();
+    const { NativePurchases } = await loadPlugin();
+    await NativePurchases.restorePurchases();
     const { error } = await supabase.functions.invoke("validate-google-receipt", {
       body: { restore: true },
     });
     // Also drain any queued receipts that never made it through.
-    const { drainPendingGoogleReceipts } = await import("./googlePlayReceiptQueue");
     const credited = await drainPendingGoogleReceipts();
     console.log("[GoogleIAP] restorePurchases drained", { credited });
     return !error;
   } catch (err) {
     console.warn("[GoogleIAP] restorePurchases failed:", err);
     try {
-      const { drainPendingGoogleReceipts } = await import("./googlePlayReceiptQueue");
       await drainPendingGoogleReceipts();
     } catch {}
     return false;
@@ -232,6 +274,8 @@ export const restorePurchases = async (): Promise<boolean> => {
 
 /**
  * Open Google Play's subscription management page (Play policy 3.4).
+ * Uses a Chrome Custom Tab so the user returns cleanly to the app —
+ * a plain window.open can silently no-op inside the Android WebView.
  */
 export const openPlaySubscriptionManagement = (
   productId?: string,
@@ -243,5 +287,5 @@ export const openPlaySubscriptionManagement = (
   if (productId && SUBSCRIPTION_PRODUCT_IDS.has(productId)) params.set("sku", productId);
   if (packageName) params.set("package", packageName);
   const url = params.toString() ? `${base}?${params}` : base;
-  window.open(url, "_blank");
+  void openInAppBrowser(url);
 };
