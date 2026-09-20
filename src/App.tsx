@@ -45,6 +45,11 @@ import DeleteAccount from "./pages/DeleteAccount";
 
 const queryClient = new QueryClient();
 
+const AndroidBackButton = () => {
+  useAndroidBackButton();
+  return null;
+};
+
 const NativeUrlOpenBridge = () => {
   const navigate = useNavigate();
   useEffect(() => {
@@ -115,6 +120,7 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <NativeUrlOpenBridge />
+          <AndroidBackButton />
           <UpdateGate>
           <Routes>
             {/* Public routes */}
