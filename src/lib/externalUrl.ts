@@ -9,6 +9,20 @@ import { Capacitor } from '@capacitor/core';
  */
 export async function openExternalUrl(url: string): Promise<void> {
   if (Capacitor.isNativePlatform()) {
+    // `App.openUrl` / `App.canOpenUrl` are NOT implemented by @capacitor/app on
+    // Android (they belong to @capacitor/app-launcher, which isn't installed),
+    // so on Android we skip straight to the Custom Tabs path below.
+    if (Capacitor.getPlatform() === 'android') {
+      try {
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url, presentationStyle: 'fullscreen' });
+        return;
+      } catch (e) {
+        console.warn('[openExternalUrl] Browser plugin failed on Android', e);
+      }
+      window.open(url, '_blank');
+      return;
+    }
     try {
       // App plugin's openUrl hands the URL to the OS, which launches Safari/Chrome.
       const { App } = await import('@capacitor/app');
@@ -86,6 +100,22 @@ export async function openMapsApp(
     }
     return false;
   };
+
+  if (platform === 'android') {
+    // On Android, @capacitor/app has no openUrl — the WebView bridge itself
+    // resolves non-http schemes to an Intent, so navigating to geo: hands the
+    // query to Google Maps (or whichever maps app the user has installed).
+    try {
+      window.location.href = `geo:0,0?q=${encoded}`;
+      return;
+    } catch (e) {
+      console.warn('[openMapsApp] geo: intent failed on Android', e);
+    }
+    await openExternalUrl(
+      `https://www.google.com/maps/search/?api=1&query=${encoded}`
+    );
+    return;
+  }
 
   if (Capacitor.isNativePlatform()) {
     // 1) Native scheme first
