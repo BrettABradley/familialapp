@@ -350,6 +350,13 @@ export const purchaseSubscription = async (
     return true;
   }
 
+  if (submission === "failed") {
+    removePending(String(transactionId));
+    throw new Error(
+      "Apple confirmed your payment, but we couldn't activate your plan. Please contact support@familialmedia.com and we'll sort it out right away."
+    );
+  }
+
   throw new Error(
     "Apple confirmed your payment. We'll finish activating your plan automatically — usually within a few minutes. " +
     "You can close the app safely; no further action is needed."
