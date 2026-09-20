@@ -114,15 +114,46 @@ async function runPushRegistration(): Promise<PushRegistrationResult> {
 
     await PushNotifications.removeAllListeners();
 
-    return await new Promise<PushRegistrationResult>(async (resolve) => {
-      let settled = false;
-      const settle = (result: PushRegistrationResult) => {
-        if (settled) return;
-        settled = true;
-        clearWatchdog();
-        resolve(result);
-      };
+    // NOTE: never use an async Promise executor here — a synchronous throw
+    // inside it would orphan the rejection and leave this promise (and
+    // `activeRegistration`) pending forever, wedging push for the session.
+    let resolveResult!: (r: PushRegistrationResult) => void;
+    const resultPromise = new Promise<PushRegistrationResult>((resolve) => {
+      resolveResult = resolve;
+    });
 
+    let settled = false;
+    const settle = (result: PushRegistrationResult) => {
+      if (settled) return;
+      settled = true;
+      clearWatchdog();
+      resolveResult(result);
+    };
+
+    // Arm the watchdog BEFORE registering listeners so any hang — including a
+    // failure inside listener setup — still resolves instead of waiting forever.
+    registrationWatchdog = window.setTimeout(() => {
+      const isAndroid = Capacitor.getPlatform() === 'android';
+      if (isAndroid) {
+        console.warn(
+          '[push] no registration callback after 15s on Android. Confirm android/app/google-services.json is present and that Firebase Cloud Messaging is enabled for the project.'
+        );
+      } else {
+        console.warn(
+          '[push] no registration callback after 15s. If permission was granted, add the AppDelegate bridge from Capacitor PushNotifications docs, then run npm run cap:sync:ios and upload a new TestFlight build.'
+        );
+      }
+      registrationAttempted = false;
+      settle({
+        ok: false,
+        status: 'timeout',
+        message: isAndroid
+          ? 'This device did not return a push token. Rebuild after confirming google-services.json is included and FCM is enabled.'
+          : 'iOS did not return an APNs token. Rebuild after running the iOS sync script so the AppDelegate push bridge is included.',
+      });
+    }, 15000);
+
+    try {
       await PushNotifications.addListener('registration', async (token) => {
         console.log('[push] token-received (APNs OK), length=', token.value?.length);
         try {
@@ -187,38 +218,19 @@ async function runPushRegistration(): Promise<PushRegistrationResult> {
         }
       });
 
-
       console.log('[push] register-called');
-      try {
-        await PushNotifications.register();
-      } catch (e) {
-        console.error('[push] register threw:', e);
-        registrationAttempted = false;
-        settle({ ok: false, status: 'registration_error', message: e instanceof Error ? e.message : 'iOS could not register this device with APNs.' });
-        return;
-      }
+      await PushNotifications.register();
+    } catch (e) {
+      console.error('[push] register threw:', e);
+      registrationAttempted = false;
+      settle({
+        ok: false,
+        status: 'registration_error',
+        message: e instanceof Error ? e.message : 'This device could not be registered for push notifications.',
+      });
+    }
 
-      registrationWatchdog = window.setTimeout(() => {
-        const isAndroid = Capacitor.getPlatform() === 'android';
-        if (isAndroid) {
-          console.warn(
-            '[push] no registration callback after 15s on Android. Confirm android/app/google-services.json is present and that Firebase Cloud Messaging is enabled for the project.'
-          );
-        } else {
-          console.warn(
-            '[push] no registration callback after 15s. If permission was granted, add the AppDelegate bridge from Capacitor PushNotifications docs, then run npm run cap:sync:ios and upload a new TestFlight build.'
-          );
-        }
-        registrationAttempted = false;
-        settle({
-          ok: false,
-          status: 'timeout',
-          message: isAndroid
-            ? 'This device did not return a push token. Rebuild after confirming google-services.json is included and FCM is enabled.'
-            : 'iOS did not return an APNs token. Rebuild after running the iOS sync script so the AppDelegate push bridge is included.',
-        });
-      }, 15000);
-    });
+    return await resultPromise;
   } catch (e) {
     console.error('[push] setup failed:', e);
     registrationAttempted = false;
