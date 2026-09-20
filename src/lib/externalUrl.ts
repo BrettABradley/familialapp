@@ -101,6 +101,22 @@ export async function openMapsApp(
     return false;
   };
 
+  if (platform === 'android') {
+    // On Android, @capacitor/app has no openUrl — the WebView bridge itself
+    // resolves non-http schemes to an Intent, so navigating to geo: hands the
+    // query to Google Maps (or whichever maps app the user has installed).
+    try {
+      window.location.href = `geo:0,0?q=${encoded}`;
+      return;
+    } catch (e) {
+      console.warn('[openMapsApp] geo: intent failed on Android', e);
+    }
+    await openExternalUrl(
+      `https://www.google.com/maps/search/?api=1&query=${encoded}`
+    );
+    return;
+  }
+
   if (Capacitor.isNativePlatform()) {
     // 1) Native scheme first
     if (app === 'apple' && platform === 'ios') {
