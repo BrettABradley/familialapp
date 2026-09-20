@@ -31,15 +31,19 @@ fi
 if [ -f "$MANIFEST" ]; then
   add_perm() {
     local NAME="$1"
+    local EXTRA="${2:-}"
     if ! grep -q "android.permission.$NAME" "$MANIFEST"; then
-      perl -0pi -e "s|<manifest |<manifest |;" "$MANIFEST" # no-op anchor
-      perl -0pi -e "s|(<manifest[^>]*>)|\$1\n    <uses-permission android:name=\"android.permission.$NAME\" />|" "$MANIFEST"
+      perl -0pi -e "s|(<manifest[^>]*>)|\$1\n    <uses-permission android:name=\"android.permission.$NAME\"$EXTRA />|" "$MANIFEST"
       echo "  + permission $NAME"
     fi
   }
-  for P in INTERNET POST_NOTIFICATIONS CAMERA RECORD_AUDIO VIBRATE WAKE_LOCK READ_MEDIA_IMAGES READ_MEDIA_VIDEO READ_EXTERNAL_STORAGE; do
+  for P in INTERNET POST_NOTIFICATIONS CAMERA RECORD_AUDIO VIBRATE WAKE_LOCK READ_MEDIA_IMAGES READ_MEDIA_VIDEO; do
     add_perm "$P"
   done
+  # Legacy storage read is only meaningful up to Android 12 (API 32). Without
+  # the cap, Play policy review flags it as an unnecessary permission.
+  add_perm READ_EXTERNAL_STORAGE ' android:maxSdkVersion=\"32\"'
+
   echo "✅ AndroidManifest.xml: permissions ensured"
 
   # <queries> block for external app handoff
@@ -97,8 +101,19 @@ if [ -f "$APP_GRADLE" ] && [ -f "package.json" ]; then
   # versionCode: integer bump = major*10000 + minor*100 + patch
   IFS='.' read -r MA MI PA <<< "$PKG_VER"
   VC=$(( ${MA:-1} * 10000 + ${MI:-0} * 100 + ${PA:-0} ))
-  perl -0pi -e "s|versionCode \\d+|versionCode $VC|g" "$APP_GRADLE"
-  perl -0pi -e "s|versionName \"[^\"]+\"|versionName \"$PKG_VER\"|g" "$APP_GRADLE"
+  # Handle both Groovy (`versionCode 1`) and Kotlin DSL (`versionCode = 1`).
+  perl -0pi -e "s|versionCode(\\s*=\\s*|\\s+)\\d+|versionCode\\${1}$VC|g" "$APP_GRADLE"
+  perl -0pi -e "s|versionName(\\s*=\\s*|\\s+)\"[^\"]+\"|versionName\\${1}\"$PKG_VER\"|g" "$APP_GRADLE"
+  # Verify the rewrite actually landed — a silent no-op here ships a stale
+  # versionCode that Play rejects at upload time.
+  if ! grep -qE "versionCode[[:space:]]*=?[[:space:]]*$VC" "$APP_GRADLE"; then
+    echo "❌ app build.gradle: versionCode was not updated to $VC. Check the file's syntax." >&2
+    exit 1
+  fi
+  if ! grep -qE "versionName[[:space:]]*=?[[:space:]]*\"$PKG_VER\"" "$APP_GRADLE"; then
+    echo "❌ app build.gradle: versionName was not updated to $PKG_VER. Check the file's syntax." >&2
+    exit 1
+  fi
   echo "✅ app build.gradle: versionCode=$VC, versionName=$PKG_VER"
 fi
 
