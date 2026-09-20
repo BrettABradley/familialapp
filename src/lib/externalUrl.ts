@@ -105,15 +105,28 @@ export async function openMapsApp(
     // On Android, @capacitor/app has no openUrl — the WebView bridge itself
     // resolves non-http schemes to an Intent, so navigating to geo: hands the
     // query to Google Maps (or whichever maps app the user has installed).
+    // Navigating to an unhandled scheme does NOT throw, it silently no-ops,
+    // so we watch for the app losing focus; if we're still visible after a
+    // short grace period no maps app handled it and we open the web map.
+    const webMapUrl = `https://www.google.com/maps/search/?api=1&query=${encoded}`;
+    let leftApp = false;
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') leftApp = true;
+    };
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onHide);
     try {
       window.location.href = `geo:0,0?q=${encoded}`;
-      return;
     } catch (e) {
       console.warn('[openMapsApp] geo: intent failed on Android', e);
     }
-    await openExternalUrl(
-      `https://www.google.com/maps/search/?api=1&query=${encoded}`
-    );
+    await new Promise((r) => setTimeout(r, 1200));
+    document.removeEventListener('visibilitychange', onHide);
+    window.removeEventListener('pagehide', onHide);
+    if (!leftApp && document.visibilityState === 'visible') {
+      console.warn('[openMapsApp] no maps app handled geo: — opening web map');
+      await openExternalUrl(webMapUrl);
+    }
     return;
   }
 

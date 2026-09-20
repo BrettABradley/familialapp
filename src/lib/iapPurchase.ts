@@ -102,10 +102,23 @@ const markPendingFailure = (transactionId: string, err: string) => {
 export const getPendingReceiptCount = () => readPending().length;
 
 /**
+ * After this many failed attempts we stop retrying forever and report the
+ * receipt as permanently failed so the user can be told to contact support.
+ */
+const MAX_ATTEMPTS = 12;
+
+/** Backend-declared permanent failures — retrying can never succeed. */
+const PERMANENT_CODES = new Set([
+  "APPLE_BUNDLE_MISMATCH",
+  "APPLE_TXN_REVOKED",
+  "APPLE_PRODUCT_UNKNOWN",
+]);
+
+/**
  * Submit a single pending receipt to the backend. Returns:
- *  - 'credited' on success or duplicate (we no longer need this receipt)
- *  - 'retry'    on transient failure (Apple 401, 503, network)
- *  - 'failed'   on permanent failure (bundle mismatch, revoked, etc.)
+ *  - 'credited' only when the backend explicitly confirms success
+ *  - 'retry'    on transient/unknown failure (Apple 401, 503, network, empty body)
+ *  - 'failed'   on permanent failure (bundle mismatch, revoked) or after MAX_ATTEMPTS
  */
 async function submitReceipt(entry: PendingReceipt): Promise<"credited" | "retry" | "failed"> {
   try {
@@ -122,31 +135,28 @@ async function submitReceipt(entry: PendingReceipt): Promise<"credited" | "retry
     });
 
     // supabase.functions.invoke surfaces non-2xx as `error`, but the body is
-    // still available on `data`. We check both.
+    // still available on `data`. ONLY an explicit success counts as credited —
+    // an empty or unexpected body must keep the receipt queued.
     const payload: any = data ?? {};
-    if (payload?.success) return "credited";
+    if (payload?.success === true) return "credited";
 
-    const code = payload?.code ?? "";
-    const retryable = payload?.retry === true ||
-      code === "APPLE_CREDENTIALS_INVALID" ||
-      code === "APPLE_TXN_NOT_FOUND" ||
-      code === "APPLE_TRANSIENT";
+    const code = String(payload?.code ?? "");
+    const permanent = payload?.permanent === true || PERMANENT_CODES.has(code);
+    const reason = payload?.error ?? error?.message ?? (code || "unrecognized response");
 
-    if (error && retryable) {
-      markPendingFailure(entry.transactionId, payload?.error ?? error.message);
-      return "retry";
+    markPendingFailure(entry.transactionId, String(reason));
+
+    if (permanent) {
+      console.warn("[IAP] permanent validation failure", { code, reason });
+      return "failed";
     }
-    if (retryable) {
-      markPendingFailure(entry.transactionId, payload?.error ?? "retryable");
-      return "retry";
+
+    const attempts = readPending().find((p) => p.transactionId === entry.transactionId)?.attempts ?? 0;
+    if (attempts >= MAX_ATTEMPTS) {
+      console.warn("[IAP] giving up after max attempts", { attempts, reason });
+      return "failed";
     }
-    if (error) {
-      markPendingFailure(entry.transactionId, payload?.error ?? error.message);
-      // For unknown errors prefer retry over discard — we'd rather try again
-      // on next launch than silently drop a real purchase.
-      return "retry";
-    }
-    return "credited";
+    return "retry";
   } catch (err: any) {
     markPendingFailure(entry.transactionId, err?.message ?? String(err));
     return "retry";
@@ -340,6 +350,13 @@ export const purchaseSubscription = async (
     return true;
   }
 
+  if (submission === "failed") {
+    removePending(String(transactionId));
+    throw new Error(
+      "Apple confirmed your payment, but we couldn't activate your plan. Please contact support@familialmedia.com and we'll sort it out right away."
+    );
+  }
+
   throw new Error(
     "Apple confirmed your payment. We'll finish activating your plan automatically — usually within a few minutes. " +
     "You can close the app safely; no further action is needed."
@@ -402,6 +419,13 @@ export const purchaseConsumable = async (
   if (submission === "credited") {
     removePending(String(transactionId));
     return true;
+  }
+
+  if (submission === "failed") {
+    removePending(String(transactionId));
+    throw new Error(
+      "Apple confirmed your payment, but we couldn't add your seats. Please contact support@familialmedia.com and we'll sort it out right away."
+    );
   }
 
   throw new Error(

@@ -76,6 +76,21 @@ const markFailure = (purchaseToken: string, err: string) => {
 
 export const getPendingGoogleReceiptCount = () => readPending().length;
 
+/**
+ * After this many failed attempts we stop retrying forever and report the
+ * receipt as permanently failed so the user can be told to contact support.
+ * At ~1 attempt per launch/resume this is many days of retries.
+ */
+const MAX_ATTEMPTS = 12;
+
+/** Backend-declared permanent failures — retrying can never succeed. */
+const PERMANENT_CODES = new Set([
+  "GOOGLE_PRODUCT_UNKNOWN",
+  "GOOGLE_TOKEN_INVALID",
+  "GOOGLE_PURCHASE_REVOKED",
+  "GOOGLE_PACKAGE_MISMATCH",
+]);
+
 export async function submitGoogleReceipt(
   entry: PendingGoogleReceipt
 ): Promise<"credited" | "retry" | "failed"> {
@@ -91,20 +106,28 @@ export async function submitGoogleReceipt(
     });
 
     const payload: any = data ?? {};
-    if (payload?.success) return "credited";
+    // ONLY an explicit success means the purchase was credited. Anything
+    // else (empty body, unexpected shape, transport error) keeps the receipt
+    // queued — we must never drop a real purchase.
+    if (payload?.success === true) return "credited";
 
-    const retryable = payload?.retry === true;
-    if (retryable) {
-      markFailure(entry.purchaseToken, payload?.error ?? "retryable");
-      return "retry";
+    const code = String(payload?.code ?? "");
+    const permanent = payload?.permanent === true || PERMANENT_CODES.has(code);
+    const reason = payload?.error ?? error?.message ?? (code || "unrecognized response");
+
+    markFailure(entry.purchaseToken, String(reason));
+
+    if (permanent) {
+      console.warn("[GoogleIAP] permanent validation failure", { code, reason });
+      return "failed";
     }
-    if (error) {
-      markFailure(entry.purchaseToken, payload?.error ?? error.message);
-      // Prefer retry over discard for unknown errors — better to retry
-      // next launch than to silently drop a real purchase.
-      return "retry";
+
+    const attempts = readPending().find((p) => p.purchaseToken === entry.purchaseToken)?.attempts ?? 0;
+    if (attempts >= MAX_ATTEMPTS) {
+      console.warn("[GoogleIAP] giving up after max attempts", { attempts, reason });
+      return "failed";
     }
-    return "credited";
+    return "retry";
   } catch (err: any) {
     markFailure(entry.purchaseToken, err?.message ?? String(err));
     return "retry";

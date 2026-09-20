@@ -188,6 +188,13 @@ export const purchaseSubscription = async (
     return true;
   }
 
+  if (submission === "failed") {
+    removePendingGoogleReceipt(purchaseToken);
+    throw new Error(
+      "Google confirmed your payment, but we couldn't activate your plan. Please contact support@familialmedia.com and we'll sort it out right away."
+    );
+  }
+
   throw new Error(
     "Google confirmed your payment. We'll finish activating your plan automatically — usually within a few minutes. " +
     "You can close the app safely; no further action is needed."
@@ -243,6 +250,13 @@ export const purchaseConsumable = async (
   if (submission === "credited") {
     removePendingGoogleReceipt(purchaseToken);
     return true;
+  }
+
+  if (submission === "failed") {
+    removePendingGoogleReceipt(purchaseToken);
+    throw new Error(
+      "Google confirmed your payment, but we couldn't add your seats. Please contact support@familialmedia.com and we'll sort it out right away."
+    );
   }
 
   throw new Error(
