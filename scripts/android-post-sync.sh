@@ -102,8 +102,8 @@ if [ -f "$APP_GRADLE" ] && [ -f "package.json" ]; then
   IFS='.' read -r MA MI PA <<< "$PKG_VER"
   VC=$(( ${MA:-1} * 10000 + ${MI:-0} * 100 + ${PA:-0} ))
   # Handle both Groovy (`versionCode 1`) and Kotlin DSL (`versionCode = 1`).
-  perl -0pi -e "s|versionCode(\\s*=\\s*|\\s+)\\d+|versionCode\\${1}$VC|g" "$APP_GRADLE"
-  perl -0pi -e "s|versionName(\\s*=\\s*|\\s+)\"[^\"]+\"|versionName\\${1}\"$PKG_VER\"|g" "$APP_GRADLE"
+  sed -i -E "s/versionCode([[:space:]]*=[[:space:]]*|[[:space:]]+)[0-9]+/versionCode\\1$VC/g" "$APP_GRADLE"
+  sed -i -E "s/versionName([[:space:]]*=[[:space:]]*|[[:space:]]+)\"[^\"]+\"/versionName\\1\"$PKG_VER\"/g" "$APP_GRADLE"
   # Verify the rewrite actually landed — a silent no-op here ships a stale
   # versionCode that Play rejects at upload time.
   if ! grep -qE "versionCode[[:space:]]*=?[[:space:]]*$VC" "$APP_GRADLE"; then
