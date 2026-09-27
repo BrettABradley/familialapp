@@ -151,10 +151,11 @@ async function submitReceipt(entry: PendingReceipt): Promise<"credited" | "retry
       return "failed";
     }
 
+    // Never discard a paid receipt just because retries keep failing —
+    // transient backend/network errors must keep it queued indefinitely.
     const attempts = readPending().find((p) => p.transactionId === entry.transactionId)?.attempts ?? 0;
     if (attempts >= MAX_ATTEMPTS) {
-      console.warn("[IAP] giving up after max attempts", { attempts, reason });
-      return "failed";
+      console.warn("[IAP] still retrying after many attempts", { attempts, reason });
     }
     return "retry";
   } catch (err: any) {
