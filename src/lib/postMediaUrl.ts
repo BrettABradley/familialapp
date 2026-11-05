@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const DEFAULT_BUCKET = "post-media";
-const TTL_SECONDS = 60 * 60; // 1 hour
+const TTL_SECONDS = 6 * 60 * 60; // 6 hours
 const REFRESH_BEFORE_MS = 5 * 60 * 1000; // refresh 5 min before expiry
 
 export interface SignTransform {
@@ -14,6 +14,30 @@ export interface SignTransform {
 
 type CacheEntry = { url: string; expiresAt: number; promise?: Promise<string> };
 const cache = new Map<string, CacheEntry>();
+const PERSIST_KEY = "familial.signedMedia.v1";
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+try {
+  const raw = typeof localStorage !== "undefined" ? localStorage.getItem(PERSIST_KEY) : null;
+  if (raw) {
+    const now = Date.now();
+    for (const [k, v] of Object.entries(JSON.parse(raw) as Record<string, [string, number]>)) {
+      if (v[1] - REFRESH_BEFORE_MS > now) cache.set(k, { url: v[0], expiresAt: v[1] });
+    }
+  }
+} catch { /* ignore corrupt cache */ }
+function schedulePersist() {
+  if (persistTimer || typeof localStorage === "undefined") return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    try {
+      const now = Date.now();
+      const out: Record<string, [string, number]> = {};
+      const entries = [...cache.entries()].filter(([, e]) => e.url && e.expiresAt - REFRESH_BEFORE_MS > now).slice(-1500);
+      for (const [k, e] of entries) out[k] = [e.url, e.expiresAt];
+      localStorage.setItem(PERSIST_KEY, JSON.stringify(out));
+    } catch { /* quota — ignore */ }
+  }, 500);
+}
 type BlobCacheEntry = { url: string; promise?: Promise<string> };
 const blobCache = new Map<string, BlobCacheEntry>();
 const dataUrlCache = new Map<string, BlobCacheEntry>();
@@ -62,10 +86,48 @@ export function toPostMediaPath(value: string | null | undefined): string | null
   return toBucketPath(value, DEFAULT_BUCKET);
 }
 
-async function signOne(bucket: string, path: string, transform?: SignTransform): Promise<string> {
+type Pending = { path: string; resolve: (u: string) => void; reject: (e: unknown) => void };
+const queues = new Map<string, Pending[]>();
+
+/** Untransformed signs are batched into one createSignedUrls call per bucket. */
+function signOne(bucket: string, path: string, transform?: SignTransform): Promise<string> {
+  if (transform) return signSingle(bucket, path, transform);
+  return new Promise((resolve, reject) => {
+    let q = queues.get(bucket);
+    if (!q) {
+      q = [];
+      queues.set(bucket, q);
+      setTimeout(() => flush(bucket), 16);
+    }
+    q.push({ path, resolve, reject });
+  });
+}
+
+async function flush(bucket: string) {
+  const q = queues.get(bucket) ?? [];
+  queues.delete(bucket);
+  if (!q.length) return;
+  try {
+    await supabase.auth.getSession();
+    const paths = [...new Set(q.map((p) => p.path))];
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrls(paths, TTL_SECONDS);
+    if (error || !data) throw error ?? new Error("Failed to sign URLs");
+    const map = new Map<string, string>();
+    data.forEach((d, i) => { if (d.signedUrl) map.set(d.path ?? paths[i], d.signedUrl); });
+    for (const p of q) {
+      const u = map.get(p.path);
+      if (u) p.resolve(u);
+      else signSingle(bucket, p.path).then(p.resolve, p.reject);
+    }
+  } catch {
+    for (const p of q) signSingle(bucket, p.path).then(p.resolve, p.reject);
+  }
+}
+
+async function signSingle(bucket: string, path: string, transform?: SignTransform): Promise<string> {
   // Native iOS can keep the app process alive for a long time; refresh the
   // session before Storage signing so private-bucket URLs are minted with a
-  // current token instead of silently producing unusable image responses.
+  // current token.
   await supabase.auth.getSession();
   const storage = supabase.storage.from(bucket);
   const { data, error } = transform
@@ -102,6 +164,7 @@ export async function getPostMediaUrl(
 
   const promise = signOne(bucket, path, transform).then((url) => {
     cache.set(key, { url, expiresAt: Date.now() + TTL_SECONDS * 1000 });
+    schedulePersist();
     return url;
   });
   cache.set(key, {
@@ -134,6 +197,7 @@ export function invalidateSignedMediaUrl(
   const path = toBucketPath(value, bucket);
   if (!path) return;
   cache.delete(variantKey(bucket, path, transform));
+  schedulePersist();
 }
 
 async function downloadOne(bucket: string, path: string): Promise<string> {
