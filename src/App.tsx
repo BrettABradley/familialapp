@@ -7,17 +7,17 @@ import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { useVisualViewport } from "@/hooks/useVisualViewport";
 import { useAndroidBackButton } from "@/hooks/useAndroidBackButton";
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { Capacitor } from "@capacitor/core";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { UpdateGate } from "@/components/UpdateGate";
 import Index from "./pages/Index";
-import Unsubscribe from "./pages/Unsubscribe";
+const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import Feed from "./pages/Feed";
 import Circles from "./pages/Circles";
-import Store from "./pages/Store";
+const Store = lazy(() => import("./pages/Store"));
 import Profile from "./pages/Profile";
 import ProfileView from "./pages/ProfileView";
 import Settings from "./pages/Settings";
@@ -28,22 +28,24 @@ import Notifications from "./pages/Notifications";
 import Albums from "./pages/Albums";
 import Messages from "./pages/Messages";
 import ResetPassword from "./pages/ResetPassword";
-import Upgrade from "./pages/Upgrade";
+const Upgrade = lazy(() => import("./pages/Upgrade"));
 import NotFound from "./pages/NotFound";
-import Admin from "./pages/Admin";
-import Appeal from "./pages/Appeal";
-import Pitch from "./pages/Pitch";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import TermsOfService from "./pages/TermsOfService";
-import CookiePolicy from "./pages/CookiePolicy";
-import ChildSafety from "./pages/ChildSafety";
-import About from "./pages/About";
-import Careers from "./pages/Careers";
-import Blog from "./pages/Blog";
-import Support from "./pages/Support";
-import DeleteAccount from "./pages/DeleteAccount";
+const Admin = lazy(() => import("./pages/Admin"));
+const Appeal = lazy(() => import("./pages/Appeal"));
+const Pitch = lazy(() => import("./pages/Pitch"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
+const ChildSafety = lazy(() => import("./pages/ChildSafety"));
+const About = lazy(() => import("./pages/About"));
+const Careers = lazy(() => import("./pages/Careers"));
+const Blog = lazy(() => import("./pages/Blog"));
+const Support = lazy(() => import("./pages/Support"));
+const DeleteAccount = lazy(() => import("./pages/DeleteAccount"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 60_000, gcTime: 30 * 60_000, refetchOnWindowFocus: false } },
+});
 
 const AndroidBackButton = () => {
   useAndroidBackButton();
@@ -122,6 +124,7 @@ const App = () => {
           <NativeUrlOpenBridge />
           <AndroidBackButton />
           <UpdateGate>
+          <Suspense fallback={null}>
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<Index />} />
@@ -162,6 +165,7 @@ const App = () => {
             
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
           </UpdateGate>
         </BrowserRouter>
       </TooltipProvider>
